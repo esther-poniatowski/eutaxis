@@ -1,0 +1,13 @@
+# ==================================================================================================
+# Citation File Format (CFF) for eutaxis
+# ==================================================================================================
+cff-version: 1.2.0
+message: "Please cite this codebase using the following metadata."
+title: "eutaxis"
+version: "0.0.0"
+authors:
+  - family-names: "Resther"
+    given-names: "E."
+year: "2026"
+license: "GPL-3.0-or-later"
+repository-code: "https://github.com/eresther/eutaxis"

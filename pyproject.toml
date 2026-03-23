@@ -1,0 +1,84 @@
+# ==================================================================================================
+# Pyproject Configuration for the eutaxis Package
+#
+# Eutaxis is an AI governance toolkit: modular specifications, templates, schemas,
+# and validation tooling for structured AI-human research note generation.
+# ==================================================================================================
+
+# --- Build System Requirements --------------------------------------------------------------------
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+# --- Package Metadata -----------------------------------------------------------------------------
+
+[project]
+name = "eutaxis"
+version = "0.0.0"
+authors = [{name = "eresther"}]
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+readme = {file = "README.md", content-type = "text/markdown"}
+description = "Modular AI governance toolkit for structured research note generation."
+keywords = ["ai", "governance", "research", "notes", "linting", "validation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Development Status :: 2 - Pre-Alpha"
+]
+urls = {homepage = "https://github.com/eresther/eutaxis"}
+
+
+# --- Dependencies ---------------------------------------------------------------------------------
+
+requires-python = ">=3.12"
+
+dependencies = [
+    "pyyaml>=6.0",
+    "typer>=0.9",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "mypy",
+    "types-pyyaml",
+]
+
+
+# --- Package Source Code --------------------------------------------------------------------------
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Include non-Python data files shipped with the package
+[tool.setuptools.package-data]
+eutaxis = [
+    "data/**/*.md",
+    "data/**/*.yaml",
+    "data/**/*.yml",
+    "data/**/*.json",
+    "data/**/*.toml",
+]
+
+
+# --- CLI Entry Points -----------------------------------------------------------------------------
+
+[project.scripts]
+eutaxis = "eutaxis.cli:app"
+
+
+# --- Tool Configurations --------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

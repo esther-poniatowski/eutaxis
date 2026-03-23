@@ -1,0 +1,44 @@
+// =================================================================================================
+// VS Code Extension Recommendations for eutaxis
+// =================================================================================================
+{
+  "recommendations": [
+    // --- Editor Enhancements ---------------------------------------------------------------------
+    "wayou.vscode-todo-highlight",
+    "tamasfe.even-better-toml",
+
+    // --- Spell Checking --------------------------------------------------------------------------
+    "streetsidesoftware.code-spell-checker",
+
+    // --- Core Language Support -------------------------------------------------------------------
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+
+    // --- Debugging -------------------------------------------------------------------------------
+    "ms-python.debugpy",
+
+    // --- Testing ---------------------------------------------------------------------------------
+    "ms-vscode.test-adapter-converter",
+    "hbenl.vscode-test-explorer",
+
+    // --- Formatting ------------------------------------------------------------------------------
+    "ms-python.black-formatter",
+    "stkb.rewrap",
+
+    // --- Linting ---------------------------------------------------------------------------------
+    "ms-python.pylint",
+
+    // --- Static Type Checking --------------------------------------------------------------------
+    "ms-python.mypy-type-checker",
+
+    // --- Documentation ---------------------------------------------------------------------------
+    "davidanson.vscode-markdownlint",
+
+    // --- Version Control -------------------------------------------------------------------------
+    "mhutchie.git-graph",
+
+    // --- Adaptive Language Assistance ------------------------------------------------------------
+    "github.copilot",
+    "github.copilot-chat"
+  ]
+}

@@ -1,0 +1,10 @@
+- [ ] Stabilize governance file structure from RS-ctx-dep-net experiments
+- [ ] Implement scaffold CLI command
+- [ ] Implement generate CLI command (from generate_agent_instructions.py)
+- [ ] Implement validate CLI command (registry validation)
+- [ ] Add JSON schemas for registries
+- [ ] Add contract templates per note type
+- [ ] Add audit checklists and report template
+- [ ] Add workflow pass specifications
+- [ ] Write tests for lint module
+- [ ] Write tests for generate module
