@@ -6,7 +6,7 @@ and project-specific configuration. Each agent receives common sources (shared
 across all agents) plus agent-specific headers, footers, and additional sources.
 
 Configuration is read from a YAML file (typically ``agent-instructions.yaml``)
-whose structure follows the format used by RS-ctx-dep-net:
+whose structure follows the format used by geonexus:
 
 .. code-block:: yaml
 

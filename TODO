@@ -1,4 +1,4 @@
-- [ ] Stabilize governance file structure from RS-ctx-dep-net experiments
+- [ ] Stabilize governance file structure from geonexus experiments
 - [ ] Implement scaffold CLI command
 - [ ] Implement generate CLI command (from generate_agent_instructions.py)
 - [ ] Implement validate CLI command (registry validation)
