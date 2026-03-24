@@ -1,27 +1,6 @@
 # Decision rules
 
-> [!INFO] See also
-> Part of the [agent instruction system](plan-agents-humain-generation.md). Related: [formal contracts](formal-contracts.md) — [note types](note-types.md) — [procedural workflows](procedural-workflows.md) — [workspace architecture](workspace-architecture.md).
-
-> [!TIP] Single source of truth
-> This section specifies the contents of the `governance/rules/` directory, which is the **authoritative definition** of each decision rule in the implemented system — one file per rule, with an `_index.md` as the cross-referencing hub. Other locations (contract templates, audit checklists) **instantiate** or **verify** these rules but must not redefine them. When a rule is updated, update the corresponding file in `governance/rules/`; all downstream instantiations reference it via anchors.
-
-## Overview
-
-**Priority stratification**: The rule system is organized by the aspect of note production each rule governs. The same rule may have different enforcement weight depending on the note type and workflow stage.
-
-| Layer             | Governs                                                                                                                                                          | Priority | Enforcement                                                                        |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------- |
-| **Epistemic**     | *What is claimed* (what must be proven, which content may enter, why new objects are introduced, which proof route is allowed, which premises are legitimate...) | Highest  | Broad generation-time criteria held in working memory during planning and drafting |
-| **Argumentative** | *How the claim is articulated* (logical chaining, functional role separation, exposition of formal content, sequencing, transitions...)                          | Medium   | Narrower operators enforced at planning time and audit                             |
-| **Stylistic**     | *How the result is expressed* (prose register, paragraph construction, notation formatting, terminological coherence...)                                         | Lowest   | Writing principles and lints at draft time                                         |
-
-**Rule structure.** Each decision rule specifies simultaneously:
-
-- a **normative constraint**: the quality criterion it enforces,
-- the **checks** by which any workflow stage may verify compliance.
-
-Post-hoc routing protocols are external to the rule system and belong to [procedural workflows](procedural-workflows.md) (e.g. divergence resolution, contract amendment).
+> [!INFO] Part of the [agent instruction system](../design/motivations-problem-statement.md)
 
 ## Epistemic layer
 
@@ -463,7 +442,7 @@ A transition need not answer all three with dedicated sentences — a well-const
 **Checks.** A note's notation satisfies this rule if all the following hold:
 
 - Do **display equations** use `$$ … $$` blocks with no punctuation inside the display block?
-- Is **inline math** restricted to symbols and short expressions? Is inline math containing `=` or spanning multiple operators limited to permitted contexts (trivial equalities, parenthetical labels, callout/list/table contexts)?
+- Is **inline math** restricted to symbols and short expressions? Is inline math containing = or spanning multiple operators limited to permitted contexts (trivial equalities, parenthetical labels, callout/list/table contexts)?
 - Is **notation consistent** within the note — the same object denoted by the same symbol throughout, related objects using related notation?
 - Is **new notation** introduced only when the shorthand is used heavily and materially improves clarity?
 

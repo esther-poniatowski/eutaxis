@@ -1,7 +1,6 @@
 # Note types
 
-> [!INFO] See also
-> Part of the [agent instruction system](plan-agents-humain-generation.md). Related: [decision rules](../quality-criteria/decision-rules.md) — [formal contracts](formal-contracts.md) — [procedural workflows](procedural-workflows.md) — [workspace architecture](workspace-architecture.md).
+> [!INFO] Part of the [agent instruction system](motivations-problem-statement.md)
 
 
 Each note type is associated with two files in the workspace:

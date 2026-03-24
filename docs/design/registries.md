@@ -1,7 +1,6 @@
 # Registries and validation
 
-> [!INFO] See also
-> Part of the [agent instruction system](plan-agents-humain-generation.md). Related: [decision rules](../quality-criteria/decision-rules.md) — [workspace architecture](workspace-architecture.md) — [procedural workflows](procedural-workflows.md).
+> [!INFO] Part of the [agent instruction system](motivations-problem-statement.md)
 
 ## Overview
 
