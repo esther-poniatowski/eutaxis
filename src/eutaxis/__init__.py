@@ -1,9 +1,16 @@
 """
 Initialization logic and public interface for the `eutaxis` package.
 
-Eutaxis is a modular AI governance toolkit for structured research note generation.
-It provides governance specifications, style linting, instruction-file generation,
-and registry validation tooling.
+Eutaxis is a domain-agnostic quality validation framework. It provides a linting
+engine, instruction-file generation, registry validation, and workspace scaffolding.
+Domain content (rules, audit prompts, standards, templates) is organized under
+`data/domains/` and selected per project via the `domain` configuration field.
+
+Bundled domain packages:
+
+- ``software``: design principles, writing standards, audit prompts, AI agent templates.
+- ``math``: mathematical writing lint rules and audit prompts.
+- ``pedagogy``: stub for future development.
 
 Variables
 ---------
@@ -19,6 +26,8 @@ info() -> str
     Format diagnostic information about the package and platform.
 data_path() -> Path
     Return the absolute path to the package data directory.
+domain_path(domain) -> Path
+    Return the absolute path to a specific domain directory under ``data/domains/``.
 """
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
@@ -31,7 +40,7 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.0+unknown"
 
-__all__ = ["info", "data_path", "__version__"]
+__all__ = ["info", "data_path", "domain_path", "__version__"]
 
 
 def info() -> str:
@@ -46,3 +55,30 @@ def data_path() -> Path:
     and when it is included as a Git submodule.
     """
     return Path(__file__).parent / "data"
+
+
+def domain_path(domain: str) -> Path:
+    """Return the absolute path to a domain directory.
+
+    Parameters
+    ----------
+    domain
+        Name of the domain (e.g. ``"math"``, ``"software"``, ``"pedagogy"``).
+
+    Returns
+    -------
+    Path
+        Absolute path to ``data/domains/<domain>/``.
+
+    Raises
+    ------
+    ValueError
+        If the requested domain directory does not exist.
+    """
+    path = data_path() / "domains" / domain
+    if not path.is_dir():
+        available = [p.name for p in (data_path() / "domains").iterdir() if p.is_dir()]
+        raise ValueError(
+            f"Domain '{domain}' not found. Available domains: {', '.join(sorted(available))}."
+        )
+    return path

@@ -71,6 +71,7 @@ import yaml
 class LintConfig:
     """Lint configuration with defaults that can be overridden per project."""
 
+    domain: str = "math"
     disabled_rules: set[str] = field(default_factory=set)
     archive_dirs: set[str] = field(default_factory=lambda: {"bak", "to-move"})
     extra_banned_transitions: list[str] = field(default_factory=list)
@@ -87,6 +88,7 @@ def load_config(path: Path) -> LintConfig:
         raw = yaml.safe_load(f) or {}
 
     return LintConfig(
+        domain=raw.get("domain", "math"),
         disabled_rules=set(raw.get("disabled_rules", [])),
         archive_dirs=set(raw.get("archive_dirs", ["bak", "to-move"])),
         extra_banned_transitions=raw.get("extra_banned_transitions", []),
@@ -706,7 +708,7 @@ def lint_file(path: Path, config: LintConfig | None = None) -> list[Issue]:
 # CLI entry point
 # ---------------------------------------------------------------------------
 
-def main(argv: list[str], config: LintConfig | None = None) -> int:
+def main(argv: list[str], config: LintConfig | None = None, domain: str = "math") -> int:
     """Main entry point for style linting."""
     parser = argparse.ArgumentParser(description="Lint math style in Markdown notes.")
     parser.add_argument(
@@ -718,7 +720,7 @@ def main(argv: list[str], config: LintConfig | None = None) -> int:
     args = parser.parse_args(argv)
 
     if config is None:
-        config = LintConfig()
+        config = LintConfig(domain=domain)
 
     input_paths = [Path(p) for p in args.paths]
     files = list(
