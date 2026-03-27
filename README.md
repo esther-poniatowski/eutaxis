@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue)](https://www.python.org/)
 [![License: GPL](https://img.shields.io/badge/License-GPL--3.0-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
 
-Governance toolkit that enforces quality standards in AI-assisted research writing.
+Quality validation framework with domain-specific rule sets for linting, instruction generation, and audit prompts.
 
 ---
 
@@ -21,39 +21,45 @@ Governance toolkit that enforces quality standards in AI-assisted research writi
 
 ## Overview
 
-Eutaxis provides a reusable governance framework for AI-assisted research writing. It ships
-modular specifications (decision rules, note-type definitions, contract templates, audit
-checklists, workflow definitions) alongside validation tooling and a style linter, so that
-any project requiring structured AI generative tasks can import a consistent quality system.
+Eutaxis is a quality validation framework organized around domains. Each domain
+ships a self-contained set of style rules, audit prompts, and AI agent templates.
+Two domains are bundled by default:
+
+- **`math`** — rules and audits for mathematics and research writing.
+- **`software`** — design standards, architecture audits, and AI agent templates
+  for software projects.
+
+The Python tooling layer provides a style linter, an instruction-file generator,
+and a workspace scaffolder that all operate against the installed domain data.
 
 ### Motivation
 
-AI agents producing research notes tend to drift in scope, accumulate loosely related material,
-and optimize visible sophistication over inferential usefulness. Eutaxis addresses this by
-externalizing governance into explicit, machine-readable specifications that constrain the
-agent's inferential behavior before, during, and after note generation.
+Quality enforcement for writing and code review tends to be either too generic
+(project-agnostic rules miss domain conventions) or too tightly coupled to a
+single project (rules cannot be reused). Eutaxis externalizes quality rules into
+domain-specific packages that can be imported by any project requiring consistent
+validation.
 
 ### Advantages
 
-- **Modular governance**: decision rules, contracts, audits, and workflows are separate files
-  that can be selectively imported or overridden per project.
-- **Dual import mechanism**: usable as a Git submodule for rapid iteration, or as a pip/conda
-  package for stable deployment.
-- **Overridable style linting**: ships default rules derived from mathematical writing best
-  practices, with per-project override support.
-- **Instruction-file generation**: assembles agent instruction files (CLAUDE.md, AGENTS.md,
-  copilot-instructions.md) from modular governance sources and project-specific configuration.
-- **Registry validation**: validates machine-readable project state (reasoning graphs, open
-  questions, terminology, dependencies) against JSON schemas.
+- **Domain-based organization**: rules, audits, and templates live under
+  `data/domains/{domain}/` and can be extended or overridden per project.
+- **Dual import mechanism**: usable as a Git submodule for rapid iteration, or as
+  a pip/conda package for stable deployment.
+- **Overridable style linting**: ships default rules per domain, with per-project
+  override support.
+- **Instruction-file generation**: assembles agent instruction files (CLAUDE.md,
+  AGENTS.md, copilot-instructions.md) from domain sources and project-specific
+  configuration.
 
 ---
 
 ## Features
 
-- [X] **Style linter**: Markdown linter for math-heavy research notes with overridable rules.
-- [ ] **Instruction generator**: Assemble agent instruction files from governance sources.
+- [X] **Style linter**: Markdown linter with domain-specific overridable rules.
+- [ ] **Instruction generator**: Assemble agent instruction files from domain sources.
 - [ ] **Registry validator**: Validate YAML registries against JSON schemas.
-- [ ] **Workspace scaffolder**: Initialize governance structure in a target workspace.
+- [ ] **Workspace scaffolder**: Initialize domain structure in a target workspace.
 - [ ] **Terminology linter**: Check prose against a terminology registry.
 
 ---
@@ -67,7 +73,7 @@ git submodule add https://github.com/eresther/eutaxis.git vendor/eutaxis
 git submodule update --init --recursive
 ```
 
-Consuming projects reference governance files directly from `vendor/eutaxis/src/eutaxis/data/`.
+Consuming projects reference domain files directly from `vendor/eutaxis/src/eutaxis/data/`.
 
 ### Using pip
 
@@ -106,8 +112,8 @@ eutaxis info
 ### Style linting
 
 ```sh
-eutaxis lint path/to/notes/
-eutaxis lint --config my-overrides.yaml path/to/file.md
+eutaxis lint --domain math path/to/notes/
+eutaxis lint --domain software --config my-overrides.yaml path/to/file.md
 ```
 
 ### Python
@@ -116,6 +122,7 @@ eutaxis lint --config my-overrides.yaml path/to/file.md
 import eutaxis
 
 eutaxis.info()
+domain = eutaxis.domain_path("math")
 ```
 
 ---
@@ -128,17 +135,17 @@ eutaxis.info()
 # Display version and diagnostics
 eutaxis info
 
-# Lint Markdown files against style rules (with optional overrides)
-eutaxis lint [--config overrides.yaml] <paths...>
+# Lint Markdown files against domain rules (with optional overrides)
+eutaxis lint --domain <domain> [--config overrides.yaml] <paths...>
 
-# Generate agent instruction files from governance sources (planned)
-eutaxis generate --config agent-instructions.yaml
+# Generate agent instruction files from domain sources (planned)
+eutaxis generate --domain <domain> --config agent-instructions.yaml
 
 # Validate registry files against schemas (planned)
 eutaxis validate registry/
 
-# Scaffold governance structure into a workspace (planned)
-eutaxis init --target /path/to/workspace
+# Scaffold domain structure into a workspace (planned)
+eutaxis init --domain <domain> --target /path/to/workspace
 ```
 
 ### Programmatic Usage
@@ -146,8 +153,8 @@ eutaxis init --target /path/to/workspace
 ```python
 from eutaxis.lint import lint_file, load_config
 
-# Lint with default rules
-issues = lint_file(Path("my-note.md"))
+# Lint with default domain rules
+issues = lint_file(Path("my-note.md"), domain="math")
 
 # Lint with project-specific overrides
 config = load_config(Path("my-overrides.yaml"))
@@ -158,25 +165,26 @@ issues = lint_file(Path("my-note.md"), config=config)
 
 ## Architecture
 
-Eutaxis is a data-heavy package: the primary payload is governance specifications (Markdown,
-YAML, JSON), with a thin Python tooling layer for validation, linting, and assembly.
+Eutaxis is a data-heavy package: the primary payload is domain specifications
+(Markdown, YAML, JSON), with a thin Python tooling layer for validation, linting,
+and assembly.
 
-| Layer | Modules | Responsibility |
-| ----- | ------- | -------------- |
-| Data | `data/governance/` | Decision rules, note specs, contracts, audits, workflows, schemas |
-| Data | `data/registries/` | Registry templates |
-| Data | `data/templates/` | Workspace scaffolding templates |
-| Application | `generate` | Instruction-file assembly from governance sources |
+| Layer | Path | Responsibility |
+| --- | --- | --- |
+| Data | `data/domains/math/` | Math style rules and audit prompts |
+| Data | `data/domains/software/` | Design standards, architecture audits, AI templates |
+| Application | `generate` | Instruction-file assembly from domain sources |
 | Application | `validate` | Registry validation against JSON schemas |
 | Application | `lint` | Style linting with overridable rule configuration |
-| Application | `scaffold` | Workspace initialization and governance scaffolding |
+| Application | `scaffold` | Workspace initialization and domain scaffolding |
 | Adapters | `cli` | CLI interface (Typer) |
 
 ### Design documentation
 
-The `docs/design/` directory contains the design rationale and specification documents for
-the governance system. These are not loaded by agents at runtime — they inform the design
-of the governance files themselves.
+The `docs/design/` directory contains design rationale for the validation tooling.
+Research knowledge structure and epistemic methods (note types, contracts,
+registries, reasoning principles) are documented in
+[gnomon](https://github.com/esther-poniatowski/gnomon).
 
 ---
 

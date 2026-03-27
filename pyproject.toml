@@ -1,8 +1,8 @@
 # ==================================================================================================
 # Pyproject Configuration for the eutaxis Package
 #
-# Eutaxis is an AI governance toolkit: modular specifications, templates, schemas,
-# and validation tooling for structured AI-human research note generation.
+# Eutaxis is a domain-agnostic quality validation framework: style linting,
+# instruction-file generation, and domain-specific rule packages.
 # ==================================================================================================
 
 # --- Build System Requirements --------------------------------------------------------------------
@@ -21,8 +21,8 @@ authors = [{name = "eresther"}]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 readme = {file = "README.md", content-type = "text/markdown"}
-description = "Modular AI governance toolkit for structured research note generation."
-keywords = ["ai", "governance", "research", "notes", "linting", "validation"]
+description = "Domain-agnostic quality validation framework for linting, instruction generation, and audit prompts."
+keywords = ["linting", "validation", "quality", "domains", "style", "markdown", "instruction-generation"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
