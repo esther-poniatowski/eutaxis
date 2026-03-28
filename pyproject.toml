@@ -21,7 +21,7 @@ authors = [{name = "eresther"}]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 readme = {file = "README.md", content-type = "text/markdown"}
-description = "Domain-agnostic quality validation framework for linting, instruction generation, and audit prompts."
+description = "Enforces quality standards for code and writing through reusable, domain-specific rules."
 keywords = ["linting", "validation", "quality", "domains", "style", "markdown", "instruction-generation"]
 classifiers = [
     "Programming Language :: Python :: 3",

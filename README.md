@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue)](https://www.python.org/)
 [![License: GPL](https://img.shields.io/badge/License-GPL--3.0-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
 
-Quality validation framework with domain-specific rule sets for linting, instruction generation, and audit prompts.
+Enforces quality standards for code and writing through reusable, domain-specific rules.
 
 ---
 
