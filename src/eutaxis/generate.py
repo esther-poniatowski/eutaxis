@@ -1,7 +1,7 @@
 """
 Agent instruction file generator.
 
-Assembles unified instruction files for AI agents from modular governance sources
+Assembles unified instruction files for AI agents from modular prompt sources
 and project-specific configuration. Each agent receives common sources (shared
 across all agents) plus agent-specific headers, footers, and additional sources.
 
@@ -136,18 +136,13 @@ def generate_agent_file(
     print(f"  Generated: {output_path}")
 
 
-def main(config_path: Path, domain: str | None = None) -> int:
+def main(config_path: Path) -> int:
     """Main entry point for instruction generation.
 
     Parameters
     ----------
     config_path
         Path to the agent-instructions YAML configuration file.
-    domain
-        Optional domain name for default source resolution. When provided,
-        eutaxis domain content at ``data/domains/<domain>/`` is available
-        as the base for relative source paths. Currently informational;
-        the YAML config determines actual source paths.
     """
     if not config_path.exists():
         print(f"Error: Configuration file not found: {config_path}")
@@ -155,8 +150,6 @@ def main(config_path: Path, domain: str | None = None) -> int:
 
     base_path = config_path.parent
 
-    if domain:
-        print(f"Domain: {domain}")
     print(f"Loading configuration: {config_path}")
 
     with open(config_path, encoding="utf-8") as f:

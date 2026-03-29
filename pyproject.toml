@@ -1,8 +1,8 @@
 # ==================================================================================================
 # Pyproject Configuration for the eutaxis Package
 #
-# Eutaxis is a domain-agnostic quality validation framework: style linting,
-# instruction-file generation, and domain-specific rule packages.
+# Eutaxis composes structured agent prompts from reusable fragments and
+# project-specific configuration.
 # ==================================================================================================
 
 # --- Build System Requirements --------------------------------------------------------------------
@@ -21,8 +21,8 @@ authors = [{name = "eresther"}]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 readme = {file = "README.md", content-type = "text/markdown"}
-description = "Enforces quality standards for code and writing through reusable, domain-specific rules."
-keywords = ["linting", "validation", "quality", "domains", "style", "markdown", "instruction-generation"]
+description = "Composes structured agent prompts from reusable files and validates prompt layouts."
+keywords = ["prompt", "ai", "composition", "validation", "templates", "instructions"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

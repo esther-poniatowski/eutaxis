@@ -1,10 +1,10 @@
 # eutaxis
 
-[![Maintenance](https://img.shields.io/maintenance/yes/2026)]()
+[![Maintenance](https://img.shields.io/maintenance/yes/2026)](https://github.com/esther-poniatowski/eutaxis)
 [![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue)](https://www.python.org/)
 [![License: GPL](https://img.shields.io/badge/License-GPL--3.0-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
 
-Enforces quality standards for code and writing through reusable, domain-specific rules.
+Builds structured agent prompts from reusable fragments.
 
 ---
 
@@ -14,71 +14,63 @@ Enforces quality standards for code and writing through reusable, domain-specifi
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Usage](#usage)
-- [Architecture](#architecture)
+- [Documentation](#documentation)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Overview
 
-Eutaxis is a quality validation framework organized around domains. Each domain
-ships a self-contained set of style rules, audit prompts, and AI agent templates.
-Two domains are bundled by default:
-
-- **`math`** — rules and audits for mathematics and research writing.
-- **`software`** — design standards, architecture audits, and AI agent templates
-  for software projects.
-
-The Python tooling layer provides a style linter, an instruction-file generator,
-and a workspace scaffolder that all operate against the installed domain data.
+Eutaxis composes, renders, and checks structured agent prompts. Domain rules
+stay in the projects that own them; eutaxis only provides the composition
+workflow, reusable templates, and prompt-authoring method.
 
 ### Motivation
 
-Quality enforcement for writing and code review tends to be either too generic
-(project-agnostic rules miss domain conventions) or too tightly coupled to a
-single project (rules cannot be reused). Eutaxis externalizes quality rules into
-domain-specific packages that can be imported by any project requiring consistent
-validation.
+High-quality agent prompts share recurring structure: role definitions,
+evidence standards, report contracts, scope guards, and output formats. Without
+composition tooling, authors either duplicate that structure across prompt sets
+or keep it in large files that are hard to review, test, and revise.
+
+Eutaxis makes the composed prompt the primary design artifact. Shared
+structure can stay single-source through reusable bundles, while each prompt
+still keeps explicit control over ordering and local transitions.
 
 ### Advantages
 
-- **Domain-based organization**: rules, audits, and templates live under
-  `data/domains/{domain}/` and can be extended or overridden per project.
-- **Dual import mechanism**: usable as a Git submodule for rapid iteration, or as
-  a pip/conda package for stable deployment.
-- **Overridable style linting**: ships default rules per domain, with per-project
-  override support.
-- **Instruction-file generation**: assembles agent instruction files (CLAUDE.md,
-  AGENTS.md, copilot-instructions.md) from domain sources and project-specific
-  configuration.
+- **Prompt families**: prompts are grouped into families that share
+  authoring workflows, methodology patterns, output contracts, and testing
+  strategies.
+- **Shell-first composition**: each prompt owns an explicit top-level shell
+  that determines final ordering, bridging text, and prompt-level coherence.
+- **Parameterized bundles**: shared methodology structure is single-source;
+  domain-specific content is injected through template variables.
+- **Profile-based validation**: family profiles distinguish hard assembly
+  requirements from advisory guidance, with no over-prescribed schemas.
+- **Golden-file review**: composed prompts are rendered into reviewable
+  output, enabling diff-based iteration and behavioral testing.
 
 ---
 
 ## Features
 
-- [X] **Style linter**: Markdown linter with domain-specific overridable rules.
-- [ ] **Instruction generator**: Assemble agent instruction files from domain sources.
-- [ ] **Registry validator**: Validate YAML registries against JSON schemas.
-- [ ] **Workspace scaffolder**: Initialize domain structure in a target workspace.
-- [ ] **Terminology linter**: Check prose against a terminology registry.
+- [ ] **Prompt composer**: assemble prompts from shells, local fragments, and
+  parameterized bundles via Jinja2 rendering.
+- [ ] **Prompt validator**: enforce family profile requirements (required files,
+  required tags, length warnings).
+- [ ] **Golden-file output**: render composed prompts for diff-based review.
+- [X] **Prompt-writing methodology**: ships `docs/prompt-writing-methods.md`,
+  the foundational reference for agent instruction design.
+- [ ] **Workspace scaffolder**: initialize prompt-composition structure in a target
+  project.
 
 ---
 
 ## Installation
 
-### As a Git submodule (recommended during development)
-
-```bash
-git submodule add https://github.com/eresther/eutaxis.git vendor/eutaxis
-git submodule update --init --recursive
-```
-
-Consuming projects reference domain files directly from `vendor/eutaxis/src/eutaxis/data/`.
-
 ### Using pip
 
 ```bash
-pip install git+https://github.com/eresther/eutaxis.git
+pip install git+https://github.com/esther-poniatowski/eutaxis.git
 ```
 
 ### From source
@@ -86,7 +78,7 @@ pip install git+https://github.com/eresther/eutaxis.git
 1. Clone the repository:
 
       ```bash
-      git clone https://github.com/eresther/eutaxis.git
+      git clone https://github.com/esther-poniatowski/eutaxis.git
       ```
 
 2. Create a dedicated virtual environment and install:
@@ -107,13 +99,7 @@ pip install git+https://github.com/eresther/eutaxis.git
 ```sh
 eutaxis --help
 eutaxis info
-```
-
-### Style linting
-
-```sh
-eutaxis lint --domain math path/to/notes/
-eutaxis lint --domain software --config my-overrides.yaml path/to/file.md
+eutaxis generate -c agent-instructions.yaml
 ```
 
 ### Python
@@ -122,69 +108,25 @@ eutaxis lint --domain software --config my-overrides.yaml path/to/file.md
 import eutaxis
 
 eutaxis.info()
-domain = eutaxis.domain_path("math")
 ```
 
 ---
 
-## Usage
+## Documentation
 
-### Command Line Interface (CLI)
+- [Prompt-Writing Methodology](docs/prompt-writing-methods.md) — foundational
+  reference for agent instruction design.
+- [Proposal](PROPOSAL.md) — architectural proposal for the prompt composition
+  framework.
 
-```sh
-# Display version and diagnostics
-eutaxis info
+### Ecosystem
 
-# Lint Markdown files against domain rules (with optional overrides)
-eutaxis lint --domain <domain> [--config overrides.yaml] <paths...>
+Eutaxis provides composition infrastructure for projects that own domain rules:
 
-# Generate agent instruction files from domain sources (planned)
-eutaxis generate --domain <domain> --config agent-instructions.yaml
-
-# Validate registry files against schemas (planned)
-eutaxis validate registry/
-
-# Scaffold domain structure into a workspace (planned)
-eutaxis init --domain <domain> --target /path/to/workspace
-```
-
-### Programmatic Usage
-
-```python
-from eutaxis.lint import lint_file, load_config
-
-# Lint with default domain rules
-issues = lint_file(Path("my-note.md"), domain="math")
-
-# Lint with project-specific overrides
-config = load_config(Path("my-overrides.yaml"))
-issues = lint_file(Path("my-note.md"), config=config)
-```
-
----
-
-## Architecture
-
-Eutaxis is a data-heavy package: the primary payload is domain specifications
-(Markdown, YAML, JSON), with a thin Python tooling layer for validation, linting,
-and assembly.
-
-| Layer | Path | Responsibility |
-| --- | --- | --- |
-| Data | `data/domains/math/` | Math style rules and audit prompts |
-| Data | `data/domains/software/` | Design standards, architecture audits, AI templates |
-| Application | `generate` | Instruction-file assembly from domain sources |
-| Application | `validate` | Registry validation against JSON schemas |
-| Application | `lint` | Style linting with overridable rule configuration |
-| Application | `scaffold` | Workspace initialization and domain scaffolding |
-| Adapters | `cli` | CLI interface (Typer) |
-
-### Design documentation
-
-The `docs/design/` directory contains design rationale for the validation tooling.
-Research knowledge structure and epistemic methods (note types, contracts,
-registries, reasoning principles) are documented in
-[gnomon](https://github.com/esther-poniatowski/gnomon).
+- [vitruv](https://github.com/esther-poniatowski/vitruv) — software
+  architecture standards and audit prompts.
+- [hermeneia](https://github.com/esther-poniatowski/hermeneia) — writing
+  quality standards and prose audit prompts.
 
 ---
 
@@ -198,10 +140,10 @@ Please refer to the [contribution guidelines](CONTRIBUTING.md).
 
 ### Authors & Contributors
 
-**Author**: @eresther
+**Author**: @esther-poniatowski
 
-For academic use, please cite using the GitHub "Cite this repository" feature to
-generate a citation in various formats.
+For academic use, please cite using the GitHub "Cite this repository" feature
+to generate a citation in various formats.
 
 Alternatively, refer to the [citation metadata](CITATION.cff).
 
