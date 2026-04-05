@@ -1,0 +1,31 @@
+# Prompt writing methods
+
+The design of agent instructions (prompts) is a discipline with well-characterized failure modes and empirically validated best practices. The following synthesizes the state of the art across structural architecture, linguistic form, and behavioral specification.
+
+> [!CHECK] Scope
+> This note addresses the **main instruction file** (system prompt) that orchestrates or launches a task — the text that defines the agent's role, constraints, reasoning schema, and output requirements. The treatment assumes a **single-turn, single-agent** system prompt as the baseline. Multi-agent considerations (controller/subagent consistency, handoff protocols, state serialization across turns) are noted where they affect instruction-file design, but the architecture of multi-agent orchestration is not covered in full. Similarly, for agentic systems the instruction file is only one component of a broader control surface that also includes external artifacts (tool descriptions, structured output schemas, governance files); these are mentioned where they interact with the instruction file, but their internal design is not covered.
+
+## Foundational Principles
+
+The central challenge is the **specification-behavior gap**: the model infers operational intent from natural language, introducing ambiguity at every underspecified node. Optimal instructions minimize this gap through precision, completeness, and internal consistency.
+
+Three meta-principles govern all decisions:
+
+- **Reduction of interpretive degrees of freedom.** Each instruction should minimize the number of valid parses. Ambiguous clauses produce stochastic behavior — the model samples from a distribution over interpretations. The target is to reduce this distribution's entropy as far as possible, not to eliminate it entirely (natural language cannot guarantee a single parse).
+- **Separation of concerns.** Role, task, constraints, output format, and edge-case handling are orthogonal dimensions. Conflating them produces coupling: changing one accidentally alters the other. Instructions should decompose cleanly along these axes.
+- **Falsifiability of compliance.** An instruction the model cannot verify it is following is either useless or harmful. Every behavioral directive must be testable against the model's own output at inference time.
+
+> [!WARNING]
+> Prompt design depends on the **model-family**. A prompt that is optimal for a reasoning model may be suboptimal for a lower-latency execution model.
+
+- [Structure of prompts](structure-prompts.md)
+- [Section demarcation](section-demarcation.md)
+- [Linguistic form](linguistic-form.md)
+- [Examples valid/invalid](examples-valid-invalid.md)
+- [Token budget](token-budget.md)
+- [Iterative refinement](iterative-refinement.md)
+- [Multi-agent and multi-turn extensions](multi-agent-multi-turn.md)
+
+
+
+

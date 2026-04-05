@@ -1,16 +1,13 @@
-# AI Prompt - Objective and Outcome
+# AI Prompt - Objective and Sope
 
 The prompt must clarify **what successful completion means**.
 
-A vague request such as "_explain optimal control_" leads to generic outputs. Instead, define the **end state of knowledge or capability**.
-
 **Rationale:** This transforms the prompt into a **goal-directed instruction**, guiding the agent to prioritize relevant material.
 
-**Guidelines:** Define:
+**Guidelines:** Define the **end state of knowledge or capability**.
 
-- the learning objective  
-- the final competence  
-- the scope of application  
+- **Objective specification** should be expressed as a **transformation function**: given input of type X, produce output of type Y satisfying property P. The function-theoretic framing forces the author to identify what constitutes a correct output, not just a plausible one.
+- **Scope of application**, to avoid irrelevant material.
 
 *Example*:
 
@@ -19,13 +16,14 @@ Objective:
 Develop full conceptual and mathematical mastery of deterministic optimal control
 sufficient to derive and solve Hamilton–Jacobi–Bellman equations and apply them
 to mean-field game models.
+
+Scope restriction:
+Focus only on deterministic optimal control.
+Do not introduce stochastic control or reinforcement learning
+unless explicitly requested.
 ```
 
-
-
----
-
-**Objective specification** should be expressed as a **transformation function**: given input of type X, produce output of type Y satisfying property P. The function-theoretic framing forces the author to identify what constitutes a correct output, not just a plausible one.
+**Avoid**: Vague requests such as "_explain optimal control_", which leads to generic outputs.
 
 Example of weak objective: _"Help the user with their Obsidian notes."_
 

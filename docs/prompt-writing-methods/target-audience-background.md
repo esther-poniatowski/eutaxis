@@ -1,4 +1,4 @@
-# AI Prompt - Target Audience and Context
+# AI Prompt - Target Audience and Background
 
 Precise prompts specify **the knowledge level of the reader**.
 
@@ -20,7 +20,7 @@ Assume strong background in calculus, linear algebra, and probability,
 but no prior exposure to optimal control theory.
 ```
 
-Provide context. Relevant contextual information helps the agent tailor responses.
+**Provide background and context**. Relevant contextual information helps the agent tailor responses.
 
 Examples:
 
