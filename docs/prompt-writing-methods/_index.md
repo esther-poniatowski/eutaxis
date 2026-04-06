@@ -2,6 +2,9 @@
 
 The design of agent instructions (prompts) is a discipline with well-characterized failure modes and empirically validated best practices. The following synthesizes the state of the art across structural architecture, linguistic form, and behavioral specification.
 
+> [!WARNING] Design-time artifact
+> This note is a **design-time reference** used when authoring the `governance/` files (rules, specs, contracts, audits, workflow). It is not loaded by agents during note production. The deployed system's agent instructions are the `governance/` files themselves; this note informs their design but is not part of the runtime instruction surface.
+
 > [!CHECK] Scope
 > This note addresses the **main instruction file** (system prompt) that orchestrates or launches a task — the text that defines the agent's role, constraints, reasoning schema, and output requirements. The treatment assumes a **single-turn, single-agent** system prompt as the baseline. Multi-agent considerations (controller/subagent consistency, handoff protocols, state serialization across turns) are noted where they affect instruction-file design, but the architecture of multi-agent orchestration is not covered in full. Similarly, for agentic systems the instruction file is only one component of a broader control surface that also includes external artifacts (tool descriptions, structured output schemas, governance files); these are mentioned where they interact with the instruction file, but their internal design is not covered.
 

@@ -1,8 +1,8 @@
 # ==================================================================================================
 # Pyproject Configuration for the eutaxis Package
 #
-# Eutaxis is an AI governance toolkit: modular specifications, templates, schemas,
-# and validation tooling for structured AI-human research note generation.
+# Eutaxis composes structured agent prompts from reusable fragments and
+# project-specific configuration.
 # ==================================================================================================
 
 # --- Build System Requirements --------------------------------------------------------------------
@@ -21,8 +21,8 @@ authors = [{name = "eresther"}]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 readme = {file = "README.md", content-type = "text/markdown"}
-description = "Modular AI governance toolkit for structured research note generation."
-keywords = ["ai", "governance", "research", "notes", "linting", "validation"]
+description = "Composes structured agent prompts from reusable files and validates prompt layouts."
+keywords = ["prompt", "ai", "composition", "validation", "templates", "instructions"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

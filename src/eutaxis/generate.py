@@ -1,7 +1,7 @@
 """
 Agent instruction file generator.
 
-Assembles unified instruction files for AI agents from modular governance sources
+Assembles unified instruction files for AI agents from modular prompt sources
 and project-specific configuration. Each agent receives common sources (shared
 across all agents) plus agent-specific headers, footers, and additional sources.
 
@@ -137,7 +137,13 @@ def generate_agent_file(
 
 
 def main(config_path: Path) -> int:
-    """Main entry point for instruction generation."""
+    """Main entry point for instruction generation.
+
+    Parameters
+    ----------
+    config_path
+        Path to the agent-instructions YAML configuration file.
+    """
     if not config_path.exists():
         print(f"Error: Configuration file not found: {config_path}")
         return 1

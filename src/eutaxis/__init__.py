@@ -1,9 +1,9 @@
 """
 Initialization logic and public interface for the `eutaxis` package.
 
-Eutaxis is a modular AI governance toolkit for structured research note generation.
-It provides governance specifications, style linting, instruction-file generation,
-and registry validation tooling.
+Eutaxis composes and validates structured agent prompts. It provides reusable
+prompt templates, prompt-authoring guidance, instruction-file generation, and
+scaffolding hooks for projects that maintain their own domain rules elsewhere.
 
 Variables
 ---------
@@ -42,7 +42,6 @@ def info() -> str:
 def data_path() -> Path:
     """Return the absolute path to the package data directory.
 
-    This path can be used both when eutaxis is installed as a package
-    and when it is included as a Git submodule.
+    This path exposes packaged prompt templates and related reference data.
     """
     return Path(__file__).parent / "data"
