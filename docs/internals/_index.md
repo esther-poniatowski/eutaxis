@@ -10,8 +10,8 @@ They are not loaded by agents at runtime — the deployed governance files in
 | Document                                                          | Scope                                  |
 | ----------------------------------------------------------------- | -------------------------------------- |
 | [motivations-problem-statement](motivations-problem-statement.md) | Master plan and problem diagnosis      |
-| [workspace-architecture](workspace-architecture.md)               | Directory layout and file organization |
-| [decision-rules](decision-rules.md)                               | Verifiable quality criteria            |
+| [architecture](architecture.md)                                   | Directory layout and file organization |
+| [registries](registries.md)                                       | Registry files and validation          |
 | [procedural-workflows](procedural-workflows.md)                   | Staged pipelines and pass model        |
 | [audits](audits.md)                                               | Post-draft verification checklists     |
 

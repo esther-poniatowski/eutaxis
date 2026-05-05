@@ -3,43 +3,43 @@
 ## Goal
 
 > [!CHECK] Global objective
-> Design a **system for generating research notes in an Obsidian vault**.
-> A research vault is a **modular reasoning system** answering a research question through a sequence of atomic inferential steps.
-> The decisive object is the **inferential contract of each note inside the vault-level argument**, rather than the polished note itself.
+> Design a **system for governing AI-assisted production of structured content** in a modular vault.
+> A vault under eutaxis is a **modular generative system** that advances a project-declared primary objective through a sequence of atomic contracted units.
+> The decisive object is the **generative contract of each unit inside the vault-level structure**, rather than the polished output itself.
 
 **Criteria**: The system must:
 
-- provide structured procedures, workflows and artifacts to orchestrate AI-human interaction on research projects,
-- combine AI autonomy, human control and their interaction,
-- implement the best design practices: modularity, separation of concerns, flexibility, extensibility, predictability and maintainability.
+- provide structured procedures, workflows, and artifacts to orchestrate AI-human interaction on complex generative projects,
+- combine AI autonomy, human control, and their interaction,
+- implement the best design practices: modularity, separation of concerns, flexibility, extensibility, predictability, and maintainability.
 
-One main challenge addressed by the system is to constrain AI agents at the level of **inferential behavior**: what must be proven, from which premises, in what order, and what counts as success.
+One main challenge addressed by the system is to constrain AI agents at the level of **generative behavior**: what must be produced, from which inputs, in what order, and what counts as success.
 
 ---
 
 ## Problem statement & Diagnosis
 
-This section describes the failure modes that the current system aims to address, and their underlying causes. The diagnosis highlights the necessity for the components described above, and the rationale behind their design.
+This section describes the failure modes the system aims to address, and their underlying causes. The diagnosis identifies the components needed and the rationale behind their design.
 
 **Hierarchy of failure rates**:
 
-- style rules are easy to follow
-- local formatting rules are easy to follow
-- abstract values like rigor and pedagogy are partially followable
-- global architectural constraints across many notes are much harder unless externalized into explicit contracts and metadata
+- style rules are easy to follow,
+- local formatting rules are easy to follow,
+- abstract values like rigor and clarity are partially followable,
+- global architectural constraints across many units are much harder unless externalized into explicit contracts and metadata.
 
 **Dominant failure modes**:
 
-- The instruction set emphasizes **syntactic and presentation rules** that are all **downstream** of the reasoning process (style, formatting, prose quality criteria, modularity, note structure...).
-- The **reasoning process itself remains unguided**: to advance toward a determinate answer, the agent needs to be constrained at the level of _argumentative logic_ (semantic-epistemic rules). It needs an _operative_ mechanism to decide what must be proven, in what order, using what premises, why this is the next necessary step, and what counts as success.
-- The **global epistemic architecture** is under-specified.
+- The instruction set emphasizes **syntactic and presentation rules** that are all **downstream** of the generative process (style, formatting, prose quality criteria, modularity, structure...).
+- The **generative process itself remains unguided**: to advance toward a determinate output, the agent needs to be constrained at the level of _generative logic_ — semantic and structural rules. It needs an _operative_ mechanism that decides what must be produced, in what order, using what inputs, why this is the next necessary step, and what counts as success.
+- The **global architecture of the vault** is under-specified.
 
 |Problem|Symptoms|Cause|
 |---|---|---|
-|**Superficiality**|The agent produces content that is _plausibly_ related rather than _logically or argumentatively necessary_ to answer the question. It defaults to associative retrieval: collects related material, provides a summary...|**Weak atomicity**: the _unit of work_ is not rigorously defined. The note is generated from a vague or thematic intention, the "question" is too broad, not sharply delineated.  <br>**Absence of pre-committed argumentative skeleton**: the agent is not forced to commit, _before_ writing, to an exact logical structure.  <br>**Missing decision criteria**: the instructions constrain _form_ and _second-order desiderata_ (e.g. "avoid redundancy", "separate concerns") rather than _inferential behavior_ (e.g. "include _only_ material required to establish the note's result").|
-|**Accumulation**|The agent:  <br>- accumulates loosely related material  <br>- drifts in scope  <br>- appends remarks that are not inferentially necessary  <br>- implicitly broadens the note's purpose|**Missing a termination criterion**: no endpoint or success criterion is formalized. This is especially severe in research writing because neighboring ideas are often genuinely interesting.|
-|**Arbitrary and misdirected depth**|The agent optimizes visible sophistication instead of inferential usefulness, such as:  <br>- generality (prove a broad but low-utility property)  <br>- density of mathematics (elaborate on properties that do not constrain the target phenomenon)  <br>- abstraction (analyze an object because it is mathematically available, not because it is explanatory)  <br>- technicallity (instead of proof architecture)  <br>- formalism (accumulate definitions instead of conceptual economy)|**Missing relevance criteria**: depth is requested (e.g. "be rigorous", "provide deep insight") without specifying _what kind of understanding is sought_.  <br>**Missing proof strategy**: depth is not tied to a target explanatory question.|
-|**Poor motivation for introduced objects**|The agent introduces concepts because they are topically proximate, not because they are _necessary steps_ in a committed proof strategy. It adds generic and decorative prose (e.g. "it is natural to consider…", "to gain intuition…", "this helps understand…").|**Missing functional justification**: motivation is requested only rhetorically and stylistically (e.g. prompts ask for "motivate concepts", "provide intuition", and "be pedagogical").|
-|**Global incoherence**|The agent optimizes local completeness instead of global coherence, producing:  <br>- overlaps  <br>- concepts introduced without clear downstream role  <br>- lack of vault-level novelty|**No operative model of the vault's established knowledge**: the dependency graph is not encoded explicitly, and he instruction set presumably does not force the agent to explicitly map, before writing, which prior results are available as premises. Thus, the agent does not have a strong representation of what has already been _established_ (versus merely mentioned) and what gap remains open.|
-|**Redundancy**|Each note is generated as if it were semi-autonomous, producing rederivations.|**Missing a rule to counteract the implicit default's objective**: language models are naturally biased toward producing self-contained, polished documents.|
-|**Application failures**|Even a strong style guide does not prevent drift in rule application.|**Missing procedural workflows**: The instruction system is too _declarative_, it describes the desired output but _does not prescribe the internal workflow_. The main instructions file mixes:  <br>- global style rules  <br>- epistemic rules  <br>- project architecture  <br>- local note objective|
+|**Superficiality**|The agent produces content that is _plausibly_ related rather than _structurally necessary_ to address the unit's question. It defaults to associative retrieval: collects related material, provides a summary...|**Weak atomicity**: the _unit of work_ is not rigorously defined. The unit is generated from a vague or thematic intention; the "question" is too broad and not sharply delineated.<br>**Absence of pre-committed structural skeleton**: the agent is not forced to commit, _before_ writing, to an exact structural plan.<br>**Missing decision criteria**: the instructions constrain _form_ and _second-order desiderata_ (e.g. "avoid redundancy", "separate concerns") rather than _generative behavior_ (e.g. "include _only_ material required to establish the unit's output").|
+|**Accumulation**|The agent:<br>- accumulates loosely related material,<br>- drifts in scope,<br>- appends remarks that are not structurally necessary,<br>- implicitly broadens the unit's purpose.|**Missing a termination criterion**: no endpoint or success criterion is formalized. This is especially severe in open-ended generative tasks because neighboring ideas are often genuinely interesting.|
+|**Arbitrary and misdirected depth**|The agent optimizes visible sophistication instead of structural usefulness, such as:<br>- generality (cover a broad but low-utility property),<br>- density of detail (elaborate on aspects that do not constrain the target),<br>- abstraction (analyze an object because it is available, not because it is informative),<br>- technicality instead of architecture,<br>- formalism (accumulate definitions instead of conceptual economy).|**Missing relevance criteria**: depth is requested (e.g. "be rigorous", "provide deep insight") without specifying _what kind of clarity is sought_.<br>**Missing construction strategy**: depth is not tied to a target explanatory question.|
+|**Poor motivation for introduced objects**|The agent introduces concepts because they are topically proximate, not because they are _necessary steps_ in a committed construction strategy. It adds generic and decorative prose (e.g. "it is natural to consider…", "to gain intuition…", "this helps understand…").|**Missing functional justification**: motivation is requested only rhetorically and stylistically (e.g. prompts ask for "motivate concepts", "provide intuition", "be pedagogical").|
+|**Global incoherence**|The agent optimizes local completeness instead of global coherence, producing:<br>- overlaps,<br>- concepts introduced without clear downstream role,<br>- lack of vault-level novelty.|**No operative model of the vault's established content**: the dependency graph is not encoded explicitly, and the instruction set does not force the agent to map, before writing, which prior outputs are available as inputs. The agent has no strong representation of what is already _established_ versus merely mentioned, and which gap remains open.|
+|**Redundancy**|Each unit is generated as if it were semi-autonomous, producing regenerations of established material.|**Missing a rule to counteract the implicit default**: language models are naturally biased toward producing self-contained, polished documents.|
+|**Application failures**|Even a strong style guide does not prevent drift in rule application.|**Missing procedural workflows**: the instruction system is too _declarative_; it describes the desired output but _does not prescribe the internal workflow_. The main instructions file mixes:<br>- global style rules,<br>- generative rules,<br>- project architecture,<br>- local unit objective.|

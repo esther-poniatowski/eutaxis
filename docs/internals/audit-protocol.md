@@ -1,17 +1,19 @@
 # Audit Protocol
 
-This file is the **operational contract**. It governs the mandatory workflow for every note edit and every section draft. No text is returned before this protocol completes.
+This file is the **operational contract**. It governs the mandatory workflow for every unit edit and every section draft under eutaxis. No text is returned before this protocol completes.
+
+The protocol fixes the *shape* of the workflow — its phases, their order, and the output gate — and defers the substance of each phase to the project's declared rules. Every project that deploys eutaxis populates the per-phase checks with its own rules, vocabulary, forbidden strings, and linters; this file is silent on those specifics.
 
 ---
 
 ## Critical warning
 
-Do not use fluency, conventional mathematical tone, or resemblance to textbook prose as evidence of compliance. Standard patterns in textbooks and journal articles — nominalization, passive indirection, heavy compound terms, imperative openings, proofs before interpretation — are the primary failure modes to guard against, not acceptable defaults. Apply every check mechanically to every sentence, including:
+Do not use fluency, idiomatic register, or resemblance to canonical examples as evidence of compliance. Standard prose patterns — nominalization, passive indirection, heavy compound terms, imperative openings, conclusions before grounding — are common failure modes to guard against, not acceptable defaults. Apply every check mechanically to every sentence, including:
 
-- carried-over text from source notes (the single highest source of missed violations, because it already "sounds right")
-- Markdown link texts (every link text is a sentence and must pass all checks independently)
-- callout bodies and contribution bullets
-- bold-label paragraphs
+- carried-over text from source units (the single highest source of missed violations, because it already "sounds right");
+- Markdown link texts (every link text is a sentence and must pass all checks independently);
+- callout bodies and contribution bullets;
+- bold-label paragraphs.
 
 ---
 
@@ -25,10 +27,10 @@ Execute every phase in order. Do not return output until Phase 7 passes.
 
 Before drafting, decide exactly one of the following:
 
-- **Derivation mode**: the full derivation belongs in this note; include setup, derivation, result, interpretation, and boundary cases
-- **Pointer mode**: only a pointer belongs here; write a single linking sentence and cross-link to the source note
+- **Full-treatment mode**: the complete development belongs in this unit; include setup, development, result, interpretation, and edge cases.
+- **Pointer mode**: only a pointer belongs here; write a single linking sentence and cross-link to the source unit.
 
-Do not mix both modes in the same note. If content currently exists in both modes, decide which to keep and delete the other.
+Do not mix modes in the same unit. If content currently exists in both modes, decide which to keep and delete the other.
 
 ---
 
@@ -36,57 +38,48 @@ Do not mix both modes in the same note. If content currently exists in both mode
 
 Before drafting any prose, establish:
 
-1. The central question (for `[!QUESTION]`)
-2. The contribution bullets (for `[!QUOTE] Originality`): each must satisfy Operator 2 — **[mathematical object] + [active verb] + [result]**
-3. The roadmap items (for `[!TIP] Roadmap`): each names a section's role in the reasoning chain, not a result
-4. The assumptions (for `[!WARNING] Applicability`)
-5. The block anchors required by downstream cross-references
-6. Whether a summary table is needed (required when the note derives results across multiple cases)
+1. the central question of the unit (recorded in the project's central-question callout, e.g. `[!QUESTION]`);
+2. the contribution bullets (recorded in the project's contribution callout, e.g. `[!QUOTE] Originality`), each fitting the project-declared contribution-statement pattern;
+3. the roadmap items (recorded in the project's roadmap callout, e.g. `[!TIP] Roadmap`), each naming a section's role in the chain rather than a result;
+4. the assumptions or applicability conditions (recorded in the project's applicability callout, e.g. `[!WARNING] Applicability`);
+5. the block anchors required by downstream cross-references;
+6. whether any project-declared structured artifact (summary table, comparison matrix, diagram) is required by the unit's content.
 
-Verify the contribution/roadmap separation: if a roadmap item states a result or novelty claim, move it to contributions. If a contribution bullet describes the reasoning path without stating a result, move it to the roadmap.
+Verify the contribution/roadmap separation: if a roadmap item states a result or novelty claim, move it to contributions. If a contribution bullet describes the path without stating a result, move it to the roadmap.
 
 ---
 
 ### Phase 2 — Draft pass
 
-Write the body in dependency order within each section:
+Write the body in dependency order within each section. The default order is:
 
-1. Purpose and problem statement
-2. Setup and definitions
-3. General derivation
-4. Result statement
-5. Interpretation
-6. Specializations and examples
-7. Failure modes and boundary cases
+1. purpose and problem statement;
+2. setup and definitions;
+3. development;
+4. result statement;
+5. interpretation;
+6. specializations and examples;
+7. edge cases and boundary conditions.
 
-After completing each section, verify the section dependency chain: what does this section receive from the preceding section? If the answer is "nothing", reorder or add a missing connecting step.
+Projects that need a different default order declare it in their structural rules. After completing each section, verify the section dependency chain: what does this section receive from the preceding section? If the answer is "nothing", reorder or add a missing connecting step.
 
 ---
 
 ### Phase 3 — Sentence audit
 
-For every sentence in the draft — including sentences carried over from earlier drafts, link texts, callout bodies, and bold-label paragraphs — apply the following seven checks in order. Do not rely on whether the sentence "sounds wrong."
+For every sentence in the draft — including sentences carried over from earlier drafts, link texts, callout bodies, and bold-label paragraphs — apply the project-declared sentence checks in order. Do not rely on whether the sentence "sounds wrong."
 
-**Check 1 — Nominalization**
-Identify every noun ending in `-tion`, `-ment`, `-ness`, `-ity`, `-ence`, `-ance`, `-al`, `-ing` used as a process noun. For each: is the verb form shorter or more direct? If yes, apply Operator 1. Check subject position specifically — process nominalizations as sentence subjects are not exempt.
+The project's style rules declare the concrete tests; the categories below are the canonical surface every project must cover:
 
-**Check 2 — Abstract framing**
-Does the sentence describe the act of establishing a result instead of stating the result? Does it contain a vague procedural nominalization without its operands? Does any noun phrase referring to a process leave its arguments implicit? Apply Operator 2 and the implicit-argument rule.
+- **Style discipline.** Nominalization, passive voice, heavy compound modifiers, and other style-level patterns the project bans.
+- **Framing.** Sentences that describe the act of establishing a result instead of stating it; vague procedural nominalizations whose operands are implicit.
+- **Modifier discipline.** Hyphenated pre-nominal modifiers that encode prepositional or clausal relationships; stacked-modifier sequences.
+- **Opening discipline.** Sentence openings forbidden by the project (typically imperative verbs that should be rephrased declaratively).
+- **Named referent.** Symbols, identifiers, or technical tokens appearing in qualifiers or conditions without naming the object they refer to.
+- **Link text.** Markdown link texts that name a container, procedure, or analysis instead of a result, object, or property.
+- **Display reference.** Sentences immediately after a display block (table, equation, code fence) that begin with a bare pronoun rather than a descriptive noun phrase.
 
-**Check 3 — Compound modifier**
-Does any hyphenated pre-nominal modifier encode a prepositional or clausal relationship (`-dependent`, `-determined`, `-driven`, `-weighted`, `-modulated`)? Apply Operator 3. Does any sequence stack two or more such modifiers? Expand unconditionally.
-
-**Check 4 — Imperative opening**
-Does the sentence begin with `Define`, `Let`, `Assume`, `Write`, `Set`, or `Denote`? Rewrite in declarative form.
-
-**Check 5 — Named symbol**
-Does any symbol appear after a preposition, in a qualifier, in a condition, or in a monotonicity statement without its object name? Apply Operator 4.
-
-**Check 6 — Link text**
-For every Markdown link `[text](target)`: does the link text name (a) a container note, (b) a procedure or analysis, or (c) an abstract property nominalization? Apply Operator 5.
-
-**Check 7 — Display reference**
-Does the sentence immediately following a `$$…$$` block begin with `It`, `This`, `They`, or `These` without a descriptive noun phrase? Replace with a named reference.
+The project's style file declares the literal forms of each test (regular expressions, banned tokens, examples).
 
 ---
 
@@ -94,80 +87,42 @@ Does the sentence immediately following a `$$…$$` block begin with `It`, `This
 
 After completing the draft, verify at paragraph and section level:
 
-**Section dependency.** For each section after the first: what does it receive from the preceding section? If nothing, either the section is misplaced or a connecting step is missing.
+**Section dependency.** For each section after the first, what does it receive from the preceding section? If nothing, the section is misplaced or a connecting step is missing.
 
-**Paragraph dependency.** For each paragraph after the first in a section: would removing the preceding paragraph break this one? If not, a logical connector is missing or the preceding paragraph is redundant.
+**Paragraph dependency.** For each paragraph after the first in a section, would removing the preceding paragraph break this one? If not, a logical connector is missing or the preceding paragraph is redundant.
 
 **Preview–conclusion redundancy.** If a section opens with a preview of the result and closes with a restatement of it, delete one. Do not state the same result at both ends of a section.
 
-**Contributions–body redundancy.** Does any body paragraph restate a `[!QUOTE] Contributions` bullet without adding new interpretive content? If yes, delete the restatement or compress it to a back-reference.
+**Contributions–body redundancy.** Does any body paragraph restate a contribution bullet without adding new content? If yes, delete the restatement or compress it to a back-reference.
 
-**Takeaway justification.** Does a concluding paragraph add mechanistic implications, limiting cases, or connections to other results beyond the formal statement? If it only restates the result in words, delete it.
+**Takeaway justification.** Does a concluding paragraph add implications, limiting cases, or connections beyond the formal statement? If it only restates the result in words, delete it.
 
-**Callout dispatch.** Does the `[!QUESTION]` body describe what the note achieves? (Move to Contributions.) Does a `[!TIP] Roadmap` item announce a result or novelty claim? (Move to Contributions.) Does a `[!QUOTE] Contributions` bullet describe the reasoning path without stating a result? (Move to Roadmap.)
+**Callout dispatch.** Does the central-question callout body describe what the unit achieves? (Move to contributions.) Does a roadmap item announce a result or novelty claim? (Move to contributions.) Does a contribution bullet describe the path without stating a result? (Move to the roadmap.)
 
 ---
 
-### Phase 5a — Forbidden string search
+### Phase 5a — Forbidden-string search
 
-Search the final Markdown text for each of the following strings outside code blocks. Any match requires revision before proceeding.
-
-```
-the role of
-the nature of
-the act of
-it can be shown
-it is possible to show
-plays a role in
-is responsible for
-serves to
-is involved in
-Define 
-Let 
-Assume 
-Write 
-Set 
-Denote 
-Note that
-Observe that
-Recall that
-More explicitly
-Equivalently
-This gives
-Therefore:
-Hence:
-Then:
-in ... ways
-```
-
-Additionally search for the pattern `the .* case` (the X case as a noun phrase) and rewrite to the prepositional form.
+Search the final Markdown text for each entry in the project-declared forbidden-string list. Any match outside code blocks requires revision before proceeding. The list lives in the project's style rules; this phase enforces it mechanically.
 
 ### Phase 5b — Semantic audit
 
-Search for semantic equivalents of forbidden patterns even when the
-literal string is absent. Revise any sentence that:
+Search for semantic equivalents of forbidden patterns even when the literal string is absent. Revise any sentence that:
 
-- places a process nominalization as the grammatical subject with an
-  existence verb ("Differential amplification occurs when …")
-- names a derivation procedure as the grammatical object of a note-
-  or section-centered sentence
-- uses a relation noun — comparison, coupling, independence, variation,
-  modulation — without naming the operands
-- uses a link text that names a procedure, container, or analysis rather
-  than a result or object
- 
+- places a process nominalization as the grammatical subject with an existence verb;
+- names a procedure as the grammatical object of a unit-centered or section-centered sentence;
+- uses a relation noun (comparison, coupling, independence, modulation, …) without naming the operands;
+- uses a link text that names a procedure, container, or analysis rather than a result or object.
+
+Projects extend this list with domain-specific semantic patterns.
+
 ---
 
 ### Phase 6 — Linter
 
-Run both linters on all modified files:
+Run the project-declared linters on all modified files. The path and entry point of each linter live in the project's tooling configuration.
 
-```
-utils/scripts/lint_math_style.py <modified_paths>
-utils/scripts/lint_modified_markdown.py
-```
-
-Fix all reported issues before proceeding. The linter catches imperative openings, forbidden phrases, heading articles, procedural link text heuristics, bare-symbol patterns after prepositions, and bare pronouns after display lines. Linter compliance is necessary but not sufficient — the linter does not catch all violations covered by Phase 3.
+Fix all reported issues before proceeding. Linter compliance is necessary but not sufficient — the linter does not catch all violations covered by Phase 3.
 
 ---
 
@@ -175,10 +130,10 @@ Fix all reported issues before proceeding. The linter catches imperative opening
 
 Return the text only when all of the following are true:
 
-- Phase 3: no sentence fails any of the seven checks
-- Phase 4: no structural redundancy or callout dispatch violation remains
-- Phase 5: no forbidden string appears outside code blocks
-- Phase 6: linter reports no issues
+- Phase 3: no sentence fails any of the project's sentence checks;
+- Phase 4: no structural redundancy or callout dispatch violation remains;
+- Phase 5: no entry from the forbidden-string list appears outside code blocks, and no semantic equivalent appears either;
+- Phase 6: every project-declared linter reports no issues.
 
 If any condition is false, return to the appropriate phase and revise. Do not return partial output.
 
@@ -186,29 +141,31 @@ If any condition is false, return to the appropriate phase and revise. Do not re
 
 ## Internal checklist (do not expose in output)
 
-Internally maintain a per-sentence checklist during Phase 3 and a per-section checklist during Phase 4. Do not include these checklists in the final note unless explicitly requested by the user.
+Internally maintain a per-sentence checklist during Phase 3 and a per-section checklist during Phase 4. Do not include these checklists in the final unit unless explicitly requested.
 
 ---
 
-## Quality tiers for rules not in `style-hard-rules.md`
+## Quality tiers for rules outside the hard-blocker set
 
-Rules from `note-template.md` and `math-pedagogy.md` that are not listed as hard blockers fall into the following tiers:
+Project-declared rules that do not appear in the hard-blocker list fall into the following tiers:
 
 **Tier B — Structural blockers** (required when applicable; revise before output)
-- Opening callout order
-- Contributions vs. roadmap separation
-- Applicability callout placement
-- Proof placement (after interpretation)
-- Formula interpretation sentence
-- Object introduction by role before notation
-- Anchors on first content line; no heading-slug links
-- No duplicated derivation across notes
-- Summary table for multi-case notes
+
+- opening-callout order;
+- contribution / roadmap separation;
+- applicability-callout placement;
+- ordering of formal results relative to interpretation (project-declared);
+- interpretation sentence after each non-trivial display element (project-declared);
+- introduction of new objects by role before notation (project-declared);
+- anchors on the first content line; no heading-slug links;
+- single-source-of-truth for any development the project marks reusable;
+- structured-artifact requirements for multi-case units (project-declared).
 
 **Tier C — Quality improvements** (revise unless there is a strong reason not to)
-- Sentence length over 40 words
-- Paragraph coherence and explicit connectors
-- Bold-label consistency across sections
-- Style homogeneity of takeaway formats
-- Inline enumeration conversion to bulleted list
-- Assumption motivation before formal statement
+
+- sentence-length thresholds set by the project;
+- paragraph coherence and explicit connectors;
+- bold-label consistency across sections;
+- style homogeneity of takeaway formats;
+- inline-enumeration conversion to a bulleted list;
+- assumption motivation before the formal statement.
