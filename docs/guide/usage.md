@@ -1,22 +1,59 @@
 # Usage
 
-Eutaxis assembles agent instruction files from modular prompt sources defined
-in a YAML configuration file. Each agent receives shared content (common
-sources) plus agent-specific sources, headers, and footers.
+Eutaxis assembles instruction files from modular Markdown sources. A single
+configuration can generate project-local files such as `AGENTS.md` and
+`.claude/CLAUDE.md`, or global files such as `~/.codex/AGENTS.md`.
 
-## Generating Instruction Files
+## Generate Project Instructions
 
-The `generate` command reads a configuration file and writes one instruction
-file per agent:
+Place `agent-instructions.yaml` at the project root and run:
 
 ```sh
 eutaxis generate -c agent-instructions.yaml
 ```
 
-Without `-c`, the command defaults to `agent-instructions.yaml` in the current
-directory.
+Without `-c`, the command defaults to `agent-instructions.yaml`.
 
-### Configuration Structure
+## Check Generated Files
+
+Use `check` to detect stale generated files:
+
+```sh
+eutaxis check -c agent-instructions.yaml
+```
+
+Print diffs for stale outputs:
+
+```sh
+eutaxis check -c agent-instructions.yaml --diff
+```
+
+This command exits with code `1` when any selected output differs from the
+generated content.
+
+## List Configured Outputs
+
+Use `list` to inspect configured agents, sources and resolved target paths:
+
+```sh
+eutaxis list -c agent-instructions.yaml
+```
+
+## Generate One Output
+
+Filter generation to a single agent output:
+
+```sh
+eutaxis generate -c agent-instructions.yaml --agent codex
+```
+
+Preview paths without writing files:
+
+```sh
+eutaxis generate -c agent-instructions.yaml --dry-run
+```
+
+## Configuration Structure
 
 The YAML config has two top-level keys:
 
@@ -53,7 +90,7 @@ The generator concatenates content in this order:
 3. All agent-specific `sources`, in list order
 4. `target.footer` (if present)
 
-### Section Extraction
+## Section Extraction
 
 Each source entry can include a `sections` list to extract only named markdown
 headings instead of the full file:
@@ -70,10 +107,68 @@ Section extraction matches heading text exactly and includes all content under
 that heading until the next heading at the same or higher level. YAML
 frontmatter in source files is stripped automatically.
 
-### Disabled Agents
+Exclude sections with `exclude_sections`:
+
+```yaml
+common_sources:
+  - path: docs/instructions/style-rules.md
+    exclude_sections:
+      - "Historical Notes"
+```
+
+Offset heading levels when embedding a source inside another structure:
+
+```yaml
+common_sources:
+  - path: docs/instructions/style-rules.md
+    heading_offset: 1
+```
+
+## Generate Global Instructions
+
+Use `root` to point at the source module directory and an absolute target path
+for the generated global file:
+
+```yaml
+root: /Users/eresther/Documents/work/projects/instruction-modules
+
+common_sources:
+  - modules/global/file-authority.md
+  - modules/global/git-safety.md
+  - modules/global/verification.md
+
+agents:
+  - name: global-codex
+    target:
+      path: /Users/eresther/.codex/AGENTS.md
+      header: |
+        # Global Agent Instructions
+```
+
+Run:
+
+```sh
+eutaxis generate -c global-agent-instructions.yaml
+```
+
+## Disabled Agents
 
 Setting `enabled: false` on an agent skips generation for that agent. The
 generator prints a notice and moves on.
+
+## Python API
+
+Use the Python API when integrating instruction generation into another tool:
+
+```python
+from pathlib import Path
+
+from eutaxis.instructions import InstructionGenerator, load_config
+
+config = load_config(Path("agent-instructions.yaml"))
+generator = InstructionGenerator(config)
+generator.write_all()
+```
 
 ## Diagnostics
 

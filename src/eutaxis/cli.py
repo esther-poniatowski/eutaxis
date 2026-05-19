@@ -25,14 +25,138 @@ def cli_info() -> None:
 
 @app.command("generate")
 def cli_generate(
-    config: str = typer.Option("agent-instructions.yaml", "--config", "-c", help="Path to generation config."),
+    config: str = typer.Option(
+        "agent-instructions.yaml",
+        "--config",
+        "-c",
+        help="Path to generation config.",
+    ),
+    root: str | None = typer.Option(
+        None,
+        "--root",
+        "-r",
+        help="Root used to resolve relative source and target paths.",
+    ),
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        "-a",
+        help="Generate only one configured agent output.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-n",
+        help="Show targets without writing files.",
+    ),
 ) -> None:
     """Assemble agent instruction files from modular prompt sources."""
     from pathlib import Path as P
-    from .generate import main as gen_main
+    from .instructions import InstructionError, InstructionGenerator, load_config
 
-    code = gen_main(P(config))
-    raise typer.Exit(code=code)
+    try:
+        loaded = load_config(P(config), root=P(root) if root else None)
+        generator = InstructionGenerator(loaded)
+        paths = generator.write_all(agent_name=agent, dry_run=dry_run)
+    except InstructionError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=exc.exit_code) from exc
+
+    verb = "Would generate" if dry_run else "Generated"
+    typer.echo(f"{verb} {len(paths)} instruction file(s):")
+    for path in paths:
+        typer.echo(f"  - {path}")
+
+
+@app.command("check")
+def cli_check(
+    config: str = typer.Option(
+        "agent-instructions.yaml",
+        "--config",
+        "-c",
+        help="Path to generation config.",
+    ),
+    root: str | None = typer.Option(
+        None,
+        "--root",
+        "-r",
+        help="Root used to resolve relative source and target paths.",
+    ),
+    agent: str | None = typer.Option(
+        None,
+        "--agent",
+        "-a",
+        help="Check only one configured agent output.",
+    ),
+    diff: bool = typer.Option(
+        False,
+        "--diff",
+        help="Print unified diffs for stale outputs.",
+    ),
+) -> None:
+    """Check whether generated instruction files are up to date."""
+    from pathlib import Path as P
+    from .instructions import InstructionError, InstructionGenerator, load_config
+
+    try:
+        loaded = load_config(P(config), root=P(root) if root else None)
+        generator = InstructionGenerator(loaded)
+        reports = list(generator.diff_report(agent_name=agent))
+    except InstructionError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=exc.exit_code) from exc
+
+    stale = False
+    for agent_config, path, differs in reports:
+        status = "OUTDATED" if differs else "OK"
+        typer.echo(f"[{status:8}] {agent_config.name}: {path}")
+        stale = stale or differs
+        if diff and differs:
+            typer.echo(generator.unified_diff(agent_config.name))
+
+    if stale:
+        raise typer.Exit(code=1)
+
+
+@app.command("list")
+def cli_list(
+    config: str = typer.Option(
+        "agent-instructions.yaml",
+        "--config",
+        "-c",
+        help="Path to generation config.",
+    ),
+    root: str | None = typer.Option(
+        None,
+        "--root",
+        "-r",
+        help="Root used to resolve relative source and target paths.",
+    ),
+) -> None:
+    """List configured instruction outputs and their source counts."""
+    from pathlib import Path as P
+    from .instructions import InstructionError, load_config
+
+    try:
+        loaded = load_config(P(config), root=P(root) if root else None)
+    except InstructionError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=exc.exit_code) from exc
+
+    typer.echo(f"Configuration: {loaded.config_path}")
+    typer.echo(f"Root: {loaded.root}")
+    typer.echo("")
+    typer.echo("Common sources:")
+    for source in loaded.common_sources:
+        typer.echo(f"  - {source.path}")
+    typer.echo("")
+    typer.echo("Agents:")
+    for agent_config in loaded.agents:
+        status = "enabled" if agent_config.enabled else "disabled"
+        target = loaded.resolve(agent_config.target.path)
+        typer.echo(f"  - {agent_config.name} ({status}) -> {target}")
+        for source in agent_config.sources:
+            typer.echo(f"      source: {source.path}")
 
 
 @app.command("validate")

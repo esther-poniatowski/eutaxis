@@ -1,0 +1,163 @@
+"""Configuration loading for instruction-file assembly."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from .exceptions import ConfigurationError
+from .models import AgentConfig, InstructionConfig, SourceFile, TargetConfig
+
+
+class ConfigLoader:
+    """Load and validate instruction assembly configuration."""
+
+    def __init__(self, config_path: Path, root: Path | None = None) -> None:
+        self.config_path = config_path.expanduser().resolve()
+        self.root_override = root.expanduser().resolve() if root else None
+
+    def load(self) -> InstructionConfig:
+        """Load a YAML configuration file."""
+        if not self.config_path.is_file():
+            raise ConfigurationError(
+                f"Configuration file not found: {self.config_path}"
+            )
+
+        try:
+            raw = yaml.safe_load(self.config_path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            raise ConfigurationError(
+                f"Invalid YAML in {self.config_path}: {exc}"
+            ) from exc
+
+        if not isinstance(raw, dict):
+            raise ConfigurationError("Configuration must be a YAML mapping")
+
+        return InstructionConfig(
+            root=self._resolve_root(raw),
+            config_path=self.config_path,
+            common_sources=self._parse_sources(raw.get("common_sources", [])),
+            agents=self._parse_agents(raw.get("agents", [])),
+        )
+
+    def _resolve_root(self, raw: dict[str, Any]) -> Path:
+        if self.root_override is not None:
+            return self.root_override
+
+        raw_root = raw.get("root")
+        if raw_root is None:
+            return self.config_path.parent
+
+        root = Path(str(raw_root)).expanduser()
+        if not root.is_absolute():
+            root = self.config_path.parent / root
+        return root.resolve()
+
+    def _parse_sources(self, raw_sources: Any) -> list[SourceFile]:
+        if raw_sources is None:
+            return []
+        if not isinstance(raw_sources, list):
+            raise ConfigurationError("sources must be a list")
+
+        return [self._parse_source(source) for source in raw_sources]
+
+    def _parse_source(self, raw: Any) -> SourceFile:
+        if isinstance(raw, str):
+            return SourceFile(path=Path(raw))
+
+        if not isinstance(raw, dict):
+            raise ConfigurationError(f"Invalid source specification: {raw!r}")
+        if "path" not in raw:
+            raise ConfigurationError("Source entries must specify 'path'")
+
+        return SourceFile(
+            path=Path(str(raw["path"])),
+            sections=self._as_tuple(raw.get("sections", ())),
+            exclude_sections=self._as_tuple(raw.get("exclude_sections", ())),
+            heading_offset=self._as_non_negative_int(
+                raw.get("heading_offset", 0),
+                "heading_offset",
+            ),
+            strip_frontmatter=self._as_bool(
+                raw.get("strip_frontmatter", True),
+                "strip_frontmatter",
+            ),
+        )
+
+    def _parse_agents(self, raw_agents: Any) -> list[AgentConfig]:
+        if raw_agents is None:
+            return []
+        if not isinstance(raw_agents, list):
+            raise ConfigurationError("agents must be a list")
+
+        agents: list[AgentConfig] = []
+        seen: set[str] = set()
+
+        for raw_agent in raw_agents:
+            agent = self._parse_agent(raw_agent)
+            if agent.name in seen:
+                raise ConfigurationError(f"Duplicate agent name: {agent.name}")
+            seen.add(agent.name)
+            agents.append(agent)
+
+        return agents
+
+    def _parse_agent(self, raw: Any) -> AgentConfig:
+        if not isinstance(raw, dict):
+            raise ConfigurationError(f"Invalid agent specification: {raw!r}")
+        if "name" not in raw:
+            raise ConfigurationError("Agent entries must specify 'name'")
+        if "target" not in raw:
+            raise ConfigurationError(f"Agent '{raw['name']}' must specify 'target'")
+
+        return AgentConfig(
+            name=str(raw["name"]),
+            target=self._parse_target(raw["target"]),
+            sources=self._parse_sources(raw.get("sources", [])),
+            enabled=self._as_bool(raw.get("enabled", True), "enabled"),
+        )
+
+    def _parse_target(self, raw: Any) -> TargetConfig:
+        if isinstance(raw, str):
+            return TargetConfig(path=Path(raw))
+
+        if not isinstance(raw, dict):
+            raise ConfigurationError(f"Invalid target specification: {raw!r}")
+        if "path" not in raw:
+            raise ConfigurationError("Target entries must specify 'path'")
+
+        return TargetConfig(
+            path=Path(str(raw["path"])),
+            header=str(raw.get("header", "")),
+            footer=str(raw.get("footer", "")),
+        )
+
+    def _as_tuple(self, value: Any) -> tuple[str, ...]:
+        if value in (None, ()):
+            return ()
+        if isinstance(value, str):
+            return (value,)
+        if isinstance(value, list):
+            return tuple(str(item) for item in value)
+        raise ConfigurationError(f"Expected string or list of strings, got {value!r}")
+
+    def _as_bool(self, value: Any, field: str) -> bool:
+        if isinstance(value, bool):
+            return value
+        raise ConfigurationError(f"Field '{field}' must be a boolean, got {value!r}")
+
+    def _as_non_negative_int(self, value: Any, field: str) -> int:
+        if not isinstance(value, int):
+            raise ConfigurationError(
+                f"Field '{field}' must be an integer, got {value!r}"
+            )
+        if value < 0:
+            raise ConfigurationError(f"Field '{field}' must be non-negative")
+        return value
+
+
+def load_config(config_path: Path, root: Path | None = None) -> InstructionConfig:
+    """Load instruction configuration from disk."""
+    return ConfigLoader(config_path, root=root).load()

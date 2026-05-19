@@ -50,10 +50,12 @@ large monolithic files that are hard to review, test, and revise.
 
 - [ ] **Prompt composer**: Assemble prompts from shells, local fragments, and
   parameterized bundles via Jinja2 rendering.
+- [X] **Agent instruction assembly**: Generate global and project-local
+  instruction files from modular Markdown sources and YAML configuration.
 - [ ] **Prompt validator**: Enforce family profile requirements (required files,
   required tags, length warnings).
 - [ ] **Golden-file output**: Render composed prompts for diff-based review.
-- [X] **Prompt-writing methodology**: Ships `docs/prompt-writing-methods.md`, the
+- [X] **Prompt-writing methodology**: Ships `docs/prompt-writing-methods/_index.md`, the
   foundational reference for agent instruction design.
 - [ ] **Workspace scaffolder**: Initialize prompt-composition structure in a target
   project.
@@ -66,13 +68,32 @@ large monolithic files that are hard to review, test, and revise.
 eutaxis generate -c agent-instructions.yaml
 ```
 
+Check whether generated instruction files are current:
+
+```sh
+eutaxis check -c agent-instructions.yaml
+```
+
+The same generator can target project-local files such as `AGENTS.md` and
+global files such as `/Users/eresther/.codex/AGENTS.md` by setting `root` and
+absolute target paths in the config.
+
+Instruction assembly lives under `eutaxis.instructions`: configuration loading,
+Markdown transformations, generation, and exceptions are separate modules. The
+older `eutaxis.generate` import path remains as a compatibility facade.
+
 ---
 
 ## Documentation
 
 | Guide | Content |
 | ----- | ------- |
-| [Prompt-Writing Methodology](docs/prompt-writing-methods.md) | Foundational reference for agent instruction design |
+| [Installation](docs/guide/installation.md) | Prerequisites and source setup |
+| [Usage](docs/guide/usage.md) | Instruction generation workflows |
+| [CLI Reference](docs/guide/cli-reference.md) | Commands and options |
+| [Configuration](docs/guide/configuration.md) | YAML schema and examples |
+| [Concepts](docs/guide/concepts.md) | Sources, outputs, project and global generation |
+| [Instruction Assembly API](docs/api/instructions.md) | Python API for config loading, generation and checks |
 | [Proposal](PROPOSAL.md) | Architectural proposal for the composition framework |
 
 ### Ecosystem

@@ -32,15 +32,53 @@ eutaxis generate -c <config-file>
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
 | `--config` | `-c` | `agent-instructions.yaml` | Path to the generation configuration file. |
+| `--root` | `-r` | config parent or config `root` | Root used to resolve relative source and target paths. |
+| `--agent` | `-a` | all enabled agents | Generate only one configured agent output. |
+| `--dry-run` | `-n` | `false` | Show output targets without writing files. |
 
 The generator reads the YAML config, resolves all source paths relative to the
-config file's parent directory, and writes one output file per enabled agent.
-See [Configuration](configuration.md) for the full schema.
+configured root, and writes one output file per enabled agent. See
+[Configuration](configuration.md) for the full schema.
 
 Exit codes:
 
 - `0` -- all agent files generated successfully.
-- `1` -- configuration file not found.
+- `1` -- configuration, source loading or generation failed.
+
+---
+
+### `check`
+
+Check whether generated instruction files match the current source modules.
+
+```sh
+eutaxis check -c <config-file>
+```
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--config` | `-c` | `agent-instructions.yaml` | Path to the generation configuration file. |
+| `--root` | `-r` | config parent or config `root` | Root used to resolve relative source and target paths. |
+| `--agent` | `-a` | all enabled agents | Check only one configured agent output. |
+| `--diff` | | `false` | Print unified diffs for stale outputs. |
+
+Exit code `0` means all selected outputs are current. Exit code `1` means at
+least one output differs from the generated content.
+
+---
+
+### `list`
+
+List configured outputs, source files, and resolved targets.
+
+```sh
+eutaxis list -c <config-file>
+```
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--config` | `-c` | `agent-instructions.yaml` | Path to the generation configuration file. |
+| `--root` | `-r` | config parent or config `root` | Root used to resolve relative source and target paths. |
 
 ---
 
