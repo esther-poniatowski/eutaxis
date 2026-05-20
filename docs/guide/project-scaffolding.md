@@ -10,6 +10,13 @@ instruction layout:
 eutaxis init --template codex-project --target .
 ```
 
+For a project that should synchronize shared instructions across Codex and
+Claude Code, use:
+
+```sh
+eutaxis init --template multi-agent-project --target .
+```
+
 The default template creates:
 
 ```text

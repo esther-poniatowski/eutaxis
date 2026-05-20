@@ -39,3 +39,12 @@ def test_scaffold_workspace_force_overwrites_existing_files(tmp_path: Path) -> N
     assert "Project Agent Instructions" in (
         tmp_path / "AGENTS.md"
     ).read_text(encoding="utf-8")
+
+
+def test_scaffold_workspace_copies_multi_agent_template(tmp_path: Path) -> None:
+    scaffold_workspace(tmp_path, template="multi-agent-project")
+
+    config = (tmp_path / "agent-instructions.yaml").read_text(encoding="utf-8")
+
+    assert "path: AGENTS.md" in config
+    assert "path: .claude/CLAUDE.md" in config
