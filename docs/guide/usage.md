@@ -14,6 +14,16 @@ eutaxis generate -c agent-instructions.yaml
 
 Without `-c`, the command defaults to `agent-instructions.yaml`.
 
+To create a starter Codex instruction layout in a project, run:
+
+```sh
+eutaxis init --template codex-project --target .
+```
+
+After scaffolding, edit the generated files inside the project. Project-specific
+instructions belong to the project repository, not to a personal configuration
+repository.
+
 ## Check Generated Files
 
 Use `check` to detect stale generated files:
@@ -200,12 +210,3 @@ eutaxis validate <paths...>
 
 Intended to validate prompt layouts and configuration files. Currently prints
 "Prompt validation is not yet implemented."
-
-### init (stub)
-
-```sh
-eutaxis init --target <directory>
-```
-
-Intended to scaffold a prompt-composition directory structure in a target
-project. Currently prints "Prompt scaffolding is not yet implemented."

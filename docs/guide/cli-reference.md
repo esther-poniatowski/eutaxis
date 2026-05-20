@@ -98,16 +98,19 @@ eutaxis validate <paths...>
 
 ---
 
-### `init` (stub)
+### `init`
 
 Scaffold a prompt-composition structure into a target project.
 
 ```sh
-eutaxis init --target <directory>
+eutaxis init --template codex-project --target <directory>
 ```
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
 | `--target` | `-t` | `.` | Target workspace directory. |
+| `--template` | | `codex-project` | Template directory under `eutaxis/data/templates`. |
+| `--force` | | `false` | Overwrite existing scaffold files. |
 
-**Status:** not yet implemented. Prints a notice and exits with code 0.
+The command copies tracked starter files from the selected template into the
+target directory. Existing files are not overwritten unless `--force` is passed.

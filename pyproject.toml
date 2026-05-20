@@ -66,6 +66,7 @@ eutaxis = [
     "data/**/*.yml",
     "data/**/*.json",
     "data/**/*.toml",
+    "data/**/*.j2",
 ]
 
 

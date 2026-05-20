@@ -93,6 +93,7 @@ older `eutaxis.generate` import path remains as a compatibility facade.
 | [CLI Reference](docs/guide/cli-reference.md) | Commands and options |
 | [Configuration](docs/guide/configuration.md) | YAML schema and examples |
 | [Concepts](docs/guide/concepts.md) | Sources, outputs, project and global generation |
+| [Project Scaffolding](docs/guide/project-scaffolding.md) | Starter templates for project-owned instructions |
 | [Instruction Assembly API](docs/api/instructions.md) | Python API for config loading, generation and checks |
 | [Proposal](PROPOSAL.md) | Architectural proposal for the composition framework |
 

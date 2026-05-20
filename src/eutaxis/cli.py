@@ -172,11 +172,30 @@ def cli_validate(
 @app.command("init")
 def cli_init(
     target: str = typer.Option(".", "--target", "-t", help="Target workspace directory."),
+    template: str = typer.Option(
+        "codex-project",
+        "--template",
+        help="Template directory under eutaxis data/templates.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite existing scaffold files.",
+    ),
 ) -> None:
-    """Scaffold prompt-composition structure into a project (planned)."""
-    _ = target
-    typer.echo("Prompt scaffolding is not yet implemented.")
-    raise typer.Exit(code=0)
+    """Scaffold prompt-composition structure into a project."""
+    from pathlib import Path as P
+    from .scaffold import ScaffoldError, scaffold_workspace
+
+    try:
+        paths = scaffold_workspace(P(target), template=template, force=force)
+    except ScaffoldError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo(f"Created {len(paths)} file(s):")
+    for path in paths:
+        typer.echo(f"  - {path}")
 
 
 @app.callback()
