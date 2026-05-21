@@ -1,8 +1,0 @@
-- [ ] Stabilize the prompt-family layout and starter templates
-- [ ] Implement scaffold CLI command for prompt-composition projects
-- [ ] Extend `generate` beyond plain concatenation
-- [ ] Implement validate CLI command for prompt families
-- [ ] Define family profiles and advisory diagnostics
-- [ ] Add starter composition config templates
-- [ ] Write tests for `generate`
-- [ ] Write tests for CLI entry points
