@@ -32,6 +32,17 @@ class TargetConfig:
     footer: str = ""
 
 
+@dataclass(frozen=True)
+class TaskModule:
+    """A task-specific instruction module referenced by the router section."""
+
+    id: str
+    title: str
+    path: Path
+    trigger: str
+    description: str = ""
+
+
 @dataclass
 class AgentConfig:
     """One generated instruction output."""
@@ -40,6 +51,7 @@ class AgentConfig:
     target: TargetConfig
     sources: list[SourceFile] = field(default_factory=list)
     enabled: bool = True
+    max_bytes: int | None = None
 
 
 @dataclass
@@ -50,6 +62,16 @@ class InstructionConfig:
     config_path: Path
     agents: list[AgentConfig] = field(default_factory=list)
     common_sources: list[SourceFile] = field(default_factory=list)
+    task_modules: list[TaskModule] = field(default_factory=list)
+    task_modules_heading: str = "Task modules"
+    task_modules_intro: str = ""
+    default_max_bytes: int | None = None
+
+    def budget_for(self, agent: AgentConfig) -> int | None:
+        """Return the byte budget that applies to one agent, if any."""
+        if agent.max_bytes is not None:
+            return agent.max_bytes
+        return self.default_max_bytes
 
     def enabled_agents(self) -> list[AgentConfig]:
         """Return enabled agent outputs."""

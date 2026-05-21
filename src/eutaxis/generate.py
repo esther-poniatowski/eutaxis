@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .instructions import (
     AgentConfig,
+    BudgetExceededError,
     ConfigLoader,
     ConfigurationError,
     InstructionConfig,
@@ -22,11 +23,13 @@ from .instructions import (
     SourceFile,
     SourceNotFoundError,
     TargetConfig,
+    TaskModule,
     load_config,
 )
 
 __all__ = [
     "AgentConfig",
+    "BudgetExceededError",
     "ConfigLoader",
     "ConfigurationError",
     "InstructionConfig",
@@ -37,6 +40,7 @@ __all__ = [
     "SourceFile",
     "SourceNotFoundError",
     "TargetConfig",
+    "TaskModule",
     "load_config",
     "main",
 ]

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from eutaxis.generate import (
+    BudgetExceededError,
     ConfigurationError,
     InstructionGenerator,
     MarkdownAssembler,
@@ -199,6 +200,202 @@ agents:
     )
 
     with pytest.raises(ConfigurationError, match="enabled"):
+        load_config(config)
+
+
+def test_task_modules_router_section_is_appended(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - rules.md
+task_modules_intro: |
+  Load the matching task module before doing the work.
+task_modules:
+  - id: programming
+    title: Programming
+    path: /modules/programming.md
+    trigger: when writing or modifying source code
+    description: Covers typed code and module boundaries.
+  - id: prose
+    title: Prose writing
+    path: /modules/prose.md
+    trigger: when drafting or revising prose
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    loaded = load_config(config)
+    output = InstructionGenerator(loaded).generate_all()["codex"]
+
+    assert "## Task modules\n" in output
+    assert "Load the matching task module" in output
+    assert (
+        "- **Programming.** Load `/modules/programming.md` when writing or "
+        "modifying source code. Covers typed code and module boundaries."
+    ) in output
+    assert (
+        "- **Prose writing.** Load `/modules/prose.md` when drafting or "
+        "revising prose."
+    ) in output
+
+
+def test_task_modules_router_omitted_when_empty(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - rules.md
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    output = InstructionGenerator(load_config(config)).generate_all()["codex"]
+    assert "Task modules" not in output
+
+
+def test_duplicate_task_module_id_raises(tmp_path: Path) -> None:
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+task_modules:
+  - id: programming
+    title: Programming
+    path: /a.md
+    trigger: trig
+  - id: programming
+    title: Other
+    path: /b.md
+    trigger: trig
+agents: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="task_module"):
+        load_config(config)
+
+
+def test_budget_exceeded_blocks_generation(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\n" + "x" * 200 + "\n", encoding="utf-8")
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - rules.md
+agents:
+  - name: codex
+    max_bytes: 50
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    loaded = load_config(config)
+    with pytest.raises(BudgetExceededError) as exc_info:
+        InstructionGenerator(loaded).generate_all()
+
+    assert exc_info.value.agent_name == "codex"
+    assert exc_info.value.limit == 50
+    assert exc_info.value.size > 50
+
+
+def test_budget_enforced_per_agent_default_applies(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\n" + "x" * 200 + "\n", encoding="utf-8")
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+max_bytes: 80
+common_sources:
+  - rules.md
+agents:
+  - name: codex
+    target: AGENTS.md
+  - name: lax
+    max_bytes: 10000
+    target: LAX.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    loaded = load_config(config)
+    generator = InstructionGenerator(loaded)
+
+    with pytest.raises(BudgetExceededError) as exc_info:
+        generator.generate_all(agent_name="codex")
+    assert exc_info.value.limit == 80
+
+    output = generator.generate_all(agent_name="lax")["lax"]
+    assert "Rules" in output
+
+
+def test_budget_report_yields_size_and_limit(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - rules.md
+agents:
+  - name: codex
+    max_bytes: 32768
+    target: AGENTS.md
+  - name: free
+    target: FREE.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    reports = list(InstructionGenerator(load_config(config)).budget_report())
+    by_name = {entry[0].name: entry for entry in reports}
+
+    assert by_name["codex"][2] == 32768
+    assert by_name["codex"][1] > 0
+    assert by_name["free"][2] is None
+
+
+def test_budget_can_be_disabled(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\n" + "x" * 200 + "\n", encoding="utf-8")
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - rules.md
+agents:
+  - name: codex
+    max_bytes: 50
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    output = InstructionGenerator(load_config(config)).generate_all(
+        enforce_budget=False
+    )
+    assert "Rules" in output["codex"]
+
+
+def test_non_positive_max_bytes_raises(tmp_path: Path) -> None:
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+agents:
+  - name: codex
+    max_bytes: 0
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="max_bytes"):
         load_config(config)
 
 

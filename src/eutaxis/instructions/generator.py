@@ -6,9 +6,13 @@ import difflib
 from pathlib import Path
 from typing import Iterator
 
-from .exceptions import ConfigurationError, SourceNotFoundError
+from .exceptions import (
+    BudgetExceededError,
+    ConfigurationError,
+    SourceNotFoundError,
+)
 from .markdown import MarkdownAssembler
-from .models import AgentConfig, InstructionConfig, SourceFile
+from .models import AgentConfig, InstructionConfig, SourceFile, TaskModule
 
 
 class InstructionGenerator:
@@ -22,11 +26,18 @@ class InstructionGenerator:
         self.config = config
         self.assembler = assembler or MarkdownAssembler()
 
-    def generate_all(self, agent_name: str | None = None) -> dict[str, str]:
+    def generate_all(
+        self,
+        agent_name: str | None = None,
+        enforce_budget: bool = True,
+    ) -> dict[str, str]:
         """Generate content for enabled outputs."""
         outputs: dict[str, str] = {}
         for agent in self._selected_agents(agent_name):
-            outputs[agent.name] = self.generate_for_agent(agent)
+            content = self.generate_for_agent(agent)
+            if enforce_budget:
+                self._enforce_budget(agent, content)
+            outputs[agent.name] = content
         return outputs
 
     def generate_for_agent(self, agent: AgentConfig) -> str:
@@ -41,6 +52,10 @@ class InstructionGenerator:
             if content:
                 parts.append(content)
 
+        router = self._render_task_module_router()
+        if router:
+            parts.append(router)
+
         if agent.target.footer:
             parts.append(agent.target.footer.strip())
 
@@ -50,6 +65,7 @@ class InstructionGenerator:
         self,
         agent_name: str | None = None,
         dry_run: bool = False,
+        enforce_budget: bool = True,
     ) -> list[Path]:
         """Write selected outputs and return their paths."""
         paths: list[Path] = []
@@ -58,11 +74,15 @@ class InstructionGenerator:
             output_path = self.config.resolve(agent.target.path)
             paths.append(output_path)
 
+            content = self.generate_for_agent(agent)
+            if enforce_budget:
+                self._enforce_budget(agent, content)
+
             if dry_run:
                 continue
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(self.generate_for_agent(agent), encoding="utf-8")
+            output_path.write_text(content, encoding="utf-8")
 
         return paths
 
@@ -112,6 +132,50 @@ class InstructionGenerator:
         if not agent.enabled:
             raise ConfigurationError(f"Agent is disabled: {agent_name}")
         return [agent]
+
+    def budget_report(
+        self, agent_name: str | None = None
+    ) -> Iterator[tuple[AgentConfig, int, int | None]]:
+        """Yield (agent, byte_size, byte_budget) for each selected agent."""
+        for agent in self._selected_agents(agent_name):
+            content = self.generate_for_agent(agent)
+            yield (
+                agent,
+                len(content.encode("utf-8")),
+                self.config.budget_for(agent),
+            )
+
+    def _enforce_budget(self, agent: AgentConfig, content: str) -> None:
+        limit = self.config.budget_for(agent)
+        if limit is None:
+            return
+        size = len(content.encode("utf-8"))
+        if size > limit:
+            raise BudgetExceededError(agent.name, size, limit)
+
+    def _render_task_module_router(self) -> str:
+        modules = self.config.task_modules
+        if not modules:
+            return ""
+
+        lines = [f"## {self.config.task_modules_heading}"]
+        intro = self.config.task_modules_intro.strip()
+        if intro:
+            lines.extend(["", intro])
+
+        lines.append("")
+        for module in modules:
+            lines.append(self._render_task_module_bullet(module))
+        return "\n".join(lines)
+
+    def _render_task_module_bullet(self, module: TaskModule) -> str:
+        bullet = (
+            f"- **{module.title}.** Load `{module.path}` {module.trigger.strip()}."
+        )
+        description = module.description.strip()
+        if description:
+            bullet = f"{bullet} {description}"
+        return bullet
 
     def _load_source(self, source: SourceFile) -> str:
         source_path = self.config.resolve(source.path)

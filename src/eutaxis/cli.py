@@ -49,6 +49,11 @@ def cli_generate(
         "-n",
         help="Show targets without writing files.",
     ),
+    ignore_budget: bool = typer.Option(
+        False,
+        "--ignore-budget",
+        help="Render even if outputs exceed their configured max_bytes.",
+    ),
 ) -> None:
     """Assemble agent instruction files from modular prompt sources."""
     from pathlib import Path as P
@@ -57,7 +62,11 @@ def cli_generate(
     try:
         loaded = load_config(P(config), root=P(root) if root else None)
         generator = InstructionGenerator(loaded)
-        paths = generator.write_all(agent_name=agent, dry_run=dry_run)
+        paths = generator.write_all(
+            agent_name=agent,
+            dry_run=dry_run,
+            enforce_budget=not ignore_budget,
+        )
     except InstructionError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=exc.exit_code) from exc
@@ -93,6 +102,11 @@ def cli_check(
         "--diff",
         help="Print unified diffs for stale outputs.",
     ),
+    ignore_budget: bool = typer.Option(
+        False,
+        "--ignore-budget",
+        help="Do not exit non-zero when outputs exceed max_bytes.",
+    ),
 ) -> None:
     """Check whether generated instruction files are up to date."""
     from pathlib import Path as P
@@ -101,20 +115,34 @@ def cli_check(
     try:
         loaded = load_config(P(config), root=P(root) if root else None)
         generator = InstructionGenerator(loaded)
-        reports = list(generator.diff_report(agent_name=agent))
+        diff_reports = list(generator.diff_report(agent_name=agent))
+        budget_reports = {
+            entry[0].name: (entry[1], entry[2])
+            for entry in generator.budget_report(agent_name=agent)
+        }
     except InstructionError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=exc.exit_code) from exc
 
     stale = False
-    for agent_config, path, differs in reports:
+    over_budget = False
+    for agent_config, path, differs in diff_reports:
+        size, limit = budget_reports[agent_config.name]
+        over = limit is not None and size > limit
+        if over and not ignore_budget:
+            over_budget = True
         status = "OUTDATED" if differs else "OK"
-        typer.echo(f"[{status:8}] {agent_config.name}: {path}")
+        if limit is None:
+            size_note = f"{size} B"
+        else:
+            flag = "OVER" if over else "ok"
+            size_note = f"{size}/{limit} B {flag}"
+        typer.echo(f"[{status:8}] {agent_config.name} [{size_note}]: {path}")
         stale = stale or differs
         if diff and differs:
             typer.echo(generator.unified_diff(agent_config.name))
 
-    if stale:
+    if stale or over_budget:
         raise typer.Exit(code=1)
 
 

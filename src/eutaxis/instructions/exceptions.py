@@ -21,3 +21,18 @@ class SourceNotFoundError(InstructionError):
     def __init__(self, path: Path) -> None:
         super().__init__(f"Source file not found: {path}")
         self.path = path
+
+
+class BudgetExceededError(InstructionError):
+    """Raised when a rendered output exceeds its configured byte budget."""
+
+    exit_code = 2
+
+    def __init__(self, agent_name: str, size: int, limit: int) -> None:
+        super().__init__(
+            f"Agent {agent_name!r} renders to {size} bytes, "
+            f"over the {limit}-byte budget."
+        )
+        self.agent_name = agent_name
+        self.size = size
+        self.limit = limit

@@ -8,7 +8,13 @@ from typing import Any
 import yaml
 
 from .exceptions import ConfigurationError
-from .models import AgentConfig, InstructionConfig, SourceFile, TargetConfig
+from .models import (
+    AgentConfig,
+    InstructionConfig,
+    SourceFile,
+    TargetConfig,
+    TaskModule,
+)
 
 
 class ConfigLoader:
@@ -40,6 +46,14 @@ class ConfigLoader:
             config_path=self.config_path,
             common_sources=self._parse_sources(raw.get("common_sources", [])),
             agents=self._parse_agents(raw.get("agents", [])),
+            task_modules=self._parse_task_modules(raw.get("task_modules", [])),
+            task_modules_heading=str(
+                raw.get("task_modules_heading", "Task modules")
+            ),
+            task_modules_intro=str(raw.get("task_modules_intro", "")),
+            default_max_bytes=self._as_optional_positive_int(
+                raw.get("max_bytes"), "max_bytes"
+            ),
         )
 
     def _resolve_root(self, raw: dict[str, Any]) -> Path:
@@ -117,6 +131,9 @@ class ConfigLoader:
             target=self._parse_target(raw["target"]),
             sources=self._parse_sources(raw.get("sources", [])),
             enabled=self._as_bool(raw.get("enabled", True), "enabled"),
+            max_bytes=self._as_optional_positive_int(
+                raw.get("max_bytes"), "max_bytes"
+            ),
         )
 
     def _parse_target(self, raw: Any) -> TargetConfig:
@@ -134,6 +151,43 @@ class ConfigLoader:
             footer=str(raw.get("footer", "")),
         )
 
+    def _parse_task_modules(self, raw_modules: Any) -> list[TaskModule]:
+        if raw_modules is None:
+            return []
+        if not isinstance(raw_modules, list):
+            raise ConfigurationError("task_modules must be a list")
+
+        modules: list[TaskModule] = []
+        seen: set[str] = set()
+        for raw in raw_modules:
+            module = self._parse_task_module(raw)
+            if module.id in seen:
+                raise ConfigurationError(
+                    f"Duplicate task_module id: {module.id}"
+                )
+            seen.add(module.id)
+            modules.append(module)
+        return modules
+
+    def _parse_task_module(self, raw: Any) -> TaskModule:
+        if not isinstance(raw, dict):
+            raise ConfigurationError(
+                f"Invalid task_module specification: {raw!r}"
+            )
+        for required in ("id", "title", "path", "trigger"):
+            if required not in raw:
+                raise ConfigurationError(
+                    f"task_module entries must specify '{required}'"
+                )
+
+        return TaskModule(
+            id=str(raw["id"]),
+            title=str(raw["title"]),
+            path=Path(str(raw["path"])),
+            trigger=str(raw["trigger"]),
+            description=str(raw.get("description", "")),
+        )
+
     def _as_tuple(self, value: Any) -> tuple[str, ...]:
         if value in (None, ()):
             return ()
@@ -147,6 +201,19 @@ class ConfigLoader:
         if isinstance(value, bool):
             return value
         raise ConfigurationError(f"Field '{field}' must be a boolean, got {value!r}")
+
+    def _as_optional_positive_int(
+        self, value: Any, field: str
+    ) -> int | None:
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ConfigurationError(
+                f"Field '{field}' must be a positive integer, got {value!r}"
+            )
+        if value <= 0:
+            raise ConfigurationError(f"Field '{field}' must be positive")
+        return value
 
     def _as_non_negative_int(self, value: Any, field: str) -> int:
         if not isinstance(value, int):
