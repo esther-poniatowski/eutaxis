@@ -13,8 +13,12 @@ init : Scaffold prompt composition into a project (planned).
 
 import typer
 from . import info as pkg_info, __version__
+from .commands._cli import commands_app
+from .ops._cli import ops_app
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+app.add_typer(commands_app, name="commands")
+app.add_typer(ops_app, name="ops")
 
 
 @app.command("info")

@@ -8,7 +8,12 @@
 - [ ] Implement a functionality to cleanup config files. This involves:
   - detecting the configs in Codex (TOML) and Claude code (JSON) that violate the recommended patterns,
   - enforcing the recommended practices.
-- [ ] Implement a functionality to clean memory in both agents.
+- [x] Implement a functionality to clean memory in both agents.
+  Shipped as the commands subsystem (`eutaxis commands install clean-memory`)
+  plus the doer (`eutaxis ops clean-memory`). Compiles to an Agent Skill on
+  both Claude and Codex. See [docs/adr/](docs/adr/index.md) for the design
+  decisions and [docs/open-questions/](docs/open-questions/_index.md) for
+  the remaining framework-level questions.
 - [ ] Implement a rule template validation to enforce a uniform structure in instruction files.
 
 ## Next steps
