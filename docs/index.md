@@ -24,6 +24,14 @@ internals/_index
 
 ```{toctree}
 :maxdepth: 2
+:caption: Architecture
+
+adr/index
+open-questions/_index
+```
+
+```{toctree}
+:maxdepth: 2
 :caption: Prompt-Writing Methods
 
 prompt-writing-methods/_index
