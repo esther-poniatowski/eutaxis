@@ -284,6 +284,192 @@ agents: []
         load_config(config)
 
 
+def test_reference_docs_section_is_appended(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - rules.md
+reference_docs_intro: |
+  Consult these authoritative docs. Local first, GitHub fallback.
+reference_docs:
+  - id: vitruv
+    title: Vitruv
+    local_path: ~/work/projects/vitruv
+    github_url: https://github.com/example/vitruv
+    trigger: for architecture and design tasks
+    description: Design principles.
+  - id: hermeneia
+    title: Hermeneia
+    local_path: ~/work/projects/hermeneia
+    github_url: https://github.com/example/hermeneia
+    trigger: for prose writing
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    loaded = load_config(config)
+    output = InstructionGenerator(loaded).generate_all()["codex"]
+
+    assert "## Reference docs\n" in output
+    assert "Consult these authoritative docs." in output
+    assert (
+        "- **Vitruv.** Consult for architecture and design tasks. "
+        "Design principles."
+    ) in output
+    assert "  - Local (primary): `~/work/projects/vitruv`" in output
+    assert (
+        "  - GitHub (fallback): <https://github.com/example/vitruv>"
+    ) in output
+    assert "- **Hermeneia.** Consult for prose writing." in output
+
+
+def test_reference_docs_section_omitted_when_empty(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - rules.md
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    output = InstructionGenerator(load_config(config)).generate_all()["codex"]
+    assert "Reference docs" not in output
+
+
+def test_duplicate_reference_doc_id_raises(tmp_path: Path) -> None:
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+reference_docs:
+  - id: vitruv
+    title: Vitruv
+    local_path: ~/a
+    github_url: https://example.com/a
+    trigger: trig
+  - id: vitruv
+    title: Other
+    local_path: ~/b
+    github_url: https://example.com/b
+    trigger: trig
+agents: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="reference_doc"):
+        load_config(config)
+
+
+def test_reference_doc_missing_required_field_raises(tmp_path: Path) -> None:
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+reference_docs:
+  - id: vitruv
+    title: Vitruv
+    local_path: ~/a
+    trigger: trig
+agents: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="github_url"):
+        load_config(config)
+
+
+def test_rule_index_scans_labels_and_groups_by_file(tmp_path: Path) -> None:
+    (tmp_path / "globals.md").write_text(
+        "# Globals\n\n**precedence**:\n\n ✓ Project wins.\n\n"
+        "**re-read**:\n\n ✓ Read before edit.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "prog.md").write_text(
+        "# Programming\n\n**design-axes**:\n\n ✓ Design.\n\n"
+        "**annotations**:\n\n ✓ Type things.\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - globals.md
+task_modules:
+  - id: programming
+    title: Programming
+    path: prog.md
+    trigger: when coding
+rule_index_enabled: true
+rule_index_intro: |
+  Use these labels for self-check.
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    output = InstructionGenerator(load_config(config)).generate_all()["codex"]
+
+    assert "## Rule index\n" in output
+    assert "Use these labels for self-check." in output
+    assert "- **globals**: precedence, re-read" in output
+    assert "- **prog**: design-axes, annotations" in output
+
+
+def test_rule_index_omitted_when_disabled(tmp_path: Path) -> None:
+    (tmp_path / "globals.md").write_text(
+        "# Globals\n\n**precedence**:\n\n ✓ Project wins.\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - globals.md
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    output = InstructionGenerator(load_config(config)).generate_all()["codex"]
+    assert "Rule index" not in output
+
+
+def test_rule_index_omitted_when_no_labels_found(tmp_path: Path) -> None:
+    (tmp_path / "globals.md").write_text(
+        "# Globals\n\nJust prose, no labels.\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - globals.md
+rule_index_enabled: true
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    output = InstructionGenerator(load_config(config)).generate_all()["codex"]
+    assert "Rule index" not in output
+
+
 def test_budget_exceeded_blocks_generation(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\n" + "x" * 200 + "\n", encoding="utf-8")
     config = tmp_path / "agent-instructions.yaml"

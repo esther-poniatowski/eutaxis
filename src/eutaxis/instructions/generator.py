@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import re
 from pathlib import Path
 from typing import Iterator
 
@@ -12,7 +13,13 @@ from .exceptions import (
     SourceNotFoundError,
 )
 from .markdown import MarkdownAssembler
-from .models import AgentConfig, InstructionConfig, SourceFile, TaskModule
+from .models import (
+    AgentConfig,
+    InstructionConfig,
+    ReferenceDoc,
+    SourceFile,
+    TaskModule,
+)
 
 
 class InstructionGenerator:
@@ -55,6 +62,14 @@ class InstructionGenerator:
         router = self._render_task_module_router()
         if router:
             parts.append(router)
+
+        reference_docs = self._render_reference_docs()
+        if reference_docs:
+            parts.append(reference_docs)
+
+        rule_index = self._render_rule_index(agent)
+        if rule_index:
+            parts.append(rule_index)
 
         if agent.target.footer:
             parts.append(agent.target.footer.strip())
@@ -176,6 +191,73 @@ class InstructionGenerator:
         if description:
             bullet = f"{bullet} {description}"
         return bullet
+
+    def _render_reference_docs(self) -> str:
+        docs = self.config.reference_docs
+        if not docs:
+            return ""
+
+        lines = [f"## {self.config.reference_docs_heading}"]
+        intro = self.config.reference_docs_intro.strip()
+        if intro:
+            lines.extend(["", intro])
+
+        lines.append("")
+        for doc in docs:
+            lines.append(self._render_reference_doc_bullet(doc))
+        return "\n".join(lines)
+
+    _label_pattern = re.compile(r"^\*\*([a-z][a-z0-9-]*)\*\*:\s*$", re.MULTILINE)
+
+    def _render_rule_index(self, agent: AgentConfig) -> str:
+        if not self.config.rule_index_enabled:
+            return ""
+
+        scan_paths: list[Path] = []
+        for source in [*self.config.common_sources, *agent.sources]:
+            scan_paths.append(self.config.resolve(source.path))
+        target_dir = self.config.resolve(agent.target.path).parent
+        for module in self.config.task_modules:
+            if module.path.is_absolute():
+                scan_paths.append(module.path)
+            else:
+                scan_paths.append((target_dir / module.path).resolve())
+
+        entries: list[tuple[str, list[str]]] = []
+        for path in scan_paths:
+            labels = self._scan_labels(path)
+            if labels:
+                entries.append((path.stem, labels))
+
+        if not entries:
+            return ""
+
+        lines = [f"## {self.config.rule_index_heading}"]
+        intro = self.config.rule_index_intro.strip()
+        if intro:
+            lines.extend(["", intro])
+
+        lines.append("")
+        for stem, labels in entries:
+            lines.append(f"- **{stem}**: {', '.join(labels)}")
+        return "\n".join(lines)
+
+    def _scan_labels(self, path: Path) -> list[str]:
+        if not path.is_file():
+            return []
+        content = path.read_text(encoding="utf-8")
+        return self._label_pattern.findall(content)
+
+    def _render_reference_doc_bullet(self, doc: ReferenceDoc) -> str:
+        header = f"- **{doc.title}.** Consult {doc.trigger.strip()}."
+        description = doc.description.strip()
+        if description:
+            header = f"{header} {description}"
+        return (
+            f"{header}\n"
+            f"  - Local (primary): `{doc.local_path}`\n"
+            f"  - GitHub (fallback): <{doc.github_url}>"
+        )
 
     def _load_source(self, source: SourceFile) -> str:
         source_path = self.config.resolve(source.path)

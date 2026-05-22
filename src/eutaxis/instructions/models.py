@@ -43,6 +43,18 @@ class TaskModule:
     description: str = ""
 
 
+@dataclass(frozen=True)
+class ReferenceDoc:
+    """An authoritative external reference doc with a local path and GitHub fallback."""
+
+    id: str
+    title: str
+    local_path: str
+    github_url: str
+    trigger: str
+    description: str = ""
+
+
 @dataclass
 class AgentConfig:
     """One generated instruction output."""
@@ -65,6 +77,12 @@ class InstructionConfig:
     task_modules: list[TaskModule] = field(default_factory=list)
     task_modules_heading: str = "Task modules"
     task_modules_intro: str = ""
+    reference_docs: list[ReferenceDoc] = field(default_factory=list)
+    reference_docs_heading: str = "Reference docs"
+    reference_docs_intro: str = ""
+    rule_index_enabled: bool = False
+    rule_index_heading: str = "Rule index"
+    rule_index_intro: str = ""
     default_max_bytes: int | None = None
 
     def budget_for(self, agent: AgentConfig) -> int | None:

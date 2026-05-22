@@ -11,6 +11,7 @@ from .exceptions import ConfigurationError
 from .models import (
     AgentConfig,
     InstructionConfig,
+    ReferenceDoc,
     SourceFile,
     TargetConfig,
     TaskModule,
@@ -51,6 +52,20 @@ class ConfigLoader:
                 raw.get("task_modules_heading", "Task modules")
             ),
             task_modules_intro=str(raw.get("task_modules_intro", "")),
+            reference_docs=self._parse_reference_docs(
+                raw.get("reference_docs", [])
+            ),
+            reference_docs_heading=str(
+                raw.get("reference_docs_heading", "Reference docs")
+            ),
+            reference_docs_intro=str(raw.get("reference_docs_intro", "")),
+            rule_index_enabled=self._as_bool(
+                raw.get("rule_index_enabled", False), "rule_index_enabled"
+            ),
+            rule_index_heading=str(
+                raw.get("rule_index_heading", "Rule index")
+            ),
+            rule_index_intro=str(raw.get("rule_index_intro", "")),
             default_max_bytes=self._as_optional_positive_int(
                 raw.get("max_bytes"), "max_bytes"
             ),
@@ -184,6 +199,44 @@ class ConfigLoader:
             id=str(raw["id"]),
             title=str(raw["title"]),
             path=Path(str(raw["path"])),
+            trigger=str(raw["trigger"]),
+            description=str(raw.get("description", "")),
+        )
+
+    def _parse_reference_docs(self, raw_docs: Any) -> list[ReferenceDoc]:
+        if raw_docs is None:
+            return []
+        if not isinstance(raw_docs, list):
+            raise ConfigurationError("reference_docs must be a list")
+
+        docs: list[ReferenceDoc] = []
+        seen: set[str] = set()
+        for raw in raw_docs:
+            doc = self._parse_reference_doc(raw)
+            if doc.id in seen:
+                raise ConfigurationError(
+                    f"Duplicate reference_doc id: {doc.id}"
+                )
+            seen.add(doc.id)
+            docs.append(doc)
+        return docs
+
+    def _parse_reference_doc(self, raw: Any) -> ReferenceDoc:
+        if not isinstance(raw, dict):
+            raise ConfigurationError(
+                f"Invalid reference_doc specification: {raw!r}"
+            )
+        for required in ("id", "title", "local_path", "github_url", "trigger"):
+            if required not in raw:
+                raise ConfigurationError(
+                    f"reference_doc entries must specify '{required}'"
+                )
+
+        return ReferenceDoc(
+            id=str(raw["id"]),
+            title=str(raw["title"]),
+            local_path=str(raw["local_path"]),
+            github_url=str(raw["github_url"]),
             trigger=str(raw["trigger"]),
             description=str(raw.get("description", "")),
         )

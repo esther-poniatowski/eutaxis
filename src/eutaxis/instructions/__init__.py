@@ -12,6 +12,7 @@ from .markdown import MarkdownAssembler
 from .models import (
     AgentConfig,
     InstructionConfig,
+    ReferenceDoc,
     Section,
     SourceFile,
     TargetConfig,
@@ -27,6 +28,7 @@ __all__ = [
     "InstructionError",
     "InstructionGenerator",
     "MarkdownAssembler",
+    "ReferenceDoc",
     "Section",
     "SourceFile",
     "SourceNotFoundError",
