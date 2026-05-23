@@ -2,16 +2,16 @@
 
 ## General principles
 
-For agents performing multi-step tasks, the **reasoning schema** must define the computational graph the model should traverse before emitting output. High-quality prompts instruct the agent **how to reason**, not only **what to produce**.
+For agents performing multi-step tasks, the **reasoning schema** must define the checks, decompositions, and external artifacts that should exist before committed output. Depending on the model class, high-quality prompts either guide the reasoning trace directly or specify the targets that the model's hidden reasoning must satisfy.
 
 **Rationale**: This prevents superficial explanations and encourages systematic reasoning.
 
 Possible reasoning constraints include:
 
-- derive results step by step  
-- justify each non-trivial statement  
-- highlight assumptions  
-- distinguish intuition from formal proof  
+- derive results step by step
+- justify each non-trivial statement
+- highlight assumptions
+- distinguish intuition from formal proof
 
 *Example*:
 
@@ -22,7 +22,7 @@ Reasoning requirements:
 - Intuition must precede formalism.
 ```
 
-Encourage explicit reasoning transparency. When analytical tasks are involved, instruct the agent to make reasoning explicit.
+Encourage explicit reasoning transparency when the model and task benefit from visible derivations. For native reasoning models, prefer concise reasoning summaries or verification artifacts unless the task requires an inspectable derivation.
 
 *Example*:
 
@@ -41,8 +41,8 @@ Each derivation must clearly indicate:
 
 | Model                                     | Context                                        | Characteristic                                                                               | Consequences for prompt design                                                                                                                              |
 | ----------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Standard instruction-following models** | Dominant in production agentic deployments     | Reasoning occurs entirely within the context window and is fully controllable via prompting. | Specify both _what_ the model should reason about and _how_ it should externalize that reasoning.                                                           |
-| **Native reasoning models**               | OpenAI o-series, Claude with extended thinking | Internal chain-of-thought executes outside the accessible context window.                    | The design task shifts from _inducing_ reasoning structure to _directing_ reasoning targets — specifying what the model should verify, decompose, or check. |
+| **Standard instruction-following models** | Non-reasoning or low-latency execution models | No separate hidden reasoning-token budget is exposed. Visible intermediate reasoning can be prompted when useful. | Specify both _what_ the model should reason about and, when needed, _how_ it should externalize that reasoning. |
+| **Native reasoning models**               | OpenAI o-series, Claude with extended thinking | The model has a separate hidden or extended reasoning path; raw reasoning is not a normal prompt-controlled output artifact. | The design task shifts from _inducing_ reasoning structure to _directing_ reasoning targets: specify success criteria, verification conditions, decomposition targets, and output contracts. |
 
 ## Explicit chain-of-thought scaffolding
 
@@ -57,4 +57,14 @@ Visible reasoning traces are not guaranteed to be _causally faithful_. The writt
 
 The boundary between the scratchpad and the output must be explicit and structural: "content within `<reasoning>` tags constitutes internal scaffolding and must not appear in the final response; content within `<output>` tags constitutes the committed response." Failure to enforce this boundary causes the model to either suppress useful reasoning (if it treats all output as committed) or pollute the response with scratchpad content.
 
-**Native reasoning models**. Imposing an explicit scratchpad section is either redundant (the model already maintains internal reasoning) or actively harmful (it consumes context budget for a process the model handles more effectively without structural constraint). For these configurations, the design effort should be directed toward specifying **verification conditions** and **decomposition targets** rather than output boundaries — state what the model should check, not how it should think.
+**Native reasoning models**. External chain-of-thought scaffolds are not the default control mechanism for native reasoning models. The model already allocates hidden reasoning, so a visible scratchpad often duplicates work and consumes context. A prescribed action sequence can also degrade performance when it forces the model through a weaker human-written plan.
+
+For these configurations, prompt design should usually specify **reasoning targets** rather than **reasoning traces**. Reasoning targets include:
+
+- the success criteria the answer must satisfy
+- the subproblems the model must decompose
+- the assumptions, edge cases, and failure modes the model must check
+- the verification conditions the final answer must pass
+- the required output contract
+
+This guidance is not an absolute ban on stepwise structure. External steps remain appropriate when the task needs inspectable intermediate artifacts, reproducible process boundaries, tool choreography, compliance evidence, or a teaching-oriented derivation. In those cases, the steps should describe the required external work product, not attempt to micromanage the model's hidden reasoning process.

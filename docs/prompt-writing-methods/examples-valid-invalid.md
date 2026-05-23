@@ -1,16 +1,16 @@
 
 # AI Prompt - Examples
 
-The empirical evidence is unambiguous: **contrastive examples (valid + invalid pairs) produce substantially more reliable rule-following than declarative rules alone**, particularly for stylistic and discourse-level constraints that resist precise logical formulation. 
+Few-shot and in-context-learning evidence supports a qualified claim: **well-chosen examples often improve rule-following beyond declarative rules alone**, particularly for format, style, and discourse-level constraints that resist precise logical formulation. The effect is model-dependent and sensitive to example quality, ordering, surface features, and task distribution.
 
-The mechanism is that contrastive pairs force the model to compute a **discriminant** between the two cases. This discriminant is a far more precise internal representation of the rule than a declarative statement alone can induce.
+Contrastive pairs are useful because they expose a boundary between allowed and disallowed outputs. The prompt should not assume this induces a faithful internal representation of the rule; it is enough that the pair gives the model a local pattern for distinguishing compliant from non-compliant outputs.
 
-Thus, two complementary information types are necessary to specify behavior:
+Thus, two complementary information types are often needed to specify behavior:
 
 - **Declarative rules** establish the constraint boundary — what is in and out of the allowed set.
   Examples without rules are subject to **overfitting to surface form**: the model generalizes from the example's incidental properties rather than its underlying principle.
-- **Examples** calibrate the _metric_ the model uses to measure distance from that boundary. 
-  Rules without examples are subject to **boundary drift**: the model correctly represents the rule in latent space but applies an incorrect decision threshold when instantiating it.
+- **Examples** calibrate the local pattern the model should instantiate near that boundary.
+  Rules without examples are subject to **boundary drift**: the model may interpret the rule in a plausible but unintended way when producing a concrete output.
 
 ## Conditions for relevance
 
@@ -38,7 +38,7 @@ Rule: Subjective informal pronouns are forbidden.
 
 **Condition 2: The rule's failure mode is a specific and recurring surface pattern**
 
-If the rule targets a clearly identifiable anti-pattern, a single invalid example is sufficient and a valid example is often unnecessary (the valid case is the entire complement). 
+If the rule targets a clearly identifiable anti-pattern, a single invalid example is sufficient and a valid example is often unnecessary (the valid case is the entire complement).
 
 *Example*: Here the valid/invalid pair doubles as a substitution table — maximally efficient.
 
@@ -50,7 +50,7 @@ Rule: Contractions are forbidden.
 
 **Condition 3: The rule interacts non-trivially with other rules**
 
-When two rules can produce conflicting outputs on the same input, an example that demonstrates their joint application is high-value. Without it, the model defaults to resolving the conflict by whichever rule was most recently stated.
+When two rules can produce conflicting outputs on the same input, an example that demonstrates their joint application is high-value. Without it, the model may resolve the conflict by whichever rule is most salient, recent, or locally plausible.
 
 ## Economy Principles
 
@@ -59,12 +59,12 @@ Two economy principles prevent example sets from becoming a maintenance liabilit
 **Minimum discriminating set.** The set of examples for a rule should be the smallest set such that any output either:
 
 - matches a valid example's pattern
-- matches an invalid example's anti-pattern. 
+- matches an invalid example's anti-pattern.
 
 > [!WARNING]
 > Redundant examples dilute attention and increase prompt length without adding information.
 
-**Generative examples, not enumerative ones.** The examples should illustrate the _principle_ of the rule, not enumerate its _instances_. 
+**Generative examples, not enumerative ones.** The examples should illustrate the _principle_ of the rule, not enumerate its _instances_.
 
 An example that instantiates the rule at a point where multiple anti-patterns co-occur is more efficient than two separate examples each targeting one anti-pattern in isolation.
 
@@ -76,7 +76,7 @@ An example that instantiates the rule at a point where multiple anti-patterns co
 ```
 
 > [!Warning]
-> The _composition_ of that set must also be representative of the task distribution and balanced across failure modes.  
+> The _composition_ of that set must also be representative of the task distribution and balanced across failure modes.
 
 ICL literature finds that:
 
@@ -88,11 +88,11 @@ ICL literature finds that:
 
 Two well-documented phenomena are relevant: **recency bias** and **contrastive priming**.
 
-These two effects jointly favor the ordering **invalid → valid**:
+These two effects usually favor the ordering **invalid -> valid**:
 
-1. The valid example occupies the recency-favored position. The model's generative prior at the moment of output production is shaped by the correct form, not the anti-pattern.
-2. The invalid → valid sequence instantiates a **correction schema** — a pattern the model has been exposed to at massive scale through RLHF feedback, code review, and editorial revision corpora. This schema carries strong learned associations: _here is a deficient form; here is its repair_. Activating this schema aligns the model's processing with its training distribution.
-3. The valid example, arriving after the anti-pattern, is computed **in contrast to** a foregrounded deficient form. This contrastive computation produces a sharper discriminant than a valid example encountered in isolation.
+1. The valid example occupies the recency-favored position. The model is more likely to continue from the compliant form than from the anti-pattern.
+2. The invalid -> valid sequence instantiates a **correction schema**: a deficient form followed by its repair. This pattern is common in editing, code review, and feedback data.
+3. The valid example, arriving after the anti-pattern, is interpreted in contrast to a foregrounded deficient form. This contrast can make the intended boundary easier to apply than a valid example encountered in isolation.
 
 ## Field name semantics
 

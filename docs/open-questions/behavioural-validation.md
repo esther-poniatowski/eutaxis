@@ -67,7 +67,13 @@ as a complement to the build-time contract. Three motivations:
   prompts and oracles are project-defined.
 - **Surface the gap in `eutaxis explain`.** When a fidelity grade is
   Approximate and no behavioural evidence is attached, the report
-  marks it "claimed, not measured".
+  marks it `unmeasured`. Structural checks produce `structural`
+  evidence; smoke prompts supplied by a consuming project produce
+  `smoke-tested` evidence.
+
+The evidence label prevents a structural guarantee from being read as
+a behavioural guarantee. A compiled artifact can be structurally
+valid while the receiving agent still fails the intended workflow.
 
 ## Decision required before
 

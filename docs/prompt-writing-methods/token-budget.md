@@ -4,18 +4,18 @@ Prompt quality is constrained by **token budget**: instructions, retrieved conte
 
 ## Empirical phenomena
 
-Transformer attention exhibits a U-shaped positional reliability profile: highest at the beginning and immediately before generation, lowest in the middle.
+Long-context transformer behavior often exhibits a U-shaped positional reliability profile: models tend to use information near the beginning and near the generation point more reliably than information in the middle. The strength of this pattern depends on the model, task, and prompt layout.
 
 - _Primacy effect_: very early tokens are more influential.
-- _Recency effect_: later context (immediately prior to the generation point) exerts more influence on generation relative to earlier context. This effect is strongest at short distances — but it is consistently observed across model scales.
-- _Contrastive priming_: the model's tends to use the immediately preceding example as a generative prior when producing output. If the last example seen is an anti-pattern, that anti-pattern occupies a privileged position in the activation space at generation time.
+- _Recency effect_: later context, especially text immediately before generation, can exert disproportionate influence relative to earlier context.
+- _Contrastive priming_: a nearby example can shape the pattern the model continues. If the last example seen is an anti-pattern, the prompt may make that anti-pattern locally salient.
 
-The mechanism is attention dilution: in a fixed context window with full self-attention, each token's influence on the generated output scales inversely with the total number of tokens competing for the model's attention at the relevant positions.
+The mechanism is not a simple inverse scaling law over tokens. Empirical work on lost-in-the-middle behavior and positional attention bias supports the practical conclusion that longer prompts make instruction placement and retrieval layout more important, but the exact mechanism varies across architectures and training regimes.
 
 ## Practical implications
 
-**Length of prompts.** The token budget for instructions should be minimized to the extent possible without sacrificing critical information. Each additional token reduces the influence of all other tokens, so every sentence must justify its presence through a unique contribution to behavior.
+**Length of prompts.** The token budget for instructions should be minimized to the extent possible without sacrificing critical information. Longer prompts increase the surface area for conflicts, salience shifts, and retrieval failures, so every sentence must justify its presence through a unique contribution to behavior.
 
 **Placement of critical instructions.** Critical global instructions usually belong in stable high-level prompt regions so they remain consistently available.
 
-**Placement of soft constraints.** As prompt length increases, soft constraints (stylistic, register-level) degrade faster than hard syntactic constraints, because the latter are more easily pattern-matched. Long prompts must front-load and structurally repeat soft constraints, not merely enumerate them once.
+**Placement of soft constraints.** As prompt length increases, soft constraints (stylistic, register-level) are often more fragile than hard syntactic constraints, because the latter can be matched against explicit surface patterns. Long prompts should place important soft constraints in prominent regions and reinforce them through examples or output contracts when they matter.

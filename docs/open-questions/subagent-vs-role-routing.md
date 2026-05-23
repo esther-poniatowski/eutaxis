@@ -14,10 +14,11 @@ session-preset components to **output styles** (Claude) and
 [session-preset-regime](session-preset-regime.md) for why that
 mapping is structurally wrong.
 
-Subagents are the **native role-isolation mechanism** on both agents:
-separate context, separate tool set, separate model. A "role"
-component, in the sense the prior proposal used (`role:reviewer`,
-`role:writer`), maps to a subagent on both platforms cleanly.
+Subagents are the **closest native role-isolation mechanism** on both
+agents: delegated context, scoped instructions, configurable tools,
+and in some cases a separate model. A "role" component, in the sense
+the prior proposal used (`role:reviewer`, `role:writer`), maps to a
+subagent more cleanly than to an output style or profile.
 
 The decision currently chosen — defer the mechanism best aligned with
 P3 (`activation-regime-as-classification-axis`) and fully model the
@@ -49,7 +50,7 @@ addresses both at once.
   — subagents are not Agent Skills, so a separate convergence story
   is needed if they are adopted.
 
-## Candidate resolution
+## Recommended resolution
 
 - **Promote subagents from "deferred" to "in scope".** Their
   declaration model is no more divergent than profile / output-style.
@@ -61,6 +62,14 @@ addresses both at once.
   currently picks the worse-fit native mechanism for role-style
   components. Document this in `eutaxis explain` until a better
   routing is implemented.
+
+The fidelity grade should split two concerns. The role payload can
+often compile with high structural fidelity because both platforms
+support a delegated instruction bundle. Invocation semantics differ:
+one platform may delegate proactively by description, while another
+may require explicit spawning or user direction. `eutaxis explain`
+therefore reports role-payload fidelity separately from invocation
+fidelity.
 
 ## Decision required before
 

@@ -21,6 +21,9 @@ live under [`docs/open-questions/`](../open-questions/_index.md).
 compiler-not-runtime-activation
 same-source-not-same-behaviour
 activation-regime-as-classification-axis
+silent-failure-rules-as-always-on
+rule-sources-as-structured-templates
+four-axis-instruction-decomposition
 two-source-kinds-instruction-vs-capability
 native-precedence-over-parallel-engine
 convergence-on-agent-skills-standard

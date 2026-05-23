@@ -61,7 +61,7 @@ applied there are implicit; they have not been promoted to ADR status.
   ([two-source-kinds-instruction-vs-capability](../adr/two-source-kinds-instruction-vs-capability.md)).
 - Any future regime that writes into shared user files.
 
-## Candidate resolution
+## ADR-ready resolution
 
 A defensible compromise from the review:
 
@@ -75,10 +75,10 @@ A defensible compromise from the review:
 - **Idempotency** is enforced by the marker plus a content hash; the
   delimiter survives reformatting.
 
-This needs decision, not just suggestion. The two halves of the
-ownership policy should be ADR-promoted together so callers do not
-have to read open-question pages to know what `eutaxis generate`
-will overwrite.
+This should be promoted to an ADR before any new always-on writer
+lands. The two halves of the ownership policy belong in one decision
+so callers do not have to read open-question pages to know what
+`eutaxis generate` will overwrite.
 
 ## Decision required before
 

@@ -80,6 +80,19 @@ Token-economy norms, recommended region order, and section-shape
 heuristics are advisory by default. They emit warnings; they do not
 fail the build.
 
+Every reported fidelity or validation claim also carries an
+**evidence state**:
+
+- **Structural** — derived from schema, rendering, length, and
+  profile checks only.
+- **Smoke-tested** — exercised against at least one representative
+  prompt or task for the target family.
+- **Unmeasured** — no behavioural evidence is attached.
+
+`eutaxis explain` reports the evidence state next to each fidelity
+grade so that a structurally valid prompt is not mistaken for an
+empirically verified one.
+
 ## Discarded alternatives
 
 - **Single tier of hard rules.** Rejected because prompt prose rules
@@ -116,6 +129,10 @@ keeps the build informative.
   `eutaxis validate` or equivalent, run on demand.
 - The `CompositionResult` data carries `diagnostics: tuple[str, ...]`
   alongside `prompt_text`, `word_count`, and `token_estimate`.
+- The `CompositionResult` or adjacent explanation record carries an
+  evidence state for each validation claim. Tier 1 and Tier 2 produce
+  structural evidence by default; Tier 3 upgrades selected claims to
+  smoke-tested when a consuming project supplies prompts and oracles.
 - Adding a new advisory rule does not break existing prompts; adding
   a new hard requirement does and requires a migration.
 - Behavioural validation is empirical and remains the responsibility

@@ -74,7 +74,7 @@ Hierarchical structure is justified only when:
 - the rules themselves have genuine logical hierarchy — when child rules are properly _instances_ or _refinements_ (special cases) of a parent rule,
 - it provides the decision procedure for novel cases in the rule's domain — when a parent rule encodes the _generative principle_ that governs how to handle cases not covered by any child rule (even when children are interpretable without it).
 
-In all other cases, the dominant format remains flat tagged blocks with contrastive examples and a `<note>` field encoding non-obvious implications.
+In most other cases, a practical default is flat tagged blocks with contrastive examples and a `<note>` field encoding non-obvious implications.
 
 Valid hierarchy: the parent rule is a general principle; the children partition its application space.
 

@@ -51,7 +51,7 @@ codebase compiles capability artifacts.
   ([same-source-not-same-behaviour](../adr/same-source-not-same-behaviour.md))
   — "Approximate" should not apply to security policy at all.
 
-## Candidate resolution
+## Recommended resolution
 
 Split the capability regime in two:
 
@@ -73,6 +73,12 @@ Split the capability regime in two:
 Codex Starlark rules in particular should remain **hand-authored** —
 compiling them is not yet justified, and they remain on the deferred
 list.
+
+This split is ADR-ready. The open design work concerns the exact
+schema vocabulary, the review gate, and the supply-chain policy for
+externally sourced capability components. The adequacy principle is
+settled: approximate fidelity may apply to tool wiring, but it must
+not apply to security policy.
 
 ## Decision required before
 

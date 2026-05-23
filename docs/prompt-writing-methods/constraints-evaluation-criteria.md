@@ -8,7 +8,7 @@ Constraints partition into two classes:
 
 **Positive constraints** (invariants that must hold): formulate as necessary conditions on output. Use modal language: "every mathematical claim **must** be accompanied by a justification", not "try to justify claims".
 
-**Negative constraints** (prohibited behaviors): these are substantially more brittle and require careful formulation.
+**Negative constraints** (prohibited behaviors): these are often more brittle and require careful formulation.
 
 Two common failure modes:
 
@@ -24,13 +24,13 @@ Quality criteria:
 - Explanations must avoid unnecessary repetition.
 ```
 
-**Priority ordering** among constraints must be explicit. When two constraints conflict under adversarial or edge inputs, the model defaults to recency or frequency of occurrence in training — not the author's intent.
+**Priority ordering** among constraints must be explicit. When two constraints conflict under adversarial or edge inputs, the model may resolve the conflict through recency, salience, learned priors, or local plausibility rather than the author's intent.
 
 *Example*: _"if constraints C1 and C2 conflict, C1 takes precedence."_
 
 ## Verification and post-conditions
 
-Specifying _what the model must verify before committing output_ is the primary lever available for directing the model's internal reasoning toward the right checks (since the reasoning process itself is not directly controllable).
+Specifying _what the model must verify before committing output_ is one of the main levers for directing hidden or extended reasoning toward the right checks. For models whose reasoning is not exposed or should not be micromanaged, verification conditions are usually more robust than prescribed reasoning traces.
 
 The instruction file should specify:
 

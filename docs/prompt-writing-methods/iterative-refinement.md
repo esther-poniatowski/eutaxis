@@ -2,7 +2,7 @@
 
 ## Human-side testing
 
-The proven refinement protocol is:
+An evidence-informed refinement protocol is:
 
 1. **Behavioral testing against adversarial inputs**: construct inputs that probe the boundary of each constraint. Failure modes reveal underspecified or conflicting rules.
 2. **Coverage analysis**: for each behavioral requirement in the original specification, verify a corresponding instruction exists. Missing instructions are the primary source of silent failures.

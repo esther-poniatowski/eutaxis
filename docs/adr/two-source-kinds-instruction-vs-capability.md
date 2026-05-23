@@ -37,6 +37,9 @@ level:
   MCP server definitions, settings permission rules, and equivalent
   native configuration. The body is a structured declaration; the
   compiler validates the shape against the target agent's schema.
+  Capability components carry a subtype: `tool-wiring` for tool
+  registration and toggles, or `policy` for permission rules,
+  command policy, sandbox configuration, and approval behaviour.
 
 The two kinds follow different paths through the pipeline:
 
@@ -51,6 +54,12 @@ Capability emission is **never automatic** in routine `eutaxis
 generate` runs. A separate flag (e.g. `--with-capabilities`) gates the
 write, and the planned changes are summarised with their privilege
 delta before any artifact lands.
+
+Approximate fidelity is valid only for `tool-wiring`. For `policy`,
+the compiler must either represent the same boundary exactly on the
+target surface or refuse the build. A policy source that compiles to
+a looser or stricter privilege boundary is not an approximate match;
+it is a privilege change and requires an explicit policy decision.
 
 Externally sourced capability components (from cross-repo rule-owning
 projects) are subject to additional supply-chain rules; see
@@ -92,6 +101,8 @@ level, where it belongs.
   components.
 - A capability component cannot be compiled "by mistake" — a flag
   must be passed and a diff acknowledged.
-- A future split of the capability regime into `tool-wiring` versus
-  `policy` is anticipated in
-  [open-questions/capability-regime-split](../open-questions/capability-regime-split.md).
+- The capability regime split into `tool-wiring` and `policy` is
+  required before capability emission. The remaining open work in
+  [open-questions/capability-regime-split](../open-questions/capability-regime-split.md)
+  concerns exact schema vocabulary and supply-chain gates, not the
+  existence of the split.

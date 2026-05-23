@@ -50,27 +50,26 @@ profile block.
   — if Eutaxis must write the activation key, that path becomes
   privilege-adjacent.
 
-## Candidate resolutions
+## Candidate resolution
 
-The review's recommended corrections sit on a spectrum:
+The recommended correction combines two moves:
 
-- **(A) Demote session-preset to a catalogued artifact.** The
-  compiler emits files but explicitly disclaims activation. The user
-  selects the active output style / profile manually. Cheapest path;
-  preserves the regime as a classification axis but weakens its
-  promise.
-- **(B) Split the regime in two.** A Claude-side "role substitution"
-  mechanism (output style) and a Codex-side "configuration preset"
-  mechanism (profile). The source declares which it targets;
-  cross-agent equivalence is not claimed. Honest but expands the
-  source vocabulary.
-- **(C) Route role components to subagents instead.** Subagents are
-  the native role-isolation mechanism in both agents and align with
-  P3. This couples to [subagent-vs-role-routing](subagent-vs-role-routing.md).
+- **Demote session-preset artifacts to catalogued, manually activated
+  artifacts.** The compiler may emit output-style files or profile
+  fragments, but it does not write the active selection key. `eutaxis
+  explain` reports that activation is out of band.
+- **Route role components to subagents where the target platform
+  supports subagents.** A reviewer, writer, auditor, or domain expert
+  role is a delegated-agent concern, not a session-profile concern.
+  Output styles and profiles remain available for non-role session
+  preferences such as communication style.
 
-The right resolution likely combines (A) — disclaim activation when
-emitting profile/output-style artifacts — with (C) — re-target role
-components to subagents where they fit.
+Cross-agent equivalence is not claimed for session presets. The
+fidelity grade must distinguish "artifact installed" from "session
+activated" and from "role isolation achieved." This question should
+be resolved together with
+[subagent-vs-role-routing](subagent-vs-role-routing.md), then promoted
+to an ADR before Phase 2 implementation.
 
 ## Decision required before
 

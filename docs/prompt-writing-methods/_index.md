@@ -1,6 +1,6 @@
 # Prompt writing methods
 
-The design of agent instructions (prompts) is a discipline with well-characterized failure modes and empirically validated best practices. The following synthesizes the state of the art across structural architecture, linguistic form, and behavioral specification.
+The design of agent instructions (prompts) is a discipline with well-characterized failure modes and evidence-informed practices. Empirical support varies by model family, task, and deployment surface. The following synthesizes stable design principles across structural architecture, linguistic form, and behavioral specification.
 
 > [!WARNING] Design-time artifact
 > This note is a **design-time reference** used when authoring the `governance/` files (rules, specs, contracts, audits, workflow). It is not loaded by agents during note production. The deployed system's agent instructions are the `governance/` files themselves; this note informs their design but is not part of the runtime instruction surface.
@@ -10,16 +10,16 @@ The design of agent instructions (prompts) is a discipline with well-characteriz
 
 ## Foundational Principles
 
-The central challenge is the **specification-behavior gap**: the model infers operational intent from natural language, introducing ambiguity at every underspecified node. Optimal instructions minimize this gap through precision, completeness, and internal consistency.
+The central challenge is the **specification-behavior gap**: the model infers operational intent from natural language, introducing ambiguity at every underspecified node. Effective instructions reduce this gap through precision, completeness, and internal consistency.
 
 Three meta-principles govern all decisions:
 
 - **Reduction of interpretive degrees of freedom.** Each instruction should minimize the number of valid parses. Ambiguous clauses produce stochastic behavior — the model samples from a distribution over interpretations. The target is to reduce this distribution's entropy as far as possible, not to eliminate it entirely (natural language cannot guarantee a single parse).
 - **Separation of concerns.** Role, task, constraints, output format, and edge-case handling are orthogonal dimensions. Conflating them produces coupling: changing one accidentally alters the other. Instructions should decompose cleanly along these axes.
-- **Falsifiability of compliance.** An instruction the model cannot verify it is following is either useless or harmful. Every behavioral directive must be testable against the model's own output at inference time.
+- **Falsifiability of compliance.** An instruction the model cannot check against its own output is harder to enforce and easier to satisfy only superficially. Every behavioral directive should be testable against the model's own output at inference time when the directive concerns the output artifact.
 
 > [!WARNING]
-> Prompt design depends on the **model-family**. A prompt that is optimal for a reasoning model may be suboptimal for a lower-latency execution model.
+> Prompt design depends on the **model-family**. A prompt that works well for a reasoning model may be suboptimal for a lower-latency execution model.
 
 - [Structure of prompts](structure-prompts.md)
 - [Section demarcation](section-demarcation.md)
@@ -28,7 +28,6 @@ Three meta-principles govern all decisions:
 - [Token budget](token-budget.md)
 - [Iterative refinement](iterative-refinement.md)
 - [Multi-agent and multi-turn extensions](multi-agent-multi-turn.md)
-
-
+- [Instruction axes and reasoning targets](instruction-axes.md)
 
 

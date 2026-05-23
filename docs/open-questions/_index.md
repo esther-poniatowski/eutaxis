@@ -20,6 +20,10 @@ behavioural-validation
 cross-repository-source-acquisition
 substrate-volatility-tracking
 identifier-and-namespace-algebra
+silent-failure-classification
+claude-md-cumulative-loading-semantics
+rule-set-granularity
+rule-template-format-and-vocabulary
 ```
 
 ## Triage
@@ -36,3 +40,7 @@ identifier-and-namespace-algebra
 | [cross-repository-source-acquisition](cross-repository-source-acquisition.md) | Medium | Phase 1 (if external fragments are consumed) | Open |
 | [substrate-volatility-tracking](substrate-volatility-tracking.md) | Low | None | Open |
 | [identifier-and-namespace-algebra](identifier-and-namespace-algebra.md) | Medium | Phase 1 (cross-repo) | Partial — `name == directory` codified for Codex |
+| [silent-failure-classification](silent-failure-classification.md) | Medium-High | Phase 1 (any rule needing placement) | Open |
+| [claude-md-cumulative-loading-semantics](claude-md-cumulative-loading-semantics.md) | Medium | Phase 1 (Claude-side always-on adapter) | Open |
+| [rule-set-granularity](rule-set-granularity.md) | Medium | Phase 1 (rule-template migration) | Leaning — one file per rule-set with internal identifiers |
+| [rule-template-format-and-vocabulary](rule-template-format-and-vocabulary.md) | High | Phase 1 (rule-template migration) | Leaning — YAML + JSON Schema; vocabulary partly committed |
