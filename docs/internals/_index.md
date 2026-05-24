@@ -11,3 +11,9 @@ Design-time reference documents for the eutaxis governance system. These files d
 | [registries](registries.md)                                       | Registry files and validation          |
 | [audits](audits.md)                                               | Post-draft verification checklists     |
 
+## Plans
+
+| Document                                              | Scope                                                          |
+| ----------------------------------------------------- | -------------------------------------------------------------- |
+| [api-docs-pipeline-plan](api-docs-pipeline-plan.md)   | Staged plan to introduce `sphinx-markdown-builder` for the API |
+
