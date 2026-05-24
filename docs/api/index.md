@@ -1,7 +1,25 @@
 # API reference
 
-```{toctree}
-:maxdepth: 2
-
-instructions
-```
+* [Instructions](instructions.md)
+  * [Configuration](instructions.md#module-eutaxis.instructions.config)
+  * [Generator](instructions.md#module-eutaxis.instructions.generator)
+  * [Markdown Assembly](instructions.md#module-eutaxis.instructions.markdown)
+  * [Data Models](instructions.md#module-eutaxis.instructions.models)
+  * [Exceptions](instructions.md#module-eutaxis.instructions.exceptions)
+* [Commands](commands.md)
+  * [Loader](commands.md#module-eutaxis.commands.loader)
+  * [Registry](commands.md#module-eutaxis.commands.registry)
+  * [Rendering](commands.md#module-eutaxis.commands.rendering)
+  * [Templating](commands.md#module-eutaxis.commands.templating)
+  * [Installer](commands.md#module-eutaxis.commands.installer)
+  * [Data Models](commands.md#module-eutaxis.commands.models)
+  * [Exceptions](commands.md#module-eutaxis.commands.exceptions)
+  * [Agent Adapters](commands.md#agent-adapters)
+* [Operations](ops.md)
+  * [Memory](ops.md#module-eutaxis.ops.memory)
+  * [Exceptions](ops.md#module-eutaxis.ops.exceptions)
+* [Top-Level Entry Points](toplevel.md)
+  * [CLI](toplevel.md#module-eutaxis.cli)
+  * [Generate](toplevel.md#module-eutaxis.generate)
+  * [Validate](toplevel.md#module-eutaxis.validate)
+  * [Scaffold](toplevel.md#module-eutaxis.scaffold)

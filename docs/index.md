@@ -1,38 +1,35 @@
+---
+tags:
+  - index
+aliases:
+  - Eutaxis
+index: ""
+---
+
 # Eutaxis
 
 Eutaxis composes structured agent prompts and instruction files from reusable Markdown fragments.
 
-```{toctree}
-:maxdepth: 2
-:caption: User guide
+## User guide
 
-guide/installation
-guide/usage
-guide/cli-reference
-guide/configuration
-guide/concepts
-```
+- [Installation](guide/installation.md)
+- [Usage](guide/usage.md)
+- [CLI Reference](guide/cli-reference.md)
+- [Configuration](guide/configuration.md)
+- [Core Concepts](guide/concepts.md)
+- [Project Scaffolding](guide/project-scaffolding.md)
+- [Instruction Assembly API](guide/instructions-api.md)
 
-```{toctree}
-:maxdepth: 2
-:caption: Reference
+## Reference
 
-api/index
-internals/_index
-```
+- [API Reference](api/index.md)
+- [Design Documentation — Methods](internals/_index.md)
 
-```{toctree}
-:maxdepth: 2
-:caption: Architecture
+## Architecture
 
-adr/index
-open-questions/_index
-```
+- [Architecture decisions](adr/_index.md)
+- [Open questions](open-questions/_index.md)
 
-```{toctree}
-:maxdepth: 2
-:caption: Prompt-writing methods
+## Prompt-writing methods
 
-prompt-writing-methods/_index
-quality-criteria/note-template
-```
+- [Prompt-writing methods](prompt-writing-methods/_index.md)

@@ -1,25 +1,14 @@
+---
+tags:
+  - index
+aliases:
+  - Open architectural questions
+index: "[Eutaxis](../index.md)"
+---
+
 # Open architectural questions
 
 Open questions for the eutaxis cross-agent compiler that the current ADR set does **not** resolve. Each file states one question, the architectural component that depends on it, and any partial work that has landed. An adversarial review of the cross-agent compiler proposal originally surfaced these questions; the review file itself has been retired in favour of this modular set.
-
-```{toctree}
-:maxdepth: 1
-
-session-preset-regime
-intra-artifact-composition
-instruction-file-ownership
-on-demand-envelope-fidelity
-capability-regime-split
-subagent-vs-role-routing
-behavioural-validation
-cross-repository-source-acquisition
-substrate-volatility-tracking
-identifier-and-namespace-algebra
-silent-failure-classification
-claude-md-cumulative-loading-semantics
-rule-set-granularity
-rule-template-format-and-vocabulary
-```
 
 ## Triage
 
