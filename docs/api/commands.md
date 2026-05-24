@@ -1,10 +1,18 @@
+<a id="commands"></a>
+
 # Commands
 
 Cross-agent command compilation: load command definitions, render them for each target agent, and install them into agent-specific surfaces.
 
+<a id="module-eutaxis.commands.loader"></a>
+
+<a id="loader"></a>
+
 ## Loader
 
 Discover and parse command sources across discovery layers.
+
+<a id="eutaxis.commands.loader.builtin_dir"></a>
 
 ### eutaxis.commands.loader.builtin_dir()
 
@@ -12,6 +20,8 @@ Return the directory holding built-in command sources.
 
 * **Return type:**
   [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
+
+<a id="eutaxis.commands.loader.user_dir"></a>
 
 ### eutaxis.commands.loader.user_dir(home=None)
 
@@ -22,6 +32,8 @@ Return the user-level command source directory.
 * **Return type:**
   [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
+<a id="eutaxis.commands.loader.project_dir"></a>
+
 ### eutaxis.commands.loader.project_dir(project_root)
 
 Return the project-level command source directory.
@@ -31,7 +43,9 @@ Return the project-level command source directory.
 * **Return type:**
   [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
-### eutaxis.commands.loader.load_sources(, project_root=None, home=None)
+<a id="eutaxis.commands.loader.load_sources"></a>
+
+### eutaxis.commands.loader.load_sources(\*, project_root=None, home=None)
 
 Discover command sources across all layers.
 
@@ -43,6 +57,10 @@ built-in, user, project.
   * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
   [list](https://docs.python.org/3/library/stdtypes.html#list)[[*CommandSource*](#eutaxis.commands.models.CommandSource)]
+
+<a id="module-eutaxis.commands.registry"></a>
+
+<a id="registry"></a>
 
 ## Registry
 
@@ -58,11 +76,15 @@ file) and serialised under a POSIX advisory file lock so concurrent
 records. A corrupted registry surfaces as `RegistryCorruptedError`
 with the path; the user can remove the file to rebuild from scratch.
 
+<a id="eutaxis.commands.registry.RegistryCorruptedError"></a>
+
 ### *exception* eutaxis.commands.registry.RegistryCorruptedError
 
 Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError)
 
 Raised when the on-disk registry cannot be decoded as JSON.
+
+<a id="eutaxis.commands.registry.Registry"></a>
 
 ### *class* eutaxis.commands.registry.Registry(state_dir)
 
@@ -79,12 +101,16 @@ half-written file.
 * **Parameters:**
   **state_dir** (*Path*)
 
+<a id="eutaxis.commands.registry.Registry.load"></a>
+
 #### load()
 
 Return all install records currently on disk.
 
 * **Return type:**
   [list](https://docs.python.org/3/library/stdtypes.html#list)[[*InstallRecord*](#eutaxis.commands.models.InstallRecord)]
+
+<a id="eutaxis.commands.registry.Registry.upsert"></a>
 
 #### upsert(record)
 
@@ -95,7 +121,9 @@ Insert or replace the record matching (name, adapter, scope).
 * **Return type:**
   None
 
-#### remove(, name, adapter, scope)
+<a id="eutaxis.commands.registry.Registry.remove"></a>
+
+#### remove(\*, name, adapter, scope)
 
 Drop the matching record and return it, if any.
 
@@ -106,7 +134,9 @@ Drop the matching record and return it, if any.
 * **Return type:**
   [*InstallRecord*](#eutaxis.commands.models.InstallRecord) | None
 
-#### find(, name, adapter, scope)
+<a id="eutaxis.commands.registry.Registry.find"></a>
+
+#### find(\*, name, adapter, scope)
 
 Return the matching record, if any.
 
@@ -117,12 +147,16 @@ Return the matching record, if any.
 * **Return type:**
   [*InstallRecord*](#eutaxis.commands.models.InstallRecord) | None
 
+<a id="eutaxis.commands.registry.utcnow_iso"></a>
+
 ### eutaxis.commands.registry.utcnow_iso()
 
 Return the current UTC time as an ISO-8601 string.
 
 * **Return type:**
   [str](https://docs.python.org/3/library/stdtypes.html#str)
+
+<a id="eutaxis.commands.registry.default_state_dir"></a>
 
 ### eutaxis.commands.registry.default_state_dir(home=None)
 
@@ -132,6 +166,10 @@ Return the default user-level state directory.
   **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
   [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
+
+<a id="module-eutaxis.commands.rendering"></a>
+
+<a id="rendering"></a>
 
 ## Rendering
 
@@ -156,7 +194,9 @@ non-ownership frontmatter dict (canonicalised) plus the sibling files
 (sorted by relative path). The marker is injected last, so the hash is
 stable regardless of the marker bytes themselves.
 
-### eutaxis.commands.rendering.render_command(source, adapter, , project_root, home)
+<a id="eutaxis.commands.rendering.render_command"></a>
+
+### eutaxis.commands.rendering.render_command(source, adapter, \*, project_root, home)
 
 Render a command source for one adapter as a multi-file artifact.
 
@@ -168,6 +208,10 @@ Render a command source for one adapter as a multi-file artifact.
 * **Return type:**
   [*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact)
 
+<a id="module-eutaxis.commands.templating"></a>
+
+<a id="templating"></a>
+
 ## Templating
 
 Tiny, fail-closed `{{ var }}` substitution.
@@ -176,6 +220,8 @@ The engine accepts dotted names (`action.template`) and rejects any
 identifier not present in the supplied context. It does not implement
 conditionals, loops, or filters. Anything beyond bare substitution
 should be handled by the caller before invocation.
+
+<a id="eutaxis.commands.templating.render"></a>
 
 ### eutaxis.commands.templating.render(template, context)
 
@@ -193,6 +239,10 @@ Substitute `{{ name }}` placeholders against `context`.
 * **Raises:**
   [**TemplateError**](#eutaxis.commands.exceptions.TemplateError) – If a placeholder references an unknown name.
 
+<a id="module-eutaxis.commands.installer"></a>
+
+<a id="installer"></a>
+
 ## Installer
 
 Install, uninstall, and diff rendered command artifacts on the filesystem.
@@ -207,6 +257,8 @@ detected via two mechanisms in priority order:
 
 A directory that exists but matches neither check is treated as
 user-owned and refused unless `force=True`.
+
+<a id="eutaxis.commands.installer.InstallOutcome"></a>
 
 ### *class* eutaxis.commands.installer.InstallOutcome(name, adapter, scope, path, action)
 
@@ -223,17 +275,29 @@ Result of one install or uninstall operation.
   * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **action** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
 
+<a id="eutaxis.commands.installer.InstallOutcome.name"></a>
+
 #### name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+<a id="eutaxis.commands.installer.InstallOutcome.adapter"></a>
 
 #### adapter *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
+<a id="eutaxis.commands.installer.InstallOutcome.scope"></a>
+
 #### scope *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+<a id="eutaxis.commands.installer.InstallOutcome.path"></a>
 
 #### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
 
+<a id="eutaxis.commands.installer.InstallOutcome.action"></a>
+
 #### action *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
-### eutaxis.commands.installer.install_command(source, adapter, , scope, project_root, home, registry, force=False)
+<a id="eutaxis.commands.installer.install_command"></a>
+
+### eutaxis.commands.installer.install_command(source, adapter, \*, scope, project_root, home, registry, force=False)
 
 Render and write one skill artifact to its native location.
 
@@ -248,7 +312,9 @@ Render and write one skill artifact to its native location.
 * **Return type:**
   [*InstallOutcome*](#eutaxis.commands.installer.InstallOutcome)
 
-### eutaxis.commands.installer.uninstall_command(, name, adapter, scope, project_root, home, registry, force=False)
+<a id="eutaxis.commands.installer.uninstall_command"></a>
+
+### eutaxis.commands.installer.uninstall_command(\*, name, adapter, scope, project_root, home, registry, force=False)
 
 Remove one installed artifact and drop its registry row.
 
@@ -263,7 +329,9 @@ Remove one installed artifact and drop its registry row.
 * **Return type:**
   [*InstallOutcome*](#eutaxis.commands.installer.InstallOutcome)
 
-### eutaxis.commands.installer.diff_command(source, adapter, , scope, project_root, home)
+<a id="eutaxis.commands.installer.diff_command"></a>
+
+### eutaxis.commands.installer.diff_command(source, adapter, \*, scope, project_root, home)
 
 Return rendered artifact, directory, and a unified diff vs disk.
 
@@ -280,6 +348,10 @@ treated as empty.
 * **Return type:**
   [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact), [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/library/stdtypes.html#str)]
 
+<a id="module-eutaxis.commands.models"></a>
+
+<a id="data-models"></a>
+
 ## Data Models
 
 Data containers for the commands subsystem.
@@ -292,6 +364,8 @@ parent directory name to equal the `name` field, and Codex carries UI
 metadata / invocation policy / tool dependencies in the sibling
 `agents/openai.yaml` file rather than in `SKILL.md` frontmatter.
 
+<a id="eutaxis.commands.models.ActionSpec"></a>
+
 ### *class* eutaxis.commands.models.ActionSpec(kind, template)
 
 Bases: [`object`](https://docs.python.org/3/library/functions.html#object)
@@ -302,23 +376,19 @@ Optional shell-backed action carried by a command source.
   * **kind** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **template** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
 
-#### kind
-
-Action kind. Only `"shell"` is supported in v1.
-
-* **Type:**
-  [str](https://docs.python.org/3/library/stdtypes.html#str)
-
-#### template
-
-Templated command string with `{{ var }}` placeholders.
-
-* **Type:**
-  [str](https://docs.python.org/3/library/stdtypes.html#str)
+<a id="eutaxis.commands.models.ActionSpec.kind"></a>
 
 #### kind *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
+Action kind. Only `"shell"` is supported in v1.
+
+<a id="eutaxis.commands.models.ActionSpec.template"></a>
+
 #### template *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+Templated command string with `{{ var }}` placeholders.
+
+<a id="eutaxis.commands.models.TargetsSpec"></a>
 
 ### *class* eutaxis.commands.models.TargetsSpec(include=(), exclude=())
 
@@ -332,9 +402,15 @@ An empty `include` tuple means “all registered adapters”.
   * **include** ([*tuple*](https://docs.python.org/3/library/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/library/stdtypes.html#str) *,*  *...* *]*)
   * **exclude** ([*tuple*](https://docs.python.org/3/library/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/library/stdtypes.html#str) *,*  *...* *]*)
 
+<a id="eutaxis.commands.models.TargetsSpec.include"></a>
+
 #### include *: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[str](https://docs.python.org/3/library/stdtypes.html#str), ...]* *= ()*
 
+<a id="eutaxis.commands.models.TargetsSpec.exclude"></a>
+
 #### exclude *: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[str](https://docs.python.org/3/library/stdtypes.html#str), ...]* *= ()*
+
+<a id="eutaxis.commands.models.AdapterPassthrough"></a>
 
 ### *class* eutaxis.commands.models.AdapterPassthrough(frontmatter=<factory>, files=<factory>)
 
@@ -350,26 +426,22 @@ alongside the entrypoint.
   * **frontmatter** ([*dict*](https://docs.python.org/3/library/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/library/stdtypes.html#str) *,* [*object*](https://docs.python.org/3/library/functions.html#object) *]*)
   * **files** ([*dict*](https://docs.python.org/3/library/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/library/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/library/stdtypes.html#str) *]*)
 
-#### frontmatter
+<a id="eutaxis.commands.models.AdapterPassthrough.frontmatter"></a>
+
+#### frontmatter *: [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [object](https://docs.python.org/3/library/functions.html#object)]*
 
 Extra keys merged into the rendered `SKILL.md` frontmatter.
 Values are emitted verbatim by the YAML dumper.
 
-* **Type:**
-  [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [object](https://docs.python.org/3/library/functions.html#object)]
-
-#### files
-
-Sibling file contents keyed by POSIX-style relative path
-(e.g. `"agents/openai.yaml"`). Templated against the same
-context as the body.
-
-* **Type:**
-  [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [str](https://docs.python.org/3/library/stdtypes.html#str)]
-
-#### frontmatter *: [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [object](https://docs.python.org/3/library/functions.html#object)]*
+<a id="eutaxis.commands.models.AdapterPassthrough.files"></a>
 
 #### files *: [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [str](https://docs.python.org/3/library/stdtypes.html#str)]*
+
+Sibling file contents keyed by POSIX-style relative path
+(e.g. `"agents/openai.yaml"`). Templated against the same context
+as the body.
+
+<a id="eutaxis.commands.models.CommandSource"></a>
 
 ### *class* eutaxis.commands.models.CommandSource(name, description, regime, scope_default, targets, action, body, argument_hint='', adapters=<factory>, overrides=<factory>, source_path=PosixPath('.'), layer='builtin')
 
@@ -391,118 +463,89 @@ Parsed Markdown command source.
   * **source_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **layer** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
 
-#### name
+<a id="eutaxis.commands.models.CommandSource.name"></a>
+
+#### name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
 Slug used for the artifact directory and the invocation symbol.
 
-* **Type:**
-  [str](https://docs.python.org/3/library/stdtypes.html#str)
+<a id="eutaxis.commands.models.CommandSource.description"></a>
 
-#### description
+#### description *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
 One-line summary surfaced by `commands list` and the agent’s
 skill picker.
 
-* **Type:**
-  [str](https://docs.python.org/3/library/stdtypes.html#str)
+<a id="eutaxis.commands.models.CommandSource.regime"></a>
 
-#### regime
+#### regime *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
 Activation regime; only `"user-invoked"` is supported in v1.
 Maps to `disable-model-invocation: true` on Claude and to
 `policy.allow_implicit_invocation: false` on Codex.
 
+<a id="eutaxis.commands.models.CommandSource.scope_default"></a>
+
+#### scope_default *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+`"user"` or `"project"`.
+
 * **Type:**
-  [str](https://docs.python.org/3/library/stdtypes.html#str)
+  Default install scope
 
-#### scope_default
+<a id="eutaxis.commands.models.CommandSource.targets"></a>
 
-Default install scope: `"user"` or `"project"`.
-
-* **Type:**
-  [str](https://docs.python.org/3/library/stdtypes.html#str)
-
-#### targets
+#### targets *: [TargetsSpec](#eutaxis.commands.models.TargetsSpec)*
 
 Adapter allow/deny list.
 
-* **Type:**
-  [TargetsSpec](#eutaxis.commands.models.TargetsSpec)
+<a id="eutaxis.commands.models.CommandSource.action"></a>
 
-#### action
+#### action *: [ActionSpec](#eutaxis.commands.models.ActionSpec) | [None](https://docs.python.org/3/library/constants.html#None)*
 
 Optional shell-backed action.
 
-* **Type:**
-  [ActionSpec](#eutaxis.commands.models.ActionSpec) | None
+<a id="eutaxis.commands.models.CommandSource.body"></a>
 
-#### argument_hint
-
-Optional `argument-hint` value (UX hint, e.g. `"[--all]"`).
-
-* **Type:**
-  [str](https://docs.python.org/3/library/stdtypes.html#str)
-
-#### body
+#### body *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
 Markdown body, with `{{ var }}` placeholders still present.
 
-* **Type:**
-  [str](https://docs.python.org/3/library/stdtypes.html#str)
+<a id="eutaxis.commands.models.CommandSource.argument_hint"></a>
 
-#### adapters
+#### argument_hint *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= ''*
 
-Per-adapter frontmatter and sibling files. Keyed by adapter
-name.
+Optional `argument-hint` value (UX hint, e.g. `"[--all]"`).
 
-* **Type:**
-  [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [AdapterPassthrough](#eutaxis.commands.models.AdapterPassthrough)]
+<a id="eutaxis.commands.models.CommandSource.adapters"></a>
 
-#### overrides
+#### adapters *: [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [AdapterPassthrough](#eutaxis.commands.models.AdapterPassthrough)]*
+
+Per-adapter frontmatter and sibling files. Keyed by adapter name.
+
+<a id="eutaxis.commands.models.CommandSource.overrides"></a>
+
+#### overrides *: [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [dict](https://docs.python.org/3/library/stdtypes.html#dict)]*
 
 Per-adapter overrides for first-class fields (only
 `action.template` is honored today).
 
-* **Type:**
-  [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [dict](https://docs.python.org/3/library/stdtypes.html#dict)]
-
-#### source_path
-
-Path to the source Markdown file on disk.
-
-* **Type:**
-  Path
-
-#### layer
-
-Discovery layer: `"builtin"`, `"user"`, or `"project"`.
-
-* **Type:**
-  [str](https://docs.python.org/3/library/stdtypes.html#str)
-
-#### name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
-
-#### description *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
-
-#### regime *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
-
-#### scope_default *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
-
-#### targets *: [TargetsSpec](#eutaxis.commands.models.TargetsSpec)*
-
-#### action *: [ActionSpec](#eutaxis.commands.models.ActionSpec) | [None](https://docs.python.org/3/library/constants.html#None)*
-
-#### body *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
-
-#### argument_hint *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= ''*
-
-#### adapters *: [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [AdapterPassthrough](#eutaxis.commands.models.AdapterPassthrough)]*
-
-#### overrides *: [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [dict](https://docs.python.org/3/library/stdtypes.html#dict)]*
+<a id="eutaxis.commands.models.CommandSource.source_path"></a>
 
 #### source_path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)* *= PosixPath('.')*
 
+Path to the source Markdown file on disk.
+
+<a id="eutaxis.commands.models.CommandSource.layer"></a>
+
 #### layer *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= 'builtin'*
+
+`"builtin"`, `"user"`, or `"project"`.
+
+* **Type:**
+  Discovery layer
+
+<a id="eutaxis.commands.models.ArtifactFile"></a>
 
 ### *class* eutaxis.commands.models.ArtifactFile(relative_path, content)
 
@@ -518,9 +561,15 @@ One file inside a rendered skill artifact directory.
   * **relative_path** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **content** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
 
+<a id="eutaxis.commands.models.ArtifactFile.relative_path"></a>
+
 #### relative_path *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
+<a id="eutaxis.commands.models.ArtifactFile.content"></a>
+
 #### content *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.RenderedArtifact"></a>
 
 ### *class* eutaxis.commands.models.RenderedArtifact(name, adapter, files, content_hash)
 
@@ -539,13 +588,23 @@ carries the `x-eutaxis-owned` hash) and the
   * **files** ([*tuple*](https://docs.python.org/3/library/stdtypes.html#tuple) *[*[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *,*  *...* *]*)
   * **content_hash** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
 
+<a id="eutaxis.commands.models.RenderedArtifact.name"></a>
+
 #### name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.RenderedArtifact.adapter"></a>
 
 #### adapter *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
+<a id="eutaxis.commands.models.RenderedArtifact.files"></a>
+
 #### files *: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[ArtifactFile](#eutaxis.commands.models.ArtifactFile), ...]*
 
+<a id="eutaxis.commands.models.RenderedArtifact.content_hash"></a>
+
 #### content_hash *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.InstallRecord"></a>
 
 ### *class* eutaxis.commands.models.InstallRecord(name, adapter, scope, path, content_hash, installed_at)
 
@@ -563,21 +622,39 @@ One row of the install manifest.
   * **content_hash** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **installed_at** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
 
+<a id="eutaxis.commands.models.InstallRecord.name"></a>
+
 #### name *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.InstallRecord.adapter"></a>
 
 #### adapter *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
+<a id="eutaxis.commands.models.InstallRecord.scope"></a>
+
 #### scope *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.InstallRecord.path"></a>
 
 #### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
 
+<a id="eutaxis.commands.models.InstallRecord.content_hash"></a>
+
 #### content_hash *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
+<a id="eutaxis.commands.models.InstallRecord.installed_at"></a>
+
 #### installed_at *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+<a id="module-eutaxis.commands.exceptions"></a>
+
+<a id="exceptions"></a>
 
 ## Exceptions
 
 Exceptions for the commands subsystem.
+
+<a id="eutaxis.commands.exceptions.CommandError"></a>
 
 ### *exception* eutaxis.commands.exceptions.CommandError
 
@@ -585,7 +662,11 @@ Bases: [`Exception`](https://docs.python.org/3/library/exceptions.html#Exception
 
 Base exception for the commands subsystem.
 
+<a id="eutaxis.commands.exceptions.CommandError.exit_code"></a>
+
 #### exit_code *= 1*
+
+<a id="eutaxis.commands.exceptions.CommandNotFoundError"></a>
 
 ### *exception* eutaxis.commands.exceptions.CommandNotFoundError
 
@@ -593,11 +674,15 @@ Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError)
 
 Raised when a referenced command name is unknown.
 
+<a id="eutaxis.commands.exceptions.CommandRenderError"></a>
+
 ### *exception* eutaxis.commands.exceptions.CommandRenderError
 
 Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError)
 
 Raised when a command source cannot be parsed or rendered.
+
+<a id="eutaxis.commands.exceptions.TemplateError"></a>
 
 ### *exception* eutaxis.commands.exceptions.TemplateError
 
@@ -605,15 +690,27 @@ Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError)
 
 Raised when a template references an unknown variable or is malformed.
 
+<a id="eutaxis.commands.exceptions.OwnershipError"></a>
+
 ### *exception* eutaxis.commands.exceptions.OwnershipError
 
 Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError)
 
 Raised when an install/uninstall target is not eutaxis-owned.
 
+<a id="eutaxis.commands.exceptions.OwnershipError.exit_code"></a>
+
 #### exit_code *= 2*
 
+<a id="agent-adapters"></a>
+
 ## Agent Adapters
+
+Per-agent renderers that translate a `CommandSource` into the file layout and frontmatter expected by each target agent.
+
+<a id="module-eutaxis.commands.adapters.claude"></a>
+
+<a id="claude"></a>
 
 ### Claude
 
@@ -630,6 +727,8 @@ Claude has no analogue to Codex’s sibling `agents/openai.yaml`: all
 metadata (including `allowed-tools`, `argument-hint`) is folded
 into `SKILL.md` frontmatter.
 
+<a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter"></a>
+
 ### *class* eutaxis.commands.adapters.claude.ClaudeCodeAdapter(name='claude')
 
 Bases: [`object`](https://docs.python.org/3/library/functions.html#object)
@@ -639,7 +738,11 @@ Compile a command source into a Claude skill directory.
 * **Parameters:**
   **name** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
 
+<a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.name"></a>
+
 #### name *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= 'claude'*
+
+<a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.supports_scope"></a>
 
 #### supports_scope(scope)
 
@@ -648,7 +751,9 @@ Compile a command source into a Claude skill directory.
 * **Return type:**
   [bool](https://docs.python.org/3/library/functions.html#bool)
 
-#### artifact_dir(command_name, scope, , home, project_root)
+<a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.artifact_dir"></a>
+
+#### artifact_dir(command_name, scope, \*, home, project_root)
 
 * **Parameters:**
   * **command_name** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
@@ -658,7 +763,9 @@ Compile a command source into a Claude skill directory.
 * **Return type:**
   [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
-#### skill_frontmatter(source, , rendered_body)
+<a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.skill_frontmatter"></a>
+
+#### skill_frontmatter(source, \*, rendered_body)
 
 * **Parameters:**
   * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
@@ -666,13 +773,19 @@ Compile a command source into a Claude skill directory.
 * **Return type:**
   [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [object](https://docs.python.org/3/library/functions.html#object)]
 
-#### sibling_files(source, , context)
+<a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.sibling_files"></a>
+
+#### sibling_files(source, \*, context)
 
 * **Parameters:**
   * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
   * **context** ([*dict*](https://docs.python.org/3/library/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/library/stdtypes.html#str) *,* [*object*](https://docs.python.org/3/library/functions.html#object) *]*)
 * **Return type:**
   [*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile)]
+
+<a id="module-eutaxis.commands.adapters.codex"></a>
+
+<a id="codex"></a>
 
 ### Codex
 
@@ -697,6 +810,8 @@ emitted** by this adapter: the Agent Skills spec marks it experimental
 on Codex and Codex documents pre-approval as host configuration, not
 artifact metadata (skills-comparison.md:106).
 
+<a id="eutaxis.commands.adapters.codex.CodexAdapter"></a>
+
 ### *class* eutaxis.commands.adapters.codex.CodexAdapter(name='codex')
 
 Bases: [`object`](https://docs.python.org/3/library/functions.html#object)
@@ -706,7 +821,11 @@ Compile a command source into a Codex skill directory.
 * **Parameters:**
   **name** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
 
+<a id="eutaxis.commands.adapters.codex.CodexAdapter.name"></a>
+
 #### name *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= 'codex'*
+
+<a id="eutaxis.commands.adapters.codex.CodexAdapter.supports_scope"></a>
 
 #### supports_scope(scope)
 
@@ -715,7 +834,9 @@ Compile a command source into a Codex skill directory.
 * **Return type:**
   [bool](https://docs.python.org/3/library/functions.html#bool)
 
-#### artifact_dir(command_name, scope, , home, project_root)
+<a id="eutaxis.commands.adapters.codex.CodexAdapter.artifact_dir"></a>
+
+#### artifact_dir(command_name, scope, \*, home, project_root)
 
 * **Parameters:**
   * **command_name** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
@@ -725,7 +846,9 @@ Compile a command source into a Codex skill directory.
 * **Return type:**
   [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
-#### skill_frontmatter(source, , rendered_body)
+<a id="eutaxis.commands.adapters.codex.CodexAdapter.skill_frontmatter"></a>
+
+#### skill_frontmatter(source, \*, rendered_body)
 
 * **Parameters:**
   * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
@@ -733,7 +856,9 @@ Compile a command source into a Codex skill directory.
 * **Return type:**
   [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [object](https://docs.python.org/3/library/functions.html#object)]
 
-#### sibling_files(source, , context)
+<a id="eutaxis.commands.adapters.codex.CodexAdapter.sibling_files"></a>
+
+#### sibling_files(source, \*, context)
 
 * **Parameters:**
   * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))

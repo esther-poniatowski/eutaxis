@@ -78,6 +78,14 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
 }
 
+# -- Markdown builder configuration ------------------------------------------
+
+# Emit explicit `<a id="...">` anchors at section and signature boundaries so
+# the cross-references autodoc generates (e.g. `#module-eutaxis.instructions`,
+# `#eutaxis.instructions.config.ConfigLoader`) actually resolve on GitHub.
+markdown_anchor_sections = True
+markdown_anchor_signatures = True
+
 # -- Markdown builder customization ------------------------------------------
 #
 # sphinx_markdown_builder renders every admonition (note, warning, seealso, ...)
@@ -109,3 +117,17 @@ def setup(app):
         self._push_context(BlockquoteContext(SubContextParams(2, 2)))
 
     MarkdownTranslator.visit_seealso = visit_seealso
+
+    # sphinx_markdown_builder ships no `visit_abbreviation` handler. The
+    # builder then emits "unknown node type" warnings and drops the node's
+    # text. Render the abbreviation's child text verbatim (the parent
+    # paragraph visitor handles surrounding spacing).
+
+    def visit_abbreviation(self, _node):
+        pass
+
+    def depart_abbreviation(self, _node):
+        pass
+
+    MarkdownTranslator.visit_abbreviation = visit_abbreviation
+    MarkdownTranslator.depart_abbreviation = depart_abbreviation

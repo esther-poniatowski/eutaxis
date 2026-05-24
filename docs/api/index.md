@@ -1,3 +1,5 @@
+<a id="api-reference"></a>
+
 # API reference
 
 * [Instructions](instructions.md)
@@ -20,6 +22,6 @@
   * [Exceptions](ops.md#module-eutaxis.ops.exceptions)
 * [Top-Level Entry Points](toplevel.md)
   * [CLI](toplevel.md#module-eutaxis.cli)
-  * [Generate](toplevel.md#module-eutaxis.generate)
+  * [Generate](toplevel.md#generate)
   * [Validate](toplevel.md#module-eutaxis.validate)
   * [Scaffold](toplevel.md#module-eutaxis.scaffold)

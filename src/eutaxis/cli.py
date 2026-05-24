@@ -1,14 +1,13 @@
 """
-Command-line interface for the `eutaxis` package.
+Command-line interface for the ``eutaxis`` package.
 
-Defines commands available via `python -m eutaxis` or `eutaxis` if installed as a script.
+Defines commands available via ``python -m eutaxis`` or ``eutaxis`` if
+installed as a script. Subcommands:
 
-Commands
---------
-info : Display diagnostic information.
-generate : Assemble agent instruction files.
-validate : Validate prompt family layouts (planned).
-init : Scaffold prompt composition into a project (planned).
+- ``info`` — display diagnostic information.
+- ``generate`` — assemble agent instruction files.
+- ``validate`` — validate prompt family layouts (planned).
+- ``init`` — scaffold prompt composition into a project (planned).
 """
 
 import typer

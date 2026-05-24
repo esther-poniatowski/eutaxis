@@ -13,11 +13,13 @@ User-facing commands invoked from the CLI: generate instruction files, validate 
 
 ## Generate
 
+`eutaxis.generate` is a thin backward-compatibility shim that re-exports
+the public surface of `eutaxis.instructions`. Only the module's own
+entry point is documented here; the re-exported classes appear under
+[Instructions](instructions.md).
+
 ```{eval-rst}
-.. automodule:: eutaxis.generate
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autofunction:: eutaxis.generate.main
 ```
 
 ## Validate

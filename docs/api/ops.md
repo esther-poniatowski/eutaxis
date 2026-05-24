@@ -1,6 +1,12 @@
+<a id="operations"></a>
+
 # Operations
 
 Operational utilities for runtime tasks (memory management, CLI helpers).
+
+<a id="module-eutaxis.ops.memory"></a>
+
+<a id="memory"></a>
 
 ## Memory
 
@@ -22,6 +28,8 @@ A `--backup` mode copies the tree to a sibling
 `memory.bak.YYYYMMDD-HHMMSS/` before deletion. `--dry-run` reports
 the paths that would be removed without touching the filesystem.
 
+<a id="eutaxis.ops.memory.MemoryWipeResult"></a>
+
 ### *class* eutaxis.ops.memory.MemoryWipeResult(removed=<factory>, skipped=<factory>, backup_paths=<factory>, dry_run=False)
 
 Bases: [`object`](https://docs.python.org/3/library/functions.html#object)
@@ -34,15 +42,25 @@ Outcome of one wipe call.
   * **backup_paths** ([*list*](https://docs.python.org/3/library/stdtypes.html#list) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*)
   * **dry_run** ([*bool*](https://docs.python.org/3/library/functions.html#bool))
 
+<a id="eutaxis.ops.memory.MemoryWipeResult.removed"></a>
+
 #### removed *: [list](https://docs.python.org/3/library/stdtypes.html#list)[[Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)]*
+
+<a id="eutaxis.ops.memory.MemoryWipeResult.skipped"></a>
 
 #### skipped *: [list](https://docs.python.org/3/library/stdtypes.html#list)[[Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)]*
 
+<a id="eutaxis.ops.memory.MemoryWipeResult.backup_paths"></a>
+
 #### backup_paths *: [list](https://docs.python.org/3/library/stdtypes.html#list)[[Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)]*
+
+<a id="eutaxis.ops.memory.MemoryWipeResult.dry_run"></a>
 
 #### dry_run *: [bool](https://docs.python.org/3/library/functions.html#bool)* *= False*
 
-### eutaxis.ops.memory.clean_memory(, agent, project_root=None, wipe_all=False, backup=False, dry_run=False, home=None)
+<a id="eutaxis.ops.memory.clean_memory"></a>
+
+### eutaxis.ops.memory.clean_memory(\*, agent, project_root=None, wipe_all=False, backup=False, dry_run=False, home=None)
 
 Delete agent memory directories.
 
@@ -66,6 +84,8 @@ Delete agent memory directories.
   * [**OpsError**](#eutaxis.ops.exceptions.OpsError) – If `agent` is not a supported identifier.
   * [**OutsideAllowedRootError**](#eutaxis.ops.exceptions.OutsideAllowedRootError) – If a resolved target escapes its allowed root.
 
+<a id="eutaxis.ops.memory.encode_project_slug"></a>
+
 ### eutaxis.ops.memory.encode_project_slug(project_root)
 
 Encode an absolute project path as a Claude project directory name.
@@ -78,9 +98,15 @@ Replaces `/` with `-` and prepends a leading dash so that
 * **Return type:**
   [str](https://docs.python.org/3/library/stdtypes.html#str)
 
+<a id="module-eutaxis.ops.exceptions"></a>
+
+<a id="exceptions"></a>
+
 ## Exceptions
 
 Exceptions for shell-side operations.
+
+<a id="eutaxis.ops.exceptions.OpsError"></a>
 
 ### *exception* eutaxis.ops.exceptions.OpsError
 
@@ -88,7 +114,11 @@ Bases: [`Exception`](https://docs.python.org/3/library/exceptions.html#Exception
 
 Base exception for operations.
 
+<a id="eutaxis.ops.exceptions.OpsError.exit_code"></a>
+
 #### exit_code *= 1*
+
+<a id="eutaxis.ops.exceptions.OutsideAllowedRootError"></a>
 
 ### *exception* eutaxis.ops.exceptions.OutsideAllowedRootError
 
@@ -98,5 +128,7 @@ Raised when a resolved path escapes its declared root.
 
 This is the path-prefix guard that prevents wildcards or symlinks
 from causing deletion outside the agent-memory directories.
+
+<a id="eutaxis.ops.exceptions.OutsideAllowedRootError.exit_code"></a>
 
 #### exit_code *= 2*
