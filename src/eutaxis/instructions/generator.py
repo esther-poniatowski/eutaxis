@@ -196,7 +196,7 @@ class InstructionGenerator:
         bullet = (
             f"- **{module.title}.** Load `{module.path}` {module.trigger.strip()}."
         )
-        description = module.description.strip()
+        description = (module.description or "").strip()
         if description:
             bullet = f"{bullet} {description}"
         return bullet

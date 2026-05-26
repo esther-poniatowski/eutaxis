@@ -222,6 +222,7 @@ task_modules:
     title: Prose writing
     path: /modules/prose.md
     trigger: when drafting or revising prose
+    description: ""
 agents:
   - name: codex
     target: AGENTS.md
@@ -395,6 +396,7 @@ def test_rule_index_scans_labels_and_groups_by_file(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     (tmp_path / "prog.md").write_text(
+        "---\ndescription: Programming labels.\n---\n\n"
         "# Programming\n\n**design-axes**:\n\n ✓ Design.\n\n"
         "**annotations**:\n\n ✓ Type things.\n",
         encoding="utf-8",
@@ -489,6 +491,7 @@ task_modules:
     title: Programming
     path: ../prog.md
     trigger: when coding
+    description: ""
 rule_index_enabled: true
 rule_index_intro: |
   Full label listing.
@@ -673,6 +676,93 @@ agents:
     )
 
     with pytest.raises(ConfigurationError, match="max_bytes"):
+        load_config(config)
+
+
+def test_task_module_description_falls_back_to_frontmatter(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "prog.md").write_text(
+        "---\n"
+        "description: How to write source code.\n"
+        "---\n\n"
+        "# Programming\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+task_modules:
+  - id: programming
+    title: Programming
+    path: prog.md
+    trigger: when coding
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    loaded = load_config(config)
+    output = InstructionGenerator(loaded).generate_all()["codex"]
+
+    assert "How to write source code." in output
+
+
+def test_config_description_overrides_frontmatter(tmp_path: Path) -> None:
+    (tmp_path / "prog.md").write_text(
+        "---\n"
+        "description: Frontmatter wording.\n"
+        "---\n\n"
+        "# Programming\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+task_modules:
+  - id: programming
+    title: Programming
+    path: prog.md
+    trigger: when coding
+    description: Config wording.
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    output = InstructionGenerator(load_config(config)).generate_all()["codex"]
+
+    assert "Config wording." in output
+    assert "Frontmatter wording." not in output
+
+
+def test_task_module_description_missing_everywhere_raises(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "prog.md").write_text(
+        "# Programming\n\nNo frontmatter.\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+task_modules:
+  - id: programming
+    title: Programming
+    path: prog.md
+    trigger: when coding
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="programming"):
         load_config(config)
 
 

@@ -6,3 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+### Added
+
+- `task_modules[i].description` falls back to the file's YAML frontmatter
+  when omitted from the config; config-level entries remain optional
+  overrides.

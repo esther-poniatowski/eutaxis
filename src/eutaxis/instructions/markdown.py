@@ -3,8 +3,38 @@
 from __future__ import annotations
 
 import re
+from typing import Any
+
+import yaml
 
 from .models import Section, SourceFile
+
+
+_FRONTMATTER_PATTERN = re.compile(r"^---\s*\n(.*?)\n---\s*(?:\n|$)", re.DOTALL)
+
+
+def parse_frontmatter(content: str) -> dict[str, Any]:
+    """Parse a Markdown file's YAML frontmatter block.
+
+    Returns an empty dict when the file has no frontmatter or when the
+    frontmatter is empty. Raises ``yaml.YAMLError`` if the block is malformed.
+    """
+    if not content.startswith("---"):
+        return {}
+
+    match = _FRONTMATTER_PATTERN.match(content)
+    if match is None:
+        return {}
+
+    body = match.group(1)
+    parsed = yaml.safe_load(body) if body.strip() else {}
+    if parsed is None:
+        return {}
+    if not isinstance(parsed, dict):
+        raise yaml.YAMLError(
+            f"Frontmatter must be a YAML mapping, got {type(parsed).__name__}"
+        )
+    return parsed
 
 
 class MarkdownAssembler:

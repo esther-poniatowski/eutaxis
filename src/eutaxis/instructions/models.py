@@ -40,7 +40,7 @@ class TaskModule:
     title: str
     path: Path
     trigger: str
-    description: str = ""
+    description: str | None = None
 
 
 @dataclass(frozen=True)

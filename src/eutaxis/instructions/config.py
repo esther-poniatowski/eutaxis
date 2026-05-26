@@ -8,6 +8,7 @@ from typing import Any
 import yaml
 
 from .exceptions import ConfigurationError
+from .markdown import parse_frontmatter
 from .models import (
     AgentConfig,
     InstructionConfig,
@@ -42,7 +43,7 @@ class ConfigLoader:
         if not isinstance(raw, dict):
             raise ConfigurationError("Configuration must be a YAML mapping")
 
-        return InstructionConfig(
+        config = InstructionConfig(
             root=self._resolve_root(raw),
             config_path=self.config_path,
             common_sources=self._parse_sources(raw.get("common_sources", [])),
@@ -74,6 +75,9 @@ class ConfigLoader:
                 raw.get("max_bytes"), "max_bytes"
             ),
         )
+
+        self._resolve_descriptions(config)
+        return config
 
     def _resolve_root(self, raw: dict[str, Any]) -> Path:
         if self.root_override is not None:
@@ -204,12 +208,13 @@ class ConfigLoader:
                     f"task_module entries must specify '{required}'"
                 )
 
+        description = raw.get("description")
         return TaskModule(
             id=str(raw["id"]),
             title=str(raw["title"]),
             path=Path(str(raw["path"])),
             trigger=str(raw["trigger"]),
-            description=str(raw.get("description", "")),
+            description=str(description) if description is not None else None,
         )
 
     def _parse_reference_docs(self, raw_docs: Any) -> list[ReferenceDoc]:
@@ -249,6 +254,49 @@ class ConfigLoader:
             trigger=str(raw["trigger"]),
             description=str(raw.get("description", "")),
         )
+
+    def _resolve_descriptions(self, config: InstructionConfig) -> None:
+        """Fill task-module descriptions from each file's frontmatter."""
+        resolved: list[TaskModule] = []
+        for module in config.task_modules:
+            if module.description is None:
+                description = self._read_frontmatter_description(
+                    config, module.path
+                )
+                if description is None:
+                    raise ConfigurationError(
+                        f"task_module '{module.id}' has no description: "
+                        f"set it in the config or in the frontmatter of "
+                        f"{module.path}"
+                    )
+                module = TaskModule(
+                    id=module.id,
+                    title=module.title,
+                    path=module.path,
+                    trigger=module.trigger,
+                    description=description,
+                )
+            resolved.append(module)
+        config.task_modules = resolved
+
+    def _read_frontmatter_description(
+        self, config: InstructionConfig, path: Path
+    ) -> str | None:
+        resolved_path = config.resolve(path)
+        if not resolved_path.is_file():
+            return None
+        try:
+            frontmatter = parse_frontmatter(
+                resolved_path.read_text(encoding="utf-8")
+            )
+        except yaml.YAMLError as exc:
+            raise ConfigurationError(
+                f"Invalid frontmatter in {resolved_path}: {exc}"
+            ) from exc
+        description = frontmatter.get("description")
+        if description is None:
+            return None
+        return str(description)
 
     def _as_tuple(self, value: Any) -> tuple[str, ...]:
         if value in (None, ()):
