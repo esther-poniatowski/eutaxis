@@ -75,8 +75,8 @@ eutaxis check -c agent-instructions.yaml
 ```
 
 The same generator can target project-local files such as `AGENTS.md` and
-global files such as `/Users/eresther/.codex/AGENTS.md` by setting `root` and
-absolute target paths in the config.
+global files such as `~/.codex/AGENTS.md` by setting `root` and absolute
+target paths in the config.
 
 Instruction assembly lives under `eutaxis.instructions`: configuration loading,
 Markdown transformations, generation, and exceptions are separate modules. The

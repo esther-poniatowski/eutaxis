@@ -140,7 +140,7 @@ Use `root` to point at the source module directory and an absolute target path
 for the generated global file:
 
 ```yaml
-root: /Users/eresther/Documents/work/projects/instruction-modules
+root: ~/agent-config
 
 common_sources:
   - modules/global/file-authority.md
@@ -150,7 +150,7 @@ common_sources:
 agents:
   - name: global-codex
     target:
-      path: /Users/eresther/.codex/AGENTS.md
+      path: ~/.codex/AGENTS.md
       header: |
         # Global Agent Instructions
 ```

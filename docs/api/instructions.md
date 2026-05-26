@@ -33,7 +33,7 @@ paths:
 ```python
 config = load_config(
     Path("global-agent-instructions.yaml"),
-    root=Path("/Users/eresther/Documents/work/projects/instruction-modules"),
+    root=Path("~/agent-config").expanduser(),
 )
 ```
 

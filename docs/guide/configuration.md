@@ -130,11 +130,11 @@ Running `eutaxis generate -c agent-instructions.yaml` with this config writes
 
 ## Global Codex Example
 
-A global config can write `/Users/eresther/.codex/AGENTS.md` while sourcing
-shared modules from a project directory:
+A global config can write `~/.codex/AGENTS.md` while sourcing shared modules
+from a separate agent-config directory:
 
 ```yaml
-root: /Users/eresther/Documents/work/projects/agent-instructions
+root: ~/agent-config
 
 common_sources:
   - modules/global/file-authority.md
@@ -144,7 +144,7 @@ common_sources:
 agents:
   - name: global-codex
     target:
-      path: /Users/eresther/.codex/AGENTS.md
+      path: ~/.codex/AGENTS.md
       header: |
         # Global Agent Instructions
       footer: |
