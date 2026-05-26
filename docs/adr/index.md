@@ -17,6 +17,7 @@ compiler-not-runtime-activation
 same-source-not-same-behaviour
 activation-regime-as-classification-axis
 silent-failure-rules-as-always-on
+failure-mode-as-source-field
 rule-sources-as-structured-templates
 four-axis-instruction-decomposition
 two-source-kinds-instruction-vs-capability
