@@ -1,12 +1,12 @@
-# AI Prompt - Output Formatting
+# AI prompt - output formatting
 
-**Principles**: 
+**Principles**:
 
 - Output format specification should be **generative**, not descriptive.
 - Provide examples of expected output. Demonstrations improve alignment.
 - If possible, provide a **template** the output must instantiate rather than listing properties the output should have. _Every constraint that can be expressed as a template or schema property should be expressed in a template rather than in the prompt_.
 
-Thus, prompts and template hold complementary roles in the instruction system:
+Prompts and template hold complementary roles in the instruction system:
 
 - The prompt indicates the agent _why_ each field matters; the template ensures the agent _cannot_ produce a malformed artifact.
 - Prose instructions cover only what schemas cannot enforce — semantic intent, edge-case rationale, and cross-field consistency that exceeds schema expressiveness.

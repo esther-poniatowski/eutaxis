@@ -29,7 +29,7 @@ the deltas exceed "path / frontmatter / sigil":
 - **Live-reload semantics differ.** Claude reloads skills mid-session;
   Codex's reload behaviour is not equivalently documented.
 
-The behavioural-equivalence claim (same procedure runs when
+The behavioural-equivalence claim (the same procedure runs when
 triggered) is mostly true. The **operational** claim (the skill is
 invocable and controllable the same way) is not.
 
@@ -55,7 +55,7 @@ review's bullets:
   ([multi-file-artifact-model](../adr/multi-file-artifact-model.md))
   is general enough to carry the per-agent envelope differences.
 
-What remains open at the framework level:
+What remains open in the framework:
 
 - The **mapping matrix** in any future ADR or doc should reflect
   *envelope fidelity* (the agent-specific frontmatter / sibling-file

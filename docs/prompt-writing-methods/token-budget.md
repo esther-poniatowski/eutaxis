@@ -1,4 +1,4 @@
-# Token-budget and Context-window
+# Token budget and context window
 
 Prompt quality is constrained by **token budget**: instructions, retrieved context, tool schemas, examples, and prior outputs all compete for space.
 
@@ -10,7 +10,7 @@ Long-context transformer behavior often exhibits a U-shaped positional reliabili
 - _Recency effect_: later context, especially text immediately before generation, can exert disproportionate influence relative to earlier context.
 - _Contrastive priming_: a nearby example can shape the pattern the model continues. If the last example seen is an anti-pattern, the prompt may make that anti-pattern locally salient.
 
-The mechanism is not a simple inverse scaling law over tokens. Empirical work on lost-in-the-middle behavior and positional attention bias supports the practical conclusion that longer prompts make instruction placement and retrieval layout more important, but the exact mechanism varies across architectures and training regimes.
+The mechanism is not a simple inverse scaling law over tokens. Empirical work on lost-in-the-middle behavior and positional attention bias supports the practical conclusion that longer prompts make instruction placement and retrieval layout more critical, but the exact mechanism varies across architectures and training regimes.
 
 ## Practical implications
 

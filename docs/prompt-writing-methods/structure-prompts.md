@@ -1,8 +1,8 @@
-# AI Prompt - Structure
+# AI prompt - structure
 
 Designing instructions for an AI agent requires structuring the prompt as a **specification of behavior** rather than a simple request.
 
-## Sections ordering
+## Section ordering
 
 The most robust prompts resemble **technical protocols**: they define the role, scope, procedure, and expected outputs.
 
@@ -105,4 +105,4 @@ Writing constraints:
 For a **controller prompt** in a hierarchical agent architecture, two additional sections are required that have no analog in single-agent design:
 
 - **Subagent taxonomy**: enumerates each subordinate agent, its scope, and its authority boundary — what each subagent may decide autonomously and what requires escalation.
-- **Trust model specification**: declares that subagent outputs constitute structured data inputs, not trusted instructions. This is a specific instantiation of the context and grounding policy (section 4 above) applied to agent-generated content rather than external documents.
+- **Trust model specification**: declares that subagent outputs constitute structured data inputs, not trusted instructions. This specifically instantiates the context and grounding policy applied to agent-generated content rather than external documents.

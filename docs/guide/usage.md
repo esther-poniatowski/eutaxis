@@ -4,7 +4,7 @@ Eutaxis assembles instruction files from modular Markdown sources. A single
 configuration can generate project-local files such as `AGENTS.md` and
 `.claude/CLAUDE.md`, or global files such as `~/.codex/AGENTS.md`.
 
-## Generate Project Instructions
+## Generate project instructions
 
 Place `agent-instructions.yaml` at the project root and run:
 
@@ -24,7 +24,7 @@ After scaffolding, edit the generated files inside the project. Project-specific
 instructions belong to the project repository, not to a personal configuration
 repository.
 
-## Check Generated Files
+## Check generated files
 
 Use `check` to detect stale generated files:
 
@@ -41,7 +41,7 @@ eutaxis check -c agent-instructions.yaml --diff
 This command exits with code `1` when any selected output differs from the
 generated content.
 
-## Scan for Unregistered Instruction Files
+## Scan for unregistered instruction files
 
 Use `scan` to compare the instruction files on disk against the files the
 config registers:
@@ -74,7 +74,7 @@ Override the directory walked with `--root <dir>`. The default is the
 union of parent directories of every currently registered instruction
 file.
 
-## List Configured Outputs
+## List configured outputs
 
 Use `list` to inspect configured agents, sources and resolved target paths:
 
@@ -82,7 +82,7 @@ Use `list` to inspect configured agents, sources and resolved target paths:
 eutaxis list -c agent-instructions.yaml
 ```
 
-## Generate One Output
+## Generate one output
 
 Filter generation to a single agent output:
 
@@ -96,7 +96,7 @@ Preview paths without writing files:
 eutaxis generate -c agent-instructions.yaml --dry-run
 ```
 
-## Configuration Structure
+## Configuration structure
 
 The YAML config has two top-level keys:
 
@@ -133,7 +133,7 @@ The generator concatenates content in this order:
 3. All agent-specific `sources`, in list order
 4. `target.footer` (if present)
 
-## Task Module Descriptions
+## Task module descriptions
 
 `task_modules[i].description` is optional. When the config omits it, the
 loader reads it from the target file's YAML frontmatter (the `description`
@@ -141,7 +141,7 @@ key). The config-level value, when present, always wins as an explicit
 override. When both are absent, the loader raises a typed error naming
 the offending module.
 
-## Section Extraction
+## Section extraction
 
 Each source entry can include a `sections` list to extract only named markdown
 headings instead of the full file:
@@ -175,7 +175,7 @@ common_sources:
     heading_offset: 1
 ```
 
-## Generate Global Instructions
+## Generate global instructions
 
 Use `root` to point at the source module directory and an absolute target path
 for the generated global file:
@@ -202,7 +202,7 @@ Run:
 eutaxis generate -c global-agent-instructions.yaml
 ```
 
-## Disabled Agents
+## Disabled agents
 
 Setting `enabled: false` on an agent skips generation for that agent. The
 generator prints a notice and moves on.
@@ -241,7 +241,7 @@ The `--version` flag prints only the version string:
 eutaxis --version
 ```
 
-## Planned Commands
+## Planned commands
 
 ### validate (stub)
 
@@ -249,5 +249,5 @@ eutaxis --version
 eutaxis validate <paths...>
 ```
 
-Intended to validate prompt layouts and configuration files. Currently prints
-"Prompt validation is not yet implemented."
+Validates prompt layouts and configuration files. Currently prints "Prompt
+validation is not yet implemented."

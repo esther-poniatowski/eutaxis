@@ -1,4 +1,4 @@
-# AI Prompt - Target Audience and Background
+# AI prompt - target audience and background
 
 Precise prompts specify **the knowledge level of the reader**.
 

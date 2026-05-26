@@ -1,8 +1,8 @@
-# AI Prompt - Objective and Sope
+# AI prompt - objective and scope
 
 The prompt must clarify **what successful completion means**.
 
-**Rationale:** This transforms the prompt into a **goal-directed instruction**, guiding the agent to prioritize relevant material.
+**Rationale:** Clarifying success transforms the prompt into a **goal-directed instruction**, guiding the agent to prioritize relevant material.
 
 **Guidelines:** Define the **end state of knowledge or capability**.
 

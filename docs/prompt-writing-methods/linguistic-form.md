@@ -1,4 +1,4 @@
-# Linguistic Form
+# Linguistic form
 
 Several linguistic properties have direct behavioral consequences:
 
@@ -8,4 +8,4 @@ Several linguistic properties have direct behavioral consequences:
 
 **Prefer positive specification; scope negative constraints.** "Do not produce vague explanations" leaves the complement class undefined. "Every explanation must reference a specific definition, result, or operation within the current scope" is positively specified and checkable. However, negative constraints remain necessary in safety-critical and style-critical settings — the principle is not to avoid them entirely, but to ensure each negative constraint is scoped, testable, and paired with a positive alternative when possible.
 
-**Avoiding self-referential ambiguity.** Instructions such as "be concise" or "be thorough" are self-undermining — their application changes the length of the instruction itself. Define the target property operationally: "each paragraph must introduce exactly one new conceptual unit; no paragraph may restate content from a preceding paragraph."
+**Avoiding self-referential ambiguity.** Instructions such as "be concise" or "be thorough" are self-undermining — applying them changes the length of the instruction itself. Define the target property operationally: "each paragraph must introduce exactly one new conceptual unit; no paragraph may restate content from a preceding paragraph."

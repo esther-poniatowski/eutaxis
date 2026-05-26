@@ -7,7 +7,7 @@ this with the top-level `root` key, and the CLI can override it with `--root`.
 
 Default config file name: `agent-instructions.yaml`.
 
-## Top-Level Keys
+## Top-level keys
 
 ```yaml
 root: .          # optional root for relative paths
@@ -20,7 +20,7 @@ shared content. An empty `agents` list produces no output. Absolute target paths
 and paths beginning with `~` can target files outside the configured root, such
 as `~/.codex/AGENTS.md`.
 
-## Source Entries
+## Source entries
 
 Each entry in `common_sources` or an agent's `sources` list has the form:
 
@@ -47,7 +47,7 @@ at the top of a file) is stripped before extraction.
 Missing source files abort generation. This prevents stale generated instruction
 files from silently omitting required modules.
 
-## Agent Definitions
+## Agent definitions
 
 Each entry in `agents` has the following structure:
 
@@ -66,7 +66,7 @@ Each entry in `agents` has the following structure:
     - path: docs/instructions/claude-specific.md
 ```
 
-### Agent Fields
+### Agent fields
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
@@ -75,7 +75,7 @@ Each entry in `agents` has the following structure:
 | `target` | mapping | yes | -- | Output file configuration. |
 | `sources` | list of source entries | no | `[]` | Agent-specific source files appended after common sources. |
 
-### Target Fields
+### Target fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -83,7 +83,7 @@ Each entry in `agents` has the following structure:
 | `header` | string | no | Text prepended before all source content. |
 | `footer` | string | no | Text appended after all source content. |
 
-## Assembly Order
+## Assembly order
 
 The generator concatenates content for each agent in this order:
 
@@ -95,7 +95,7 @@ The generator concatenates content for each agent in this order:
 Parts are joined with double newlines. The output file ends with a single
 trailing newline.
 
-## Full Example
+## Full example
 
 ```yaml
 common_sources:
@@ -128,7 +128,7 @@ agents:
 Running `eutaxis generate -c agent-instructions.yaml` with this config writes
 `.claude/CLAUDE.md` (the claude agent) and skips the disabled copilot agent.
 
-## Global Codex Example
+## Global Codex example
 
 A global config can write `~/.codex/AGENTS.md` while sourcing shared modules
 from a separate agent-config directory:

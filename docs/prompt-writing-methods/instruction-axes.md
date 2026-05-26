@@ -74,7 +74,7 @@ agent must traverse.
 ## Within-axis discipline: reasoning targets, not reasoning traces
 
 The reasoning-targets axis carries the gravest authoring risk.
-The default authorial mode — describe what the model should *do*
+The default authorial mode — describing what the model should *do*
 in what order — produces *reasoning-trace* rules. For native
 reasoning models (Claude with extended thinking, OpenAI o-series),
 externalised trace prescriptions are usually redundant when the

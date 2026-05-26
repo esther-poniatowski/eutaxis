@@ -1,10 +1,10 @@
-# AI Prompt - Constraining the Reasoning Process
+# AI prompt - constraining the reasoning process
 
 ## General principles
 
 For agents performing multi-step tasks, the **reasoning schema** must define the checks, decompositions, and external artifacts that should exist before committed output. Depending on the model class, high-quality prompts either guide the reasoning trace directly or specify the targets that the model's hidden reasoning must satisfy.
 
-**Rationale**: This prevents superficial explanations and encourages systematic reasoning.
+**Rationale**: An explicit reasoning schema prevents superficial explanations and encourages systematic reasoning.
 
 Possible reasoning constraints include:
 
@@ -51,9 +51,8 @@ Each derivation must clearly indicate:
 1. The model's generative process is constrained to pass through interpretable intermediate states.
 2. Errors localize to specific reasoning steps, enabling targeted correction.
 
-Warning
-
-Visible reasoning traces are not guaranteed to be _causally faithful_. The written steps may rationalize rather than generate the output, so error localization via scratchpad is heuristically useful but epistemically unreliable.
+> [!WARNING]
+> Visible reasoning traces are not guaranteed to be _causally faithful_. The written steps may rationalize rather than generate the output, so error localization via scratchpad is heuristically useful but epistemically unreliable.
 
 The boundary between the scratchpad and the output must be explicit and structural: "content within `<reasoning>` tags constitutes internal scaffolding and must not appear in the final response; content within `<output>` tags constitutes the committed response." Failure to enforce this boundary causes the model to either suppress useful reasoning (if it treats all output as committed) or pollute the response with scratchpad content.
 

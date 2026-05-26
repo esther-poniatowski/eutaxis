@@ -1,5 +1,5 @@
 
-# AI Prompt - Role and Domain Expertise
+# AI prompt - role and domain expertise
 
 **Principle**: The role specifies **what type of expert the agent must emulate**.
 

@@ -35,8 +35,8 @@ Both reduce to *model-judgment-gated activation*: the rule is in
 scope only if the model first recognises that the current task is
 the one the rule governs.
 
-This works for some rules and silently fails for others. The
-failure mode is asymmetric:
+Model-judgment-gated activation works for some rules and silently
+fails for others. The failure mode is asymmetric:
 
 - For a rule whose violation produces a **visibly suboptimal
   artifact** (missing summary table, no contrastive comparison,

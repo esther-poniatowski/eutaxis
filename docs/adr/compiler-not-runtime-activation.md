@@ -81,9 +81,9 @@ in separate ADRs:
 A build-time compiler eliminates the runtime portability failure (no
 directive to mis-route), removes the sigil collision (no sigil
 emitted), and is reviewable by inspection of the generated artifacts.
-It is also the design that respects how the agents are actually built:
-each one exposes its own customisation surface; the source layer is
-the only place a unification can hold.
+The build-time stance also respects how the agents are actually
+built: each one exposes its own customisation surface, and the source
+layer is the only place a unification can hold.
 
 ## Consequences
 

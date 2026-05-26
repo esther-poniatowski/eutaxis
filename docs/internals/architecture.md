@@ -2,7 +2,7 @@
 
 ## Hierarchical levels
 
-The architecture should reflect **distinct scales of organization**:
+The architecture reflects **distinct scales of organization**:
 
 | Scale               | Contents                                                                                                                                                                         |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -11,11 +11,11 @@ The architecture should reflect **distinct scales of organization**:
 | **Module scale**    | One coherent subdomain within a project, with its own local index, local frontier of open questions, and note production.<br>(+ Cross-module integration if necessary)           |
 
 > [!CHECK] General organization
-> - **Global rules** should be centralized
-> - **Contracts, notes, audits, registry state, artifacts** should be attached to the scale at which content control is exercised (project or module).
-> - **Legacy materials** should remain close enough to their original context to preserve traceability, but isolated from active authoritative notes.
+> - **Global rules** are centralized.
+> - **Contracts, notes, audits, registry state, artifacts** attach to the scale at which content control is exercised (project or module).
+> - **Legacy materials** remain close enough to their original context to preserve traceability, but stay isolated from active authoritative notes.
 
-The vault's governance is distributed across the following components:
+The vault's governance distributes across the following components:
 
 | Component | Directory |
 | --- | --- |
@@ -26,7 +26,7 @@ The vault's governance is distributed across the following components:
 | Workflow and pass specs | `governance/workflow/` |
 | Registry files and validation | `registries/` + `tools/` + `governance/schemas/` |
 
-Each component carries one or more abstract responsibilities; the concrete content of each is project-declared. The audit responsibilities are detailed in [audits](audits.md) and the registry-and-validation responsibilities in [registries](registries.md). Decision rules, note specifications, and contract templates are domain-specific and authored by the project deploying eutaxis. The workflow component is described in the architectural target only; its standalone specification has not yet been written.
+Each component carries one or more abstract responsibilities, and the concrete content of each is project-declared. The [audit responsibilities](audits.md) and the [registry-and-validation responsibilities](registries.md) are detailed separately. Decision rules, note specifications, and contract templates are domain-specific, and the project deploying eutaxis authors them. The workflow component appears in the architectural target only; its standalone specification has not yet been written.
 
 ## Directory layout
 
@@ -96,7 +96,7 @@ vault/
 └── ...
 ```
 
-The vault root contains `AGENTS.md` (the agent entry point, always loaded first) and four top-level directories that separate **normative** content (how the system works) from **descriptive** content (what state the system is in):
+The vault root contains `AGENTS.md` (the agent entry point, always loaded first) and four top-level directories that separate **normative** content (how the system works) from **descriptive** content (the system's current state):
 
 **`governance/`** contains the normative rules of the system — static, authoritative, amended only by explicit human decision:
 
@@ -137,19 +137,19 @@ The vault root contains `AGENTS.md` (the agent entry point, always loaded first)
 
 **File**: `AGENTS.md` (at the vault root)
 
-**Role**: This file is the **entry point** for the agent, always loaded first. It must direct the agent toward the authoritative files in `governance/`. It should coordinate, not contain the entire doctrine.
+**Role**: This file is the **entry point** for the agent, always loaded first. It directs the agent toward the authoritative files in `governance/`. It coordinates, rather than containing the entire doctrine.
 
-**Suggested structure**: This file must be **short, hierarchical, and procedural**. It should contain exactly the following sections:
+**Suggested structure**: This file must be **short, hierarchical, and procedural**, with exactly the following sections:
 
 - **Mission.** A one-sentence statement: the vault is a modular content system whose typed notes compose toward a project-declared primary objective.
-- **Core invariants.** Three non-negotiable constraints: (1) no note may be drafted without an explicit contract, (2) no note may introduce a major output unless contracted, (3) no note may regenerate content already established unless the contract explicitly permits it.
+- **Core invariants.** Three non-negotiable constraints: no note may be drafted without an explicit contract; no note may introduce a major output unless contracted; no note may regenerate content already established unless the contract explicitly permits it.
 - **Workflow.** A pointer to `governance/workflow/` stating that the staged pipeline governs all note production and that stages must not be combined.
-- **Context injection.** A pointer to the context injection protocol in `governance/workflow/`, stating that each pass receives only its designated governance files, not all files.
+- **Context injection.** A pointer to the context injection protocol in `governance/workflow/`, stating that each pass receives only its designated governance files, rather than all files.
 - **Conflict resolution.** Priority ordering: note contract over note specification, note specification over global policy, project scope over stylistic preference.
 
 ## File naming conventions
 
-Enforce a stable naming discipline
+Enforce a stable naming discipline.
 
 **Contracts**: Use the exact note identifier, e.g., `contracts/active/<note_id>.contract.md` or simply `contracts/active/<note_id>.md`.
 

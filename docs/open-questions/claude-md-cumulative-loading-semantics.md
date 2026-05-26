@@ -1,4 +1,4 @@
-# Claude code `CLAUDE.md` cumulative-loading semantics
+# Claude Code `CLAUDE.md` cumulative-loading semantics
 
 **Severity.** Medium.
 **Phase-blocking.** Phase 1 (always-on regime adapter for Claude
@@ -6,14 +6,14 @@ code).
 **Origin.** Cross-agent customisation-mechanism review, recorded in
 [silent-failure-rules-as-always-on](../adr/silent-failure-rules-as-always-on.md).
 Surfaced by the asymmetry between Codex `AGENTS.md` cumulative
-loading (documented) and Claude code `CLAUDE.md` merge semantics
+loading (documented) and Claude Code `CLAUDE.md` merge semantics
 (undocumented for nested paths).
 
 ## Question
 
 The always-on regime adapter compiles authored components into the
-agent's main instruction file. On the Codex side this is
-straightforward: `AGENTS.md` has a [documented cumulative loading
+agent's main instruction file. On the Codex side the contract is
+explicit: `AGENTS.md` has a [documented cumulative loading
 order](../../../instructions/...) — global, project, and intermediate
 parent directories merge in a known sequence, with a documented
 `project_doc_max_bytes` cap. A modular authoring layout (one file
@@ -21,7 +21,7 @@ per rule set in a structured directory tree) can be rendered into
 multiple `AGENTS.md` files at different scopes and rely on Codex to
 merge them.
 
-On the Claude code side the comparable behaviour for `CLAUDE.md` is
+On the Claude Code side, the comparable behaviour for `CLAUDE.md` is
 **not documented**:
 
 - Global `~/.claude/CLAUDE.md` and project `<project>/CLAUDE.md` are
@@ -40,7 +40,7 @@ from vendor documentation. The candidate strategies have different
 failure modes:
 
 - **Trust observed behaviour** (assume parent directories merge
-  like Codex). Risk: silent behaviour change on Claude code update.
+  like Codex). Risk: silent behaviour change on Claude Code update.
 - **Render a single concatenated `CLAUDE.md` per scope** (global,
   project). Risk: loses modular authoring on disk for Claude users
   but eliminates the dependency on undocumented merge semantics.
@@ -60,7 +60,7 @@ failure modes:
   documented in the vendor surface.
 - The [customization-mechanisms](../../../tutorials/ai-agents/customization-mechanisms.md)
   comparative note flags the asymmetry directly:
-  > Claude code uses a `CLAUDE.md` file (merge order and limit not documented).
+  > Claude Code uses a `CLAUDE.md` file (merge order and limit not documented).
 - The current eutaxis legacy `generate` writes a single file per
   scope; the question has not been exercised because no scope
   beyond global / project has been emitted.
@@ -94,7 +94,7 @@ Two reasons to keep this conservative:
 1. The behaviour is testable end-to-end without needing vendor
    confirmation — the adapter writes one file, the platform loads
    one file.
-2. The strategy survives a future Claude code change that
+2. The strategy survives a future Claude Code change that
    formalises (or breaks) nested merge semantics.
 
 The fallback path, should vendor documentation later confirm

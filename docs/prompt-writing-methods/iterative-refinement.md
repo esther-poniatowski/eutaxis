@@ -1,4 +1,4 @@
-# Iterative Refinement
+# Iterative refinement
 
 ## Human-side testing
 

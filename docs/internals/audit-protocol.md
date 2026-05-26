@@ -1,14 +1,14 @@
-# Audit Protocol
+# Audit protocol
 
 This file is the **operational contract**. It governs the mandatory workflow for every unit edit and every section draft under eutaxis. No text is returned before this protocol completes.
 
-The protocol fixes the *shape* of the workflow — its phases, their order, and the output gate — and defers the substance of each phase to the project's declared rules. Every project that deploys eutaxis populates the per-phase checks with its own rules, vocabulary, forbidden strings, and linters; this file is silent on those specifics.
+The protocol fixes the *shape* of the workflow — its phases, their order, and the output gate — and defers the substance of each phase to the project's declared rules. Every project that deploys eutaxis populates the per-phase checks with its own rules, vocabulary, forbidden strings, and linters. This file remains silent on those specifics.
 
 ---
 
 ## Critical warning
 
-Do not use fluency, idiomatic register, or resemblance to canonical examples as evidence of compliance. Standard prose patterns — nominalization, passive indirection, heavy compound terms, imperative openings, conclusions before grounding — are common failure modes to guard against, not acceptable defaults. Apply every check mechanically to every sentence, including:
+Do not use fluency, idiomatic register, or resemblance to canonical examples as evidence of compliance. Standard prose patterns — nominalization, passive indirection, heavy compound terms, imperative openings, conclusions before grounding — are common failure modes to guard against, rather than acceptable defaults. Apply every check mechanically to every sentence, including:
 
 - carried-over text from source units (the single highest source of missed violations, because it already "sounds right");
 - Markdown link texts (every link text is a sentence and must pass all checks independently);
@@ -27,8 +27,8 @@ Execute every phase in order. Do not return output until Phase 7 passes.
 
 Before drafting, decide exactly one of the following:
 
-- **Full-treatment mode**: the complete development belongs in this unit; include setup, development, result, interpretation, and edge cases.
-- **Pointer mode**: only a pointer belongs here; write a single linking sentence and cross-link to the source unit.
+- **Full-treatment mode**: the complete development belongs in this unit, including setup, development, result, interpretation, and edge cases.
+- **Pointer mode**: only a pointer belongs here. Write a single linking sentence and cross-link to the source unit.
 
 Do not mix modes in the same unit. If content currently exists in both modes, decide which to keep and delete the other.
 
@@ -61,7 +61,7 @@ Write the body in dependency order within each section. The default order is:
 6. specializations and examples;
 7. edge cases and boundary conditions.
 
-Projects that need a different default order declare it in their structural rules. After completing each section, verify the section dependency chain: what does this section receive from the preceding section? If the answer is "nothing", reorder or add a missing connecting step.
+Projects that need a different default order declare it in their structural rules. After completing each section, verify the section dependency chain by checking what this section receives from the preceding section. If the answer is "nothing", reorder or add a missing connecting step.
 
 ---
 
@@ -69,7 +69,7 @@ Projects that need a different default order declare it in their structural rule
 
 For every sentence in the draft — including sentences carried over from earlier drafts, link texts, callout bodies, and bold-label paragraphs — apply the project-declared sentence checks in order. Do not rely on whether the sentence "sounds wrong."
 
-The project's style rules declare the concrete tests; the categories below are the canonical surface every project must cover:
+The project's style rules declare the concrete tests. The categories below are the canonical surface every project must cover:
 
 - **Style discipline.** Nominalization, passive voice, heavy compound modifiers, and other style-level patterns the project bans.
 - **Framing.** Sentences that describe the act of establishing a result instead of stating it; vague procedural nominalizations whose operands are implicit.
@@ -87,23 +87,23 @@ The project's style file declares the literal forms of each test (regular expres
 
 After completing the draft, verify at paragraph and section level:
 
-**Section dependency.** For each section after the first, what does it receive from the preceding section? If nothing, the section is misplaced or a connecting step is missing.
+**Section dependency.** For each section after the first, identify what it receives from the preceding section. If nothing, the section is misplaced or a connecting step is missing.
 
-**Paragraph dependency.** For each paragraph after the first in a section, would removing the preceding paragraph break this one? If not, a logical connector is missing or the preceding paragraph is redundant.
+**Paragraph dependency.** For each paragraph after the first in a section, check whether removing the preceding paragraph would break this one. If not, a logical connector is missing or the preceding paragraph is redundant.
 
 **Preview–conclusion redundancy.** If a section opens with a preview of the result and closes with a restatement of it, delete one. Do not state the same result at both ends of a section.
 
-**Contributions–body redundancy.** Does any body paragraph restate a contribution bullet without adding new content? If yes, delete the restatement or compress it to a back-reference.
+**Contributions–body redundancy.** If a body paragraph restates a contribution bullet without adding new content, delete the restatement or compress it to a back-reference.
 
-**Takeaway justification.** Does a concluding paragraph add implications, limiting cases, or connections beyond the formal statement? If it only restates the result in words, delete it.
+**Takeaway justification.** A concluding paragraph must add implications, limiting cases, or connections beyond the formal statement. If it only restates the result in words, delete it.
 
-**Callout dispatch.** Does the central-question callout body describe what the unit achieves? (Move to contributions.) Does a roadmap item announce a result or novelty claim? (Move to contributions.) Does a contribution bullet describe the path without stating a result? (Move to the roadmap.)
+**Callout dispatch.** If the central-question callout body describes what the unit achieves, move it to contributions. If a roadmap item announces a result or novelty claim, move it to contributions. If a contribution bullet describes the path without stating a result, move it to the roadmap.
 
 ---
 
 ### Phase 5a — Forbidden-string search
 
-Search the final Markdown text for each entry in the project-declared forbidden-string list. Any match outside code blocks requires revision before proceeding. The list lives in the project's style rules; this phase enforces it mechanically.
+Search the final Markdown text for each entry in the project-declared forbidden-string list. Any match outside code blocks requires revision before proceeding. The list lives in the project's style rules, and this phase enforces it mechanically.
 
 ### Phase 5b — Semantic audit
 

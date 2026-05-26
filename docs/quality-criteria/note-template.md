@@ -1,4 +1,4 @@
-# Note Template
+# Note template
 
 This file defines the structural requirements for all notes in the repository. These are architectural rules, not stylistic preferences. Every note must satisfy them before output.
 

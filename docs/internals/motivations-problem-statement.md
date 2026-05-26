@@ -13,11 +13,11 @@
 - combine AI autonomy, human control, and their interaction,
 - implement the best design practices: modularity, separation of concerns, flexibility, extensibility, predictability, and maintainability.
 
-One main challenge addressed by the system is to constrain AI agents at the level of **generative behavior**: what must be produced, from which inputs, in what order, and what counts as success.
+One main challenge addressed by the system is to constrain AI agents in their **generative behavior**: what must be produced, from which inputs, in what order, and what counts as success.
 
 ---
 
-## Problem statement & Diagnosis
+## Problem statement and diagnosis
 
 This section describes the failure modes the system aims to address, and their underlying causes. The diagnosis identifies the components needed and the rationale behind their design.
 

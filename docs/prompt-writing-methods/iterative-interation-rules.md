@@ -1,4 +1,4 @@
-# AI Prompt - Iterative Interaction Rules
+# AI prompt - iterative interaction rules
 
 For complex tasks, the prompt may define **interaction protocols**.
 

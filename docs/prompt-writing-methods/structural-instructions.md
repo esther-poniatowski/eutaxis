@@ -1,4 +1,4 @@
-# AI Prompt - Structural Instructions
+# AI prompt - structural instructions
 
 Explicitly define the **organization of explanations**.
 

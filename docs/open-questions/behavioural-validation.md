@@ -14,8 +14,8 @@ does with it**. The framework currently relies on
 as the explicit correctness contract; the README also references
 behavioural testing and profile-based validation as project
 capabilities. The proposal contains no behavioural-validation loop,
-no contract tests against the agents' actual responses, no oracle for
-"this output style actually makes Claude write differently".
+no contract tests against the agents' actual responses, and no oracle
+for "this output style actually makes Claude write differently".
 
 For an architecture whose advertised guarantee is "same source, not
 same behaviour"
@@ -62,9 +62,9 @@ as a complement to the build-time contract. Three motivations:
   `eutaxis generate`; invoked via a separate command (`eutaxis
   validate` or `eutaxis behavioural-check`).
 - **Owned by the consuming project, not the framework.** vitruv,
-  hermeneia, gnomon already define quality criteria; the behavioural
-  loop is a project concern. Eutaxis supplies the harness shape; the
-  prompts and oracles are project-defined.
+  hermeneia, and gnomon already define quality criteria; the
+  behavioural loop is a project concern. Eutaxis supplies the harness
+  shape; the prompts and oracles are project-defined.
 - **Surface the gap in `eutaxis explain`.** When a fidelity grade is
   Approximate and no behavioural evidence is attached, the report
   marks it `unmeasured`. Structural checks produce `structural`

@@ -3,8 +3,8 @@
 Open questions for the eutaxis cross-agent compiler that the current
 ADR set does **not** resolve. Each file states one question, the
 architectural component that depends on it, and any partial work that
-has landed. These were originally surfaced by an adversarial review
-of the cross-agent compiler proposal; the review file itself has been
+has landed. An adversarial review of the cross-agent compiler proposal
+originally surfaced these questions; the review file itself has been
 retired in favour of this modular set.
 
 ```{toctree}

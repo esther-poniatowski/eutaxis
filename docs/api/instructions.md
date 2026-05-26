@@ -1,8 +1,8 @@
-# Instruction Assembly API
+# Instruction assembly API
 
 The instruction assembly API is exposed from `eutaxis.instructions`.
 
-## Public Imports
+## Public imports
 
 ```python
 from pathlib import Path
@@ -14,7 +14,7 @@ generator = InstructionGenerator(config)
 generator.write_all()
 ```
 
-## Configuration Loading
+## Configuration loading
 
 `load_config(config_path, root=None)` loads a YAML instruction config and returns
 an `InstructionConfig`.
@@ -57,7 +57,7 @@ content = generator.generate_all(agent_name="codex")
 paths = generator.write_all(agent_name="codex")
 ```
 
-## Stale Output Checks
+## Stale output checks
 
 `diff_report()` compares generated content to files currently on disk:
 
@@ -72,7 +72,7 @@ for agent, path, differs in generator.diff_report():
 print(generator.unified_diff("codex"))
 ```
 
-## Markdown Assembly
+## Markdown assembly
 
 `MarkdownAssembler` applies source-level transformations:
 
@@ -95,7 +95,7 @@ source = SourceFile(
 content = assembler.process(markdown_text, source)
 ```
 
-## Data Models
+## Data models
 
 The main dataclasses are:
 

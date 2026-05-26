@@ -21,7 +21,8 @@ command policy." MCP definitions and permission/command policy are
   "Approximate" here means one agent grants slightly more or slightly
   less than the other. That is not fidelity degradation — it is a
   **vulnerability** if the looser side authorises something the
-  stricter side blocks, and a **usability failure** if vice versa.
+  stricter side blocks, and a **usability failure** in the reverse
+  configuration.
 
 The fidelity vocabulary obscures the security stakes.
 

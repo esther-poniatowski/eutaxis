@@ -12,7 +12,7 @@ Accepted architecture decisions for Eutaxis, organised by scope:
 - **Superseded.** Earlier decisions retained for historical context.
 
 Open architectural questions — items the ADR set does not resolve —
-live under [`docs/open-questions/`](../open-questions/_index.md).
+live under [open-questions](../open-questions/_index.md).
 
 ```{toctree}
 :maxdepth: 1

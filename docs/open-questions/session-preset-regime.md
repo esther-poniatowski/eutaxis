@@ -8,7 +8,7 @@ objection O1.
 ## Question
 
 The proposed mapping for the **session-preset regime** routes a single
-authored component to a Claude Code output style *and* a Codex
+authored component to a Claude Code output style *and* to a Codex
 `[profiles.<id>]` block carrying `developer_instructions`. The two
 mechanisms differ in two structural ways that "approximate fidelity"
 does not capture:
@@ -32,7 +32,7 @@ does not capture:
 
 The session-preset regime is **declared** in
 [activation-regime-as-classification-axis](../adr/activation-regime-as-classification-axis.md)
-as one of the four regimes. It is **not yet implemented**. The
+as one of the four regimes, but **not yet implemented**. The
 phasing
 ([cross-agent compiler architecture](../adr/compiler-not-runtime-activation.md))
 places this regime after Phase 1 (always-on plus on-demand). No

@@ -1,6 +1,6 @@
-# AI Prompts - Section demarcation
+# AI prompts - section demarcation
 
-Use unambiguous delimiters to demarcate content regions. 
+Use unambiguous delimiters to demarcate content regions.
 
 **Preferred option**: XML-style tags (e.g. `<role>`, `<constraints>`, `<output_format>`) are often effective, especially for nested structure:
 
@@ -12,7 +12,7 @@ Use unambiguous delimiters to demarcate content regions.
 
 **Avoid**: Natural language labels are the weakest option — they are parsed as _descriptive_ annotations rather than structural boundaries (e.g. "Constraints:", etc).
 
-The format that dominates in practice is a **rule block** per constraint, not a flat list of bullets:
+A **rule block** per constraint dominates in practice, instead of a flat list of bullets:
 
 ```xml
 <rule id="R1">

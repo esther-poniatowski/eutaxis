@@ -66,8 +66,8 @@ A small, mechanical discipline:
 - **`eutaxis explain`** surfaces the vendor-doc revision the
   adapter was reconciled to, so the user can judge currency.
 
-This is a small addition; its value is honesty about substrate
-volatility rather than feature reach.
+This discipline is a small addition; its value is honesty about
+substrate volatility rather than feature reach.
 
 ## Decision required before
 

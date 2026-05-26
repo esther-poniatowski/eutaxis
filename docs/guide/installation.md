@@ -13,7 +13,7 @@ The package installs directly from the GitHub repository:
 pip install git+https://github.com/esther-poniatowski/eutaxis.git
 ```
 
-## From Source
+## From source
 
 1. Clone the repository:
 

@@ -1,8 +1,8 @@
 # Registries and validation
 
-This file specifies the registries and the validation toolchain that govern a vault under eutaxis. The vault is treated as a graph of typed content units rather than a flat collection of documents. The registries make the global structure explicit so that automated checks, an agent, and a human supervisor share one description of the vault state.
+This file specifies the registries and the validation toolchain that govern a vault under eutaxis. The vault is treated as a graph of typed content units rather than a flat collection of documents. The registries make the global structure explicit, so that automated checks, an agent, and a human supervisor share one description of the vault state.
 
-The specifics of the typed vocabulary (content kinds, output types, statement roles) are project-specific and must be declared in the project's governance directory. This file fixes the *shape* of the registries and the *contract* of the toolchain; the entries are domain-defined.
+The specifics of the typed vocabulary (content kinds, output types, statement roles) are project-specific and must be declared in the project's governance directory. This file fixes the *shape* of the registries and the *contract* of the toolchain, while the entries are domain-defined.
 
 ---
 
@@ -21,7 +21,7 @@ Maintain machine-readable indexes (YAML or JSON) usable simultaneously by a huma
 
 ### Content graph
 
-**Role.** Encodes the dependencies between notes as a typed graph. A note rarely depends on another note as a whole; it depends on a specific declared object inside that note. Without typed imports, the dependency list is a citation list, not a structural map; coarse dependencies are a primary cause of accidental overlap and hidden duplication.
+**Role.** Encodes the dependencies between notes as a typed graph. A note rarely depends on another note as a whole, since it depends on a specific declared object inside that note. Without typed imports, the dependency list is a citation list rather than a structural map, and coarse dependencies are a primary cause of accidental overlap and hidden duplication.
 
 **Suggested fields per note entry:**
 
@@ -36,7 +36,7 @@ Maintain machine-readable indexes (YAML or JSON) usable simultaneously by a huma
 
 **Project-declared enums.** The set of admissible import kinds, output types, and statement roles is project-specific and declared in the project's governance directory. The registry schema enforces that every entry's `kind`, `type`, and `statement_role` come from the declared enum.
 
-**Upstream-instability propagation.** When a completed note is revised, downstream consumers may silently inherit stale inputs. The registry tracks this explicitly: when a note's status transitions to `revised`, three fields are added — `revision_note` (what changed), `downstream_affected` (consumer note IDs), and `propagation_status`.
+**Upstream-instability propagation.** When a completed note is revised, downstream consumers may silently inherit stale inputs. The registry tracks this explicitly: when a note's status transitions to `revised`, three fields appear — `revision_note` (what changed), `downstream_affected` (consumer note IDs), and `propagation_status`.
 
 `propagation_status` values:
 
@@ -44,7 +44,7 @@ Maintain machine-readable indexes (YAML or JSON) usable simultaneously by a huma
 - **checked**: downstream consumers have been inspected; some require revision;
 - **cleared**: all downstream consumers have been confirmed or updated.
 
-**Drafting gate.** Before any drafting pass begins, the agent checks whether any declared import has `propagation_status: unresolved`. If so, drafting is blocked until the upstream instability is resolved — either by confirming that the importing note's content remains valid under the revised input, or by revising the importing note. ^drafting-gate
+**Drafting gate.** Before any drafting pass begins, the agent checks whether any declared import has `propagation_status: unresolved`. If so, drafting is blocked until the upstream instability is resolved — either by confirming that the importing note's content remains valid under the revised input, or by revising the importing note itself. ^drafting-gate
 
 ### Open questions
 
@@ -54,7 +54,7 @@ Maintain machine-readable indexes (YAML or JSON) usable simultaneously by a huma
 
 ### Dependencies
 
-**Role.** Tracks reusable objects and their provenance, reducing accidental redefinition and hidden duplication.
+**Role.** Tracks reusable objects and their provenance, thereby reducing accidental redefinition and hidden duplication.
 
 **Suggested fields per entry:** `id`, `kind` (from the project's import-kind enum), a provenance field whose name depends on the kind (e.g. `defined_in`, `produced_in`), optional kind-specific fields declared by the schema, and `imported_by` (note IDs that use the object). The schema enables the validation toolchain to detect regenerations, orphaned objects, and missing imports.
 
@@ -72,6 +72,7 @@ Registry corruption is a silent, compounding failure: it does not surface immedi
 
 ### Architecture ^validation-architecture
 
+
 | Layer | Mechanism | Failure mode addressed |
 | --- | --- | --- |
 | **Schema enforcement** | JSON Schema validation on write | Field name drift, missing required fields, type errors |
@@ -87,7 +88,7 @@ Registry corruption is a silent, compounding failure: it does not surface immedi
 **Directory.** `governance/schemas/`. One JSON Schema per registry file: `content_graph.schema.json`, `dependencies.schema.json`, `open_questions.schema.json`, `terminology.schema.json`. Critical properties:
 
 - **`additionalProperties: false`** on all note entries: prevents silently accepted novel field names from a drifting agent;
-- **Typed imports** enforced in schema: `imports` entries must have `from`, `kind`, and `object` fields, not bare note IDs;
+- **Typed imports** enforced in schema: `imports` entries must have `from`, `kind`, and `object` fields, rather than bare note IDs;
 - **Enumerated types**: `type`, `status`, `propagation_status`, import `kind`, and output `statement_role` must be enum-constrained;
 - **ID format**: a uniform identifier pattern enforced across all IDs (e.g. `^[a-z0-9-]+$`).
 
@@ -106,7 +107,7 @@ Any transition outside the declared set is a validation error.
 
 ### Staging area
 
-The agent must never modify live registry files directly. All proposed updates are written to `registries/staging/`. Promotion to the live `registries/` directory requires:
+The agent must never modify live registry files directly. All proposed updates land in `registries/staging/`. Promotion to the live `registries/` directory requires:
 
 1. all automated validation checks pass with zero errors;
 2. a human reviews the structured diff between live and staging for semantic correctness — naming consistency, transition legitimacy, dependency justification, completeness of consumer lists;
@@ -119,4 +120,4 @@ Three scripts in `tools/`:
 
 - **`validate_registry.py`**: schema validation, ID uniqueness, path existence, referential integrity, cycle detection on dependency edges, status-transition validity, propagation consistency, cross-registry consistency. Exits non-zero on any failure.
 - **`registry_diff.py`**: produces a structured diff between live and staging registries, showing all mutations by change type (added, removed, modified) with old and new values.
-- **`lint_terminology.py`**: scans note Markdown files against the terminology registry. For each `preferred_terms` entry, searches for `forbidden_variants` in the prose and reports violations with the canonical replacement. Also flags terms that appear to introduce new concepts not present in the registry. Exits non-zero on any forbidden-variant match.
+- **`lint_terminology.py`**: scans note Markdown files against the terminology registry. For each `preferred_terms` entry, searches for `forbidden_variants` in the prose and reports violations with the canonical replacement. Also flags terms that appear to introduce new concepts absent from the registry. Exits non-zero on any forbidden-variant match.

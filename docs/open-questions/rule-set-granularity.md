@@ -22,20 +22,20 @@ Two packaging schemes are possible:
   file declares its own identifier. The file is the loading unit;
   the identifier is the selection unit.
 
-The choice is not purely cosmetic. It shapes:
+The choice is not purely cosmetic. The decision shapes:
 
 - **Authoring locality.** Closely related rules cross-reference
-  each other ("see also [[no-forward-references]]"); editing them
-  together is the dominant access pattern.
+  each other ("see also [[no-forward-references]]"), and editing
+  them together is the dominant access pattern.
 - **Loading granularity.** A skill that activates "conceptual
   reasoning" typically wants the whole rule-set, not three of its
-  eleven rules; the bulk-load case is more common than the
-  single-rule case.
+  eleven rules; bulk loading is more common than single-rule
+  loading.
 - **Filesystem footprint.** The current `instructions/tasks/` set
   has on the order of fifty rules across eight files; per-rule
   packaging would mean fifty files, growing as the set grows.
 - **Index and discovery overhead.** Cross-rule lookup at scale
-  benefits from larger files (fewer file opens); single-rule
+  benefits from larger files (fewer file opens), whereas single-rule
   lookup benefits from per-rule files (no internal indexing
   needed).
 
@@ -44,8 +44,8 @@ The choice is not purely cosmetic. It shapes:
 - All current oikos `instructions/tasks/` files are
   rule-sets with multiple rules per file.
 - The eutaxis commands subsystem packages each command as its own
-  directory (one identifier, one artifact); this is the on-demand
-  skill case, not the rule case.
+  directory (one identifier, one artifact); this concerns on-demand
+  skills, not rules.
 - The schema decision in
   [rule-sources-as-structured-templates](../adr/rule-sources-as-structured-templates.md)
   is neutral on packaging — it requires only that each rule have
@@ -87,8 +87,8 @@ session discussion. The rationale:
   examples) and editing one in isolation is rare.
 - Groups of rules tend to cohere around a behavioural aspect (the
   ten rules under `conceptual-reasoning` collectively shape how
-  the agent reasons; loading three of them in isolation is not
-  the common case).
+  the agent reasons; loading three of them in isolation is
+  uncommon).
 - The dominant loading scenario is the whole rule-set, which
   rule-set packaging optimises directly.
 - Per-rule identifiers preserve the option to compose more finely
@@ -99,8 +99,8 @@ session discussion. The rationale:
   single-export convention: file-level `exports:` frontmatter
   lists the identifiers a file exposes, with a soft linter
   warning when a file lists more than one entry. The convention
-  works for the rule case by inversion: a rule-set file lists
-  the rule `id`s it contains, and the linter inverts the warning
+  applies to rules by inversion: a rule-set file lists the rule
+  `id`s it contains, and the linter inverts the warning
   to flag files with *too few* rules (a rule-set of one
   suggests the file should merge with a related set) or *too
   many* rules without a unifying behavioural aspect.
@@ -117,7 +117,7 @@ Three sub-questions to settle before landing:
 2. **Single-rule files as an escape hatch.** Whether a one-rule
    file is permitted (a rule-set of size one), and if so, whether
    the format degrades gracefully (no required `rules:` list
-   wrapper for the single-rule case).
+   wrapper when only one rule is present).
 3. **Cross-set composition syntax.** How a skill declares
    "include set A, plus rule B from set C, minus rule D from set
    A" — the algebra is unspecified and couples to the format

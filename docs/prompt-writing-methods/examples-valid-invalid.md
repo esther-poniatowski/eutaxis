@@ -1,11 +1,11 @@
 
-# AI Prompt - Examples
+# AI prompt - examples
 
 Few-shot and in-context-learning evidence supports a qualified claim: **well-chosen examples often improve rule-following beyond declarative rules alone**, particularly for format, style, and discourse-level constraints that resist precise logical formulation. The effect is model-dependent and sensitive to example quality, ordering, surface features, and task distribution.
 
-Contrastive pairs are useful because they expose a boundary between allowed and disallowed outputs. The prompt should not assume this induces a faithful internal representation of the rule; it is enough that the pair gives the model a local pattern for distinguishing compliant from non-compliant outputs.
+Contrastive pairs are useful because they expose a boundary between allowed and disallowed outputs. The prompt should not assume this induces a faithful internal representation of the rule; the pair only needs to give the model a local pattern for distinguishing compliant from non-compliant outputs.
 
-Thus, two complementary information types are often needed to specify behavior:
+Two complementary information types are often needed to specify behavior:
 
 - **Declarative rules** establish the constraint boundary — what is in and out of the allowed set.
   Examples without rules are subject to **overfitting to surface form**: the model generalizes from the example's incidental properties rather than its underlying principle.
@@ -52,7 +52,7 @@ Rule: Contractions are forbidden.
 
 When two rules can produce conflicting outputs on the same input, an example that demonstrates their joint application is high-value. Without it, the model may resolve the conflict by whichever rule is most salient, recent, or locally plausible.
 
-## Economy Principles
+## Economy principles
 
 Two economy principles prevent example sets from becoming a maintenance liability:
 
@@ -84,7 +84,7 @@ ICL literature finds that:
 - the distribution of examples across classes affects the output distribution,
 - superficial surface features of examples (length, punctuation) can dominate over their intended semantic signal.
 
-## Ordering: Invalid Before Valid
+## Ordering: invalid before valid
 
 Two well-documented phenomena are relevant: **recency bias** and **contrastive priming**.
 
@@ -92,7 +92,7 @@ These two effects usually favor the ordering **invalid -> valid**:
 
 1. The valid example occupies the recency-favored position. The model is more likely to continue from the compliant form than from the anti-pattern.
 2. The invalid -> valid sequence instantiates a **correction schema**: a deficient form followed by its repair. This pattern is common in editing, code review, and feedback data.
-3. The valid example, arriving after the anti-pattern, is interpreted in contrast to a foregrounded deficient form. This contrast can make the intended boundary easier to apply than a valid example encountered in isolation.
+3. The valid example, arriving after the anti-pattern, contrasts with a foregrounded deficient form. This contrast can make the intended boundary easier to apply than a valid example encountered in isolation.
 
 ## Field name semantics
 

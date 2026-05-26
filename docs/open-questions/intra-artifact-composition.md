@@ -41,9 +41,9 @@ other regime that ships will encounter the question on its first
 multi-component scope.
 
 The commands subsystem of Eutaxis avoids the question because each
-command is a separate skill artifact; intra-artifact composition is
-not exercised. The always-on regime, when it lands beyond the legacy
-`generate`, will exercise it immediately.
+command is a separate skill artifact, so intra-artifact composition
+is not exercised. The always-on regime, when it lands beyond the
+legacy `generate`, will exercise it immediately.
 
 ## Architectural components that depend on this
 

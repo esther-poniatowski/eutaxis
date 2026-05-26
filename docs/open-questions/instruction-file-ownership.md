@@ -10,7 +10,7 @@ objection O3.
 Generated artifacts are written into `~/.claude/`, `~/.codex/`, and
 project-local configuration files. These targets almost universally
 contain hand-authored content: project conventions, personal
-preferences, notes accumulated over time. The compiler must decide
+preferences, and notes accumulated over time. The compiler must decide
 how it coexists with that content.
 
 Two ownership models:

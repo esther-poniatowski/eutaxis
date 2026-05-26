@@ -106,7 +106,7 @@ Two refinements that should be considered before landing:
 - **Granularity.** The classification belongs at the rule level,
   not at the rule-set level. A current oikos task module typically
   mixes both classes; without per-rule classification, the gate
-  has to be conservative at the file level and over-routes content
+  must be conservative at the file level and over-routes content
   to the always-on body.
 - **Activation path as a separate field.** A three-level
   `failure-mode` scale (`silent`, `mixed`, `visible`) was considered
@@ -117,5 +117,5 @@ Two refinements that should be considered before landing:
 ## Decision required before
 
 Any release that emits skill artifacts from rule sources that also
-contain always-on content. This is the case for every oikos task
-module today, so the question blocks the first migration pass.
+contain always-on content. Every oikos task module today fits this
+description, so the question blocks the first migration pass.

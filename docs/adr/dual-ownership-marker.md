@@ -68,9 +68,9 @@ as user-owned unless `--force` is passed.
   fragile to agent rewrites of `SKILL.md`.
 - **Registry only, no on-disk marker.** Rejected because the registry
   and the disk drift in realistic scenarios. Without a disk marker the
-  installer cannot distinguish "we installed this here and lost the
-  record" from "the user wrote this by hand", and must conservatively
-  refuse both.
+  installer cannot distinguish "the artifact was installed here and the
+  record was lost" from "the user wrote this by hand", and must
+  conservatively refuse both.
 - **HTML comment above the frontmatter** (carry-over from the legacy
   design). Rejected because `SKILL.md` frontmatter must start at line
   one; a comment above breaks YAML parsing on both agents.
@@ -95,5 +95,5 @@ the frontmatter key is the recovery channel when the sidecar is gone.
   installer rewrites the full set on update).
 - The `x-eutaxis-owned` key sits inside frontmatter that agents parse.
   Both Claude and Codex are documented to tolerate unknown keys; if a
-  future stricter validator rejects it, we would switch to a comment
-  trailer or move the marker entirely to the sidecar.
+  future stricter validator rejects it, the fallback is to switch to a
+  comment trailer or to move the marker entirely to the sidecar.

@@ -1,6 +1,6 @@
-# CLI Reference
+# CLI reference
 
-## Global Options
+## Global options
 
 | Flag | Short | Effect |
 |------|-------|--------|

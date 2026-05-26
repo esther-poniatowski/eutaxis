@@ -8,11 +8,11 @@ objection O6.
 ## Question
 
 The original proposal defers subagents on the grounds that their
-declaration models differ between agents. It then routes role /
+declaration models differ between agents. It then routes role and
 session-preset components to **output styles** (Claude) and
 **profiles** (Codex) — see
 [session-preset-regime](session-preset-regime.md) for why that
-mapping is structurally wrong.
+mapping is structurally incorrect.
 
 Subagents are the **closest native role-isolation mechanism** on both
 agents: delegated context, scoped instructions, configurable tools,

@@ -1,4 +1,4 @@
-# Context and Grounding Policy
+# Context and grounding policy
 
 Modern prompt engineering is increasingly framed as **context engineering**: curating the right tokens, references, and state.
 
@@ -12,7 +12,7 @@ For any agent that processes _external content_ — documents, tool outputs, ret
 - **Retrieval priority**: how retrieved context is prioritized when multiple sources are available
 - **Missing-information behavior**: what to do when sources are incomplete
 - **Conflict resolution across sources**: how to handle contradictions between sources
-- **Injection detection policy**: specifying the response when injected instructions are detected inside external content
+- **Injection detection policy**: specifying the response when injected instructions appear inside external content
 
 ## Tool usage
 
@@ -20,7 +20,7 @@ For agentic systems with tool use, the reasoning schema must additionally specif
 
 - **Pre-conditions** for invoking each tool (when, not just how)
 - **Post-conditions** the model must verify before proceeding
-- **Abort criteria** — conditions under which the agent should stop the current task, _what_ it should emit (a structured failure report, not merely a halt), and _to whom_ (the downstream consumer may be a controller agent, not a human). Halting silently is rarely the correct response; the abort specification must define the failure signal's format and recipient.
+- **Abort criteria** — conditions under which the agent should stop the current task, _what_ it should emit (a structured failure report, not merely a halt), and _to whom_ (the downstream consumer may be a controller agent, not a human). Silent halting is rarely the correct response; the abort specification must define the failure signal's format and recipient.
 
 The agent's effective instruction set should include:
 

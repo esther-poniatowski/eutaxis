@@ -8,7 +8,7 @@
 ## Question
 
 [rule-sources-as-structured-templates](../adr/rule-sources-as-structured-templates.md)
-commits to structured, schema-validated rule sources, but defers
+commits to structured, schema-validated rule sources but defers
 two concrete choices:
 
 1. **Surface syntax** — which configuration format the source file
@@ -66,7 +66,7 @@ rejects an untyped frontmatter-plus-convention-body hybrid, not a
 typed tag-delimited hybrid whose content blocks are schema-addressable
 fields.
 
-Mapped to the rule-template case:
+Mapped to rule templates:
 
 ```markdown
 ---

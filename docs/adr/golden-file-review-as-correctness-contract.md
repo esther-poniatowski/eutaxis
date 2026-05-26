@@ -17,8 +17,8 @@ scope for v1.
 The build-time stance (compiler-not-runtime-activation) reframes the
 correctness question. Compilation is a deterministic function of the
 source. Every artifact is reviewable as a file. The contract Eutaxis
-can credibly support is: **given this source, this is the artifact you
-will see installed**. Behavioural correctness is downstream.
+can credibly support is: **given this source, this is the artifact
+installed on disk**. Behavioural correctness is downstream.
 
 ## Decision
 

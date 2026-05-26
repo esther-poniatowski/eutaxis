@@ -1,6 +1,6 @@
-# AI Prompt - Constraints and Evaluation Criteria
+# AI prompt - constraints and evaluation criteria
 
-## Constraint Formulation
+## Constraint formulation
 
 The prompt may specify **quality standards**.
 
@@ -35,7 +35,7 @@ Specifying _what the model must verify before committing output_ is one of the m
 The instruction file should specify:
 
 - **Output post-conditions**: what must be checked before the final answer is committed (e.g., "verify that every assumption used in the proof is listed in the assumptions section")
-- **Assumption validation**: which premises or intermediate results must be confirmed before they are treated as established
+- **Assumption validation**: which premises or intermediate results must be confirmed before being treated as established
 - **Halt conditions**: which conditions require stopping and surfacing ambiguity rather than proceeding (e.g., "if the derivation requires an assumption not declared in the contract, halt and report")
 - **Completion criteria**: what counts as task completion — the verifiable conjunction that distinguishes a finished output from a partial one
 
