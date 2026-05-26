@@ -26,7 +26,7 @@ The vault's governance is distributed across the following components:
 | Workflow and pass specs | `governance/workflow/` |
 | Registry files and validation | `registries/` + `tools/` + `governance/schemas/` |
 
-Each component carries one or more abstract responsibilities; the concrete content of each is project-declared. The audit responsibilities are detailed in [audits](audits), the workflow responsibilities in [procedural-workflows](procedural-workflows), and the registry-and-validation responsibilities in [registries](registries). Decision rules, note specifications, and contract templates are domain-specific and authored by the project deploying eutaxis.
+Each component carries one or more abstract responsibilities; the concrete content of each is project-declared. The audit responsibilities are detailed in [audits](audits.md) and the registry-and-validation responsibilities in [registries](registries.md). Decision rules, note specifications, and contract templates are domain-specific and authored by the project deploying eutaxis. The workflow component is described in the architectural target only; its standalone specification has not yet been written.
 
 ## Directory layout
 
@@ -103,9 +103,9 @@ The vault root contains `AGENTS.md` (the agent entry point, always loaded first)
 - `rules/` — one file per project-declared decision rule, plus an `_index.md` as cross-referencing hub
 - `specs/` — one project-declared note specification per type, plus an `_index.md` as note-type index
 - `contracts/` — one project-declared contract template per note type
-- `audits/` — [audit checklists and report template](audits)
-- `schemas/` — one JSON Schema per registry file (see [schema requirements](registries#^schema-requirements))
-- `workflow/` — pipeline prompts and [pass specifications](procedural-workflows)
+- `audits/` — [audit checklists and report template](audits.md)
+- `schemas/` — one JSON Schema per registry file (see [schema requirements](registries.md#schema-requirements))
+- `workflow/` — pipeline prompts and pass specifications (standalone spec not yet authored)
 
 **`registries/`** contains the descriptive global state — dynamic, updated as the vault evolves:
 
