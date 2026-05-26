@@ -36,9 +36,7 @@ eutaxis generate -c <config-file>
 | `--agent` | `-a` | all enabled agents | Generate only one configured agent output. |
 | `--dry-run` | `-n` | `false` | Show output targets without writing files. |
 
-The generator reads the YAML config, resolves all source paths relative to the
-configured root, and writes one output file per enabled agent. See
-[Configuration](configuration.md) for the full schema.
+The generator reads the YAML config, resolves all source paths relative to the configured root, and writes one output file per enabled agent. See [Configuration](configuration.md) for the full schema.
 
 Exit codes:
 
@@ -62,8 +60,7 @@ eutaxis check -c <config-file>
 | `--agent` | `-a` | all enabled agents | Check only one configured agent output. |
 | `--diff` | | `false` | Print unified diffs for stale outputs. |
 
-Exit code `0` means all selected outputs are current. Exit code `1` means at
-least one output differs from the generated content.
+Exit code `0` means all selected outputs are current. Exit code `1` means at least one output differs from the generated content.
 
 ---
 
@@ -96,16 +93,11 @@ eutaxis scan -c <config-file>
 | `--root` | `-r` | parent directories of registered files | Override the directory walked for instruction files. |
 | `--register` | | `false` | Print a YAML snippet registering any unregistered files. |
 
-The command emits three groups: registered-and-present,
-unregistered-and-present, and registered-but-missing. Files whose
-frontmatter sets `enabled: false` are excluded from the unregistered
-report. `--register` prints a paste-ready snippet to stdout; the
-on-disk config is never rewritten.
+The command emits three groups: registered-and-present, unregistered-and-present, and registered-but-missing. Files whose frontmatter sets `enabled: false` are excluded from the unregistered report. `--register` prints a paste-ready snippet to stdout; the on-disk config is never rewritten.
 
 Exit codes:
 
-- `0` -- no drift: every registered file is present and every present
-  file is registered (or opted out).
+- `0` -- no drift: every registered file is present and every present file is registered (or opted out).
 - `1` -- drift detected, or a discovered file has malformed frontmatter.
 
 ---
@@ -140,5 +132,4 @@ eutaxis init --template codex-project --target <directory>
 | `--template` | | `codex-project` | Template directory under `eutaxis/data/templates`. |
 | `--force` | | `false` | Overwrite existing scaffold files. |
 
-The command copies tracked starter files from the selected template into the
-target directory. Existing files are not overwritten unless `--force` is passed.
+The command copies tracked starter files from the selected template into the target directory. Existing files are not overwritten unless `--force` is passed.

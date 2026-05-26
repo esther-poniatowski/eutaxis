@@ -26,6 +26,3 @@ Act as a research-level mathematician specializing in optimal control and Hamilt
 Provide explanations suitable for a graduate researcher with strong mathematical background.
 ```
 
-
-
-

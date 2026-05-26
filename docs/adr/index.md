@@ -2,17 +2,12 @@
 
 Accepted architecture decisions for Eutaxis, organised by scope:
 
-- **Framework.** Cross-cutting decisions about what Eutaxis is and
-  how it composes its capabilities.
-- **Prompt composition.** Decisions specific to the prompt-composition
-  framework (prompt families, methodology bundles, validation tiers).
-- **Cross-agent commands.** Decisions specific to the commands
-  subsystem (Agent Skill artifacts compiled from one source for
-  Claude Code and Codex).
+- **Framework.** Cross-cutting decisions about what Eutaxis is and how it composes its capabilities.
+- **Prompt composition.** Decisions specific to the prompt-composition framework (prompt families, methodology bundles, validation tiers).
+- **Cross-agent commands.** Decisions specific to the commands subsystem (Agent Skill artifacts compiled from one source for Claude Code and Codex).
 - **Superseded.** Earlier decisions retained for historical context.
 
-Open architectural questions — items the ADR set does not resolve —
-live under [open-questions](../open-questions/_index.md).
+Open architectural questions — items the ADR set does not resolve — live under [open-questions](../open-questions/_index.md).
 
 ```{toctree}
 :maxdepth: 1

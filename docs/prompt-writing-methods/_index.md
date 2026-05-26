@@ -30,4 +30,3 @@ Three meta-principles govern all decisions:
 - [Multi-agent and multi-turn extensions](multi-agent-multi-turn.md)
 - [Instruction axes and reasoning targets](instruction-axes.md)
 
-

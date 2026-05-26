@@ -40,8 +40,7 @@ Forbidden in contribution bullets:
 
 Apply Operator 2 (concrete subject) to every contribution bullet without exception.
 
-[mathematical object] + [active verb] + [result or implication]
-The note is never the grammatical subject of a contribution bullet. The derivation procedure is never the grammatical object.
+[mathematical object] + [active verb] + [result or implication] The note is never the grammatical subject of a contribution bullet. The derivation procedure is never the grammatical object.
 
 **Index notes (`_index.md`).** Contribution bullets must synthesize the module’s role in the parent project, using the parent project’s goals and sibling modules as context. They must not restate per-note contribution bullets or describe navigation/grouping ("this index organizes …", "the module groups notes …", "the index points to …"); that content belongs in the Roadmap. Omit **Established results** in index notes unless a module-level claim genuinely requires external context.
 

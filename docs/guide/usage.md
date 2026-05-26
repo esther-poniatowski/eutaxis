@@ -1,8 +1,6 @@
 # Usage
 
-Eutaxis assembles instruction files from modular Markdown sources. A single
-configuration can generate project-local files such as `AGENTS.md` and
-`.claude/CLAUDE.md`, or global files such as `~/.codex/AGENTS.md`.
+Eutaxis assembles instruction files from modular Markdown sources. A single configuration can generate project-local files such as `AGENTS.md` and `.claude/CLAUDE.md`, or global files such as `~/.codex/AGENTS.md`.
 
 ## Generate project instructions
 
@@ -20,9 +18,7 @@ To create a starter Codex instruction layout in a project, run:
 eutaxis init --template codex-project --target .
 ```
 
-After scaffolding, edit the generated files inside the project. Project-specific
-instructions belong to the project repository, not to a personal configuration
-repository.
+After scaffolding, edit the generated files inside the project. Project-specific instructions belong to the project repository, not to a personal configuration repository.
 
 ## Check generated files
 
@@ -38,41 +34,29 @@ Print diffs for stale outputs:
 eutaxis check -c agent-instructions.yaml --diff
 ```
 
-This command exits with code `1` when any selected output differs from the
-generated content.
+This command exits with code `1` when any selected output differs from the generated content.
 
 ## Scan for unregistered instruction files
 
-Use `scan` to compare the instruction files on disk against the files the
-config registers:
+Use `scan` to compare the instruction files on disk against the files the config registers:
 
 ```sh
 eutaxis scan -c agent-instructions.yaml
 ```
 
-The command reports three groups: registered-and-present,
-unregistered-and-present, and registered-but-missing. The exit code is
-`1` when any of the latter two groups is non-empty, which makes the
-command usable as a CI drift check.
+The command reports three groups: registered-and-present, unregistered-and-present, and registered-but-missing. The exit code is `1` when any of the latter two groups is non-empty, which makes the command usable as a CI drift check.
 
-Instruction files whose frontmatter sets `enabled: false` are skipped in
-the unregistered-present report. Authors use this opt-out flag to keep a
-draft under the instruction tree without forcing it into the rendered
-output.
+Instruction files whose frontmatter sets `enabled: false` are skipped in the unregistered-present report. Authors use this opt-out flag to keep a draft under the instruction tree without forcing it into the rendered output.
 
-To preview a YAML stanza that would register the unregistered files
-under `common_sources`, pass `--register`:
+To preview a YAML stanza that would register the unregistered files under `common_sources`, pass `--register`:
 
 ```sh
 eutaxis scan -c agent-instructions.yaml --register
 ```
 
-The on-disk config file is never rewritten. The snippet is printed to
-stdout for the user to paste into the desired section of the config.
+The on-disk config file is never rewritten. The snippet is printed to stdout for the user to paste into the desired section of the config.
 
-Override the directory walked with `--root <dir>`. The default is the
-union of parent directories of every currently registered instruction
-file.
+Override the directory walked with `--root <dir>`. The default is the union of parent directories of every currently registered instruction file.
 
 ## List configured outputs
 
@@ -101,8 +85,7 @@ eutaxis generate -c agent-instructions.yaml --dry-run
 The YAML config has two top-level keys:
 
 - **`common_sources`** -- source files included in every agent's output.
-- **`agents`** -- per-agent definitions controlling output path, ordering, and
-  agent-specific sources.
+- **`agents`** -- per-agent definitions controlling output path, ordering, and agent-specific sources.
 
 Minimal example:
 
@@ -135,16 +118,11 @@ The generator concatenates content in this order:
 
 ## Task module descriptions
 
-`task_modules[i].description` is optional. When the config omits it, the
-loader reads it from the target file's YAML frontmatter (the `description`
-key). The config-level value, when present, always wins as an explicit
-override. When both are absent, the loader raises a typed error naming
-the offending module.
+`task_modules[i].description` is optional. When the config omits it, the loader reads it from the target file's YAML frontmatter (the `description` key). The config-level value, when present, always wins as an explicit override. When both are absent, the loader raises a typed error naming the offending module.
 
 ## Section extraction
 
-Each source entry can include a `sections` list to extract only named markdown
-headings instead of the full file:
+Each source entry can include a `sections` list to extract only named markdown headings instead of the full file:
 
 ```yaml
 common_sources:
@@ -154,9 +132,7 @@ common_sources:
       - "Formatting"
 ```
 
-Section extraction matches heading text exactly and includes all content under
-that heading until the next heading at the same or higher level. YAML
-frontmatter in source files is stripped automatically.
+Section extraction matches heading text exactly and includes all content under that heading until the next heading at the same or higher level. YAML frontmatter in source files is stripped automatically.
 
 Exclude sections with `exclude_sections`:
 
@@ -177,8 +153,7 @@ common_sources:
 
 ## Generate global instructions
 
-Use `root` to point at the source module directory and an absolute target path
-for the generated global file:
+Use `root` to point at the source module directory and an absolute target path for the generated global file:
 
 ```yaml
 root: ~/agent-config
@@ -204,8 +179,7 @@ eutaxis generate -c global-agent-instructions.yaml
 
 ## Disabled agents
 
-Setting `enabled: false` on an agent skips generation for that agent. The
-generator prints a notice and moves on.
+Setting `enabled: false` on an agent skips generation for that agent. The generator prints a notice and moves on.
 
 ## Python API
 
@@ -249,5 +223,4 @@ eutaxis --version
 eutaxis validate <paths...>
 ```
 
-Validates prompt layouts and configuration files. Currently prints "Prompt
-validation is not yet implemented."
+Validates prompt layouts and configuration files. Currently prints "Prompt validation is not yet implemented."

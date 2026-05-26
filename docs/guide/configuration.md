@@ -1,9 +1,6 @@
 # Configuration
 
-The `generate` command reads a YAML file that declares shared sources, per-agent
-sources, and output targets. Relative paths resolve against the configured root.
-By default, the root is the config file's parent directory. A config can override
-this with the top-level `root` key, and the CLI can override it with `--root`.
+The `generate` command reads a YAML file that declares shared sources, per-agent sources, and output targets. Relative paths resolve against the configured root. By default, the root is the config file's parent directory. A config can override this with the top-level `root` key, and the CLI can override it with `--root`.
 
 Default config file name: `agent-instructions.yaml`.
 
@@ -15,10 +12,7 @@ common_sources:   # list of source entries shared across all agents
 agents:           # list of agent definitions
 ```
 
-All keys are optional. An empty `common_sources` list (or omitted key) means no
-shared content. An empty `agents` list produces no output. Absolute target paths
-and paths beginning with `~` can target files outside the configured root, such
-as `~/.codex/AGENTS.md`.
+All keys are optional. An empty `common_sources` list (or omitted key) means no shared content. An empty `agents` list produces no output. Absolute target paths and paths beginning with `~` can target files outside the configured root, such as `~/.codex/AGENTS.md`.
 
 ## Source entries
 
@@ -39,13 +33,9 @@ Each entry in `common_sources` or an agent's `sources` list has the form:
 | `heading_offset` | integer | no | Number of levels to add to all headings in this source. |
 | `strip_frontmatter` | bool | no | Strip top-level YAML frontmatter before assembly. Defaults to `true`. |
 
-When `sections` is present, the generator extracts only the content under
-headings whose text matches exactly. Each extracted block runs from its heading
-to the next heading at the same or higher level. YAML frontmatter (`---` fences
-at the top of a file) is stripped before extraction.
+When `sections` is present, the generator extracts only the content under headings whose text matches exactly. Each extracted block runs from its heading to the next heading at the same or higher level. YAML frontmatter (`---` fences at the top of a file) is stripped before extraction.
 
-Missing source files abort generation. This prevents stale generated instruction
-files from silently omitting required modules.
+Missing source files abort generation. This prevents stale generated instruction files from silently omitting required modules.
 
 ## Agent definitions
 
@@ -92,8 +82,7 @@ The generator concatenates content for each agent in this order:
 3. Each agent-specific `sources` entry, in list order
 4. `target.footer` (trimmed)
 
-Parts are joined with double newlines. The output file ends with a single
-trailing newline.
+Parts are joined with double newlines. The output file ends with a single trailing newline.
 
 ## Full example
 
@@ -125,13 +114,11 @@ agents:
       - path: docs/instructions/copilot-workflow.md
 ```
 
-Running `eutaxis generate -c agent-instructions.yaml` with this config writes
-`.claude/CLAUDE.md` (the claude agent) and skips the disabled copilot agent.
+Running `eutaxis generate -c agent-instructions.yaml` with this config writes `.claude/CLAUDE.md` (the claude agent) and skips the disabled copilot agent.
 
 ## Global Codex example
 
-A global config can write `~/.codex/AGENTS.md` while sourcing shared modules
-from a separate agent-config directory:
+A global config can write `~/.codex/AGENTS.md` while sourcing shared modules from a separate agent-config directory:
 
 ```yaml
 root: ~/agent-config

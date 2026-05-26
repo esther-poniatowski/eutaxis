@@ -16,8 +16,7 @@ generator.write_all()
 
 ## Configuration loading
 
-`load_config(config_path, root=None)` loads a YAML instruction config and returns
-an `InstructionConfig`.
+`load_config(config_path, root=None)` loads a YAML instruction config and returns an `InstructionConfig`.
 
 ```python
 from pathlib import Path
@@ -27,8 +26,7 @@ from eutaxis.instructions import load_config
 config = load_config(Path("agent-instructions.yaml"))
 ```
 
-Pass `root` to override the config root used for relative source and target
-paths:
+Pass `root` to override the config root used for relative source and target paths:
 
 ```python
 config = load_config(

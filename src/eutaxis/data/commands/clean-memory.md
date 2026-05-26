@@ -23,20 +23,14 @@ adapters:
 
 # Clean memory
 
-Run the following to wipe my memory files for this project, then confirm
-the directory is empty:
+Run the following to wipe my memory files for this project, then confirm the directory is empty:
 
 ```bash
 {{ action.template }}
 ```
 
-If the user asked to wipe **all** projects (not just the current one),
-append `--all` to the command above. If the user asked to keep a backup,
-append `--backup`.
+If the user asked to wipe **all** projects (not just the current one), append `--all` to the command above. If the user asked to keep a backup, append `--backup`.
 
-If the user asked for a **preview** or **dry run**, replace `--yes` with
-`--dry-run` — this lists the files that would be removed without touching
-the filesystem.
+If the user asked for a **preview** or **dry run**, replace `--yes` with `--dry-run` — this lists the files that would be removed without touching the filesystem.
 
-After the operation completes, list the paths that were removed (or, in
-dry-run mode, the paths that would be removed).
+After the operation completes, list the paths that were removed (or, in dry-run mode, the paths that would be removed).

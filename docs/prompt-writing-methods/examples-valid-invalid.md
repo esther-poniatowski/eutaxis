@@ -7,10 +7,8 @@ Contrastive pairs are useful because they expose a boundary between allowed and 
 
 Two complementary information types are often needed to specify behavior:
 
-- **Declarative rules** establish the constraint boundary — what is in and out of the allowed set.
-  Examples without rules are subject to **overfitting to surface form**: the model generalizes from the example's incidental properties rather than its underlying principle.
-- **Examples** calibrate the local pattern the model should instantiate near that boundary.
-  Rules without examples are subject to **boundary drift**: the model may interpret the rule in a plausible but unintended way when producing a concrete output.
+- **Declarative rules** establish the constraint boundary — what is in and out of the allowed set. Examples without rules are subject to **overfitting to surface form**: the model generalizes from the example's incidental properties rather than its underlying principle.
+- **Examples** calibrate the local pattern the model should instantiate near that boundary. Rules without examples are subject to **boundary drift**: the model may interpret the rule in a plausible but unintended way when producing a concrete output.
 
 ## Conditions for relevance
 

@@ -40,4 +40,3 @@ Theorem (Dynamic Programming Principle)
 ...
 ```
 
-

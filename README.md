@@ -1,8 +1,6 @@
 # eutaxis
 
-[![Maintenance](https://img.shields.io/maintenance/yes/2026)](https://github.com/esther-poniatowski/eutaxis)
-[![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue)](https://www.python.org/)
-[![License: GPL](https://img.shields.io/badge/License-GPL--3.0-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
+[![Maintenance](https://img.shields.io/maintenance/yes/2026)](https://github.com/esther-poniatowski/eutaxis) [![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue)](https://www.python.org/) [![License: GPL](https://img.shields.io/badge/License-GPL--3.0-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
 
 Builds structured agent prompts from reusable fragments.
 
@@ -20,45 +18,30 @@ Builds structured agent prompts from reusable fragments.
 
 ## Overview
 
-Eutaxis composes, renders, and validates structured agent prompts. Domain rules
-stay in the projects that own them; eutaxis provides the composition workflow,
-reusable templates, and prompt-authoring methodology.
+Eutaxis composes, renders, and validates structured agent prompts. Domain rules stay in the projects that own them; eutaxis provides the composition workflow, reusable templates, and prompt-authoring methodology.
 
 ### Motivation
 
-High-quality agent prompts share recurring structure: role definitions, evidence
-standards, report contracts, scope guards, and output formats. Without composition
-tooling, authors either duplicate that structure across prompt sets or maintain
-large monolithic files that are hard to review, test, and revise.
+High-quality agent prompts share recurring structure: role definitions, evidence standards, report contracts, scope guards, and output formats. Without composition tooling, authors either duplicate that structure across prompt sets or maintain large monolithic files that are hard to review, test, and revise.
 
 ### Advantages
 
-- **Prompt families** — prompts are grouped into families that share authoring
-  workflows, methodology patterns, output contracts, and testing strategies.
-- **Shell-first composition** — each prompt owns an explicit top-level shell that
-  determines final ordering, bridging text, and prompt-level coherence.
-- **Parameterized bundles** — shared methodology structure is single-source;
-  domain-specific content is injected through template variables.
-- **Profile-based validation** — family profiles distinguish hard assembly
-  requirements from advisory guidance.
-- **Golden-file review** — composed prompts render into reviewable output, enabling
-  diff-based iteration and behavioral testing.
+- **Prompt families** — prompts are grouped into families that share authoring workflows, methodology patterns, output contracts, and testing strategies.
+- **Shell-first composition** — each prompt owns an explicit top-level shell that determines final ordering, bridging text, and prompt-level coherence.
+- **Parameterized bundles** — shared methodology structure is single-source; domain-specific content is injected through template variables.
+- **Profile-based validation** — family profiles distinguish hard assembly requirements from advisory guidance.
+- **Golden-file review** — composed prompts render into reviewable output, enabling diff-based iteration and behavioral testing.
 
 ---
 
 ## Features
 
-- [ ] **Prompt composer**: Assemble prompts from shells, local fragments, and
-  parameterized bundles via Jinja2 rendering.
-- [X] **Agent instruction assembly**: Generate global and project-local
-  instruction files from modular Markdown sources and YAML configuration.
-- [ ] **Prompt validator**: Enforce family profile requirements (required files,
-  required tags, length warnings).
+- [ ] **Prompt composer**: Assemble prompts from shells, local fragments, and parameterized bundles via Jinja2 rendering.
+- [X] **Agent instruction assembly**: Generate global and project-local instruction files from modular Markdown sources and YAML configuration.
+- [ ] **Prompt validator**: Enforce family profile requirements (required files, required tags, length warnings).
 - [ ] **Golden-file output**: Render composed prompts for diff-based review.
-- [X] **Prompt-writing methodology**: Ships `docs/prompt-writing-methods/_index.md`, the
-  foundational reference for agent instruction design.
-- [ ] **Workspace scaffolder**: Initialize prompt-composition structure in a target
-  project.
+- [X] **Prompt-writing methodology**: Ships `docs/prompt-writing-methods/_index.md`, the foundational reference for agent instruction design.
+- [ ] **Workspace scaffolder**: Initialize prompt-composition structure in a target project.
 
 ---
 
@@ -74,13 +57,9 @@ Check whether generated instruction files are current:
 eutaxis check -c agent-instructions.yaml
 ```
 
-The same generator can target project-local files such as `AGENTS.md` and
-global files such as `~/.codex/AGENTS.md` by setting `root` and absolute
-target paths in the config.
+The same generator can target project-local files such as `AGENTS.md` and global files such as `~/.codex/AGENTS.md` by setting `root` and absolute target paths in the config.
 
-Instruction assembly lives under `eutaxis.instructions`: configuration loading,
-Markdown transformations, generation, and exceptions are separate modules. The
-older `eutaxis.generate` import path remains as a compatibility facade.
+Instruction assembly lives under `eutaxis.instructions`: configuration loading, Markdown transformations, generation, and exceptions are separate modules. The older `eutaxis.generate` import path remains as a compatibility facade.
 
 ---
 
@@ -99,12 +78,7 @@ One-line entry points for the everyday operations:
 | `eutaxis commands install clean-memory` | Install the clean-memory skill on both agents. |
 | `eutaxis ops clean-memory` | Run the clean-memory operation. |
 
-A regenerate-instructions skill (an `eutaxis commands install` analogue
-that wraps `eutaxis generate`) is deferred to the router → Skills
-migration tracked under Tier 3 of the consumer-side TODO. The current
-`commands` subsystem ships skill prompts authored as Markdown
-(`src/eutaxis/data/commands/*.md`); wrapping a CLI invocation requires a
-skill-shape that the broader migration will introduce.
+A regenerate-instructions skill (an `eutaxis commands install` analogue that wraps `eutaxis generate`) is deferred to the router → Skills migration tracked under Tier 3 of the consumer-side TODO. The current `commands` subsystem ships skill prompts authored as Markdown (`src/eutaxis/data/commands/*.md`); wrapping a CLI invocation requires a skill-shape that the broader migration will introduce.
 
 ---
 
@@ -125,10 +99,8 @@ skill-shape that the broader migration will introduce.
 
 Eutaxis provides composition infrastructure for projects that own domain rules:
 
-- [vitruv](https://github.com/esther-poniatowski/vitruv) — software architecture
-  standards and audit prompts.
-- [hermeneia](https://github.com/esther-poniatowski/hermeneia) — writing quality
-  standards and prose audit prompts.
+- [vitruv](https://github.com/esther-poniatowski/vitruv) — software architecture standards and audit prompts.
+- [hermeneia](https://github.com/esther-poniatowski/hermeneia) — writing quality standards and prose audit prompts.
 
 ---
 
@@ -144,12 +116,10 @@ Contribution guidelines are described in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **Author**: @esther-poniatowski
 
-For academic use, the GitHub "Cite this repository" feature generates citations in
-various formats. The [citation metadata](CITATION.cff) file is also available.
+For academic use, the GitHub "Cite this repository" feature generates citations in various formats. The [citation metadata](CITATION.cff) file is also available.
 
 ---
 
 ## License
 
-This project is licensed under the terms of the
-[GNU General Public License v3.0](LICENSE).
+This project is licensed under the terms of the [GNU General Public License v3.0](LICENSE).

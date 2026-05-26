@@ -1,7 +1,6 @@
 # Eutaxis
 
-Eutaxis composes structured agent prompts and instruction files from reusable
-Markdown fragments.
+Eutaxis composes structured agent prompts and instruction files from reusable Markdown fragments.
 
 ```{toctree}
 :maxdepth: 2

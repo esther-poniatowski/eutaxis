@@ -1,11 +1,6 @@
 # Design documentation — methods
 
-Design-time reference documents for the eutaxis governance system. These files
-describe the rationale, structure, and specification of each governance
-component as **planned** — the runtime artifacts they describe (deployment
-under `src/eutaxis/data/governance/`, staged pipelines, post-draft audits) are
-not yet implemented in the current code. The contents define an architectural
-target, not shipping behaviour.
+Design-time reference documents for the eutaxis governance system. These files describe the rationale, structure, and specification of each governance component as **planned** — the runtime artifacts they describe (deployment under `src/eutaxis/data/governance/`, staged pipelines, post-draft audits) are not yet implemented in the current code. The contents define an architectural target, not shipping behaviour.
 
 ## Components
 

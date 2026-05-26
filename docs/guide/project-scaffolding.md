@@ -1,17 +1,14 @@
 # Project scaffolding
 
-`eutaxis` owns reusable instruction templates. Projects own their generated or
-edited project-specific instructions.
+`eutaxis` owns reusable instruction templates. Projects own their generated or edited project-specific instructions.
 
-Use `eutaxis init` inside a project repository to create a starter Codex
-instruction layout:
+Use `eutaxis init` inside a project repository to create a starter Codex instruction layout:
 
 ```sh
 eutaxis init --template codex-project --target .
 ```
 
-For a project that should synchronize shared instructions across Codex and
-Claude Code, use:
+For a project that should synchronize shared instructions across Codex and Claude Code, use:
 
 ```sh
 eutaxis init --template multi-agent-project --target .
@@ -29,5 +26,4 @@ docs/instructions/tasks/programming.md
 
 The command refuses to overwrite existing files unless `--force` is supplied.
 
-Template ownership stays in `eutaxis`; project-specific content should be edited
-and maintained in the project repository after scaffolding.
+Template ownership stays in `eutaxis`; project-specific content should be edited and maintained in the project repository after scaffolding.

@@ -72,7 +72,6 @@ Registry corruption is a silent, compounding failure: it does not surface immedi
 
 ### Architecture ^validation-architecture
 
-
 | Layer | Mechanism | Failure mode addressed |
 | --- | --- | --- |
 | **Schema enforcement** | JSON Schema validation on write | Field name drift, missing required fields, type errors |

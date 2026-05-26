@@ -20,7 +20,6 @@ For a _single-agent system prompt_, a strong default template is:
 10. [Edge cases and fallback policy](edge-case-fallback-policy.md)
 11. [Iterative interation rules](iterative-interation-rules.md)
 
-
 > [!IMPORTANT]
 > Each section should be:
 > - _exhaustive over its domain_,

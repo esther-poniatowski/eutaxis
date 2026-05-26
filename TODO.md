@@ -8,12 +8,7 @@
 - [ ] Implement a functionality to cleanup config files. This involves:
   - detecting the configs in Codex (TOML) and Claude code (JSON) that violate the recommended patterns,
   - enforcing the recommended practices.
-- [x] Implement a functionality to clean memory in both agents.
-  Shipped as the commands subsystem (`eutaxis commands install clean-memory`)
-  plus the doer (`eutaxis ops clean-memory`). Compiles to an Agent Skill on
-  both Claude and Codex. See [docs/adr/](docs/adr/index.md) for the design
-  decisions and [docs/open-questions/](docs/open-questions/_index.md) for
-  the remaining framework-level questions.
+- [x] Implement a functionality to clean memory in both agents. Shipped as the commands subsystem (`eutaxis commands install clean-memory`) plus the doer (`eutaxis ops clean-memory`). Compiles to an Agent Skill on both Claude and Codex. See [docs/adr/](docs/adr/index.md) for the design decisions and [docs/open-questions/](docs/open-questions/_index.md) for the remaining framework-level questions.
 - [ ] Implement a rule template validation to enforce a uniform structure in instruction files.
 
 ## Next steps
@@ -29,9 +24,7 @@
 
 ## Long term
 
-- [ ] Turn eutaxis into a fully configurable rule generator. Predefine behavioral rules with identifiers and
-  let users decide how to configure each rule in YAML. Then eutaxis generates instructions for these
-  rules in the appropriate instruction files. Users can override the rule formulations if needed.
+- [ ] Turn eutaxis into a fully configurable rule generator. Predefine behavioral rules with identifiers and let users decide how to configure each rule in YAML. Then eutaxis generates instructions for these rules in the appropriate instruction files. Users can override the rule formulations if needed.
 - [ ] Review the design architecture.
 - [ ] Complete the workflows and audit parts.
 - [ ] Create one subfolder for each type of decision rules: epistemology (content validity, logical inference, relevance), argumentation (exposition, presentation structure), stylistic (redaction).

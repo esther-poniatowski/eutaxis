@@ -13,8 +13,7 @@ To submit a new issue:
 
 ## Developing the Code
 
-Contributions to the codebase should be developed in a local clone of the repository. Follow these
-steps to set up a development environment:
+Contributions to the codebase should be developed in a local clone of the repository. Follow these steps to set up a development environment:
 
 ### Installation
 
@@ -32,8 +31,7 @@ steps to set up a development environment:
    conda env create -f environment.yml
    ```
 
-   By default, the environment will be named `eutaxis`, as specified in the `environment.yml`
-   file. This name can be modified by passing the `-n` option.
+   By default, the environment will be named `eutaxis`, as specified in the `environment.yml` file. This name can be modified by passing the `-n` option.
 
 3. Register the packages in "editable mode":
 
@@ -44,8 +42,7 @@ steps to set up a development environment:
 
 ### Using the Commit Message Template
 
-1. Edit the commit template (`.gitmessage`, at the root of the repository) to specify the name and
-   email address of the committer.
+1. Edit the commit template (`.gitmessage`, at the root of the repository) to specify the name and email address of the committer.
 
 2. Configure `git` to use this file as a commit template:
 
@@ -78,8 +75,7 @@ This project separates configuration concerns between two locations:
 
 ### `pyproject.toml` — Project Management
 
-Contains only build system, package metadata, dependencies, entry points, and tool configurations
-that **must** reside in `pyproject.toml` (because the tool does not support external config paths):
+Contains only build system, package metadata, dependencies, entry points, and tool configurations that **must** reside in `pyproject.toml` (because the tool does not support external config paths):
 
 - `[build-system]` — Build backend (setuptools)
 - `[project]` — Name, version, authors, license, description, keywords, classifiers, URLs
@@ -91,8 +87,7 @@ that **must** reside in `pyproject.toml` (because the tool does not support exte
 
 ### `config/tools/` — Tool-Specific Settings
 
-Contains dedicated configuration files for each development tool. This achieves modular,
-tool-specific settings that are decoupled from the main project file:
+Contains dedicated configuration files for each development tool. This achieves modular, tool-specific settings that are decoupled from the main project file:
 
 | File                  | Tool                   | Purpose                           |
 |-----------------------|------------------------|-----------------------------------|
