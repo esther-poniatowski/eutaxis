@@ -66,6 +66,10 @@ class ConfigLoader:
                 raw.get("rule_index_heading", "Rule index")
             ),
             rule_index_intro=str(raw.get("rule_index_intro", "")),
+            rule_index_pointer=str(raw.get("rule_index_pointer", "")),
+            rule_index_target=self._parse_optional_target(
+                raw.get("rule_index_target")
+            ),
             default_max_bytes=self._as_optional_positive_int(
                 raw.get("max_bytes"), "max_bytes"
             ),
@@ -150,6 +154,11 @@ class ConfigLoader:
                 raw.get("max_bytes"), "max_bytes"
             ),
         )
+
+    def _parse_optional_target(self, raw: Any) -> TargetConfig | None:
+        if raw is None:
+            return None
+        return self._parse_target(raw)
 
     def _parse_target(self, raw: Any) -> TargetConfig:
         if isinstance(raw, str):

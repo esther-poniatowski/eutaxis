@@ -83,6 +83,8 @@ class InstructionConfig:
     rule_index_enabled: bool = False
     rule_index_heading: str = "Rule index"
     rule_index_intro: str = ""
+    rule_index_pointer: str = ""
+    rule_index_target: TargetConfig | None = None
     default_max_bytes: int | None = None
 
     def budget_for(self, agent: AgentConfig) -> int | None:

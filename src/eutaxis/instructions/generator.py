@@ -99,6 +99,15 @@ class InstructionGenerator:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(content, encoding="utf-8")
 
+        if agent_name is None:
+            standalone = self.render_standalone_rule_index()
+            if standalone is not None:
+                index_path, index_content = standalone
+                paths.append(index_path)
+                if not dry_run:
+                    index_path.parent.mkdir(parents=True, exist_ok=True)
+                    index_path.write_text(index_content, encoding="utf-8")
+
         return paths
 
     def diff_report(
@@ -210,13 +219,50 @@ class InstructionGenerator:
     _label_pattern = re.compile(r"^\*\*([a-z][a-z0-9-]*)\*\*:\s*$", re.MULTILINE)
 
     def _render_rule_index(self, agent: AgentConfig) -> str:
+        """Render the rule-index section for inclusion inside an agent output."""
         if not self.config.rule_index_enabled:
             return ""
 
-        scan_paths: list[Path] = []
-        for source in [*self.config.common_sources, *agent.sources]:
-            scan_paths.append(self.config.resolve(source.path))
+        if self.config.rule_index_target is not None:
+            pointer = self.config.rule_index_pointer.strip()
+            if not pointer:
+                return ""
+            return f"## {self.config.rule_index_heading}\n\n{pointer}"
+
         target_dir = self.config.resolve(agent.target.path).parent
+        entries = self._scan_rule_index_entries(target_dir)
+        if not entries:
+            return ""
+
+        return self._render_rule_index_section(entries)
+
+    def render_standalone_rule_index(self) -> tuple[Path, str] | None:
+        """Return (path, content) for the standalone rule-index file, if any."""
+        if not self.config.rule_index_enabled:
+            return None
+        target = self.config.rule_index_target
+        if target is None:
+            return None
+
+        target_path = self.config.resolve(target.path)
+        entries = self._scan_rule_index_entries(target_path.parent)
+        if not entries:
+            return None
+
+        parts: list[str] = []
+        if target.header:
+            parts.append(target.header.strip())
+        parts.append(self._render_rule_index_section(entries))
+        if target.footer:
+            parts.append(target.footer.strip())
+        return target_path, "\n\n".join(parts).rstrip() + "\n"
+
+    def _scan_rule_index_entries(
+        self, target_dir: Path
+    ) -> list[tuple[str, list[str]]]:
+        scan_paths: list[Path] = []
+        for source in self.config.common_sources:
+            scan_paths.append(self.config.resolve(source.path))
         for module in self.config.task_modules:
             if module.path.is_absolute():
                 scan_paths.append(module.path)
@@ -228,15 +274,15 @@ class InstructionGenerator:
             labels = self._scan_labels(path)
             if labels:
                 entries.append((path.stem, labels))
+        return entries
 
-        if not entries:
-            return ""
-
+    def _render_rule_index_section(
+        self, entries: list[tuple[str, list[str]]]
+    ) -> str:
         lines = [f"## {self.config.rule_index_heading}"]
         intro = self.config.rule_index_intro.strip()
         if intro:
             lines.extend(["", intro])
-
         lines.append("")
         for stem, labels in entries:
             lines.append(f"- **{stem}**: {', '.join(labels)}")

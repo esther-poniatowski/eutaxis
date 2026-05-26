@@ -470,6 +470,97 @@ agents:
     assert "Rule index" not in output
 
 
+def test_rule_index_externalized_when_target_set(tmp_path: Path) -> None:
+    (tmp_path / "globals.md").write_text(
+        "# Globals\n\n**precedence**:\n\n ✓ Project wins.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "prog.md").write_text(
+        "# Programming\n\n**design-axes**:\n\n ✓ Design.\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - globals.md
+task_modules:
+  - id: programming
+    title: Programming
+    path: ../prog.md
+    trigger: when coding
+rule_index_enabled: true
+rule_index_intro: |
+  Full label listing.
+rule_index_pointer: |
+  See `generated/rule-index.md` for the full label index.
+rule_index_target:
+  path: generated/rule-index.md
+  header: |
+    # Rule index
+    Auto-generated. Do not edit.
+agents:
+  - name: codex
+    target: generated/AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    loaded = load_config(config)
+    gen = InstructionGenerator(loaded)
+    paths = gen.write_all()
+
+    index_path = tmp_path / "generated" / "rule-index.md"
+    agents_path = tmp_path / "generated" / "AGENTS.md"
+    assert agents_path in paths
+    assert index_path in paths
+
+    agent_text = agents_path.read_text(encoding="utf-8")
+    assert "## Rule index\n" in agent_text
+    assert "See `generated/rule-index.md`" in agent_text
+    # Full body must NOT be in the agent output
+    assert "- **globals**:" not in agent_text
+    assert "- **prog**:" not in agent_text
+    # Intro is the full-body intro, not the pointer text — also not inline
+    assert "Full label listing." not in agent_text
+
+    index_text = index_path.read_text(encoding="utf-8")
+    assert index_text.startswith("# Rule index")
+    assert "## Rule index" in index_text
+    assert "Full label listing." in index_text
+    assert "- **globals**: precedence" in index_text
+    assert "- **prog**: design-axes" in index_text
+
+
+def test_rule_index_inline_when_no_target(tmp_path: Path) -> None:
+    (tmp_path / "globals.md").write_text(
+        "# Globals\n\n**precedence**:\n\n ✓ Project wins.\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - globals.md
+rule_index_enabled: true
+rule_index_intro: |
+  Inline body.
+agents:
+  - name: codex
+    target: generated/AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    loaded = load_config(config)
+    gen = InstructionGenerator(loaded)
+    output = gen.generate_all()["codex"]
+
+    assert "## Rule index\n" in output
+    assert "Inline body." in output
+    assert "- **globals**: precedence" in output
+
+
 def test_budget_exceeded_blocks_generation(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\n" + "x" * 200 + "\n", encoding="utf-8")
     config = tmp_path / "agent-instructions.yaml"
