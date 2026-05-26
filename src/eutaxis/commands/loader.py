@@ -18,7 +18,9 @@ from .models import (
 )
 
 _FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
-_SUPPORTED_REGIMES = frozenset({"user-invoked"})
+_SUPPORTED_REGIMES = frozenset({"user-invoked", "model-invoked"})
+_SUPPORTED_FAILURE_MODES = frozenset({"silent", "visible"})
+_SUPPORTED_REQUIRED_VISIBILITIES = frozenset({"pre-invocation", "pre-action"})
 
 
 def builtin_dir() -> Path:
@@ -89,7 +91,7 @@ def _load_one(path: Path, *, layer: str) -> CommandSource:
 def _build_source(
     meta: dict[str, Any], *, body: str, path: Path, layer: str
 ) -> CommandSource:
-    for required in ("name", "description", "regime"):
+    for required in ("name", "description", "regime", "failure-mode"):
         if required not in meta:
             raise CommandRenderError(
                 f"Command source {path} missing required key: {required!r}"
@@ -101,6 +103,17 @@ def _build_source(
             f"Unsupported regime {regime!r} in {path}; "
             f"expected one of {sorted(_SUPPORTED_REGIMES)}"
         )
+
+    failure_mode = str(meta["failure-mode"])
+    if failure_mode not in _SUPPORTED_FAILURE_MODES:
+        raise CommandRenderError(
+            f"Unsupported failure-mode {failure_mode!r} in {path}; "
+            f"expected one of {sorted(_SUPPORTED_FAILURE_MODES)}"
+        )
+
+    required_visibility = _parse_required_visibility(
+        meta.get("required-visibility"), failure_mode=failure_mode, path=path
+    )
 
     scope_default = str(meta.get("scope_default", "user"))
     if scope_default not in {"user", "project"}:
@@ -118,6 +131,8 @@ def _build_source(
         name=str(meta["name"]),
         description=str(meta["description"]),
         regime=regime,
+        failure_mode=failure_mode,
+        required_visibility=required_visibility,
         scope_default=scope_default,
         targets=targets,
         action=action,
@@ -128,6 +143,32 @@ def _build_source(
         source_path=path,
         layer=layer,
     )
+
+
+def _parse_required_visibility(
+    raw: Any, *, failure_mode: str, path: Path
+) -> str | None:
+    if failure_mode == "silent":
+        if raw is None:
+            raise CommandRenderError(
+                f"required-visibility is mandatory when failure-mode is "
+                f"'silent' in {path}; expected one of "
+                f"{sorted(_SUPPORTED_REQUIRED_VISIBILITIES)}"
+            )
+        value = str(raw)
+        if value not in _SUPPORTED_REQUIRED_VISIBILITIES:
+            raise CommandRenderError(
+                f"Unsupported required-visibility {value!r} in {path}; "
+                f"expected one of "
+                f"{sorted(_SUPPORTED_REQUIRED_VISIBILITIES)}"
+            )
+        return value
+    if raw is not None:
+        raise CommandRenderError(
+            f"required-visibility must be unset when failure-mode is "
+            f"'visible' in {path}"
+        )
+    return None
 
 
 def _parse_targets(raw: Any, *, path: Path) -> TargetsSpec:

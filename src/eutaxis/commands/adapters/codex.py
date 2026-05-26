@@ -8,8 +8,14 @@ mirrors the source ``name`` slug as the artifact directory name.
 
 Codex-specific metadata — invocation policy, UI metadata, declared tool
 dependencies — lives in the sibling ``agents/openai.yaml`` file
-(`codex/skills.md`). The ``regime: user-invoked`` declared in the source
-maps to ``policy.allow_implicit_invocation: false`` in that sibling.
+(`codex/skills.md`). Regime translation:
+
+- ``regime: user-invoked`` -> ``policy.allow_implicit_invocation: false``
+  in the derived ``agents/openai.yaml``.
+- ``regime: model-invoked`` -> the ``policy`` block is not derived;
+  Codex is free to pick the skill implicitly. Passthrough keys are still
+  honoured if the author supplies them.
+
 The ``dependencies.tools`` block declared via passthrough is *metadata
 only, not a permission grant*; sandbox / approval policy still lives in
 ``~/.codex/config.toml`` and is out of scope for the artifact.

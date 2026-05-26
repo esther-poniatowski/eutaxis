@@ -85,6 +85,7 @@ def test_override_replaces_action_template(tmp_path: Path) -> None:
     src_path.parent.mkdir(parents=True)
     src_path.write_text(
         "---\nname: demo\ndescription: d\nregime: user-invoked\n"
+        "failure-mode: visible\n"
         "action:\n  kind: shell\n  template: 'base {{ agent }}'\n"
         "overrides:\n  codex:\n    action:\n      template: 'codex-special {{ agent }}'\n"
         "---\nrun {{ action.template }}\n",
@@ -108,6 +109,7 @@ def test_codex_refuses_allowed_tools_passthrough(tmp_path: Path) -> None:
     src_path.parent.mkdir(parents=True)
     src_path.write_text(
         "---\nname: demo\ndescription: d\nregime: user-invoked\n"
+        "failure-mode: visible\n"
         "adapters:\n  codex:\n    frontmatter:\n      allowed-tools: 'Bash(foo*)'\n"
         "---\nbody\n",
         encoding="utf-8",

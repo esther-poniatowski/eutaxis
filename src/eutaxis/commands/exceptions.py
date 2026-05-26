@@ -25,3 +25,17 @@ class OwnershipError(CommandError):
     """Raised when an install/uninstall target is not eutaxis-owned."""
 
     exit_code = 2
+
+
+class FailureModeError(CommandError):
+    """Raised when a source's failure-mode classification forbids the target regime.
+
+    A ``failure-mode: silent`` source cannot ship as a ``model-invoked`` skill;
+    the model-judgment activation gate gives no visibility guarantee before the
+    first irreversible action. A ``silent`` source with
+    ``required-visibility: pre-invocation`` cannot ship as a ``user-invoked``
+    skill either; it routes only to the always-on body. See the
+    ``failure-mode-as-source-field`` ADR.
+    """
+
+    exit_code = 3

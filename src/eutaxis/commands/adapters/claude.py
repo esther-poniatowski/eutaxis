@@ -1,11 +1,15 @@
 """Claude Code adapter: compile a command source into a Claude skill.
 
 Targets ``~/.claude/skills/<name>/SKILL.md`` (user scope) and
-``<project>/.claude/skills/<name>/SKILL.md`` (project scope). The
-``regime: user-invoked`` declared in the source maps to
-``disable-model-invocation: true`` in the rendered frontmatter
-(documented use case for *task* skills with side effects whose timing
-must be controlled — `claude/skills.md`).
+``<project>/.claude/skills/<name>/SKILL.md`` (project scope).
+
+Regime translation:
+
+- ``regime: user-invoked`` -> ``disable-model-invocation: true`` in the
+  rendered frontmatter (documented use case for *task* skills with side
+  effects whose timing must be controlled — ``claude/skills.md``).
+- ``regime: model-invoked`` -> ``disable-model-invocation`` is omitted;
+  Claude is free to pick the skill from its description.
 
 Claude has no analogue to Codex's sibling ``agents/openai.yaml``: all
 metadata (including ``allowed-tools``, ``argument-hint``) is folded

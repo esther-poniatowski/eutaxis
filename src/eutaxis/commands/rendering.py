@@ -29,12 +29,49 @@ from pathlib import Path
 import yaml
 
 from .adapters import AgentAdapter
+from .exceptions import FailureModeError
 from .models import ActionSpec, ArtifactFile, CommandSource, RenderedArtifact
 from .templating import render as render_template
 
 OWNED_FRONTMATTER_KEY = "x-eutaxis-owned"
 SIDECAR_FILENAME = ".eutaxis-owned.json"
 ENTRYPOINT_FILENAME = "SKILL.md"
+
+
+def check_failure_mode(source: CommandSource) -> None:
+    """Refuse a source whose failure-mode forbids its regime.
+
+    The compiler gate from the ``failure-mode-as-source-field`` ADR:
+
+    - ``failure-mode: silent`` cannot ship as a ``model-invoked`` skill.
+      Model-judgment activation gives no visibility guarantee before the
+      first irreversible action.
+    - ``failure-mode: silent`` with ``required-visibility: pre-invocation``
+      cannot ship as any skill: the rule must be visible *before*
+      deciding which procedure applies, so it routes only to the
+      always-on body.
+
+    Raises
+    ------
+    FailureModeError
+        On a forbidden combination, with the source path in the message.
+    """
+    if source.failure_mode != "silent":
+        return
+    if source.regime == "model-invoked":
+        raise FailureModeError(
+            f"Refusing to emit a model-invoked skill from a silent-failure "
+            f"source: {source.source_path}. Move the rule to the always-on "
+            f"body or re-author it as visible-failure. See ADR "
+            f"failure-mode-as-source-field."
+        )
+    if source.required_visibility == "pre-invocation":
+        raise FailureModeError(
+            f"Refusing to emit any skill from a silent-failure source whose "
+            f"required-visibility is 'pre-invocation': {source.source_path}. "
+            f"The rule must route to the always-on body. See ADR "
+            f"failure-mode-as-source-field."
+        )
 
 
 def render_command(
@@ -45,6 +82,7 @@ def render_command(
     home: Path,
 ) -> RenderedArtifact:
     """Render a command source for one adapter as a multi-file artifact."""
+    check_failure_mode(source)
     body_context = _body_context(source, adapter.name, project_root, home)
     rendered_body = render_template(source.body, body_context)
 

@@ -35,6 +35,7 @@ from .exceptions import (
     CommandError,
     CommandNotFoundError,
     CommandRenderError,
+    FailureModeError,
     OwnershipError,
     TemplateError,
 )
@@ -42,7 +43,7 @@ from .installer import diff_command, install_command, uninstall_command
 from .loader import load_sources
 from .models import ArtifactFile, CommandSource, InstallRecord, RenderedArtifact
 from .registry import Registry, RegistryCorruptedError
-from .rendering import render_command
+from .rendering import check_failure_mode, render_command
 
 __all__ = [
     "AgentAdapter",
@@ -51,6 +52,7 @@ __all__ = [
     "CommandNotFoundError",
     "CommandRenderError",
     "CommandSource",
+    "FailureModeError",
     "InstallRecord",
     "OwnershipError",
     "Registry",
@@ -58,6 +60,7 @@ __all__ = [
     "RenderedArtifact",
     "TemplateError",
     "all_adapters",
+    "check_failure_mode",
     "diff_command",
     "get_adapter",
     "install_command",

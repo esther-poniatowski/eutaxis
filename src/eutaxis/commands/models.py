@@ -77,9 +77,25 @@ class CommandSource:
         One-line summary surfaced by ``commands list`` and the agent's
         skill picker.
     regime : str
-        Activation regime; only ``"user-invoked"`` is supported in v1.
-        Maps to ``disable-model-invocation: true`` on Claude and to
-        ``policy.allow_implicit_invocation: false`` on Codex.
+        Activation regime. Supported values: ``"user-invoked"`` (explicit
+        user invocation; maps to ``disable-model-invocation: true`` on
+        Claude and ``policy.allow_implicit_invocation: false`` on Codex)
+        and ``"model-invoked"`` (model picks the skill from its
+        description; no explicit invocation flag is emitted).
+    failure_mode : str
+        Silent-failure classification. ``"silent"`` if violation produces
+        irreversible state mutation; ``"visible"`` if the defect is
+        reviewable. See [failure-mode-as-source-field] ADR for the author
+        checklist. The compiler refuses to emit a ``model-invoked``
+        artifact from a ``silent`` source and a ``user-invoked`` artifact
+        from a ``silent`` source whose ``required_visibility`` is
+        ``pre-invocation``.
+    required_visibility : str | None
+        Required for ``silent`` sources only. ``"pre-invocation"`` if the
+        rule must be visible before deciding which procedure applies;
+        ``"pre-action"`` if explicit invocation can load the rule before
+        the first irreversible action. Must be ``None`` for ``visible``
+        sources.
     scope_default : str
         Default install scope: ``"user"`` or ``"project"``.
     targets : TargetsSpec
@@ -99,16 +115,20 @@ class CommandSource:
     source_path : Path
         Path to the source Markdown file on disk.
     layer : str
-        Discovery layer: ``"builtin"``, ``"user"``, or ``"project"``.
+        Discovery layer: ``"builtin"``, ``"user"``, ``"project"``, or
+        ``"config"`` (for sources loaded from an instruction-assembly
+        configuration rather than a layered directory).
     """
 
     name: str
     description: str
     regime: str
+    failure_mode: str
     scope_default: str
     targets: TargetsSpec
     action: ActionSpec | None
     body: str
+    required_visibility: str | None = None
     argument_hint: str = ""
     adapters: dict[str, AdapterPassthrough] = field(default_factory=dict)
     overrides: dict[str, dict] = field(default_factory=dict)

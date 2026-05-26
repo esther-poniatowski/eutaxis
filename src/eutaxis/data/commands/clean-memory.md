@@ -2,6 +2,8 @@
 name: clean-memory
 description: Delete this agent's memory files for the current project. Run only when the user types the slash/skill invocation explicitly.
 regime: user-invoked
+failure-mode: silent
+required-visibility: pre-action
 scope_default: user
 argument-hint: "[--all] [--backup] [--dry-run]"
 action:

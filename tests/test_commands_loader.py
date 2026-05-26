@@ -34,11 +34,13 @@ def test_project_overrides_user_overrides_builtin(tmp_path: Path) -> None:
 
     _write_source(
         user_root / ".eutaxis" / "commands" / "clean-memory.md",
-        "---\nname: clean-memory\ndescription: USER\nregime: user-invoked\n---\nbody\n",
+        "---\nname: clean-memory\ndescription: USER\nregime: user-invoked\n"
+        "failure-mode: visible\n---\nbody\n",
     )
     _write_source(
         project_root / ".eutaxis" / "commands" / "clean-memory.md",
-        "---\nname: clean-memory\ndescription: PROJECT\nregime: user-invoked\n---\nbody\n",
+        "---\nname: clean-memory\ndescription: PROJECT\nregime: user-invoked\n"
+        "failure-mode: visible\n---\nbody\n",
     )
 
     sources = load_sources(home=user_root, project_root=project_root)
@@ -59,9 +61,61 @@ def test_missing_frontmatter_raises(tmp_path: Path) -> None:
 def test_unsupported_regime_raises(tmp_path: Path) -> None:
     _write_source(
         tmp_path / ".eutaxis" / "commands" / "weird.md",
-        "---\nname: weird\ndescription: x\nregime: model-invoked\n---\nbody\n",
+        "---\nname: weird\ndescription: x\nregime: never-invoked\n"
+        "failure-mode: visible\n---\nbody\n",
     )
     with pytest.raises(CommandRenderError):
+        load_sources(home=tmp_path, project_root=tmp_path)
+
+
+def test_model_invoked_regime_accepted(tmp_path: Path) -> None:
+    _write_source(
+        tmp_path / ".eutaxis" / "commands" / "rs.md",
+        "---\nname: rs\ndescription: x\nregime: model-invoked\n"
+        "failure-mode: visible\n---\nbody\n",
+    )
+    sources = load_sources(home=tmp_path, project_root=tmp_path)
+    src = next(s for s in sources if s.name == "rs")
+    assert src.regime == "model-invoked"
+    assert src.failure_mode == "visible"
+
+
+def test_missing_failure_mode_raises(tmp_path: Path) -> None:
+    _write_source(
+        tmp_path / ".eutaxis" / "commands" / "weird.md",
+        "---\nname: weird\ndescription: x\nregime: user-invoked\n---\nbody\n",
+    )
+    with pytest.raises(CommandRenderError, match="failure-mode"):
+        load_sources(home=tmp_path, project_root=tmp_path)
+
+
+def test_silent_failure_requires_required_visibility(tmp_path: Path) -> None:
+    _write_source(
+        tmp_path / ".eutaxis" / "commands" / "silent.md",
+        "---\nname: silent\ndescription: x\nregime: user-invoked\n"
+        "failure-mode: silent\n---\nbody\n",
+    )
+    with pytest.raises(CommandRenderError, match="required-visibility is mandatory"):
+        load_sources(home=tmp_path, project_root=tmp_path)
+
+
+def test_visible_failure_rejects_required_visibility(tmp_path: Path) -> None:
+    _write_source(
+        tmp_path / ".eutaxis" / "commands" / "visible.md",
+        "---\nname: visible\ndescription: x\nregime: user-invoked\n"
+        "failure-mode: visible\nrequired-visibility: pre-action\n---\nbody\n",
+    )
+    with pytest.raises(CommandRenderError, match="must be unset"):
+        load_sources(home=tmp_path, project_root=tmp_path)
+
+
+def test_unsupported_required_visibility_raises(tmp_path: Path) -> None:
+    _write_source(
+        tmp_path / ".eutaxis" / "commands" / "silent.md",
+        "---\nname: silent\ndescription: x\nregime: user-invoked\n"
+        "failure-mode: silent\nrequired-visibility: maybe\n---\nbody\n",
+    )
+    with pytest.raises(CommandRenderError, match="Unsupported required-visibility"):
         load_sources(home=tmp_path, project_root=tmp_path)
 
 
@@ -69,6 +123,7 @@ def test_action_kind_other_than_shell_raises(tmp_path: Path) -> None:
     _write_source(
         tmp_path / ".eutaxis" / "commands" / "weird.md",
         "---\nname: weird\ndescription: x\nregime: user-invoked\n"
+        "failure-mode: visible\n"
         "action:\n  kind: http\n  template: 'GET /'\n---\nbody\n",
     )
     with pytest.raises(CommandRenderError):
@@ -80,6 +135,7 @@ def test_adapters_passthrough_parses(tmp_path: Path) -> None:
         tmp_path / ".eutaxis" / "commands" / "demo.md",
         "---\n"
         "name: demo\ndescription: d\nregime: user-invoked\n"
+        "failure-mode: visible\n"
         "adapters:\n"
         "  claude:\n"
         "    frontmatter:\n"
@@ -100,6 +156,7 @@ def test_adapters_files_value_must_be_string(tmp_path: Path) -> None:
         tmp_path / ".eutaxis" / "commands" / "bad.md",
         "---\n"
         "name: bad\ndescription: d\nregime: user-invoked\n"
+        "failure-mode: visible\n"
         "adapters:\n"
         "  codex:\n"
         "    files:\n"
