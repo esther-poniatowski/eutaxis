@@ -41,6 +41,39 @@ eutaxis check -c agent-instructions.yaml --diff
 This command exits with code `1` when any selected output differs from the
 generated content.
 
+## Scan for Unregistered Instruction Files
+
+Use `scan` to compare the instruction files on disk against the files the
+config registers:
+
+```sh
+eutaxis scan -c agent-instructions.yaml
+```
+
+The command reports three groups: registered-and-present,
+unregistered-and-present, and registered-but-missing. The exit code is
+`1` when any of the latter two groups is non-empty, which makes the
+command usable as a CI drift check.
+
+Instruction files whose frontmatter sets `enabled: false` are skipped in
+the unregistered-present report. Authors use this opt-out flag to keep a
+draft under the instruction tree without forcing it into the rendered
+output.
+
+To preview a YAML stanza that would register the unregistered files
+under `common_sources`, pass `--register`:
+
+```sh
+eutaxis scan -c agent-instructions.yaml --register
+```
+
+The on-disk config file is never rewritten. The snippet is printed to
+stdout for the user to paste into the desired section of the config.
+
+Override the directory walked with `--root <dir>`. The default is the
+union of parent directories of every currently registered instruction
+file.
+
 ## List Configured Outputs
 
 Use `list` to inspect configured agents, sources and resolved target paths:
@@ -99,6 +132,14 @@ The generator concatenates content in this order:
 2. All `common_sources`, in list order
 3. All agent-specific `sources`, in list order
 4. `target.footer` (if present)
+
+## Task Module Descriptions
+
+`task_modules[i].description` is optional. When the config omits it, the
+loader reads it from the target file's YAML frontmatter (the `description`
+key). The config-level value, when present, always wins as an explicit
+override. When both are absent, the loader raises a typed error naming
+the offending module.
 
 ## Section Extraction
 

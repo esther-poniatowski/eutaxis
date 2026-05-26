@@ -82,6 +82,34 @@ eutaxis list -c <config-file>
 
 ---
 
+### `scan`
+
+Compare instruction files on disk against the files the config registers.
+
+```sh
+eutaxis scan -c <config-file>
+```
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--config` | `-c` | `agent-instructions.yaml` | Path to the generation configuration file. |
+| `--root` | `-r` | parent directories of registered files | Override the directory walked for instruction files. |
+| `--register` | | `false` | Print a YAML snippet registering any unregistered files. |
+
+The command emits three groups: registered-and-present,
+unregistered-and-present, and registered-but-missing. Files whose
+frontmatter sets `enabled: false` are excluded from the unregistered
+report. `--register` prints a paste-ready snippet to stdout; the
+on-disk config is never rewritten.
+
+Exit codes:
+
+- `0` -- no drift: every registered file is present and every present
+  file is registered (or opted out).
+- `1` -- drift detected, or a discovered file has malformed frontmatter.
+
+---
+
 ### `validate` (stub)
 
 Validate prompt family layouts and configuration files.
