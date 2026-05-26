@@ -398,7 +398,7 @@ def test_rule_index_scans_labels_and_groups_by_file(tmp_path: Path) -> None:
     (tmp_path / "prog.md").write_text(
         "---\ndescription: Programming labels.\n---\n\n"
         "# Programming\n\n**design-axes**:\n\n ✓ Design.\n\n"
-        "**annotations**:\n\n ✓ Type things.\n",
+        "**annotations**:\n\n ✓ Annotate.\n",
         encoding="utf-8",
     )
     config = tmp_path / "agent-instructions.yaml"

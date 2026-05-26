@@ -191,6 +191,74 @@ def cli_list(
             typer.echo(f"      source: {source.path}")
 
 
+@app.command("scan")
+def cli_scan(
+    config: str = typer.Option(
+        "agent-instructions.yaml",
+        "--config",
+        "-c",
+        help="Path to generation config.",
+    ),
+    root: str | None = typer.Option(
+        None,
+        "--root",
+        "-r",
+        help="Override the directory walked for instruction files.",
+    ),
+    register: bool = typer.Option(
+        False,
+        "--register",
+        help="Print a YAML snippet registering any unregistered files.",
+    ),
+) -> None:
+    """Report instruction files that drift from the configured registry."""
+    from pathlib import Path as P
+    from .instructions import (
+        InstructionError,
+        format_registration_snippet,
+        load_config,
+        scan_instructions,
+    )
+
+    try:
+        loaded = load_config(P(config), root=P(root) if root else None)
+        report = scan_instructions(
+            loaded, root=P(root) if root else None
+        )
+    except InstructionError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=exc.exit_code) from exc
+
+    typer.echo(
+        f"Registered and present: {len(report.registered_present)}"
+    )
+    typer.echo(
+        f"Unregistered and present: {len(report.unregistered_present)}"
+    )
+    for path in report.unregistered_present:
+        typer.echo(f"  + {path}")
+    typer.echo(
+        f"Registered but missing: {len(report.registered_missing)}"
+    )
+    for path in report.registered_missing:
+        typer.echo(f"  - {path}")
+    if report.frontmatter_errors:
+        typer.echo(f"Frontmatter errors: {len(report.frontmatter_errors)}")
+        for path, message in report.frontmatter_errors:
+            typer.echo(f"  ! {path}: {message}")
+
+    if register and report.unregistered_present:
+        snippet = format_registration_snippet(
+            loaded, report.unregistered_present
+        )
+        typer.echo("")
+        typer.echo("# Suggested config addition:")
+        typer.echo(snippet, nl=False)
+
+    if report.has_issues:
+        raise typer.Exit(code=1)
+
+
 @app.command("validate")
 def cli_validate(
     paths: list[str] = typer.Argument(..., help="Prompt family files or directories to validate."),

@@ -8,7 +8,7 @@ from .exceptions import (
     SourceNotFoundError,
 )
 from .generator import InstructionGenerator
-from .markdown import MarkdownAssembler
+from .markdown import MarkdownAssembler, parse_frontmatter
 from .models import (
     AgentConfig,
     InstructionConfig,
@@ -17,6 +17,12 @@ from .models import (
     SourceFile,
     TargetConfig,
     TaskModule,
+)
+from .scanner import (
+    ScanReport,
+    collect_registered_paths,
+    format_registration_snippet,
+    scan_instructions,
 )
 
 __all__ = [
@@ -29,10 +35,15 @@ __all__ = [
     "InstructionGenerator",
     "MarkdownAssembler",
     "ReferenceDoc",
+    "ScanReport",
     "Section",
     "SourceFile",
     "SourceNotFoundError",
     "TargetConfig",
     "TaskModule",
+    "collect_registered_paths",
+    "format_registration_snippet",
     "load_config",
+    "parse_frontmatter",
+    "scan_instructions",
 ]
