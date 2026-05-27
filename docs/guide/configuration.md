@@ -14,12 +14,16 @@ Default config file name: `agent-instructions.yaml`.
 ## Top-level keys
 
 ```yaml
-root: .          # optional root for relative paths
-common_sources:   # list of source entries shared across all agents
-agents:           # list of agent definitions
+root: .                          # optional root for relative paths
+common_sources:                  # source entries shared across all agents
+task_modules:                    # source entries compiled to Skill artifacts
+task_modules_router_enabled:     # default true; set false to suppress the pointer section
+agents:                          # cumulative-file targets
 ```
 
 All keys are optional. An empty `common_sources` list (or omitted key) means no shared content. An empty `agents` list produces no output. Absolute target paths and paths beginning with `~` can target files outside the configured root, such as `~/.codex/AGENTS.md`.
+
+The `common_sources` list feeds the cumulative-file surface (`eutaxis generate`). The `task_modules` list feeds the on-demand Skill surface (`eutaxis skills install`). The two lists are independent. See [Concepts: two compilation surfaces](concepts.md) for the mental model.
 
 ## Source entries
 
@@ -43,6 +47,31 @@ Each entry in `common_sources` or an agent's `sources` list has the form:
 When `sections` is present, the generator extracts only the content under headings whose text matches exactly. Each extracted block runs from its heading to the next heading at the same or higher level. YAML frontmatter (`---` fences at the top of a file) is stripped before extraction.
 
 Missing source files abort generation. This prevents stale generated instruction files from silently omitting required modules.
+
+## Task module entries
+
+Each entry in `task_modules` references a Markdown file eligible for compilation to a Skill artifact:
+
+```yaml
+task_modules:
+  - id: prose-writing-style
+    title: Prose writing style
+    path: docs/instructions/tasks/prose-writing-style.md
+    trigger: when drafting or revising documentation, articles, or long-form prose
+    description: How to write expository prose.   # optional; falls back to frontmatter
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | yes | Unique slug identifying the rule set. Used by `eutaxis skills` commands. |
+| `title` | string | yes | Human-readable title used in the pointer section when emitted. |
+| `path` | string | yes | Path to the source Markdown file, relative to the configured root. |
+| `trigger` | string | yes | Plain-language activation hint, surfaced in the pointer section when emitted. |
+| `description` | string | no | One-line summary. When omitted, the loader reads it from the source file's YAML frontmatter. |
+
+Each referenced file must declare the source-schema frontmatter required by the Skills compiler (`invocation`, `failure-mode`, optionally `required-visibility`). The fields and their roles are documented in [Concepts: source schema](concepts.md). The Skill compiler refuses to emit an artifact from a file that omits any required field.
+
+The default cumulative file carries a pointer section that lists each `task_modules` entry. When the rule sets are also compiled to Skills via `eutaxis skills install`, the pointer section is redundant; suppress it by setting `task_modules_router_enabled: false` at the top level of the configuration.
 
 ## Agent definitions
 

@@ -7,200 +7,85 @@ index: ""
 
 # Usage
 
-Eutaxis assembles instruction files from modular Markdown sources. A single configuration can generate project-local files such as `AGENTS.md` and `.claude/CLAUDE.md`, or global files such as `~/.codex/AGENTS.md`.
+This page sequences the operations a maintainer performs on an eutaxis configuration, from first setup to ongoing maintenance. It assumes the mental model from [Concepts](concepts.md). For command-by-command reference (options, exit codes), see [CLI Reference](cli-reference.md). For the YAML schema reference, see [Configuration](configuration.md).
 
-## Generate project instructions
+## Get started
 
-Place `agent-instructions.yaml` at the project root and run:
+The first three steps take a fresh project from no configuration to one generated cumulative instruction file. The fourth step is optional and covers on-demand Skill artifacts.
+
+### 1. Install eutaxis
+
+Follow [Installation](installation.md) for prerequisites and source-install instructions. Verify with:
 
 ```sh
-eutaxis generate -c agent-instructions.yaml
+eutaxis info
 ```
 
-Without `-c`, the command defaults to `agent-instructions.yaml`.
+### 2. Author or scaffold a configuration
 
-To create a starter Codex instruction layout in a project, run:
+The fastest path is the project scaffolder:
 
 ```sh
 eutaxis init --template codex-project --target .
 ```
 
-After scaffolding, edit the generated files inside the project. Project-specific instructions belong to the project repository, not to a personal configuration repository.
+The command writes a starter `agent-instructions.yaml`, an `AGENTS.md` placeholder, and a `docs/instructions/` tree. Two templates are available; see [Project scaffolding](project-scaffolding.md) for the difference between them.
 
-## Check generated files
+A configuration may also be written by hand. A minimal example:
 
-Use `check` to detect stale generated files:
+```yaml
+common_sources:
+  - path: docs/instructions/file-authority.md
+  - path: docs/instructions/environment-safety.md
 
-```sh
-eutaxis check -c agent-instructions.yaml
+agents:
+  - name: codex
+    target:
+      path: AGENTS.md
 ```
 
-Print diffs for stale outputs:
+### 3. Generate the cumulative instruction file
 
 ```sh
-eutaxis check -c agent-instructions.yaml --diff
+eutaxis generate -c agent-instructions.yaml
 ```
 
-This command exits with code `1` when any selected output differs from the generated content.
+The command writes the file declared under `agents[0].target.path` (the project `AGENTS.md` in the example above). The on-disk path is also reported by `eutaxis list -c agent-instructions.yaml`.
 
-## Scan for unregistered instruction files
+Without the `-c` flag, `eutaxis generate` defaults to `agent-instructions.yaml` in the current directory.
 
-Use `scan` to compare the instruction files on disk against the files the config registers:
+### 4. Compile on-demand rule sets to Skills (optional)
 
-```sh
-eutaxis scan -c agent-instructions.yaml
-```
+This step applies only when the configuration's `task_modules` list is non-empty and the referenced files carry the source-schema frontmatter (`invocation`, `failure-mode`, optionally `required-visibility`). See [Concepts: source schema](concepts.md) for the schema, and [Concepts: failure-mode gate](concepts.md) for the placement rules.
 
-The command reports three groups: registered-and-present, unregistered-and-present, and registered-but-missing. The exit code is `1` when any of the latter two groups is non-empty, which makes the command usable as a CI drift check.
-
-Instruction files whose frontmatter sets `enabled: false` are skipped in the unregistered-present report. Authors use this opt-out flag to keep a draft under the instruction tree without forcing it into the rendered output.
-
-To preview a YAML stanza that would register the unregistered files under `common_sources`, pass `--register`:
-
-```sh
-eutaxis scan -c agent-instructions.yaml --register
-```
-
-The on-disk config file is never rewritten. The snippet is printed to stdout for the user to paste into the desired section of the config.
-
-Override the directory walked with `--root <dir>`. The default is the union of parent directories of every currently registered instruction file.
-
-## Compile instruction files to Skill artifacts
-
-Use `skills` to compile config-registered instruction files into native Agent Skill artifacts under `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/`. Each rule set ships as a Skill the agent loads when its description matches the task; the cumulative instruction file (`AGENTS.md` / `CLAUDE.md`) carries only always-on globals.
-
-The eligibility requirement is the source-schema frontmatter. Each Markdown file listed under `task_modules` carries:
-
-- `name`, `description` — slug and one-line summary.
-- `invocation: [user]` or `[model, user]` — permitted invocation routes (list). When `model` is absent, Claude emits `disable-model-invocation: true` and Codex emits `policy.allow_implicit_invocation: false`; when `model` is present, both flags are omitted (user invocation remains available either way).
-- `failure-mode: silent | visible` — silent-failure classification per the [failure-mode-as-source-field](../adr/failure-mode-as-source-field.md) ADR.
-- `required-visibility: pre-invocation | pre-action` — mandatory when `failure-mode: silent`.
-
-List the configured Skill sources:
+Inspect the configured Skill sources first:
 
 ```sh
 eutaxis skills list -c agent-instructions.yaml
 ```
 
-Each line shows the invocation routes and the failure-mode tag so an author can spot mis-classified sources at a glance.
+Each line shows the invocation routes and the failure-mode tag, surfacing misclassified sources before any artifact is written.
 
-Preview a single artifact without writing to disk:
-
-```sh
-eutaxis skills show <name> -c agent-instructions.yaml --agent claude
-```
-
-Install one source (or every source) into the selected adapter:
+Install every configured Skill source on every registered adapter:
 
 ```sh
-eutaxis skills install <name> -c agent-instructions.yaml --agent claude
-eutaxis skills install all  -c agent-instructions.yaml
+eutaxis skills install all -c agent-instructions.yaml
 ```
 
-The renderer's failure-mode gate refuses to emit a skill that admits model invocation (`"model"` in `invocation`) from a silent-failure source, and any skill from a silent-failure source whose `required-visibility` is `pre-invocation`. There is no `--force` escape for these checks; the source moves to the always-on body instead.
+The command writes one directory per rule set under `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/`. The directories are dual-marker-owned, so re-running the command is idempotent and uninstall is safe.
 
-Show drift between rendered output and what is installed on disk:
+## Author always-on globals
 
-```sh
-eutaxis skills diff -c agent-instructions.yaml
-```
+The cumulative instruction file carries rules that must hold on every turn. The `common_sources` list in the configuration defines its content.
 
-## List configured outputs
+### Project-local versus global targets
 
-Use `list` to inspect configured agents, sources and resolved target paths:
+Two deployment patterns differ only in the configuration's `root` field and the target paths:
 
-```sh
-eutaxis list -c agent-instructions.yaml
-```
+- **Project-local.** The configuration sits at the project root; `root` is absent (defaults to the configuration's parent directory); target paths are project-relative (`AGENTS.md`, `.claude/CLAUDE.md`).
+- **Global.** The configuration sits outside any single project (typically a personal configuration repository); `root` points at that repository; target paths are absolute (`~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`).
 
-## Generate one output
-
-Filter generation to a single agent output:
-
-```sh
-eutaxis generate -c agent-instructions.yaml --agent codex
-```
-
-Preview paths without writing files:
-
-```sh
-eutaxis generate -c agent-instructions.yaml --dry-run
-```
-
-## Configuration structure
-
-The YAML config has two top-level keys:
-
-- **`common_sources`** -- source files included in every agent's output.
-- **`agents`** -- per-agent definitions controlling output path, ordering, and agent-specific sources.
-
-Minimal example:
-
-```yaml
-common_sources:
-  - path: docs/instructions/style-rules.md
-  - path: docs/instructions/note-template.md
-
-agents:
-  - name: claude
-    enabled: true
-    target:
-      path: .claude/CLAUDE.md
-      header: |
-        # CLAUDE.md
-        Agent instructions (auto-generated).
-      footer: |
-        ---
-        *Auto-generated by eutaxis.*
-    sources:
-      - path: docs/instructions/claude-extra.md
-```
-
-The generator concatenates content in this order:
-
-1. `target.header` (if present)
-2. All `common_sources`, in list order
-3. All agent-specific `sources`, in list order
-4. `target.footer` (if present)
-
-## Task module descriptions
-
-`task_modules[i].description` is optional. When the config omits it, the loader reads it from the target file's YAML frontmatter (the `description` key). The config-level value, when present, always wins as an explicit override. When both are absent, the loader raises a typed error naming the offending module.
-
-## Section extraction
-
-Each source entry can include a `sections` list to extract only named markdown headings instead of the full file:
-
-```yaml
-common_sources:
-  - path: docs/instructions/style-rules.md
-    sections:
-      - "Hard blockers"
-      - "Formatting"
-```
-
-Section extraction matches heading text exactly and includes all content under that heading until the next heading at the same or higher level. YAML frontmatter in source files is stripped automatically.
-
-Exclude sections with `exclude_sections`:
-
-```yaml
-common_sources:
-  - path: docs/instructions/style-rules.md
-    exclude_sections:
-      - "Historical Notes"
-```
-
-Offset heading levels when embedding a source inside another structure:
-
-```yaml
-common_sources:
-  - path: docs/instructions/style-rules.md
-    heading_offset: 1
-```
-
-## Generate global instructions
-
-Use `root` to point at the source module directory and an absolute target path for the generated global file:
+A global configuration writing both Codex and Claude Code targets:
 
 ```yaml
 root: ~/agent-config
@@ -216,21 +101,179 @@ agents:
       path: ~/.codex/AGENTS.md
       header: |
         # Global Agent Instructions
+  - name: global-claude
+    target:
+      path: ~/.claude/CLAUDE.md
+      header: |
+        # Global Claude Code Instructions
 ```
 
-Run:
+### Header and footer
+
+A `target.header` block is prepended before the assembled body; a `target.footer` block is appended after it. Both are optional. Use them for top-level titles, generated-file warnings, or attribution.
+
+### Multiple agent outputs from one configuration
+
+A single configuration may declare any number of agent outputs. Each entry under `agents` produces one cumulative file:
+
+```yaml
+agents:
+  - name: codex
+    target:
+      path: AGENTS.md
+  - name: claude
+    target:
+      path: .claude/CLAUDE.md
+  - name: copilot
+    target:
+      path: .github/copilot-instructions.md
+```
+
+Generation writes all enabled outputs. To restrict generation to one agent:
 
 ```sh
-eutaxis generate -c global-agent-instructions.yaml
+eutaxis generate -c agent-instructions.yaml --agent codex
 ```
 
-## Disabled agents
+To skip an output without removing it from the configuration, set `enabled: false` on the agent entry. The generator prints a notice and proceeds with the remaining outputs.
 
-Setting `enabled: false` on an agent skips generation for that agent. The generator prints a notice and moves on.
+### Section extraction from a broader source
 
-## Python API
+A source entry may extract only named sections of a broader Markdown file:
 
-Use the Python API when integrating instruction generation into another tool:
+```yaml
+common_sources:
+  - path: docs/instructions/style-rules.md
+    sections:
+      - "Hard blockers"
+      - "Formatting"
+```
+
+The extraction matches heading text exactly and includes every nested subsection until the next heading at the same or higher level. YAML frontmatter in the source file is stripped automatically.
+
+The complementary `exclude_sections` field removes named sections from an otherwise included file. The `heading_offset` field shifts the heading levels of the extracted content when embedding it inside another structure. Full syntax is documented in [Configuration: source entries](configuration.md).
+
+### Suppress the task-modules pointer section
+
+When `task_modules` is populated and is also compiled to Skills, the default cumulative file carries a pointer section that is now redundant. Set `task_modules_router_enabled: false` at the top level of the configuration to suppress the pointer section while keeping the list available for the Skills compiler:
+
+```yaml
+task_modules_router_enabled: false
+task_modules:
+  - id: prose-writing-style
+    ...
+```
+
+The cumulative file shrinks; the Skill artifacts continue to be produced by `eutaxis skills install`.
+
+## Author on-demand rule sets as Skills
+
+A rule set authored under `task_modules` becomes a Skill artifact when the source file declares the source-schema frontmatter and `eutaxis skills install` is run.
+
+### Required source-schema frontmatter
+
+Every Markdown file listed under `task_modules` must declare:
+
+```markdown
+---
+name: prose-writing-style
+description: How to write expository prose — documentation, articles, long-form text.
+invocation: [model, user]
+failure-mode: visible
+---
+```
+
+The four required fields and their roles are documented in [Concepts: source schema](concepts.md). A source missing any required field raises a typed error naming the file and the missing field. The failure-mode gate refuses two placements; both refusals carry the source path and the violated rule.
+
+### Render a single Skill before installing
+
+```sh
+eutaxis skills show <name> -c agent-instructions.yaml --agent claude
+```
+
+The command prints the rendered `SKILL.md` and any sibling files to stdout, without writing to disk. Use it to confirm the frontmatter and body before committing to an install.
+
+### Install one Skill or every Skill
+
+```sh
+eutaxis skills install <name> -c agent-instructions.yaml --agent claude
+eutaxis skills install all  -c agent-instructions.yaml
+```
+
+Without `--agent`, every registered adapter receives the Skill (Claude Code and Codex today). Without `--scope`, the install uses the source's declared `scope_default` (defaults to `user`, writing under `~/.claude/skills/` and `~/.agents/skills/`); `--scope project` writes under the project-local equivalents.
+
+### Detect drift
+
+```sh
+eutaxis skills diff -c agent-instructions.yaml
+```
+
+The command compares each rendered Skill artifact against its installed directory and reports drift. Exit code `1` on drift makes the command usable as a CI check.
+
+### Uninstall
+
+```sh
+eutaxis skills uninstall <name> -c agent-instructions.yaml --agent claude
+```
+
+The dual ownership marker prevents the command from removing directories Eutaxis did not write.
+
+## Verify and maintain
+
+Four commands cover the recurring maintenance loop.
+
+### Detect cumulative-file drift
+
+```sh
+eutaxis check -c agent-instructions.yaml
+eutaxis check -c agent-instructions.yaml --diff
+```
+
+The first form reports `OK` or `OUTDATED` per agent and exits with code `1` when any output differs from the rendered content. The `--diff` flag prints a unified diff for each `OUTDATED` output.
+
+### Detect Skill-artifact drift
+
+```sh
+eutaxis skills diff -c agent-instructions.yaml
+```
+
+Same purpose as `check` but for Skill directories instead of cumulative files. Equivalent exit-code semantics.
+
+### Detect registry drift
+
+```sh
+eutaxis scan -c agent-instructions.yaml
+```
+
+The command compares the Markdown files registered in the configuration against the files present in the directories it walks. It reports three groups: registered-and-present, unregistered-and-present, and registered-but-missing. Exit code `1` when either of the latter two groups is non-empty.
+
+Instruction files whose frontmatter declares `enabled: false` are skipped in the unregistered-present report. The flag opts a draft file out of the registry without forcing it into the rendered output.
+
+To preview a YAML snippet that would register every unregistered file under `common_sources`:
+
+```sh
+eutaxis scan -c agent-instructions.yaml --register
+```
+
+The on-disk configuration is never rewritten. The snippet is printed to stdout for manual review and paste.
+
+### Inspect the configuration
+
+```sh
+eutaxis list -c agent-instructions.yaml
+```
+
+The command prints every agent entry, its enabled status, its resolved target path, and any agent-specific sources. Useful for auditing what a configuration would actually produce before running `generate`.
+
+## Advanced patterns
+
+### Override `description` from a source's frontmatter
+
+When a `task_modules` entry omits the `description` field, the loader reads `description` from the referenced file's YAML frontmatter. A configuration-level value, when present, always wins as an explicit override. Both absent raises a typed error naming the offending module.
+
+### Python API
+
+The Python API is suitable for embedding generation in another tool:
 
 ```python
 from pathlib import Path
@@ -242,32 +285,24 @@ generator = InstructionGenerator(config)
 generator.write_all()
 ```
 
-## Diagnostics
+For configuration loading, Markdown transformations, and exception types, see [Instruction assembly API](../api/instructions.md).
 
-The `info` command prints the installed version and platform details:
-
-```sh
-eutaxis info
-```
-
-Example output:
-
-```text
-eutaxis 0.1.0 | Platform: Darwin Python 3.12.5
-```
-
-The `--version` flag prints only the version string:
+### Diagnostics
 
 ```sh
-eutaxis --version
+eutaxis info       # version + platform
+eutaxis --version  # version only
 ```
 
-## Planned commands
+### Built-in commands subsystem
 
-### validate (stub)
+The `eutaxis commands` subsystem covers built-in skills whose body is authored as a Markdown template with shell-backed actions. Today the subsystem ships one entry, `clean-memory`:
 
 ```sh
-eutaxis validate <paths...>
+eutaxis commands install clean-memory
+eutaxis ops clean-memory
 ```
 
-Validates prompt layouts and configuration files. Currently prints "Prompt validation is not yet implemented."
+The first form installs the skill under `~/.claude/skills/clean-memory/` and `~/.agents/skills/clean-memory/` and registers it. The second form runs the underlying operation directly, which is also what the installed skill's action invokes.
+
+The commands subsystem is distinct from the config-driven `skills` subcommand: `commands` discovers sources from layered directories (built-in, user, project) under `~/.eutaxis/commands/`; `skills` discovers sources from the `task_modules` list of an instruction-assembly configuration.

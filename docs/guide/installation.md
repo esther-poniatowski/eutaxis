@@ -36,3 +36,7 @@ pip install git+https://github.com/esther-poniatowski/eutaxis.git
    conda activate eutaxis
    pip install -e ".[dev]"
    ```
+
+## Next steps
+
+After installation, read [Concepts](concepts.md) for the mental model behind the configuration, then [Usage: get started](usage.md) for the first-time walkthrough.

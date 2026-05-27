@@ -123,7 +123,7 @@ eutaxis skills diff [<name>] -c <config-file>
 
 | Subcommand | Use it to |
 |------------|-----------|
-| `list` | List Skill sources registered in the configuration, with regime and failure-mode tags. |
+| `list` | List Skill sources registered in the configuration, with invocation routes and failure-mode tags. |
 | `show` | Render and print one Skill artifact for one adapter, without writing to disk. |
 | `install` | Install one Skill artifact (by name) or all artifacts (`all`) into the selected adapter and scope. |
 | `uninstall` | Remove one installed Skill artifact from the selected adapter and scope. |
