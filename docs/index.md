@@ -8,7 +8,7 @@ index: ""
 
 # Eutaxis
 
-Eutaxis assembles agent instruction files from modular Markdown sources. A single YAML configuration drives two compilation surfaces — the cumulative instruction file each agent loads on every turn (Codex `AGENTS.md`, Claude Code `CLAUDE.md`) and the on-demand Agent Skill artifacts loaded when a skill description matches the active task (directories under `~/.claude/skills/`, `~/.agents/skills/`).
+Eutaxis assembles agent instruction files from modular Markdown sources. A single YAML configuration drives two compilation surfaces — the cumulative instruction file each agent loads on every turn, and the on-demand Agent Skill artifacts loaded when a skill description matches the active task. The list of currently supported agents is recorded in the [Supported agents](../README.md#supported-agents) table.
 
 ## Start here
 

@@ -152,9 +152,9 @@ agents:
 
 Running `eutaxis generate -c agent-instructions.yaml` with this config writes `.claude/CLAUDE.md` (the claude agent) and skips the disabled copilot agent.
 
-## Global Codex example
+## Global configuration example
 
-A global config can write `~/.codex/AGENTS.md` while sourcing shared modules from a separate agent-config directory:
+A global config can write an absolute target path while sourcing shared modules from a separate agent-config directory:
 
 ```yaml
 root: ~/agent-config

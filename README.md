@@ -1,103 +1,89 @@
 # eutaxis
 
-[![Maintenance](https://img.shields.io/maintenance/yes/2026)](https://github.com/esther-poniatowski/eutaxis) [![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue)](https://www.python.org/) [![License: GPL](https://img.shields.io/badge/License-GPL--3.0-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
+[![Conda](https://img.shields.io/badge/conda-eresthanaconda--channel-blue)](docs/guide/installation.md)
+[![Maintenance](https://img.shields.io/maintenance/yes/2026)]()
+[![Last Commit](https://img.shields.io/github/last-commit/esther-poniatowski/eutaxis)](https://github.com/esther-poniatowski/eutaxis/commits/main)
+[![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue)](https://www.python.org/)
+[![License: GPL](https://img.shields.io/badge/License-GPL--3.0-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
 
-Eutaxis assembles agent instruction files from modular Markdown sources. A single YAML configuration drives two compilation surfaces: the cumulative instruction file each agent loads on every turn (Codex `AGENTS.md`, Claude Code `CLAUDE.md`), and the on-demand Agent Skill artifacts each agent loads when a skill description matches the active task (directories under `~/.claude/skills/` and `~/.agents/skills/`). Both surfaces share one source-of-truth tree, so a rule authored once propagates to every agent target and every project that references it.
+Assemble agent instruction files from modular Markdown sources.
 
 ---
 
-## Table of contents
+## Table of Contents
 
-- [Compilation surfaces](#compilation-surfaces)
-- [Getting started](#getting-started)
-- [Common tasks](#common-tasks)
+- [Overview](#overview)
+- [Features](#features)
+- [Quick Start](#quick-start)
 - [Documentation](#documentation)
-- [Ecosystem](#ecosystem)
 - [Contributing](#contributing)
 - [Acknowledgments](#acknowledgments)
 - [License](#license)
 
-## Compilation surfaces
+## Overview
 
-The two surfaces correspond to two activation regimes built into Claude Code and Codex:
+Eutaxis assembles agent instruction files from one configuration. The same rules reach every supported agent and every project that references them, without manual duplication and without per-agent forks.
 
-- **Cumulative instruction file** — every line enters the agent's context on every turn. The `eutaxis generate` command assembles the file from the modules listed under `common_sources` in the configuration. This surface carries unconditional rules — file authority, environment safety, verification policy.
-- **On-demand Skill artifact** — one directory per rule set, loaded by the agent's native skill loader only when the rule set's description matches the active task. The `eutaxis skills install` command compiles each Markdown file listed under `task_modules` into a Skill artifact for every registered adapter. This surface carries task-specific rule sets — prose style, mathematical exposition, git workflow conventions.
+### Motivation
 
-Both surfaces read from the same configuration. A rule set listed under `task_modules` declares its eligibility for Skill compilation in its YAML frontmatter (`invocation`, `failure-mode`, optionally `required-visibility`). The renderer refuses placements that would route a silent-failure rule through the model's invocation gate; see the [failure-mode-as-source-field](docs/adr/failure-mode-as-source-field.md) ADR.
+Coding-assistant agents read their guidance from on-disk files specific to each platform. Maintaining the same rule sets across several agents and several projects creates duplication, drifts toward inconsistency, and forces every edit to be replayed by hand. Authoring instruction sets as monolithic per-agent files makes review, testing, and reuse harder still.
 
-For the conceptual model behind these surfaces, read [Concepts](docs/guide/concepts.md). For the CLI surface, read [CLI Reference](docs/guide/cli-reference.md).
+### Advantages
 
-## Getting started
+- **Single source of truth.** Each rule is authored once as a Markdown module. The configuration declares where it appears; the tool propagates the change.
+- **Agent-neutral authoring.** Modules describe what the agent must do; the per-agent translation (file path, frontmatter, marker conventions) is handled by adapters.
+- **Two activation regimes.** Always-on rules compile into the cumulative instruction file each agent loads on every turn; on-demand rule sets compile into native Agent Skill artifacts loaded only when their description matches the active task.
+- **Drift detection.** Configuration, sources, and on-disk targets are kept in sync by explicit drift checks usable in CI.
+- **Extensible to new agents.** Support for a new agent reduces to a single adapter registration; the authoring surface does not change.
 
-The walkthrough below assumes a single project that contains both shared and task-specific instruction modules. For the global-instruction pattern (one configuration that writes `~/.codex/AGENTS.md` and `~/.claude/CLAUDE.md`), see [Usage: author always-on globals](docs/guide/usage.md).
+### Supported agents
 
-1. **Install the package.** See [Installation](docs/guide/installation.md) for prerequisites and source-install instructions.
+| Agent | Cumulative file | Skill directory |
+| --- | --- | --- |
+| Claude Code | `~/.claude/CLAUDE.md` (global) or `.claude/CLAUDE.md` (project) | `~/.claude/skills/<name>/` (user) or `.claude/skills/<name>/` (project) |
+| Codex | `~/.codex/AGENTS.md` (global) or `AGENTS.md` (project) | `~/.agents/skills/<name>/` (user) or `.agents/skills/<name>/` (project) |
 
-2. **Scaffold a starter layout** (optional) inside an empty or existing project directory:
+Additional agents are added by registering one adapter in `src/eutaxis/commands/adapters/`. See [Architecture decisions](docs/adr/_index.md) for the adapter contract.
 
-   ```sh
-   eutaxis init --template codex-project --target .
-   ```
+---
 
-   The command writes `AGENTS.md`, `agent-instructions.yaml`, and a starter `docs/instructions/` tree. See [Project scaffolding](docs/guide/project-scaffolding.md) for available templates.
+## Features
 
-3. **Generate the cumulative instruction file** declared in the configuration:
+- [X] **Instruction assembly** — render modular Markdown sources into one cumulative instruction file per agent.
+- [X] **Skill compilation** — compile on-demand rule sets into native Agent Skill artifacts.
+- [X] **Drift detection** — compare configuration, sources, and on-disk targets; usable as a CI gate.
+- [X] **Registry hygiene** — surface instruction files present on disk but absent from the configuration, and vice versa.
+- [X] **Project scaffolding** — initialise a starter instruction layout in a project.
+- [X] **Prompt-writing methodology** — reference notes on agent instruction design under `docs/prompt-writing-methods/`.
+- [ ] **Prompt composition framework** — planned. Compose prompts from shells, local fragments, and parameterised bundles.
+- [ ] **Prompt validator** — planned. Enforce family-profile requirements.
+- [ ] **Golden-file output** — planned. Render composed prompts for diff-based review.
 
-   ```sh
-   eutaxis generate -c agent-instructions.yaml
-   ```
+---
 
-   Inspect the written file. The on-disk path is recorded in the `target.path` field of each agent entry; the default scaffold writes `AGENTS.md` at the project root.
+## Quick Start
 
-4. **Compile on-demand rule sets to Skills** (optional, only when `task_modules` is non-empty). Each Markdown file listed under `task_modules` must declare the source-schema frontmatter (`invocation`, `failure-mode`, optionally `required-visibility`); see [Concepts: source schema](docs/guide/concepts.md):
+A minimal project configuration:
 
-   ```sh
-   eutaxis skills install all -c agent-instructions.yaml
-   ```
+```yaml
+# agent-instructions.yaml
+common_sources:
+  - path: docs/instructions/file-authority.md
+  - path: docs/instructions/verification.md
 
-   The command writes one directory per rule set under `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/`.
+agents:
+  - name: codex
+    target:
+      path: AGENTS.md
+```
 
-For day-to-day operations after the first run, see the table below.
+Render the cumulative file:
 
-## Common tasks
+```sh
+eutaxis generate -c agent-instructions.yaml
+```
 
-The commands are grouped by use case rather than alphabetically.
-
-### Daily
-
-| Command | Purpose |
-| ------- | ------- |
-| `eutaxis generate -c <config>` | Regenerate every active cumulative instruction file. |
-| `eutaxis skills install all -c <config>` | Recompile every `task_modules` source to a Skill artifact and update the installed directories. |
-| `eutaxis check -c <config>` | Detect drift between the rendered cumulative file and the on-disk file. Exit code `1` on drift. Useful in CI. |
-| `eutaxis skills diff -c <config>` | Detect drift between rendered Skill artifacts and the installed directories. |
-
-### Inspection
-
-| Command | Purpose |
-| ------- | ------- |
-| `eutaxis generate -c <config> --dry-run` | List the cumulative-file targets without writing. |
-| `eutaxis list -c <config>` | List configured agent outputs and their resolved targets. |
-| `eutaxis skills list -c <config>` | List `task_modules` sources with their invocation routes and failure-mode tags. |
-| `eutaxis skills show <name> -c <config>` | Render a single Skill artifact to stdout, without writing. |
-| `eutaxis info` | Print the installed eutaxis version and platform diagnostics. |
-
-### Drift and registry hygiene
-
-| Command | Purpose |
-| ------- | ------- |
-| `eutaxis scan -c <config>` | Report instruction files on disk that are not registered in the configuration, and registered files that are missing on disk. Exit code `1` on drift. |
-| `eutaxis scan -c <config> --register` | Print a paste-ready YAML snippet that registers any unregistered files. The configuration file itself is never rewritten. |
-
-### Commands subsystem
-
-| Command | Purpose |
-| ------- | ------- |
-| `eutaxis commands install clean-memory` | Install the built-in `clean-memory` skill on every registered agent. The commands subsystem covers built-in skills authored as Markdown templates with shell-backed actions, distinct from the config-driven `skills` subcommand above. |
-| `eutaxis ops clean-memory` | Run the `clean-memory` operation directly (used as the action body inside the installed skill). |
-
-A regenerate-instructions skill that wraps `eutaxis generate` as a slash command is not yet shipped. The shape of such a skill — a one-shot CLI invocation rather than a Markdown body — does not match the current `commands` subsystem, whose skill sources are authored as Markdown (`src/eutaxis/data/commands/*.md`). Run `eutaxis generate -c <config>` directly until that surface lands.
+The full first-time walkthrough — installation, scaffolding, on-demand Skill compilation — lives in [Usage: get started](docs/guide/usage.md).
 
 ---
 
@@ -106,13 +92,13 @@ A regenerate-instructions skill that wraps `eutaxis generate` as a slash command
 | Guide | Content |
 | ----- | ------- |
 | [Installation](docs/guide/installation.md) | Prerequisites and source setup. |
-| [Concepts](docs/guide/concepts.md) | Compilation surfaces, source schema, activation regimes — the mental model behind the CLI. Read this before the Usage guide. |
-| [Usage](docs/guide/usage.md) | Step-by-step workflows: author always-on globals, author on-demand rule sets, verify and maintain. |
+| [Concepts](docs/guide/concepts.md) | Mental model behind the configuration: compilation surfaces, source schema, activation regimes. |
+| [Usage](docs/guide/usage.md) | Step-by-step workflows from first setup to ongoing maintenance. |
 | [CLI Reference](docs/guide/cli-reference.md) | Commands, options, exit codes. |
 | [Configuration](docs/guide/configuration.md) | YAML schema and worked examples. |
-| [Project scaffolding](docs/guide/project-scaffolding.md) | Starter templates. |
-| [Instruction assembly API](docs/api/instructions.md) | Python API for embedding generation in another tool. |
-| [Proposal](PROPOSAL.md) | Architectural proposal for the broader composition framework (forward-looking). |
+| [Project Scaffolding](docs/guide/project-scaffolding.md) | Starter templates. |
+| [Instruction Assembly API](docs/api/instructions.md) | Python API for embedding generation in another tool. |
+| [Proposal](PROPOSAL.md) | Architectural proposal for the broader composition framework. |
 
 ### Ecosystem
 

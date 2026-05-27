@@ -72,7 +72,7 @@ Install every configured Skill source on every registered adapter:
 eutaxis skills install all -c agent-instructions.yaml
 ```
 
-The command writes one directory per rule set under `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/`. The directories are dual-marker-owned, so re-running the command is idempotent and uninstall is safe.
+The command writes one directory per rule set into the user-scope skill directory of every registered agent. The directories are dual-marker-owned, so re-running the command is idempotent and uninstall is safe. The concrete directory paths used by each agent are listed in the [Supported agents](../../README.md#supported-agents) table.
 
 ## Author always-on globals
 
@@ -82,10 +82,10 @@ The cumulative instruction file carries rules that must hold on every turn. The 
 
 Two deployment patterns differ only in the configuration's `root` field and the target paths:
 
-- **Project-local.** The configuration sits at the project root; `root` is absent (defaults to the configuration's parent directory); target paths are project-relative (`AGENTS.md`, `.claude/CLAUDE.md`).
-- **Global.** The configuration sits outside any single project (typically a personal configuration repository); `root` points at that repository; target paths are absolute (`~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`).
+- **Project-local.** The configuration sits at the project root; `root` is absent (defaults to the configuration's parent directory); target paths are project-relative.
+- **Global.** The configuration sits outside any single project (typically a personal configuration repository); `root` points at that repository; target paths are absolute paths to each agent's global instruction file (see the [Supported agents](../../README.md#supported-agents) table for the per-agent paths).
 
-A global configuration writing both Codex and Claude Code targets:
+A global configuration with two agent outputs:
 
 ```yaml
 root: ~/agent-config
@@ -200,7 +200,7 @@ eutaxis skills install <name> -c agent-instructions.yaml --agent claude
 eutaxis skills install all  -c agent-instructions.yaml
 ```
 
-Without `--agent`, every registered adapter receives the Skill (Claude Code and Codex today). Without `--scope`, the install uses the source's declared `scope_default` (defaults to `user`, writing under `~/.claude/skills/` and `~/.agents/skills/`); `--scope project` writes under the project-local equivalents.
+Without `--agent`, every registered adapter receives the Skill (see the [Supported agents](../../README.md#supported-agents) table for the current set). Without `--scope`, the install uses the source's declared `scope_default` (typically `user`, writing into the user-scope skill directory of each agent); `--scope project` writes into the project-scope skill directory instead.
 
 ### Detect drift
 
@@ -303,6 +303,6 @@ eutaxis commands install clean-memory
 eutaxis ops clean-memory
 ```
 
-The first form installs the skill under `~/.claude/skills/clean-memory/` and `~/.agents/skills/clean-memory/` and registers it. The second form runs the underlying operation directly, which is also what the installed skill's action invokes.
+The first form installs the skill into the user-scope skill directory of every registered agent and registers it. The second form runs the underlying operation directly, which is also what the installed skill's action invokes.
 
 The commands subsystem is distinct from the config-driven `skills` subcommand: `commands` discovers sources from layered directories (built-in, user, project) under `~/.eutaxis/commands/`; `skills` discovers sources from the `task_modules` list of an instruction-assembly configuration.

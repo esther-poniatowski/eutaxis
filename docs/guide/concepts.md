@@ -7,16 +7,18 @@ index: ""
 
 # Concepts
 
-Eutaxis solves one problem: a set of modular Markdown rule sets must reach several agent target files (Codex `AGENTS.md`, Claude Code `CLAUDE.md`, per-skill directories under `~/.claude/skills/`, `~/.agents/skills/`) without manual duplication. The tool reads one YAML configuration and writes every target. This page introduces the mental model the configuration encodes.
+Eutaxis solves one problem: a set of modular Markdown rule sets must reach several agent target files on disk without manual duplication. The tool reads one YAML configuration and writes every target. This page introduces the mental model the configuration encodes.
+
+The list of currently supported agents, and the on-disk paths each one uses, is recorded in the [Supported agents](../../README.md#supported-agents) table of the README. The rest of this guide refers to those targets in agent-neutral terms.
 
 ## Two compilation surfaces
 
-The configuration drives two distinct compilation paths, each suited to a different activation regime built into Claude Code and Codex:
+The configuration drives two distinct compilation paths, each suited to a different activation regime supported by every registered agent:
 
-| Surface | Target | Activation | Eutaxis command |
+| Surface | Target shape | Activation | Eutaxis command |
 | --- | --- | --- | --- |
-| **Cumulative instruction file** | `AGENTS.md`, `CLAUDE.md` (project-local or global) | Loaded into the agent's context on every turn. Every line is always present. | `eutaxis generate` |
-| **On-demand Skill artifact** | `~/.claude/skills/<name>/`, `~/.agents/skills/<name>/` | Loaded only when the skill description matches the active task (model-invoked) or when the user invokes the skill explicitly (user-invoked). | `eutaxis skills install` |
+| **Cumulative instruction file** | One Markdown file per agent, at a path declared by the configuration. | Loaded into the agent's context on every turn. Every line is always present. | `eutaxis generate` |
+| **On-demand Skill artifact** | One directory per rule set, in the native skill directory of each agent. | Loaded only when the skill description matches the active task (model-invoked) or when the user invokes the skill explicitly (user-invoked). | `eutaxis skills install` |
 
 The cumulative surface carries rules that must hold unconditionally — file authority, environment safety, verification policy. The Skill surface carries task-specific rule sets — prose style, mathematical exposition, git workflow conventions. The same configuration drives both: `common_sources` feeds the cumulative file, `task_modules` feeds the Skill compiler.
 
@@ -117,16 +119,14 @@ failure-mode: visible
 ...
 ```
 
-### Activation regimes
+### Invocation routes
 
-The `invocation` list determines which native activation flags the compiler emits on each adapter:
+The `invocation` list controls which activation routes each compiled Skill artifact permits:
 
-| `invocation` value | Claude `SKILL.md` frontmatter | Codex `agents/openai.yaml` |
-| --- | --- | --- |
-| `[user]` | `disable-model-invocation: true` | `policy.allow_implicit_invocation: false` |
-| `[user, model]` (or `[model, user]`) | omitted | omitted |
+- `[user]` — the agent cannot pick the skill from its description; only explicit user invocation activates it.
+- `[user, model]` (or `[model, user]`) — both routes are available: the agent may select the skill when its description matches the active task, and the user may invoke it explicitly.
 
-When `model` is absent from `invocation`, the agent cannot pick the skill from its description; explicit user invocation via `/<name>` (Claude) or `$<name>` (Codex) still works. When `model` is present, both routes are available.
+The per-adapter translation (which native frontmatter key, which sibling file, which manifest field) is handled by the registered adapter for each agent. Authoring stays agent-neutral; the [regime-and-permission-mapping](../adr/regime-and-permission-mapping.md) ADR records the translation contract.
 
 ### Failure-mode gate
 
@@ -141,10 +141,10 @@ Both refusals raise a typed error naming the source path and the violated rule. 
 
 The same machinery powers two deployment patterns, distinguished by where `root` points and where the targets sit:
 
-- **Project-level.** The configuration file lives at the project root; relative paths resolve against the project tree; targets are project-local (`AGENTS.md`, `.claude/CLAUDE.md`). Each project owns its own agent instruction files. This is the pattern produced by `eutaxis init`.
-- **Global.** The configuration file lives outside any single project (typically under a personal configuration repository); `root` points at that repository; targets are absolute paths (`~/.codex/AGENTS.md`, `~/.claude/CLAUDE.md`). One configuration writes the instruction files every project inherits.
+- **Project-level.** The configuration file lives at the project root; relative paths resolve against the project tree; cumulative-file targets are project-local. Each project owns its own agent instruction files. This is the pattern produced by `eutaxis init`.
+- **Global.** The configuration file lives outside any single project (typically under a personal configuration repository); `root` points at that repository; cumulative-file targets are absolute paths to each agent's global instruction file. One configuration writes the instruction files every project inherits.
 
-Both patterns share the same `task_modules` mechanism: Skill artifacts always land under `~/.claude/skills/` and `~/.agents/skills/` (or the project-local equivalents when `--scope project` is passed to `eutaxis skills install`).
+Both patterns share the same `task_modules` mechanism: Skill artifacts land in the user-scope skill directory of each registered agent by default, or in the project-scope skill directory when `--scope project` is passed to `eutaxis skills install`. The concrete directory paths are listed in the [Supported agents](../../README.md#supported-agents) table.
 
 ## Lifecycle
 
