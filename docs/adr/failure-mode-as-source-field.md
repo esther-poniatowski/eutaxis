@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Failure-mode classification as a source field
+index: "[Architecture decisions](_index.md)"
+---
+
 # Failure-mode classification as a source field
 
 ## Status

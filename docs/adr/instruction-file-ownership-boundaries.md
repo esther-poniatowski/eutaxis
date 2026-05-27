@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Instruction-file ownership boundaries (navigation only)
+index: "[Architecture decisions](_index.md)"
+---
+
 # Instruction-file ownership boundaries (navigation only)
 
 ## Status
