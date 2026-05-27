@@ -57,7 +57,8 @@ def cli_list(
     for source in sources:
         targets = ", ".join(_effective_adapter_names(source, adapter_names))
         typer.echo(
-            f"- {source.name} [{source.regime}, {source.failure_mode}] "
+            f"- {source.name} [invocation: {'/'.join(source.invocation)}, "
+            f"failure-mode: {source.failure_mode}] "
             f"-> [{targets}]: {source.description}"
         )
 

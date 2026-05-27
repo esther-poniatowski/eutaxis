@@ -3,13 +3,15 @@
 Targets ``~/.claude/skills/<name>/SKILL.md`` (user scope) and
 ``<project>/.claude/skills/<name>/SKILL.md`` (project scope).
 
-Regime translation:
+Invocation translation:
 
-- ``regime: user-invoked`` -> ``disable-model-invocation: true`` in the
-  rendered frontmatter (documented use case for *task* skills with side
-  effects whose timing must be controlled — ``claude/skills.md``).
-- ``regime: model-invoked`` -> ``disable-model-invocation`` is omitted;
-  Claude is free to pick the skill from its description.
+- ``"model" not in invocation`` -> ``disable-model-invocation: true``
+  in the rendered frontmatter (documented use case for *task* skills
+  with side effects whose timing must be controlled —
+  ``claude/skills.md``). User invocation via ``/<name>`` still works.
+- ``"model" in invocation`` -> ``disable-model-invocation`` is omitted;
+  Claude is free to pick the skill from its description, and user
+  invocation via ``/<name>`` continues to work as well.
 
 Claude has no analogue to Codex's sibling ``agents/openai.yaml``: all
 metadata (including ``allowed-tools``, ``argument-hint``) is folded
@@ -52,7 +54,7 @@ class ClaudeCodeAdapter:
             "name": source.name,
             "description": source.description,
         }
-        if source.regime == "user-invoked":
+        if "model" not in source.invocation:
             front["disable-model-invocation"] = True
         if source.argument_hint:
             front["argument-hint"] = source.argument_hint

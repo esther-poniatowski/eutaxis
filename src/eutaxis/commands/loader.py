@@ -18,7 +18,7 @@ from .models import (
 )
 
 _FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
-_SUPPORTED_REGIMES = frozenset({"user-invoked", "model-invoked"})
+_SUPPORTED_INVOCATIONS = frozenset({"user", "model"})
 _SUPPORTED_FAILURE_MODES = frozenset({"silent", "visible"})
 _SUPPORTED_REQUIRED_VISIBILITIES = frozenset({"pre-invocation", "pre-action"})
 
@@ -117,19 +117,13 @@ def _load_one(path: Path, *, layer: str) -> CommandSource:
 def _build_source(
     meta: dict[str, Any], *, body: str, path: Path, layer: str
 ) -> CommandSource:
-    for required in ("name", "description", "regime", "failure-mode"):
+    for required in ("name", "description", "invocation", "failure-mode"):
         if required not in meta:
             raise CommandRenderError(
                 f"Command source {path} missing required key: {required!r}"
             )
 
-    regime = str(meta["regime"])
-    if regime not in _SUPPORTED_REGIMES:
-        raise CommandRenderError(
-            f"Unsupported regime {regime!r} in {path}; "
-            f"expected one of {sorted(_SUPPORTED_REGIMES)}"
-        )
-
+    invocation = _parse_invocation(meta["invocation"], path=path)
     failure_mode = str(meta["failure-mode"])
     if failure_mode not in _SUPPORTED_FAILURE_MODES:
         raise CommandRenderError(
@@ -156,7 +150,7 @@ def _build_source(
     return CommandSource(
         name=str(meta["name"]),
         description=str(meta["description"]),
-        regime=regime,
+        invocation=invocation,
         failure_mode=failure_mode,
         required_visibility=required_visibility,
         scope_default=scope_default,
@@ -169,6 +163,32 @@ def _build_source(
         source_path=path,
         layer=layer,
     )
+
+
+def _parse_invocation(raw: Any, *, path: Path) -> tuple[str, ...]:
+    if isinstance(raw, str):
+        raise CommandRenderError(
+            f"'invocation' must be a list of permitted routes in {path}; "
+            f"got the string {raw!r}. Use list syntax, e.g. "
+            f"`invocation: [user]` or `invocation: [model, user]`."
+        )
+    if not isinstance(raw, list) or not raw:
+        raise CommandRenderError(
+            f"'invocation' must be a non-empty list in {path}; "
+            f"got {raw!r}"
+        )
+    values = tuple(str(item) for item in raw)
+    unknown = [v for v in values if v not in _SUPPORTED_INVOCATIONS]
+    if unknown:
+        raise CommandRenderError(
+            f"Unsupported invocation route(s) {unknown!r} in {path}; "
+            f"expected members of {sorted(_SUPPORTED_INVOCATIONS)}"
+        )
+    if len(set(values)) != len(values):
+        raise CommandRenderError(
+            f"'invocation' contains duplicate routes in {path}: {values!r}"
+        )
+    return values
 
 
 def _parse_required_visibility(

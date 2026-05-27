@@ -104,7 +104,7 @@ Exit codes:
 
 ### `skills`
 
-Compile config-registered instruction files to Agent Skill artifacts. The per-rule-set analogue of `commands`, which discovers sources from layered directories. Discovery is config-driven: every Markdown file listed under `task_modules` is a Skill candidate, provided its frontmatter satisfies the source schema (`name`, `description`, `regime`, `failure-mode`, and `required-visibility` when silent).
+Compile config-registered instruction files to Agent Skill artifacts. The per-rule-set analogue of `commands`, which discovers sources from layered directories. Discovery is config-driven: every Markdown file listed under `task_modules` is a Skill candidate, provided its frontmatter satisfies the source schema (`name`, `description`, `invocation`, `failure-mode`, and `required-visibility` when silent).
 
 ```sh
 eutaxis skills list -c <config-file>

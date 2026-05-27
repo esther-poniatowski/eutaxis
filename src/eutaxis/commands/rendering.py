@@ -39,13 +39,14 @@ ENTRYPOINT_FILENAME = "SKILL.md"
 
 
 def check_failure_mode(source: CommandSource) -> None:
-    """Refuse a source whose failure-mode forbids its regime.
+    """Refuse a source whose failure-mode forbids its invocation routes.
 
     The compiler gate from the ``failure-mode-as-source-field`` ADR:
 
-    - ``failure-mode: silent`` cannot ship as a ``model-invoked`` skill.
-      Model-judgment activation gives no visibility guarantee before the
-      first irreversible action.
+    - ``failure-mode: silent`` cannot ship as a skill that admits model
+      invocation (``"model"`` in ``invocation``). Model-judgment
+      activation gives no visibility guarantee before the first
+      irreversible action.
     - ``failure-mode: silent`` with ``required-visibility: pre-invocation``
       cannot ship as any skill: the rule must be visible *before*
       deciding which procedure applies, so it routes only to the
@@ -58,11 +59,12 @@ def check_failure_mode(source: CommandSource) -> None:
     """
     if source.failure_mode != "silent":
         return
-    if source.regime == "model-invoked":
+    if "model" in source.invocation:
         raise FailureModeError(
-            f"Refusing to emit a model-invoked skill from a silent-failure "
-            f"source: {source.source_path}. Move the rule to the always-on "
-            f"body or re-author it as visible-failure. See ADR "
+            f"Refusing to emit a skill that admits model invocation from a "
+            f"silent-failure source: {source.source_path}. Remove 'model' "
+            f"from `invocation`, move the rule to the always-on body, or "
+            f"re-author it as visible-failure. See ADR "
             f"failure-mode-as-source-field."
         )
     if source.required_visibility == "pre-invocation":

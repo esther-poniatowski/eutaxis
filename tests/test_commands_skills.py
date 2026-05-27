@@ -19,7 +19,7 @@ from eutaxis.instructions.exceptions import ConfigurationError
 def _write_module(path: Path, *, name: str, body: str = "rule body\n", **fm) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fm.setdefault("description", f"{name} description")
-    fm.setdefault("regime", "model-invoked")
+    fm.setdefault("invocation", "[model, user]")
     fm.setdefault("failure-mode", "visible")
     fm_text = "".join(f"{k}: {v}\n" for k, v in fm.items())
     path.write_text(f"---\nname: {name}\n{fm_text}---\n{body}", encoding="utf-8")
@@ -63,7 +63,7 @@ def test_load_from_instruction_config_returns_sources(tmp_path: Path) -> None:
     sources = load_from_instruction_config(config_path)
     assert [s.name for s in sources] == ["first", "second"]
     assert all(s.layer == "config" for s in sources)
-    assert all(s.regime == "model-invoked" for s in sources)
+    assert all(set(s.invocation) == {"model", "user"} for s in sources)
 
 
 def test_load_from_instruction_config_raises_on_missing_file(tmp_path: Path) -> None:
@@ -96,7 +96,7 @@ def test_load_from_instruction_config_raises_on_missing_failure_mode(
     path = root / "instructions" / "rules" / "incomplete.md"
     path.parent.mkdir(parents=True)
     path.write_text(
-        "---\nname: incomplete\ndescription: x\nregime: model-invoked\n---\nbody\n",
+        "---\nname: incomplete\ndescription: x\ninvocation: [model, user]\n---\nbody\n",
         encoding="utf-8",
     )
     config_path = tmp_path / "agent-instructions.yaml"
@@ -123,7 +123,7 @@ def test_skills_list_cli_reports_each_source(tmp_path: Path) -> None:
     _write_module(
         root / "instructions" / "rules" / "beta.md",
         name="beta",
-        regime="user-invoked",
+        invocation="[user]",
         **{"failure-mode": "silent", "required-visibility": "pre-action"},
     )
     config_path = tmp_path / "agent-instructions.yaml"
@@ -151,8 +151,9 @@ def test_skills_list_cli_reports_each_source(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "alpha" in result.output
     assert "beta" in result.output
-    assert "model-invoked" in result.output
-    assert "user-invoked" in result.output
+    # alpha defaults to invocation: [model, user]; beta is user-only.
+    assert "invocation: model/user" in result.output
+    assert "invocation: user" in result.output
 
 
 def test_skills_show_renders_for_claude(tmp_path: Path) -> None:
@@ -179,7 +180,7 @@ def test_skills_show_renders_for_claude(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "--- SKILL.md ---" in result.output
     assert "name: gamma" in result.output
-    # model-invoked: no disable-model-invocation in the rendered SKILL.md.
+    # invocation includes 'model': no disable-model-invocation in the rendered SKILL.md.
     assert "disable-model-invocation" not in result.output
 
 

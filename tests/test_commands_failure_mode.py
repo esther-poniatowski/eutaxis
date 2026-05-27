@@ -19,14 +19,14 @@ from eutaxis.commands.rendering import ENTRYPOINT_FILENAME
 
 def _make_source(
     *,
-    regime: str,
+    invocation: tuple[str, ...],
     failure_mode: str,
     required_visibility: str | None = None,
 ) -> CommandSource:
     return CommandSource(
         name="rs",
         description="test rule set",
-        regime=regime,
+        invocation=invocation,
         failure_mode=failure_mode,
         required_visibility=required_visibility,
         scope_default="user",
@@ -36,19 +36,19 @@ def _make_source(
     )
 
 
-def test_check_failure_mode_rejects_silent_model_invoked() -> None:
+def test_check_failure_mode_rejects_silent_with_model_invocation() -> None:
     src = _make_source(
-        regime="model-invoked",
+        invocation=("model", "user"),
         failure_mode="silent",
         required_visibility="pre-action",
     )
-    with pytest.raises(FailureModeError, match="model-invoked"):
+    with pytest.raises(FailureModeError, match="model invocation"):
         check_failure_mode(src)
 
 
-def test_check_failure_mode_rejects_pre_invocation_user_invoked() -> None:
+def test_check_failure_mode_rejects_pre_invocation_user_only() -> None:
     src = _make_source(
-        regime="user-invoked",
+        invocation=("user",),
         failure_mode="silent",
         required_visibility="pre-invocation",
     )
@@ -56,9 +56,9 @@ def test_check_failure_mode_rejects_pre_invocation_user_invoked() -> None:
         check_failure_mode(src)
 
 
-def test_check_failure_mode_allows_silent_user_invoked_pre_action() -> None:
+def test_check_failure_mode_allows_silent_user_only_pre_action() -> None:
     src = _make_source(
-        regime="user-invoked",
+        invocation=("user",),
         failure_mode="silent",
         required_visibility="pre-action",
     )
@@ -66,14 +66,16 @@ def test_check_failure_mode_allows_silent_user_invoked_pre_action() -> None:
 
 
 def test_check_failure_mode_allows_visible_anywhere() -> None:
-    for regime in ("user-invoked", "model-invoked"):
-        src = _make_source(regime=regime, failure_mode="visible")
+    for invocation in (("user",), ("model",), ("model", "user")):
+        src = _make_source(invocation=invocation, failure_mode="visible")
         check_failure_mode(src)  # no raise
 
 
-def test_render_command_refuses_silent_model_invoked(tmp_path: Path) -> None:
+def test_render_command_refuses_silent_with_model_invocation(
+    tmp_path: Path,
+) -> None:
     src = _make_source(
-        regime="model-invoked",
+        invocation=("model", "user"),
         failure_mode="silent",
         required_visibility="pre-action",
     )
@@ -83,13 +85,13 @@ def test_render_command_refuses_silent_model_invoked(tmp_path: Path) -> None:
         )
 
 
-def test_model_invoked_rule_set_renders_without_disable_invocation(
+def test_model_and_user_invocation_renders_without_disable_invocation(
     tmp_path: Path,
 ) -> None:
     src_path = tmp_path / ".eutaxis" / "commands" / "rs.md"
     src_path.parent.mkdir(parents=True)
     src_path.write_text(
-        "---\nname: rs\ndescription: d\nregime: model-invoked\n"
+        "---\nname: rs\ndescription: d\ninvocation: [model, user]\n"
         "failure-mode: visible\n---\nbody\n",
         encoding="utf-8",
     )
@@ -105,11 +107,11 @@ def test_model_invoked_rule_set_renders_without_disable_invocation(
     assert "disable-model-invocation" not in skill
 
 
-def test_model_invoked_rule_set_codex_omits_policy(tmp_path: Path) -> None:
+def test_model_and_user_invocation_codex_omits_policy(tmp_path: Path) -> None:
     src_path = tmp_path / ".eutaxis" / "commands" / "rs.md"
     src_path.parent.mkdir(parents=True)
     src_path.write_text(
-        "---\nname: rs\ndescription: d\nregime: model-invoked\n"
+        "---\nname: rs\ndescription: d\ninvocation: [model, user]\n"
         "failure-mode: visible\n---\nbody\n",
         encoding="utf-8",
     )
@@ -120,5 +122,5 @@ def test_model_invoked_rule_set_codex_omits_policy(tmp_path: Path) -> None:
         src, get_adapter("codex"), project_root=tmp_path, home=tmp_path
     )
     paths = {f.relative_path for f in artifact.files}
-    # No derived policy file when the regime is model-invoked.
+    # No derived policy file when 'model' is among the permitted routes.
     assert "agents/openai.yaml" not in paths

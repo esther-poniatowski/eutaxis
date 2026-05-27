@@ -8,11 +8,12 @@ mirrors the source ``name`` slug as the artifact directory name.
 
 Codex-specific metadata — invocation policy, UI metadata, declared tool
 dependencies — lives in the sibling ``agents/openai.yaml`` file
-(`codex/skills.md`). Regime translation:
+(`codex/skills.md`). Invocation translation:
 
-- ``regime: user-invoked`` -> ``policy.allow_implicit_invocation: false``
-  in the derived ``agents/openai.yaml``.
-- ``regime: model-invoked`` -> the ``policy`` block is not derived;
+- ``"model" not in invocation`` -> ``policy.allow_implicit_invocation:
+  false`` in the derived ``agents/openai.yaml``. Explicit user
+  invocation via ``$<name>`` still works.
+- ``"model" in invocation`` -> the ``policy`` block is not derived;
   Codex is free to pick the skill implicitly. Passthrough keys are still
   honoured if the author supplies them.
 
@@ -111,7 +112,7 @@ def _build_openai_yaml(
     the author can extend (or override) the derived defaults.
     """
     derived: dict[str, object] = {}
-    if source.regime == "user-invoked":
+    if "model" not in source.invocation:
         derived["policy"] = {"allow_implicit_invocation": False}
 
     raw = passthrough_files.get("agents/openai.yaml")

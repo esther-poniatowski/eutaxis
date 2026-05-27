@@ -76,20 +76,23 @@ class CommandSource:
     description : str
         One-line summary surfaced by ``commands list`` and the agent's
         skill picker.
-    regime : str
-        Activation regime. Supported values: ``"user-invoked"`` (explicit
-        user invocation; maps to ``disable-model-invocation: true`` on
-        Claude and ``policy.allow_implicit_invocation: false`` on Codex)
-        and ``"model-invoked"`` (model picks the skill from its
-        description; no explicit invocation flag is emitted).
+    invocation : tuple[str, ...]
+        Permitted invocation routes. Allowed members: ``"user"`` (user
+        invokes explicitly via ``/<name>`` on Claude or ``$<name>`` on
+        Codex) and ``"model"`` (the model picks the skill from its
+        description). At least one route is required. When ``"model"``
+        is absent, Claude emits ``disable-model-invocation: true`` and
+        Codex emits ``policy.allow_implicit_invocation: false``; when
+        ``"model"`` is present, both flags are omitted (the platform
+        defaults permit both routes).
     failure_mode : str
         Silent-failure classification. ``"silent"`` if violation produces
         irreversible state mutation; ``"visible"`` if the defect is
         reviewable. See [failure-mode-as-source-field] ADR for the author
-        checklist. The compiler refuses to emit a ``model-invoked``
-        artifact from a ``silent`` source and a ``user-invoked`` artifact
-        from a ``silent`` source whose ``required_visibility`` is
-        ``pre-invocation``.
+        checklist. The compiler refuses to emit a skill that admits
+        model invocation (``"model"`` in ``invocation``) from a
+        ``silent`` source, and a skill from a ``silent`` source whose
+        ``required_visibility`` is ``pre-invocation``.
     required_visibility : str | None
         Required for ``silent`` sources only. ``"pre-invocation"`` if the
         rule must be visible before deciding which procedure applies;
@@ -122,7 +125,7 @@ class CommandSource:
 
     name: str
     description: str
-    regime: str
+    invocation: tuple[str, ...]
     failure_mode: str
     scope_default: str
     targets: TargetsSpec

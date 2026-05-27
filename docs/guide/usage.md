@@ -65,7 +65,7 @@ Use `skills` to compile config-registered instruction files into native Agent Sk
 The eligibility requirement is the source-schema frontmatter. Each Markdown file listed under `task_modules` carries:
 
 - `name`, `description` — slug and one-line summary.
-- `regime: user-invoked | model-invoked` — activation mode.
+- `invocation: [user]` or `[model, user]` — permitted invocation routes (list). When `model` is absent, Claude emits `disable-model-invocation: true` and Codex emits `policy.allow_implicit_invocation: false`; when `model` is present, both flags are omitted (user invocation remains available either way).
 - `failure-mode: silent | visible` — silent-failure classification per the [failure-mode-as-source-field](../adr/failure-mode-as-source-field.md) ADR.
 - `required-visibility: pre-invocation | pre-action` — mandatory when `failure-mode: silent`.
 
@@ -90,7 +90,7 @@ eutaxis skills install <name> -c agent-instructions.yaml --agent claude
 eutaxis skills install all  -c agent-instructions.yaml
 ```
 
-The renderer's failure-mode gate refuses to emit a `model-invoked` artifact from a silent-failure source and a `user-invoked` artifact whose `required-visibility` is `pre-invocation`. There is no `--force` escape for these checks; the source moves to the always-on body instead.
+The renderer's failure-mode gate refuses to emit a skill that admits model invocation (`"model"` in `invocation`) from a silent-failure source, and any skill from a silent-failure source whose `required-visibility` is `pre-invocation`. There is no `--force` escape for these checks; the source moves to the always-on body instead.
 
 Show drift between rendered output and what is installed on disk:
 

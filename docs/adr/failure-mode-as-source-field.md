@@ -42,8 +42,10 @@ A `visible` classification asserts none of the above. The checklist is reproduce
 
 **Compiler-side enforcement.** The renderer refuses to emit:
 
-- a model-invoked artifact (`regime: model-invoked`) from any source carrying `failure-mode: silent`. Misplacement raises `FailureModeError` before any artifact is written.
-- a user-invoked artifact (`regime: user-invoked`) from a source carrying `failure-mode: silent` with `required-visibility: pre-invocation`. Such a rule routes only to the always-on body.
+- a skill that admits model invocation (`"model" in invocation`) from any source carrying `failure-mode: silent`. Misplacement raises `FailureModeError` before any artifact is written.
+- a skill from a source carrying `failure-mode: silent` with `required-visibility: pre-invocation` regardless of `invocation`. Such a rule routes only to the always-on body.
+
+The `invocation` field is itself a list whose members are the permitted invocation routes (`user`, `model`). It supersedes the single-valued `regime` field considered in earlier drafts: a binary single-value scheme cannot express the common case where both the user and the model may legitimately invoke the same skill, since the native platforms expose the binary "block model invocation: yes/no" only on the model side and the user side is always permitted.
 
 The enforcement is unconditional. `eutaxis check` surfaces misplacements before generation runs. There is no `--force` escape for these checks; the matrix is small enough that authors fix the placement, not the gate.
 
@@ -66,9 +68,9 @@ The required-visibility sub-field carries the distinction between rules that gat
 ## Consequences
 
 - The `commands` subsystem source schema gains two fields: `failure-mode` (mandatory, `silent | visible`) and `required-visibility` (mandatory when `failure-mode: silent`, values `pre-invocation | pre-action`). The loader raises a typed error when the fields are missing or invalid.
-- The compiler check refuses to emit a model-invoked skill carrying `failure-mode: silent` and a user-invoked skill carrying `failure-mode: silent` with `required-visibility: pre-invocation`. Both rejections name the source and the violated rule.
-- The existing `clean-memory` command must declare its `failure-mode`. By the checklist it is `silent` (mutates filesystem state) with `required-visibility: pre-action` (explicit user invocation loads the skill before the action runs). The migration commit adds these fields.
+- The compiler check refuses to emit a skill admitting model invocation from a `failure-mode: silent` source, and any skill from a `failure-mode: silent` source whose `required-visibility` is `pre-invocation`. Both rejections name the source and the violated rule.
+- The existing `clean-memory` command must declare its `failure-mode`. By the checklist it is `silent` (mutates filesystem state) with `required-visibility: pre-action` (explicit user invocation loads the skill before the action runs); its `invocation` is `[user]`. The migration commit adds these fields.
 - The author checklist is documented under `docs/guide/` so authors apply the same gate the compiler enforces. The checklist is reproduced verbatim, not paraphrased.
-- The Phase 1 always-on regime adapter, when it lands, consumes the same field to decide whether a rule belongs in the always-on body or can ship as a model-invoked skill.
+- The Phase 1 always-on regime adapter, when it lands, consumes the same field to decide whether a rule belongs in the always-on body or can ship as a skill that admits model invocation.
 - The rule-template migration ([rule-template-format-and-vocabulary](../open-questions/rule-template-format-and-vocabulary.md)) will move the classification from the source-level frontmatter to per-rule fields. The file-level field stays as the source-level placement summary; the per-rule field is the fine-grained version.
 - The open question [silent-failure-classification](../open-questions/silent-failure-classification.md) is closed by this ADR.
