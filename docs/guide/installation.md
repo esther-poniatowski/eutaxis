@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Installation
+index: ""
+---
+
 # Installation
 
 ## Prerequisites

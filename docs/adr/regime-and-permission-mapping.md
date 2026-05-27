@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Regime translation and permission mapping per adapter
+index: "[Architecture decisions](_index.md)"
+---
+
 # Regime translation and permission mapping per adapter
 
 ## Status

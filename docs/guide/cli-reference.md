@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - CLI Reference
+index: ""
+---
+
 # CLI reference
 
 ## Global options

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Rule-set granularity: one file per rule vs one file per rule-set"
+index: "[Open architectural questions](_index.md)"
+---
+
 # Rule-set granularity: one file per rule vs one file per rule-set
 
 **Severity.** Medium. **Phase-blocking.** Phase 1 (rule-template migration). **Origin.** Refinement of session proposal 2, recorded in [rule-sources-as-structured-templates](../adr/rule-sources-as-structured-templates.md).

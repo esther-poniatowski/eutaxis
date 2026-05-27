@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Silent-failure classification criterion
+index: "[Open architectural questions](_index.md)"
+---
+
 # Silent-failure classification criterion
 
 **Status.** Resolved by [failure-mode-as-source-field](../adr/failure-mode-as-source-field.md). The candidate resolution sketched below was ratified with one refinement: the `failure-mode` field is mandatory (no default) so that an unclassified source surfaces at validation time. The page is retained for the context, the discarded-alternatives discussion, and the author checklist.

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompts - Section demarcation
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompts - section demarcation
 
 Use unambiguous delimiters to demarcate content regions.

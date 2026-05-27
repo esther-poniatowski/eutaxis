@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Cross-repository source acquisition
+index: "[Open architectural questions](_index.md)"
+---
+
 # Cross-repository source acquisition
 
 **Severity.** Medium. **Phase-blocking.** Phase 1 if external fragments are consumed. **Origin.** Adversarial review of the cross-agent compiler proposal, objection O8.

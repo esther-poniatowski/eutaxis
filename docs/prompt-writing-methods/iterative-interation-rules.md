@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Iterative Interaction Rules
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompt - iterative interaction rules
 
 For complex tasks, the prompt may define **interaction protocols**.

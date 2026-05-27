@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Eutaxis as a build-time compiler, not a runtime activation mechanism"
+index: "[Architecture decisions](_index.md)"
+---
+
 # Eutaxis as a build-time compiler, not a runtime activation mechanism
 
 ## Status

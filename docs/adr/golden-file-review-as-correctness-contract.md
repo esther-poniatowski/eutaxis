@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Golden-file review as the correctness contract
+index: "[Architecture decisions](_index.md)"
+---
+
 # Golden-file review as the correctness contract
 
 ## Status

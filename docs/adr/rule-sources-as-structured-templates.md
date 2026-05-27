@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Rule sources as structured templates
+index: "[Architecture decisions](_index.md)"
+---
+
 # Rule sources as structured templates
 
 ## Status

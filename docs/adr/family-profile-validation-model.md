@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Family profiles and a three-tier validation model
+index: "[Architecture decisions](_index.md)"
+---
+
 # Family profiles and a three-tier validation model
 
 ## Status

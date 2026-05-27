@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Adapter-passthrough frontmatter and files in the source schema
+index: "[Architecture decisions](_index.md)"
+---
+
 # Adapter-passthrough frontmatter and files in the source schema
 
 ## Status

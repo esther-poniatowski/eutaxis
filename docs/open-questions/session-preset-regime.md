@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Session-preset regime mismodel
+index: "[Open architectural questions](_index.md)"
+---
+
 # Session-preset regime mismodel
 
 **Severity.** High. **Phase-blocking.** Phase 2 (session-preset compilation). **Origin.** Adversarial review of the cross-agent compiler proposal, objection O1.

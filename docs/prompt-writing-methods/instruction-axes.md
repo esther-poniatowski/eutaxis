@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Instruction axes and reasoning targets
+index: "[Prompt writing methods](_index.md)"
+---
+
 # Instruction axes and reasoning targets
 
 > [!CHECK] Scope

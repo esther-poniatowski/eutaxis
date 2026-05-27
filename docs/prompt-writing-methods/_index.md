@@ -1,3 +1,11 @@
+---
+tags:
+  - index
+aliases:
+  - Prompt writing methods
+index: "[Eutaxis](../index.md)"
+---
+
 # Prompt writing methods
 
 Designing agent instructions (prompts) is a discipline with well-characterized failure modes and evidence-informed practices. Empirical support varies by model family, task, and deployment surface. Stable design principles span structural architecture, linguistic form, and behavioral specification.

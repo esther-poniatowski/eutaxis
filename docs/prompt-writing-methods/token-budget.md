@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Token-budget and Context-window
+index: "[Prompt writing methods](_index.md)"
+---
+
 # Token budget and context window
 
 Prompt quality is constrained by **token budget**: instructions, retrieved context, tool schemas, examples, and prior outputs all compete for space.

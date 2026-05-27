@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Same source, not same behaviour: declared per-target fidelity"
+index: "[Architecture decisions](_index.md)"
+---
+
 # Same source, not same behaviour: declared per-target fidelity
 
 ## Status

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Edge Case and Fallback Policy
+index: "[Prompt writing methods](_index.md)"
+---
+
 # Edge case and fallback policy
 
 ## Edge cases

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Constraints and Evaluation Criteria
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompt - constraints and evaluation criteria
 
 ## Constraint formulation

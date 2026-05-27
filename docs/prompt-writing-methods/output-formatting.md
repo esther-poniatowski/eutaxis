@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Output Formatting
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompt - output formatting
 
 **Principles**:

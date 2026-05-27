@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Prompt family as the primary organising unit
+index: "[Architecture decisions](_index.md)"
+---
+
 # Prompt family as the primary organising unit
 
 ## Status

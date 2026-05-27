@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Prompt-level component activation
+index: "[Architecture decisions](_index.md)"
+---
+
 # Prompt-level component activation
 
 ## Status

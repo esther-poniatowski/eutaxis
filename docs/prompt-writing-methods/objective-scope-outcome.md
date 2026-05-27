@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Objective and Sope
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompt - objective and scope
 
 The prompt must clarify **what successful completion means**.

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Structural Instructions
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompt - structural instructions
 
 Explicitly define the **organization of explanations**.

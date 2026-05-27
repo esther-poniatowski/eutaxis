@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Context and Grounding Policy
+index: "[Prompt writing methods](_index.md)"
+---
+
 # Context and grounding policy
 
 Modern prompt engineering is increasingly framed as **context engineering**: curating the right tokens, references, and state.

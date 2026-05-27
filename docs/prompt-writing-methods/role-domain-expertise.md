@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Role and Domain Expertise
+index: "[Prompt writing methods](_index.md)"
+---
+
 
 # AI prompt - role and domain expertise
 

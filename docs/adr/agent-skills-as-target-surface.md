@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Agent Skills as the command target surface
+index: "[Architecture decisions](_index.md)"
+---
+
 # Agent Skills as the command target surface
 
 ## Status

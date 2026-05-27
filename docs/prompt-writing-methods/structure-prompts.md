@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Structure
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompt - structure
 
 Designing instructions for an AI agent requires structuring the prompt as a **specification of behavior** rather than a simple request.

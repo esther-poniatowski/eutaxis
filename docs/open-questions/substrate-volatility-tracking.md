@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Substrate volatility: tracking vendor doc drift"
+index: "[Open architectural questions](_index.md)"
+---
+
 # Substrate volatility: tracking vendor doc drift
 
 **Severity.** Low. **Phase-blocking.** None. **Origin.** Adversarial review of the cross-agent compiler proposal, objection O9.

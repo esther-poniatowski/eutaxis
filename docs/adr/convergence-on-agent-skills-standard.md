@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Convergence on the Agent Skills open standard
+index: "[Architecture decisions](_index.md)"
+---
+
 # Convergence on the Agent Skills open standard
 
 ## Status

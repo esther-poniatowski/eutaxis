@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Two source kinds: instruction content and capability configuration"
+index: "[Architecture decisions](_index.md)"
+---
+
 # Two source kinds: instruction content and capability configuration
 
 ## Status

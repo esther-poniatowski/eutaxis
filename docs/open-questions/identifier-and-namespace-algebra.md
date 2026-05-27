@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Identifier and namespace algebra
+index: "[Open architectural questions](_index.md)"
+---
+
 # Identifier and namespace algebra
 
 **Severity.** Medium. **Phase-blocking.** Phase 1 if cross-repository fragments are consumed. **Origin.** Adversarial review of the cross-agent compiler proposal, objection O10 (and §10 Q5).

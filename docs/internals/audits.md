@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Audits
+index: "[Design Documentation — Methods](_index.md)"
+---
+
 # Audits
 
 > [!INFO] Part of the [agent instruction system](motivations-problem-statement.md)

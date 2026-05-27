@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Claude code `CLAUDE.md` cumulative-loading semantics"
+index: "[Open architectural questions](_index.md)"
+---
+
 # Claude Code `CLAUDE.md` cumulative-loading semantics
 
 **Severity.** Medium. **Phase-blocking.** Phase 1 (always-on regime adapter for Claude code). **Origin.** Cross-agent customisation-mechanism review, recorded in [silent-failure-rules-as-always-on](../adr/silent-failure-rules-as-always-on.md). Surfaced by the asymmetry between Codex `AGENTS.md` cumulative loading (documented) and Claude Code `CLAUDE.md` merge semantics (undocumented for nested paths).

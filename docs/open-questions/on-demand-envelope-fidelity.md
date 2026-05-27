@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "On-demand fidelity: payload vs envelope"
+index: "[Open architectural questions](_index.md)"
+---
+
 # On-demand fidelity: payload vs envelope
 
 **Severity.** Medium. **Phase-blocking.** None (commands subsystem already addresses the load-bearing part). **Origin.** Adversarial review of the cross-agent compiler proposal, objections O4 and §10 Q4.

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Prompt shells and parameterised methodology bundles
+index: "[Architecture decisions](_index.md)"
+---
+
 # Prompt shells and parameterised methodology bundles
 
 ## Status

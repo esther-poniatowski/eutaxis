@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Generalisation requires demonstrated maintenance pressure
+index: "[Architecture decisions](_index.md)"
+---
+
 # Generalisation requires demonstrated maintenance pressure
 
 ## Status

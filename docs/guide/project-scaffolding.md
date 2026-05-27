@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Project Scaffolding
+index: ""
+---
+
 # Project scaffolding
 
 `eutaxis` owns reusable instruction templates. Projects own their generated or edited project-specific instructions.

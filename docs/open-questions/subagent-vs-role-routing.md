@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Subagent deferral vs role routing
+index: "[Open architectural questions](_index.md)"
+---
+
 # Subagent deferral vs role routing
 
 **Severity.** Medium. **Phase-blocking.** Phase 2 (session-preset compilation). **Origin.** Adversarial review of the cross-agent compiler proposal, objection O6.

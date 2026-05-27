@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Four-axis instruction decomposition
+index: "[Architecture decisions](_index.md)"
+---
+
 # Four-axis instruction decomposition
 
 ## Status

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Linguistic Form
+index: "[Prompt writing methods](_index.md)"
+---
+
 # Linguistic form
 
 Several linguistic properties have direct behavioral consequences:

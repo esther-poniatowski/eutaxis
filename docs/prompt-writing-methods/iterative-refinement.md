@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Iterative Refinement
+index: "[Prompt writing methods](_index.md)"
+---
+
 # Iterative refinement
 
 ## Human-side testing

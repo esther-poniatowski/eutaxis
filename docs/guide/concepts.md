@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Core Concepts
+index: ""
+---
+
 # Core concepts
 
 This guide explains the core concepts used by Eutaxis to assemble agent prompts and instruction files.

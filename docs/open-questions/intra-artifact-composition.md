@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Intra-artifact composition, ordering, and conflict"
+index: "[Open architectural questions](_index.md)"
+---
+
 # Intra-artifact composition, ordering, and conflict
 
 **Severity.** High. **Phase-blocking.** Phase 1 (any scope with multiple components compiling to one artifact). **Origin.** Adversarial review of the cross-agent compiler proposal, objection O2.

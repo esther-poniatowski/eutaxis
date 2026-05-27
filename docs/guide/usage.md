@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Usage
+index: ""
+---
+
 # Usage
 
 Eutaxis assembles instruction files from modular Markdown sources. A single configuration can generate project-local files such as `AGENTS.md` and `.claude/CLAUDE.md`, or global files such as `~/.codex/AGENTS.md`.

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Dual ownership marker: sidecar plus frontmatter key"
+index: "[Architecture decisions](_index.md)"
+---
+
 # Dual ownership marker: sidecar plus frontmatter key
 
 ## Status

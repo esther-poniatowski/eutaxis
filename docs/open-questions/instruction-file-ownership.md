@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Instruction-file ownership policy
+index: "[Open architectural questions](_index.md)"
+---
+
 # Instruction-file ownership policy
 
 **Status.** Scope narrowed by [instruction-file-ownership-boundaries](../adr/instruction-file-ownership-boundaries.md). The on-demand half is resolved by [dual-ownership-marker](../adr/dual-ownership-marker.md). The always-on whole-file case follows current generator behaviour (no constraint, consumers reserve target paths). The always-on **partial-ownership** case — a target that mixes hand-authored and generated content via delimiters — remains open and is the only outstanding scope of this question.

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Style and Tone
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompt - style and tone
 
 Explicit style instructions significantly affect output quality.

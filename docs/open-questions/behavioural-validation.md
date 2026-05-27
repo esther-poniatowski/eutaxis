@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Behavioural validation gap
+index: "[Open architectural questions](_index.md)"
+---
+
 # Behavioural validation gap
 
 **Severity.** Medium. **Phase-blocking.** None — the correctness contract has been reframed. **Origin.** Adversarial review of the cross-agent compiler proposal, objection O7.

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Rule-template format and field vocabulary
+index: "[Open architectural questions](_index.md)"
+---
+
 # Rule-template format and field vocabulary
 
 **Severity.** High. **Phase-blocking.** Phase 1 (rule-template migration). **Origin.** Refinement of session proposal 2, recorded in [rule-sources-as-structured-templates](../adr/rule-sources-as-structured-templates.md).

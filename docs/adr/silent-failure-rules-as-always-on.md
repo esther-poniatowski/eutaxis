@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Silent-failure rules as always-on
+index: "[Architecture decisions](_index.md)"
+---
+
 # Silent-failure rules as always-on
 
 ## Status

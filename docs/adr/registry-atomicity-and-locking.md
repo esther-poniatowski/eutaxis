@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Install registry: atomicity and locking"
+index: "[Architecture decisions](_index.md)"
+---
+
 # Install registry: atomicity and locking
 
 ## Status

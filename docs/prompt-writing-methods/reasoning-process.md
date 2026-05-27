@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Constraining the Reasoning Process
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompt - constraining the reasoning process
 
 ## General principles

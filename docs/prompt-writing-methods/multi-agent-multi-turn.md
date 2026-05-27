@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Multi agent multi turn
+index: "[Prompt writing methods](_index.md)"
+---
+
 ## Multi-turn and multi-agent prompt architecture
 
 Architectural decisions constrain what output specifications are even expressible.

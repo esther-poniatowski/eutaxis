@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Native precedence, not a parallel resolution engine"
+index: "[Architecture decisions](_index.md)"
+---
+
 # Native precedence, not a parallel resolution engine
 
 ## Status

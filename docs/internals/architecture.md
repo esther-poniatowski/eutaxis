@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Architecture
+index: "[Design Documentation — Methods](_index.md)"
+---
+
 # Architecture
 
 ## Hierarchical levels

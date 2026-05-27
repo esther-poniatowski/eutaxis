@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Examples
+index: "[Prompt writing methods](_index.md)"
+---
+
 
 # AI prompt - examples
 

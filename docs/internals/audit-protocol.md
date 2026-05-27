@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Audit Protocol
+index: "[Design Documentation — Methods](_index.md)"
+---
+
 # Audit protocol
 
 This file is the **operational contract**. It governs the mandatory workflow for every unit edit and every section draft under eutaxis. No text is returned before this protocol completes.

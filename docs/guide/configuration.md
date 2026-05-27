@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Configuration
+index: ""
+---
+
 # Configuration
 
 The `generate` command reads a YAML file that declares shared sources, per-agent sources, and output targets. Relative paths resolve against the configured root. By default, the root is the config file's parent directory. A config can override this with the top-level `root` key, and the CLI can override it with `--root`.

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Instruction Assembly API
+index: ""
+---
+
 # Instruction assembly API
 
 The instruction assembly API is exposed from `eutaxis.instructions`.

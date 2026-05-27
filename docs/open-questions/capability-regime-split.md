@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - "Capability regime: split tool wiring from policy"
+index: "[Open architectural questions](_index.md)"
+---
+
 # Capability regime: split tool wiring from policy
 
 **Severity.** High. **Phase-blocking.** Phase 3 (capability compilation). **Origin.** Adversarial review of the cross-agent compiler proposal, objection O5 (and §10 Q7).

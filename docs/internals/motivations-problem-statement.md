@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Motivations
+index: "[Design Documentation — Methods](_index.md)"
+---
+
 # Motivations
 
 ## Goal

@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - AI Prompt - Target Audience and Background
+index: "[Prompt writing methods](_index.md)"
+---
+
 # AI prompt - target audience and background
 
 Precise prompts specify **the knowledge level of the reader**.

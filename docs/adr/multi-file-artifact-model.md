@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Multi-file rendered artifact model
+index: "[Architecture decisions](_index.md)"
+---
+
 # Multi-file rendered artifact model
 
 ## Status

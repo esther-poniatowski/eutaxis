@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Activation regime as the classification axis
+index: "[Architecture decisions](_index.md)"
+---
+
 # Activation regime as the classification axis
 
 ## Status

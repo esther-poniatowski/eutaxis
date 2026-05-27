@@ -1,3 +1,10 @@
+---
+tags: []
+aliases:
+  - Registries and validation
+index: "[Design Documentation — Methods](_index.md)"
+---
+
 # Registries and validation
 
 This file specifies the registries and the validation toolchain that govern a vault under eutaxis. The vault is treated as a graph of typed content units rather than a flat collection of documents. The registries make the global structure explicit, so that automated checks, an agent, and a human supervisor share one description of the vault state.
