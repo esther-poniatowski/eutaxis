@@ -102,6 +102,30 @@ Exit codes:
 
 ---
 
+### `skills`
+
+Compile config-registered instruction files to Agent Skill artifacts. The per-rule-set analogue of `commands`, which discovers sources from layered directories. Discovery is config-driven: every Markdown file listed under `task_modules` is a Skill candidate, provided its frontmatter satisfies the source schema (`name`, `description`, `regime`, `failure-mode`, and `required-visibility` when silent).
+
+```sh
+eutaxis skills list -c <config-file>
+eutaxis skills show <name> -c <config-file> [--agent claude|codex]
+eutaxis skills install <name|all> -c <config-file> [--agent <agent>] [--scope user|project]
+eutaxis skills uninstall <name> -c <config-file> [--agent <agent>] [--scope user|project]
+eutaxis skills diff [<name>] -c <config-file>
+```
+
+| Subcommand | Use it to |
+|------------|-----------|
+| `list` | List Skill sources registered in the configuration, with regime and failure-mode tags. |
+| `show` | Render and print one Skill artifact for one adapter, without writing to disk. |
+| `install` | Install one Skill artifact (by name) or all artifacts (`all`) into the selected adapter and scope. |
+| `uninstall` | Remove one installed Skill artifact from the selected adapter and scope. |
+| `diff` | Show drift between rendered output and installed artifacts. |
+
+The failure-mode gate ([failure-mode-as-source-field](../adr/failure-mode-as-source-field.md)) applies at render time: the renderer refuses to emit a `model-invoked` artifact from a silent-failure source and a `user-invoked` artifact whose `required-visibility` is `pre-invocation`. There is no `--force` escape for these checks.
+
+---
+
 ### `validate` (stub)
 
 Validate prompt family layouts and configuration files.

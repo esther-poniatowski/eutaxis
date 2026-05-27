@@ -58,6 +58,46 @@ The on-disk config file is never rewritten. The snippet is printed to stdout for
 
 Override the directory walked with `--root <dir>`. The default is the union of parent directories of every currently registered instruction file.
 
+## Compile instruction files to Skill artifacts
+
+Use `skills` to compile config-registered instruction files into native Agent Skill artifacts under `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/`. The Skills surface replaces the heuristic router pattern in cumulative instruction files: each rule set ships as a Skill the agent loads when its description matches the task.
+
+The eligibility requirement is the source-schema frontmatter. Each Markdown file listed under `task_modules` carries:
+
+- `name`, `description` — slug and one-line summary.
+- `regime: user-invoked | model-invoked` — activation mode.
+- `failure-mode: silent | visible` — silent-failure classification per the [failure-mode-as-source-field](../adr/failure-mode-as-source-field.md) ADR.
+- `required-visibility: pre-invocation | pre-action` — mandatory when `failure-mode: silent`.
+
+List the configured Skill sources:
+
+```sh
+eutaxis skills list -c agent-instructions.yaml
+```
+
+Each line shows the regime and failure-mode tags so an author can spot mis-classified sources at a glance.
+
+Preview a single artifact without writing to disk:
+
+```sh
+eutaxis skills show <name> -c agent-instructions.yaml --agent claude
+```
+
+Install one source (or every source) into the selected adapter:
+
+```sh
+eutaxis skills install <name> -c agent-instructions.yaml --agent claude
+eutaxis skills install all  -c agent-instructions.yaml
+```
+
+The renderer's failure-mode gate refuses to emit a `model-invoked` artifact from a silent-failure source and a `user-invoked` artifact whose `required-visibility` is `pre-invocation`. There is no `--force` escape for these checks; the source moves to the always-on body instead.
+
+Show drift between rendered output and what is installed on disk:
+
+```sh
+eutaxis skills diff -c agent-instructions.yaml
+```
+
 ## List configured outputs
 
 Use `list` to inspect configured agents, sources and resolved target paths:
