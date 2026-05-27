@@ -263,6 +263,37 @@ agents:
     assert "Task modules" not in output
 
 
+def test_task_modules_router_disabled_by_flag(tmp_path: Path) -> None:
+    """The list is still parsed (for `eutaxis skills`) but the router section is omitted."""
+    (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        """
+common_sources:
+  - rules.md
+task_modules_router_enabled: false
+task_modules:
+  - id: programming
+    title: Programming
+    path: /modules/programming.md
+    trigger: when writing source code
+    description: Covers typed code.
+agents:
+  - name: codex
+    target: AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    loaded = load_config(config)
+    output = InstructionGenerator(loaded).generate_all()["codex"]
+    # Cumulative file: no router section.
+    assert "Task modules" not in output
+    assert "/modules/programming.md" not in output
+    # Config object: list is still populated for downstream consumers.
+    assert [m.id for m in loaded.task_modules] == ["programming"]
+
+
 def test_duplicate_task_module_id_raises(tmp_path: Path) -> None:
     config = tmp_path / "agent-instructions.yaml"
     config.write_text(

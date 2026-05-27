@@ -53,6 +53,10 @@ class ConfigLoader:
                 raw.get("task_modules_heading", "Task modules")
             ),
             task_modules_intro=str(raw.get("task_modules_intro", "")),
+            task_modules_router_enabled=self._as_bool(
+                raw.get("task_modules_router_enabled", True),
+                "task_modules_router_enabled",
+            ),
             reference_docs=self._parse_reference_docs(
                 raw.get("reference_docs", [])
             ),

@@ -179,7 +179,7 @@ class InstructionGenerator:
 
     def _render_task_module_router(self) -> str:
         modules = self.config.task_modules
-        if not modules:
+        if not modules or not self.config.task_modules_router_enabled:
             return ""
 
         lines = [f"## {self.config.task_modules_heading}"]

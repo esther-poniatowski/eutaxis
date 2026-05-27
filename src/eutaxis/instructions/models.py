@@ -77,6 +77,7 @@ class InstructionConfig:
     task_modules: list[TaskModule] = field(default_factory=list)
     task_modules_heading: str = "Task modules"
     task_modules_intro: str = ""
+    task_modules_router_enabled: bool = True
     reference_docs: list[ReferenceDoc] = field(default_factory=list)
     reference_docs_heading: str = "Reference docs"
     reference_docs_intro: str = ""
