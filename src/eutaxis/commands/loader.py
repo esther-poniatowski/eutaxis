@@ -64,6 +64,32 @@ def load_sources(
     return sorted(by_name.values(), key=lambda src: src.name)
 
 
+def load_from_instruction_config(config_path: Path) -> list[CommandSource]:
+    """Load Skill sources from an instruction-assembly configuration.
+
+    Each ``task_modules`` entry names a Markdown file whose frontmatter
+    must satisfy the Skill source schema (``name``, ``description``,
+    ``regime``, ``failure-mode``, and ``required-visibility`` when
+    silent). Missing files or frontmatter raise ``CommandRenderError``
+    with the offending path.
+
+    The discovery layer is recorded as ``"config"`` on each returned
+    source.
+    """
+    from ..instructions.config import load_config
+
+    config = load_config(config_path)
+    sources: list[CommandSource] = []
+    for module in config.task_modules:
+        path = config.resolve(module.path)
+        if not path.is_file():
+            raise CommandRenderError(
+                f"task_module {module.id!r} references missing file: {path}"
+            )
+        sources.append(_load_one(path, layer="config"))
+    return sorted(sources, key=lambda src: src.name)
+
+
 def _load_one(path: Path, *, layer: str) -> CommandSource:
     raw = path.read_text(encoding="utf-8")
     match = _FRONTMATTER.match(raw)

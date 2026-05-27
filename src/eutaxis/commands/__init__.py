@@ -40,7 +40,7 @@ from .exceptions import (
     TemplateError,
 )
 from .installer import diff_command, install_command, uninstall_command
-from .loader import load_sources
+from .loader import load_from_instruction_config, load_sources
 from .models import ArtifactFile, CommandSource, InstallRecord, RenderedArtifact
 from .registry import Registry, RegistryCorruptedError
 from .rendering import check_failure_mode, render_command
@@ -64,6 +64,7 @@ __all__ = [
     "diff_command",
     "get_adapter",
     "install_command",
+    "load_from_instruction_config",
     "load_sources",
     "register_adapter",
     "render_command",

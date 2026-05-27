@@ -14,10 +14,12 @@ init : Scaffold prompt composition into a project (planned).
 import typer
 from . import info as pkg_info, __version__
 from .commands._cli import commands_app
+from .commands._skills_cli import skills_app
 from .ops._cli import ops_app
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 app.add_typer(commands_app, name="commands")
+app.add_typer(skills_app, name="skills")
 app.add_typer(ops_app, name="ops")
 
 
