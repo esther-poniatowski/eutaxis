@@ -63,7 +63,7 @@ Additional agents are added by registering one adapter in `src/eutaxis/commands/
 
 ## Quick Start
 
-A minimal project configuration:
+A project's instruction layout is declared in `agent-instructions.yaml` at the project root. The configuration below lists two shared Markdown sources and one cumulative-file target:
 
 ```yaml
 # agent-instructions.yaml
@@ -77,7 +77,7 @@ agents:
       path: AGENTS.md
 ```
 
-Render the cumulative file:
+Running the `generate` command against this configuration writes the cumulative instruction file at the declared target path:
 
 ```sh
 eutaxis generate -c agent-instructions.yaml

@@ -85,7 +85,7 @@ Two deployment patterns differ only in the configuration's `root` field and the 
 - **Project-local.** The configuration sits at the project root; `root` is absent (defaults to the configuration's parent directory); target paths are project-relative.
 - **Global.** The configuration sits outside any single project (typically a personal configuration repository); `root` points at that repository; target paths are absolute paths to each agent's global instruction file (see the [Supported agents](../../README.md#supported-agents) table for the per-agent paths).
 
-A global configuration with two agent outputs:
+The configuration below illustrates the global pattern with two agent outputs:
 
 ```yaml
 root: ~/agent-config

@@ -68,7 +68,7 @@ agents:        [ ... ]     # one entry per cumulative-file target
 - **`task_modules`** lists Markdown source modules eligible for compilation as Skill artifacts. Each entry names the source file and declares enough metadata for the Skill compiler to resolve it.
 - **`agents`** lists the cumulative-file targets. Each agent entry declares its output path, optional header and footer, and optional per-agent extra sources.
 
-A minimal configuration that exercises both surfaces:
+The configuration below exercises both compilation surfaces — `common_sources` feeds the cumulative file, `task_modules` feeds the Skill compiler:
 
 ```yaml
 common_sources:
@@ -104,7 +104,7 @@ Every Markdown file listed under `task_modules` must declare four frontmatter fi
 | `failure-mode` | yes | `silent`, `visible` | Silent-failure classification per the [failure-mode-as-source-field](../adr/failure-mode-as-source-field.md) ADR. |
 | `required-visibility` | required when `failure-mode: silent`; forbidden otherwise | `pre-invocation`, `pre-action` | Distinguishes rules that must be visible before the model decides which procedure applies from rules that must be visible before the first irreversible action. |
 
-Example frontmatter for a Skill-eligible source module:
+The frontmatter block below declares every required field for a Skill-eligible source module:
 
 ```markdown
 ---
