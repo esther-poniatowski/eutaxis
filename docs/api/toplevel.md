@@ -71,6 +71,19 @@ List configured instruction outputs and their source counts.
 * **Return type:**
   None
 
+<a id="eutaxis.cli.cli_scan"></a>
+
+### eutaxis.cli.cli_scan(config=<typer.models.OptionInfo object>, root=<typer.models.OptionInfo object>, register=<typer.models.OptionInfo object>)
+
+Report instruction files that drift from the configured registry.
+
+* **Parameters:**
+  * **config** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
+  * **root** ([*str*](https://docs.python.org/3/library/stdtypes.html#str) *|* *None*)
+  * **register** ([*bool*](https://docs.python.org/3/library/functions.html#bool))
+* **Return type:**
+  None
+
 <a id="eutaxis.cli.cli_validate"></a>
 
 ### eutaxis.cli.cli_validate(paths=<typer.models.ArgumentInfo object>)

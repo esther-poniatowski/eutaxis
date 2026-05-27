@@ -1,6 +1,6 @@
 <a id="api-reference"></a>
 
-# API reference
+# API Reference
 
 * [Instructions](instructions.md)
   * [Configuration](instructions.md#module-eutaxis.instructions.config)

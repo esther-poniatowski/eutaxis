@@ -34,7 +34,7 @@ class TargetConfig:
 
 @dataclass(frozen=True)
 class TaskModule:
-    """A task-specific instruction module referenced by the router section."""
+    """A task-specific instruction module compiled to an Agent Skill artifact."""
 
     id: str
     title: str

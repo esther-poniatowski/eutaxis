@@ -67,7 +67,7 @@ Override the directory walked with `--root <dir>`. The default is the union of p
 
 ## Compile instruction files to Skill artifacts
 
-Use `skills` to compile config-registered instruction files into native Agent Skill artifacts under `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/`. The Skills surface replaces the heuristic router pattern in cumulative instruction files: each rule set ships as a Skill the agent loads when its description matches the task.
+Use `skills` to compile config-registered instruction files into native Agent Skill artifacts under `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/`. Each rule set ships as a Skill the agent loads when its description matches the task; the cumulative instruction file (`AGENTS.md` / `CLAUDE.md`) carries only always-on globals.
 
 The eligibility requirement is the source-schema frontmatter. Each Markdown file listed under `task_modules` carries:
 
@@ -82,7 +82,7 @@ List the configured Skill sources:
 eutaxis skills list -c agent-instructions.yaml
 ```
 
-Each line shows the regime and failure-mode tags so an author can spot mis-classified sources at a glance.
+Each line shows the invocation routes and the failure-mode tag so an author can spot mis-classified sources at a glance.
 
 Preview a single artifact without writing to disk:
 

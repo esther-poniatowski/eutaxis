@@ -58,6 +58,26 @@ built-in, user, project.
 * **Return type:**
   [list](https://docs.python.org/3/library/stdtypes.html#list)[[*CommandSource*](#eutaxis.commands.models.CommandSource)]
 
+<a id="eutaxis.commands.loader.load_from_instruction_config"></a>
+
+### eutaxis.commands.loader.load_from_instruction_config(config_path)
+
+Load Skill sources from an instruction-assembly configuration.
+
+Each `task_modules` entry names a Markdown file whose frontmatter
+must satisfy the Skill source schema (`name`, `description`,
+`regime`, `failure-mode`, and `required-visibility` when
+silent). Missing files or frontmatter raise `CommandRenderError`
+with the offending path.
+
+The discovery layer is recorded as `"config"` on each returned
+source.
+
+* **Parameters:**
+  **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [list](https://docs.python.org/3/library/stdtypes.html#list)[[*CommandSource*](#eutaxis.commands.models.CommandSource)]
+
 <a id="module-eutaxis.commands.registry"></a>
 
 <a id="registry"></a>
@@ -193,6 +213,30 @@ The hash is computed over the rendered body plus the
 non-ownership frontmatter dict (canonicalised) plus the sibling files
 (sorted by relative path). The marker is injected last, so the hash is
 stable regardless of the marker bytes themselves.
+
+<a id="eutaxis.commands.rendering.check_failure_mode"></a>
+
+### eutaxis.commands.rendering.check_failure_mode(source)
+
+Refuse a source whose failure-mode forbids its invocation routes.
+
+The compiler gate from the `failure-mode-as-source-field` ADR:
+
+- `failure-mode: silent` cannot ship as a skill that admits model
+  invocation (`"model"` in `invocation`). Model-judgment
+  activation gives no visibility guarantee before the first
+  irreversible action.
+- `failure-mode: silent` with `required-visibility: pre-invocation`
+  cannot ship as any skill: the rule must be visible *before*
+  deciding which procedure applies, so it routes only to the
+  always-on body.
+
+* **Raises:**
+  [**FailureModeError**](#eutaxis.commands.exceptions.FailureModeError) – On a forbidden combination, with the source path in the message.
+* **Parameters:**
+  **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
+* **Return type:**
+  None
 
 <a id="eutaxis.commands.rendering.render_command"></a>
 
@@ -443,7 +487,7 @@ as the body.
 
 <a id="eutaxis.commands.models.CommandSource"></a>
 
-### *class* eutaxis.commands.models.CommandSource(name, description, regime, scope_default, targets, action, body, argument_hint='', adapters=<factory>, overrides=<factory>, source_path=PosixPath('.'), layer='builtin')
+### *class* eutaxis.commands.models.CommandSource(name, description, invocation, failure_mode, scope_default, targets, action, body, required_visibility=None, argument_hint='', adapters=<factory>, overrides=<factory>, source_path=PosixPath('.'), layer='builtin')
 
 Bases: [`object`](https://docs.python.org/3/library/functions.html#object)
 
@@ -452,11 +496,13 @@ Parsed Markdown command source.
 * **Parameters:**
   * **name** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **description** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
-  * **regime** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
+  * **invocation** ([*tuple*](https://docs.python.org/3/library/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/library/stdtypes.html#str) *,*  *...* *]*)
+  * **failure_mode** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **scope_default** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **targets** ([*TargetsSpec*](#eutaxis.commands.models.TargetsSpec))
   * **action** ([*ActionSpec*](#eutaxis.commands.models.ActionSpec) *|* *None*)
   * **body** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
+  * **required_visibility** ([*str*](https://docs.python.org/3/library/stdtypes.html#str) *|* *None*)
   * **argument_hint** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **adapters** ([*dict*](https://docs.python.org/3/library/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/library/stdtypes.html#str) *,* [*AdapterPassthrough*](#eutaxis.commands.models.AdapterPassthrough) *]*)
   * **overrides** ([*dict*](https://docs.python.org/3/library/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/library/stdtypes.html#str) *,* [*dict*](https://docs.python.org/3/library/stdtypes.html#dict) *]*)
@@ -476,13 +522,33 @@ Slug used for the artifact directory and the invocation symbol.
 One-line summary surfaced by `commands list` and the agent’s
 skill picker.
 
-<a id="eutaxis.commands.models.CommandSource.regime"></a>
+<a id="eutaxis.commands.models.CommandSource.invocation"></a>
 
-#### regime *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+#### invocation *: [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[str](https://docs.python.org/3/library/stdtypes.html#str), ...]*
 
-Activation regime; only `"user-invoked"` is supported in v1.
-Maps to `disable-model-invocation: true` on Claude and to
-`policy.allow_implicit_invocation: false` on Codex.
+`"user"` (user
+invokes explicitly via `/<name>` on Claude or `$<name>` on
+Codex) and `"model"` (the model picks the skill from its
+description). At least one route is required. When `"model"` is
+absent, Claude emits `disable-model-invocation: true` and Codex
+emits `policy.allow_implicit_invocation: false`; when `"model"`
+is present, both flags are omitted (the platform defaults permit
+both routes).
+
+* **Type:**
+  Permitted invocation routes. Allowed members
+
+<a id="eutaxis.commands.models.CommandSource.failure_mode"></a>
+
+#### failure_mode *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
+
+Silent-failure classification. `"silent"` if violation produces
+irreversible state mutation; `"visible"` if the defect is
+reviewable. See [failure-mode-as-source-field] ADR for the author
+checklist. The compiler refuses to emit a skill that admits model
+invocation (`"model"` in `invocation`) from a `silent` source,
+and a skill from a `silent` source whose `required_visibility`
+is `pre-invocation`.
 
 <a id="eutaxis.commands.models.CommandSource.scope_default"></a>
 
@@ -510,6 +576,16 @@ Optional shell-backed action.
 #### body *: [str](https://docs.python.org/3/library/stdtypes.html#str)*
 
 Markdown body, with `{{ var }}` placeholders still present.
+
+<a id="eutaxis.commands.models.CommandSource.required_visibility"></a>
+
+#### required_visibility *: [str](https://docs.python.org/3/library/stdtypes.html#str) | [None](https://docs.python.org/3/library/constants.html#None)* *= None*
+
+Required for `silent` sources only. `"pre-invocation"` if the
+rule must be visible before deciding which procedure applies;
+`"pre-action"` if explicit invocation can load the rule before the
+first irreversible action. Must be `None` for `visible`
+sources.
 
 <a id="eutaxis.commands.models.CommandSource.argument_hint"></a>
 
@@ -540,7 +616,9 @@ Path to the source Markdown file on disk.
 
 #### layer *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= 'builtin'*
 
-`"builtin"`, `"user"`, or `"project"`.
+`"builtin"`, `"user"`, `"project"`, or
+`"config"` (for sources loaded from an instruction-assembly
+configuration rather than a layered directory).
 
 * **Type:**
   Discovery layer
@@ -702,6 +780,25 @@ Raised when an install/uninstall target is not eutaxis-owned.
 
 #### exit_code *= 2*
 
+<a id="eutaxis.commands.exceptions.FailureModeError"></a>
+
+### *exception* eutaxis.commands.exceptions.FailureModeError
+
+Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError)
+
+Raised when a source’s failure-mode classification forbids the target regime.
+
+A `failure-mode: silent` source cannot ship as a `model-invoked` skill;
+the model-judgment activation gate gives no visibility guarantee before the
+first irreversible action. A `silent` source with
+`required-visibility: pre-invocation` cannot ship as a `user-invoked`
+skill either; it routes only to the always-on body. See the
+`failure-mode-as-source-field` ADR.
+
+<a id="eutaxis.commands.exceptions.FailureModeError.exit_code"></a>
+
+#### exit_code *= 3*
+
 <a id="agent-adapters"></a>
 
 ## Agent Adapters
@@ -717,11 +814,17 @@ Per-agent renderers that translate a `CommandSource` into the file layout and fr
 Claude Code adapter: compile a command source into a Claude skill.
 
 Targets `~/.claude/skills/<name>/SKILL.md` (user scope) and
-`<project>/.claude/skills/<name>/SKILL.md` (project scope). The
-`regime: user-invoked` declared in the source maps to
-`disable-model-invocation: true` in the rendered frontmatter
-(documented use case for *task* skills with side effects whose timing
-must be controlled — claude/skills.md).
+`<project>/.claude/skills/<name>/SKILL.md` (project scope).
+
+Invocation translation:
+
+- `"model" not in invocation` -> `disable-model-invocation: true`
+  in the rendered frontmatter (documented use case for *task* skills
+  with side effects whose timing must be controlled —
+  `claude/skills.md`). User invocation via `/<name>` still works.
+- `"model" in invocation` -> `disable-model-invocation` is omitted;
+  Claude is free to pick the skill from its description, and user
+  invocation via `/<name>` continues to work as well.
 
 Claude has no analogue to Codex’s sibling `agents/openai.yaml`: all
 metadata (including `allowed-tools`, `argument-hint`) is folded
@@ -799,8 +902,15 @@ mirrors the source `name` slug as the artifact directory name.
 
 Codex-specific metadata — invocation policy, UI metadata, declared tool
 dependencies — lives in the sibling `agents/openai.yaml` file
-(codex/skills.md). The `regime: user-invoked` declared in the source
-maps to `policy.allow_implicit_invocation: false` in that sibling.
+(codex/skills.md). Invocation translation:
+
+- `"model" not in invocation` -> `policy.allow_implicit_invocation:
+  false` in the derived `agents/openai.yaml`. Explicit user
+  invocation via `$<name>` still works.
+- `"model" in invocation` -> the `policy` block is not derived;
+  Codex is free to pick the skill implicitly. Passthrough keys are still
+  honoured if the author supplies them.
+
 The `dependencies.tools` block declared via passthrough is *metadata
 only, not a permission grant*; sandbox / approval policy still lives in
 `~/.codex/config.toml` and is out of scope for the artifact.

@@ -134,6 +134,15 @@ Yield (agent, byte_size, byte_budget) for each selected agent.
 * **Return type:**
   [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[[tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig), [int](https://docs.python.org/3/library/functions.html#int), [int](https://docs.python.org/3/library/functions.html#int) | None]]
 
+<a id="eutaxis.instructions.generator.InstructionGenerator.render_standalone_rule_index"></a>
+
+#### render_standalone_rule_index()
+
+Return (path, content) for the standalone rule-index file, if any.
+
+* **Return type:**
+  [tuple](https://docs.python.org/3/library/stdtypes.html#tuple)[[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/library/stdtypes.html#str)] | None
+
 <a id="module-eutaxis.instructions.markdown"></a>
 
 <a id="markdown-assembly"></a>
@@ -141,6 +150,20 @@ Yield (agent, byte_size, byte_budget) for each selected agent.
 ## Markdown Assembly
 
 Markdown transformations used by instruction-file assembly.
+
+<a id="eutaxis.instructions.markdown.parse_frontmatter"></a>
+
+### eutaxis.instructions.markdown.parse_frontmatter(content)
+
+Parse a Markdown file’s YAML frontmatter block.
+
+Returns an empty dict when the file has no frontmatter or when the
+frontmatter is empty. Raises `yaml.YAMLError` if the block is malformed.
+
+* **Parameters:**
+  **content** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
+* **Return type:**
+  [dict](https://docs.python.org/3/library/stdtypes.html#dict)[[str](https://docs.python.org/3/library/stdtypes.html#str), [*Any*](https://docs.python.org/3/library/typing.html#typing.Any)]
 
 <a id="eutaxis.instructions.markdown.MarkdownAssembler"></a>
 
@@ -294,18 +317,18 @@ Output file target and surrounding literal content.
 
 <a id="eutaxis.instructions.models.TaskModule"></a>
 
-### *class* eutaxis.instructions.models.TaskModule(id, title, path, trigger, description='')
+### *class* eutaxis.instructions.models.TaskModule(id, title, path, trigger, description=None)
 
 Bases: [`object`](https://docs.python.org/3/library/functions.html#object)
 
-A task-specific instruction module referenced by the router section.
+A task-specific instruction module compiled to an Agent Skill artifact.
 
 * **Parameters:**
   * **id** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **title** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **trigger** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
-  * **description** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
+  * **description** ([*str*](https://docs.python.org/3/library/stdtypes.html#str) *|* *None*)
 
 <a id="eutaxis.instructions.models.TaskModule.id"></a>
 
@@ -325,7 +348,7 @@ A task-specific instruction module referenced by the router section.
 
 <a id="eutaxis.instructions.models.TaskModule.description"></a>
 
-#### description *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= ''*
+#### description *: [str](https://docs.python.org/3/library/stdtypes.html#str) | [None](https://docs.python.org/3/library/constants.html#None)* *= None*
 
 <a id="eutaxis.instructions.models.ReferenceDoc"></a>
 
@@ -404,7 +427,7 @@ One generated instruction output.
 
 <a id="eutaxis.instructions.models.InstructionConfig"></a>
 
-### *class* eutaxis.instructions.models.InstructionConfig(root, config_path, agents=<factory>, common_sources=<factory>, task_modules=<factory>, task_modules_heading='Task modules', task_modules_intro='', reference_docs=<factory>, reference_docs_heading='Reference docs', reference_docs_intro='', rule_index_enabled=False, rule_index_heading='Rule index', rule_index_intro='', default_max_bytes=None)
+### *class* eutaxis.instructions.models.InstructionConfig(root, config_path, agents=<factory>, common_sources=<factory>, task_modules=<factory>, task_modules_heading='Task modules', task_modules_intro='', task_modules_router_enabled=True, reference_docs=<factory>, reference_docs_heading='Reference docs', reference_docs_intro='', rule_index_enabled=False, rule_index_heading='Rule index', rule_index_intro='', rule_index_pointer='', rule_index_target=None, default_max_bytes=None)
 
 Bases: [`object`](https://docs.python.org/3/library/functions.html#object)
 
@@ -418,12 +441,15 @@ Complete instruction assembly configuration.
   * **task_modules** ([*list*](https://docs.python.org/3/library/stdtypes.html#list) *[*[*TaskModule*](#eutaxis.instructions.models.TaskModule) *]*)
   * **task_modules_heading** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **task_modules_intro** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
+  * **task_modules_router_enabled** ([*bool*](https://docs.python.org/3/library/functions.html#bool))
   * **reference_docs** ([*list*](https://docs.python.org/3/library/stdtypes.html#list) *[*[*ReferenceDoc*](#eutaxis.instructions.models.ReferenceDoc) *]*)
   * **reference_docs_heading** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **reference_docs_intro** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **rule_index_enabled** ([*bool*](https://docs.python.org/3/library/functions.html#bool))
   * **rule_index_heading** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
   * **rule_index_intro** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
+  * **rule_index_pointer** ([*str*](https://docs.python.org/3/library/stdtypes.html#str))
+  * **rule_index_target** ([*TargetConfig*](#eutaxis.instructions.models.TargetConfig) *|* *None*)
   * **default_max_bytes** ([*int*](https://docs.python.org/3/library/functions.html#int) *|* *None*)
 
 <a id="eutaxis.instructions.models.InstructionConfig.root"></a>
@@ -454,6 +480,10 @@ Complete instruction assembly configuration.
 
 #### task_modules_intro *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= ''*
 
+<a id="eutaxis.instructions.models.InstructionConfig.task_modules_router_enabled"></a>
+
+#### task_modules_router_enabled *: [bool](https://docs.python.org/3/library/functions.html#bool)* *= True*
+
 <a id="eutaxis.instructions.models.InstructionConfig.reference_docs"></a>
 
 #### reference_docs *: [list](https://docs.python.org/3/library/stdtypes.html#list)[[ReferenceDoc](#eutaxis.instructions.models.ReferenceDoc)]*
@@ -477,6 +507,14 @@ Complete instruction assembly configuration.
 <a id="eutaxis.instructions.models.InstructionConfig.rule_index_intro"></a>
 
 #### rule_index_intro *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= ''*
+
+<a id="eutaxis.instructions.models.InstructionConfig.rule_index_pointer"></a>
+
+#### rule_index_pointer *: [str](https://docs.python.org/3/library/stdtypes.html#str)* *= ''*
+
+<a id="eutaxis.instructions.models.InstructionConfig.rule_index_target"></a>
+
+#### rule_index_target *: [TargetConfig](#eutaxis.instructions.models.TargetConfig) | [None](https://docs.python.org/3/library/constants.html#None)* *= None*
 
 <a id="eutaxis.instructions.models.InstructionConfig.default_max_bytes"></a>
 

@@ -80,7 +80,7 @@ One-line entry points for the everyday operations:
 | `eutaxis skills install all -c <config>` | Compile every config-registered instruction file to a Skill artifact on both agents. |
 | `eutaxis ops clean-memory` | Run the clean-memory operation. |
 
-A regenerate-instructions skill (an `eutaxis commands install` analogue that wraps `eutaxis generate`) is deferred to the router → Skills migration tracked under Tier 3 of the consumer-side TODO. The current `commands` subsystem ships skill prompts authored as Markdown (`src/eutaxis/data/commands/*.md`); wrapping a CLI invocation requires a skill-shape that the broader migration will introduce.
+A regenerate-instructions skill that wraps `eutaxis generate` as a slash command is not yet shipped. The shape of such a skill — a one-shot CLI invocation rather than a Markdown body — does not match the current `commands` subsystem, whose skill sources are authored as Markdown (`src/eutaxis/data/commands/*.md`). Use `eutaxis generate -c <config>` directly until that surface lands.
 
 ---
 
