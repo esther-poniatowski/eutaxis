@@ -44,6 +44,7 @@ agent-skills-as-target-surface
 multi-file-artifact-model
 adapter-passthrough-source-schema
 dual-ownership-marker
+instruction-file-ownership-boundaries
 regime-and-permission-mapping
 registry-atomicity-and-locking
 ```
