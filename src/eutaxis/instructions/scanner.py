@@ -8,7 +8,7 @@ from pathlib import Path
 import yaml
 
 from .markdown import parse_frontmatter
-from .models import InstructionConfig
+from .models import InstructionConfig, SourceFile
 
 
 @dataclass
@@ -38,6 +38,28 @@ def collect_registered_paths(config: InstructionConfig) -> list[Path]:
     for module in config.task_modules:
         paths.append(config.resolve(module.path))
     return paths
+
+
+def declared_sources(
+    config: InstructionConfig,
+) -> list[tuple[Path, SourceFile | None]]:
+    """Return every module that the config declares, with its source entry.
+
+    The modules come in configuration order: ``common_sources``, then
+    ``task_modules``, then the ``sources`` of each agent. A ``task_modules``
+    entry carries no section selection, so its entry is ``None``. A path
+    declared several times appears once per declaration.
+    """
+    declared: list[tuple[Path, SourceFile | None]] = [
+        (config.resolve(source.path), source) for source in config.common_sources
+    ]
+    declared.extend((config.resolve(module.path), None) for module in config.task_modules)
+    declared.extend(
+        (config.resolve(source.path), source)
+        for agent in config.agents
+        for source in agent.sources
+    )
+    return declared
 
 
 def scan_instructions(

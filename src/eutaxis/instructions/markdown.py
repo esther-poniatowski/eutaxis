@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Sequence
 
 import yaml
 
@@ -109,47 +109,115 @@ class MarkdownAssembler:
     def include_sections(self, content: str, headings: tuple[str, ...]) -> str:
         """Include named sections and their nested subsections."""
         lines = content.splitlines()
+        blocks = (
+            "\n".join(lines[index] for index in block).strip()
+            for block in self._included_blocks(lines, range(len(lines)), headings)
+        )
+        return "\n\n".join(block for block in blocks if block)
+
+    def exclude_sections(self, content: str, headings: tuple[str, ...]) -> str:
+        """Remove named sections and their nested subsections."""
+        lines = content.splitlines()
+        kept = self._kept_indices(lines, range(len(lines)), headings)
+        return "\n".join(lines[index] for index in kept).strip()
+
+    def selected_line_numbers(
+        self, content: str, source: SourceFile
+    ) -> frozenset[int] | None:
+        """Return the lines of ``content`` that the section selection keeps.
+
+        The selection follows :meth:`process`: frontmatter stripping, then
+        ``sections``, then ``exclude_sections``. Heading offsets and blank-line
+        trimming change no membership, so they are ignored.
+
+        Parameters
+        ----------
+        content : str
+            Full text of the source file, as read from disk.
+        source : SourceFile
+            Source entry whose selection applies.
+
+        Returns
+        -------
+        frozenset[int] or None
+            Line numbers of ``content``, counted from 1, that the selection
+            keeps; ``None`` when the entry selects no section, so that every
+            line is kept.
+
+        Examples
+        --------
+        >>> from pathlib import Path
+        >>> text = "# A\\nkept\\n# B\\ndropped\\n"
+        >>> source = SourceFile(path=Path("m.md"), sections=("A",))
+        >>> sorted(MarkdownAssembler().selected_line_numbers(text, source))
+        [1, 2]
+        """
+        if not source.sections and not source.exclude_sections:
+            return None
+        lines = content.splitlines()
+        start = 0
+        if source.strip_frontmatter and content.startswith("---"):
+            match = re.match(r"^---\s*\n.*?\n---\s*\n?", content, flags=re.DOTALL)
+            if match is not None:
+                start = content[: match.end()].count("\n")
+        selected: list[int] = list(range(start, len(lines)))
+        if source.sections:
+            blocks = self._included_blocks(lines, selected, source.sections)
+            selected = [index for block in blocks for index in block]
+        if source.exclude_sections:
+            selected = self._kept_indices(lines, selected, source.exclude_sections)
+        return frozenset(index + 1 for index in selected)
+
+    def _included_blocks(
+        self, lines: list[str], indices: Sequence[int], headings: tuple[str, ...]
+    ) -> list[list[int]]:
+        """Return the indices of each block that ``include_sections`` keeps.
+
+        A block opens on a heading named in ``headings`` and closes before the
+        next heading at the same or a higher level, unless that heading is
+        itself named, in which case it opens the next block.
+        """
         heading_set = set(headings)
-        blocks: list[str] = []
-        current: list[str] = []
+        blocks: list[list[int]] = []
+        current: list[int] = []
         current_level = 0
 
-        for line in lines:
-            match = self.heading_pattern.match(line)
+        for index in indices:
+            match = self.heading_pattern.match(lines[index])
             if match is not None:
                 level = len(match.group(1))
                 heading = match.group(2).strip()
 
                 if heading in heading_set:
                     if current:
-                        blocks.append("\n".join(current).strip())
-                    current = [line]
+                        blocks.append(current)
+                    current = [index]
                     current_level = level
                 elif current and level <= current_level:
-                    blocks.append("\n".join(current).strip())
+                    blocks.append(current)
                     current = []
                     current_level = 0
                 elif current:
-                    current.append(line)
+                    current.append(index)
                 continue
 
             if current:
-                current.append(line)
+                current.append(index)
 
         if current:
-            blocks.append("\n".join(current).strip())
+            blocks.append(current)
+        return blocks
 
-        return "\n\n".join(block for block in blocks if block)
-
-    def exclude_sections(self, content: str, headings: tuple[str, ...]) -> str:
-        """Remove named sections and their nested subsections."""
-        lines = content.splitlines()
+    def _kept_indices(
+        self, lines: list[str], indices: Sequence[int], headings: tuple[str, ...]
+    ) -> list[int]:
+        """Return the indices that ``exclude_sections`` keeps."""
         heading_set = set(headings)
-        kept: list[str] = []
+        kept: list[int] = []
         excluded_level: int | None = None
 
-        for line in lines:
-            match = self.heading_pattern.match(line)
+        for index in indices:
+            match = self.heading_pattern.match(lines[index])
             if match is not None:
                 level = len(match.group(1))
                 heading = match.group(2).strip()
@@ -162,9 +230,9 @@ class MarkdownAssembler:
                     continue
 
             if excluded_level is None:
-                kept.append(line)
+                kept.append(index)
 
-        return "\n".join(kept).strip()
+        return kept
 
     def apply_heading_offset(self, content: str, offset: int) -> str:
         """Increase all Markdown heading levels by ``offset``."""

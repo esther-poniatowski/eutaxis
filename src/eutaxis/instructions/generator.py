@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import difflib
-import re
 from pathlib import Path
 from typing import Iterator
 
 from .exceptions import (
     BudgetExceededError,
     ConfigurationError,
+    RejectedLabelError,
     SourceNotFoundError,
 )
 from .markdown import MarkdownAssembler
@@ -20,6 +20,8 @@ from .models import (
     SourceFile,
     TaskModule,
 )
+from .rules import LABEL_PATTERN, RejectedLabel, parse_module
+from .scanner import declared_sources
 
 
 class InstructionGenerator:
@@ -82,7 +84,17 @@ class InstructionGenerator:
         dry_run: bool = False,
         enforce_budget: bool = True,
     ) -> list[Path]:
-        """Write selected outputs and return their paths."""
+        """Write selected outputs and return their paths.
+
+        Raises
+        ------
+        RejectedLabelError
+            When the configuration sets ``strict_rule_labels`` and a declared
+            module holds a rejected label line. Nothing is written.
+        BudgetExceededError
+            When ``enforce_budget`` is set and an output exceeds its budget.
+        """
+        self.enforce_rule_labels()
         paths: list[Path] = []
 
         for agent in self._selected_agents(agent_name):
@@ -109,6 +121,40 @@ class InstructionGenerator:
                     index_path.write_text(index_content, encoding="utf-8")
 
         return paths
+
+    def rejected_labels(self) -> list[tuple[Path, RejectedLabel]]:
+        """Return the label-shaped lines that the label grammar rejects.
+
+        Every module declared by the configuration is parsed whole, as the
+        rule index scans it: ``common_sources``, ``task_modules`` and the
+        ``sources`` of each agent. A rejected line defines no label, so the
+        rule index, the rule query and progressive disclosure all omit it. A
+        declared module missing on disk is skipped here; generation reports
+        it.
+        """
+        found: list[tuple[Path, RejectedLabel]] = []
+        for path in dict.fromkeys(path for path, _ in declared_sources(self.config)):
+            if not path.is_file():
+                continue
+            parsed = parse_module(path.read_text(encoding="utf-8"), module=path.stem)
+            found.extend((path, rejection) for rejection in parsed.rejected)
+        return found
+
+    def enforce_rule_labels(self) -> None:
+        """Raise when ``strict_rule_labels`` is set and a label line is rejected.
+
+        Raises
+        ------
+        RejectedLabelError
+            Listing the location of every rejected line.
+        """
+        if not self.config.strict_rule_labels:
+            return
+        rejected = self.rejected_labels()
+        if rejected:
+            raise RejectedLabelError(
+                [f"{path}:{item.line_number}" for path, item in rejected]
+            )
 
     def diff_report(
         self,
@@ -216,7 +262,7 @@ class InstructionGenerator:
             lines.append(self._render_reference_doc_bullet(doc))
         return "\n".join(lines)
 
-    _label_pattern = re.compile(r"^\*\*([a-z][a-z0-9-]*)\*\*:\s*$", re.MULTILINE)
+    _label_pattern = LABEL_PATTERN
 
     def _render_rule_index(self, agent: AgentConfig) -> str:
         """Render the rule-index section for inclusion inside an agent output."""

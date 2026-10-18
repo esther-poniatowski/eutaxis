@@ -78,6 +78,9 @@ class ConfigLoader:
             default_max_bytes=self._as_optional_positive_int(
                 raw.get("max_bytes"), "max_bytes"
             ),
+            strict_rule_labels=self._as_bool(
+                raw.get("strict_rule_labels", False), "strict_rule_labels"
+            ),
         )
 
         self._resolve_descriptions(config)

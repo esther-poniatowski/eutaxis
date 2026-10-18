@@ -87,6 +87,7 @@ class InstructionConfig:
     rule_index_pointer: str = ""
     rule_index_target: TargetConfig | None = None
     default_max_bytes: int | None = None
+    strict_rule_labels: bool = False
 
     def budget_for(self, agent: AgentConfig) -> int | None:
         """Return the byte budget that applies to one agent, if any."""

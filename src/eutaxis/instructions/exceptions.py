@@ -23,6 +23,18 @@ class SourceNotFoundError(InstructionError):
         self.path = path
 
 
+class RejectedLabelError(InstructionError):
+    """Raised under ``strict_rule_labels`` when a module holds a rejected label line."""
+
+    def __init__(self, locations: list[str]) -> None:
+        super().__init__(
+            f"{len(locations)} label line(s) violate the label grammar, and "
+            f"strict_rule_labels is set: {', '.join(locations)}. Rename each "
+            f"label, or unset strict_rule_labels to report them as warnings."
+        )
+        self.locations = locations
+
+
 class BudgetExceededError(InstructionError):
     """Raised when a rendered output exceeds its configured byte budget."""
 
