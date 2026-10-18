@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from .. import data_path
+from .disclosure import DISCLOSURE_INLINE, DISCLOSURE_MODES
 from .exceptions import CommandRenderError
+from .links import normalize_path
 from .models import (
     ActionSpec,
     AdapterPassthrough,
     CommandSource,
+    SiblingSkill,
     TargetsSpec,
 )
 
@@ -87,7 +91,16 @@ def load_from_instruction_config(config_path: Path) -> list[CommandSource]:
                 f"task_module {module.id!r} references missing file: {path}"
             )
         sources.append(_load_one(path, layer="config"))
-    return sorted(sources, key=lambda src: src.name)
+    siblings = {
+        normalize_path(source.source_path): SiblingSkill(
+            name=source.name, targets=source.targets
+        )
+        for source in sources
+    }
+    return sorted(
+        (replace(source, sibling_skills=siblings) for source in sources),
+        key=lambda src: src.name,
+    )
 
 
 def _load_one(path: Path, *, layer: str) -> CommandSource:
@@ -111,7 +124,8 @@ def _load_one(path: Path, *, layer: str) -> CommandSource:
         )
 
     body = raw[match.end():].lstrip("\n")
-    return _build_source(meta, body=body, path=path, layer=layer)
+    source = _build_source(meta, body=body, path=path, layer=layer)
+    return replace(source, body_start_line=raw[: len(raw) - len(body)].count("\n") + 1)
 
 
 def _build_source(
@@ -146,6 +160,12 @@ def _build_source(
     overrides = _parse_overrides(meta.get("overrides"), path=path)
     adapters = _parse_adapters(meta.get("adapters"), path=path)
     argument_hint = str(meta.get("argument-hint", "") or "")
+    disclosure = str(meta.get("disclosure", DISCLOSURE_INLINE))
+    if disclosure not in DISCLOSURE_MODES:
+        raise CommandRenderError(
+            f"Unsupported disclosure {disclosure!r} in {path}; "
+            f"expected one of {sorted(DISCLOSURE_MODES)}"
+        )
 
     return CommandSource(
         name=str(meta["name"]),
@@ -160,6 +180,7 @@ def _build_source(
         argument_hint=argument_hint,
         adapters=adapters,
         overrides=overrides,
+        disclosure=disclosure,
         source_path=path,
         layer=layer,
     )

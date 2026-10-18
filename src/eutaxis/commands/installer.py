@@ -44,6 +44,8 @@ class InstallOutcome:
     scope: str
     path: Path
     action: str  # "created" | "updated" | "unchanged" | "removed" | "skipped"
+    warnings: tuple[str, ...] = ()
+    """Warnings of the render, such as a link whose target does not exist."""
 
 
 def install_command(
@@ -71,13 +73,14 @@ def install_command(
                 f"Refusing to overwrite non-eutaxis directory: {target_dir}. "
                 "Re-run with --force to overwrite, or back up the contents first."
             )
-        if existing.matches(rendered):
+        if existing.matches(rendered, target_dir):
             return InstallOutcome(
                 name=source.name,
                 adapter=adapter.name,
                 scope=scope,
                 path=target_dir,
                 action="unchanged",
+                warnings=rendered.warnings,
             )
         _remove_owned_files(target_dir, existing.owned_paths)
         action = "updated"
@@ -105,6 +108,7 @@ def install_command(
         scope=scope,
         path=target_dir,
         action=action,
+        warnings=rendered.warnings,
     )
 
 
@@ -164,7 +168,9 @@ def diff_command(
 
     The diff is computed over the ``SKILL.md`` entrypoint plus all
     rendered sibling files (sorted by path). Missing files on disk are
-    treated as empty.
+    treated as empty. A file that the ownership sidecar on disk lists but
+    the render no longer produces, such as the file of a deleted rule, is
+    reported as a removal.
     """
     rendered = render_command(
         source, adapter, project_root=project_root, home=home
@@ -193,7 +199,47 @@ def diff_command(
         )
         if chunk:
             diff_chunks.append(chunk)
+    for rel in _stale_owned_paths(target_dir, rendered):
+        stale_path = target_dir / rel
+        diff_chunks.append(
+            "".join(
+                difflib.unified_diff(
+                    stale_path.read_text(encoding="utf-8").splitlines(keepends=True),
+                    [],
+                    fromfile=str(stale_path),
+                    tofile=f"{stale_path} (removed)",
+                )
+            )
+        )
     return rendered, target_dir, "".join(diff_chunks)
+
+
+def is_eutaxis_owned(target_dir: Path) -> bool:
+    """Return whether ``target_dir`` holds a skill artifact written by eutaxis.
+
+    A directory is eutaxis-owned when its ownership sidecar parses, or when
+    its ``SKILL.md`` frontmatter carries the ``x-eutaxis-owned`` marker. A
+    missing or empty directory is not an artifact and yields ``False``.
+    """
+    if not target_dir.is_dir() or not any(target_dir.iterdir()):
+        return False
+    try:
+        return _read_existing(target_dir).eutaxis_owned
+    except OwnershipError:
+        return False
+
+
+def _stale_owned_paths(target_dir: Path, rendered: RenderedArtifact) -> list[str]:
+    """Return owned paths on disk that the rendered artifact no longer holds."""
+    if not (target_dir / SIDECAR_FILENAME).is_file():
+        return []
+    existing = _read_existing(target_dir)
+    rendered_paths = {f.relative_path for f in rendered.files}
+    return sorted(
+        rel
+        for rel in existing.owned_paths
+        if rel not in rendered_paths and (target_dir / rel).is_file()
+    )
 
 
 @dataclass(frozen=True)
@@ -204,8 +250,25 @@ class _ExistingArtifact:
     owned_paths: tuple[str, ...]
     content_hash: str | None
 
-    def matches(self, rendered: RenderedArtifact) -> bool:
-        return self.content_hash == rendered.content_hash
+    def matches(self, rendered: RenderedArtifact, target_dir: Path) -> bool:
+        """Whether the directory already holds exactly the rendered files.
+
+        The recorded hash alone does not detect a file edited or deleted by
+        hand, so every rendered file is also compared with its copy on disk,
+        and the owned file set must equal the rendered file set.
+        """
+        if self.content_hash != rendered.content_hash:
+            return False
+        rendered_paths = {f.relative_path for f in rendered.files}
+        if set(self.owned_paths) != rendered_paths:
+            return False
+        for artifact_file in rendered.files:
+            path = target_dir / artifact_file.relative_path
+            if not path.is_file():
+                return False
+            if path.read_text(encoding="utf-8") != artifact_file.content:
+                return False
+        return True
 
 
 def _read_existing(target_dir: Path) -> _ExistingArtifact:

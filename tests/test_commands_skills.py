@@ -216,3 +216,72 @@ def test_skills_install_writes_artifact(tmp_path: Path) -> None:
     content = installed.read_text(encoding="utf-8")
     assert "name: delta" in content
     assert "disable-model-invocation" not in content
+
+
+def _diff_workspace(tmp_path: Path, body: str, **fm) -> tuple[Path, Path, Path]:
+    """Write one module and its configuration; return config, module and HOME."""
+    module = tmp_path / "instructions" / "rules" / "epsilon.md"
+    _write_module(module, name="epsilon", body=body, **fm)
+    config_path = tmp_path / "agent-instructions.yaml"
+    _write_config(
+        config_path,
+        root=tmp_path,
+        modules=[
+            {
+                "id": "epsilon",
+                "title": "Epsilon",
+                "path": "instructions/rules/epsilon.md",
+                "trigger": "v",
+            }
+        ],
+    )
+    home = tmp_path / "home"
+    home.mkdir()
+    return config_path, module, home
+
+
+def _skills(home: Path, *args: str):
+    return CliRunner().invoke(
+        app, ["skills", *args, "--agent", "claude"], env={"HOME": str(home)}
+    )
+
+
+def test_skills_diff_exits_zero_when_every_artifact_is_current(
+    tmp_path: Path,
+) -> None:
+    config_path, _, home = _diff_workspace(tmp_path, "rule body\n")
+    assert _skills(home, "install", "all", "-c", str(config_path)).exit_code == 0
+
+    result = _skills(home, "diff", "-c", str(config_path))
+
+    assert result.exit_code == 0, result.output
+    assert "[OK      ] epsilon@claude" in result.output
+
+
+@pytest.mark.parametrize("drift", ["outdated", "modified", "missing", "removed"])
+def test_skills_diff_exits_one_on_drift(tmp_path: Path, drift: str) -> None:
+    body = "# Rules\n\n**alpha**:\n\n✓ Do A.\n\n**beta**:\n\n✓ Do B.\n"
+    config_path, module, home = _diff_workspace(
+        tmp_path, body, disclosure="progressive"
+    )
+    skill_dir = home / ".claude" / "skills" / "epsilon"
+    if drift != "missing":
+        assert _skills(home, "install", "all", "-c", str(config_path)).exit_code == 0
+    if drift == "outdated":
+        module.write_text(
+            module.read_text(encoding="utf-8").replace("Do A.", "Do A now."),
+            encoding="utf-8",
+        )
+    elif drift == "modified":
+        (skill_dir / "rules" / "alpha.md").write_text("edited\n", encoding="utf-8")
+    elif drift == "removed":
+        module.write_text(
+            module.read_text(encoding="utf-8").split("**beta**")[0], encoding="utf-8"
+        )
+
+    result = _skills(home, "diff", "-c", str(config_path))
+
+    assert result.exit_code == 1, result.output
+    assert "[OUTDATED] epsilon@claude" in result.output
+    if drift == "removed":
+        assert "rules/beta.md (removed)" in result.output

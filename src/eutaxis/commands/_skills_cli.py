@@ -29,6 +29,7 @@ from . import (
     render_command,
     uninstall_command,
 )
+from .disclosure import DISCLOSURE_INLINE
 from .models import CommandSource
 from .registry import Registry, default_state_dir
 
@@ -56,9 +57,12 @@ def cli_list(
     adapter_names = [adapter.name for adapter in all_adapters()]
     for source in sources:
         targets = ", ".join(_effective_adapter_names(source, adapter_names))
+        disclosure = (
+            "" if source.disclosure == DISCLOSURE_INLINE else f", disclosure: {source.disclosure}"
+        )
         typer.echo(
             f"- {source.name} [invocation: {'/'.join(source.invocation)}, "
-            f"failure-mode: {source.failure_mode}] "
+            f"failure-mode: {source.failure_mode}{disclosure}] "
             f"-> [{targets}]: {source.description}"
         )
 
@@ -85,6 +89,7 @@ def cli_show(
         project_root=_resolve_project(project_root),
         home=Path.home(),
     )
+    _echo_warnings(rendered.warnings, set())
     for artifact_file in rendered.files:
         typer.echo(f"--- {artifact_file.relative_path} ---")
         typer.echo(artifact_file.content)
@@ -120,6 +125,7 @@ def cli_install(
         _load(config) if name == "all" else [_require_source(name, config)]
     )
 
+    reported: set[str] = set()
     for source in sources:
         chosen_scope = scope or source.scope_default
         for adapter in _select_adapters(source, agent, scope=chosen_scope):
@@ -132,6 +138,7 @@ def cli_install(
                 registry=registry,
                 force=force,
             )
+            _echo_warnings(outcome.warnings, reported)
             typer.echo(
                 f"[{outcome.action:9}] {outcome.name}@{outcome.adapter} "
                 f"({outcome.scope}) -> {outcome.path}"
@@ -193,25 +200,48 @@ def cli_diff(
     agent: str = typer.Option("all", "--agent", "-a"),
     project_root: str | None = typer.Option(None, "--project"),
 ) -> None:
-    """Show drift between rendered output and installed artifacts."""
+    """Show drift between rendered output and installed artifacts.
+
+    Exits with code 1 when any artifact differs from its render: a file
+    outdated, edited by hand, missing on disk, or left over from a removed
+    rule. Exits with code 0 when every artifact is current.
+    """
     sources = (
         [_require_source(name, config)] if name is not None else _load(config)
     )
     project = _resolve_project(project_root)
 
+    drift = False
+    reported: set[str] = set()
     for source in sources:
         for adapter in _select_adapters(source, agent, scope=scope):
-            _, target, diff = diff_command(
+            rendered, target, diff = diff_command(
                 source,
                 adapter,
                 scope=scope,
                 project_root=project,
                 home=Path.home(),
             )
+            _echo_warnings(rendered.warnings, reported)
             status = "OK" if not diff else "OUTDATED"
             typer.echo(f"[{status:8}] {source.name}@{adapter.name} -> {target}")
             if diff:
+                drift = True
                 typer.echo(diff)
+    if drift:
+        raise typer.Exit(code=1)
+
+
+def _echo_warnings(warnings: tuple[str, ...], reported: set[str]) -> None:
+    """Print each render warning on standard error, once per command run.
+
+    The render of one source repeats its warnings for every adapter, so
+    ``reported`` collects the warnings already printed.
+    """
+    for warning in warnings:
+        if warning not in reported:
+            reported.add(warning)
+            typer.echo(f"warning: {warning}", err=True)
 
 
 def _select_adapters(source: CommandSource, agent: str, *, scope: str) -> list:
@@ -242,8 +272,9 @@ def _effective_adapter_names(
     base = (
         list(source.targets.include) if source.targets.include else list(registered)
     )
-    excluded = set(source.targets.exclude)
-    return [name for name in base if name in registered and name not in excluded]
+    return [
+        name for name in base if name in registered and source.targets.admits(name)
+    ]
 
 
 def _load(config: str) -> list[CommandSource]:

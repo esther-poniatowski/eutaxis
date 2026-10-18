@@ -36,6 +36,32 @@ class TargetsSpec:
     include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
 
+    def admits(self, adapter_name: str) -> bool:
+        """Return whether the lists let the adapter receive the artifact.
+
+        Examples
+        --------
+        >>> TargetsSpec(exclude=("codex",)).admits("claude")
+        True
+        >>> TargetsSpec(include=("codex",)).admits("claude")
+        False
+        """
+        if self.include and adapter_name not in self.include:
+            return False
+        return adapter_name not in self.exclude
+
+
+@dataclass(frozen=True)
+class SiblingSkill:
+    """Another source compiled from the same configuration, as a link target."""
+
+    name: str
+    """Name of the skill, which is also the name of its directory."""
+
+    targets: TargetsSpec
+    """Adapters that receive the skill; a link to it from an adapter that
+    does not receive it falls back to the absolute source path."""
+
 
 @dataclass(frozen=True)
 class AdapterPassthrough:
@@ -115,8 +141,24 @@ class CommandSource:
     """Per-adapter overrides for first-class fields (only
     ``action.template`` is honored today)."""
 
+    disclosure: str = "inline"
+    """Layout of the compiled skill. ``"inline"`` emits the whole body in
+    ``SKILL.md``; ``"progressive"`` emits an index of the rules in
+    ``SKILL.md`` and one file per rule under ``rules/``. See
+    :mod:`eutaxis.commands.disclosure`."""
+
     source_path: Path = Path()
     """Path to the source Markdown file on disk."""
+
+    body_start_line: int = 1
+    """Line of the source file on which ``body`` starts, used to locate
+    diagnostics in the authored file."""
+
+    sibling_skills: dict[Path, SiblingSkill] = field(default_factory=dict)
+    """Sources compiled from the same configuration, keyed by normalized
+    source path. The renderer rewrites a relative link to one of them into a
+    link to its ``SKILL.md``. Empty for a source discovered from a layered
+    directory."""
 
     layer: str = "builtin"
     """Discovery layer: ``"builtin"``, ``"user"``, ``"project"``, or
@@ -151,6 +193,9 @@ class RenderedArtifact:
     adapter: str
     files: tuple[ArtifactFile, ...]
     content_hash: str
+    warnings: tuple[str, ...] = ()
+    """Defects found while rendering, such as a relative link whose target
+    does not exist. They do not enter the content hash."""
 
 
 @dataclass(frozen=True)

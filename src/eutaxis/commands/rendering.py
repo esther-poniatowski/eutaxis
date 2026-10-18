@@ -1,11 +1,21 @@
-"""Pure rendering: ``CommandSource × AgentAdapter -> RenderedArtifact``.
+"""Rendering: ``CommandSource × AgentAdapter -> RenderedArtifact``.
+
+The renderer writes no file. Its one read of the file system tests whether
+the target of a relative link exists.
 
 The renderer assembles a multi-file Agent Skill artifact:
 
 - ``SKILL.md`` — entrypoint, YAML frontmatter + Markdown body.
 - adapter-specific siblings (e.g. ``agents/openai.yaml`` for Codex).
+- ``rules/<label>.md`` — one file per rule, when the source declares
+  ``disclosure: progressive`` (see :mod:`eutaxis.commands.disclosure`).
 - ``.eutaxis-owned.json`` — sidecar manifest used by the installer to
   detect ownership and drive idempotent updates.
+
+The relative links of ``SKILL.md`` and of each rule file are rewritten for
+the installed location (see :mod:`eutaxis.commands.links`). A relative link
+whose target does not exist is kept as written and reported in
+:attr:`RenderedArtifact.warnings`.
 
 Ownership is tracked **twice** for robustness:
 
@@ -29,7 +39,9 @@ from pathlib import Path
 import yaml
 
 from .adapters import AgentAdapter
-from .exceptions import FailureModeError
+from .disclosure import DISCLOSURE_PROGRESSIVE, disclose
+from .exceptions import CommandRenderError, FailureModeError
+from .links import LinkResolver
 from .models import ActionSpec, ArtifactFile, CommandSource, RenderedArtifact
 from .templating import render as render_template
 
@@ -86,18 +98,22 @@ def render_command(
     """Render a command source for one adapter as a multi-file artifact."""
     check_failure_mode(source)
     body_context = _body_context(source, adapter.name, project_root, home)
-    rendered_body = render_template(source.body, body_context)
+    rendered_body, rule_files, warnings = _layout_body(
+        source, adapter.name, render_template(source.body, body_context)
+    )
 
     front = adapter.skill_frontmatter(source, rendered_body=rendered_body)
     if OWNED_FRONTMATTER_KEY in front:
-        from .exceptions import CommandRenderError
-
         raise CommandRenderError(
             f"Adapter {adapter.name!r} set reserved frontmatter key "
             f"{OWNED_FRONTMATTER_KEY!r}"
         )
 
-    siblings = tuple(adapter.sibling_files(source, context=body_context))
+    siblings = _merge_siblings(
+        tuple(adapter.sibling_files(source, context=body_context)),
+        rule_files,
+        adapter_name=adapter.name,
+    )
 
     pre_hash = _content_hash(front, rendered_body, siblings)
 
@@ -124,7 +140,94 @@ def render_command(
         adapter=adapter.name,
         files=files,
         content_hash=pre_hash,
+        warnings=warnings,
     )
+
+
+def _layout_body(
+    source: CommandSource, adapter_name: str, body: str
+) -> tuple[str, tuple[ArtifactFile, ...], tuple[str, ...]]:
+    """Split the rendered body as its disclosure mode requires, then relink it.
+
+    Returns the ``SKILL.md`` body, the rule files and the link warnings. The
+    missing link targets are collected on the body before the split, so their
+    line numbers refer to the source file.
+    """
+    resolver = _link_resolver(source, adapter_name)
+    warnings = tuple(
+        missing.message
+        for missing in resolver.missing(
+            body, source_path=source.source_path, first_line=source.body_start_line
+        )
+    )
+    rule_files: tuple[ArtifactFile, ...] = ()
+    if source.disclosure == DISCLOSURE_PROGRESSIVE:
+        disclosed = disclose(body, module=source.name)
+        body = disclosed.entrypoint_body
+        rule_files = disclosed.rule_files
+    body, rule_files = _rewrite_links(resolver, body, rule_files)
+    return body, rule_files, warnings
+
+
+def _link_resolver(source: CommandSource, adapter_name: str) -> LinkResolver:
+    """Return the resolver of the links of ``source`` for one adapter.
+
+    A sibling skill that the adapter does not receive is left out, so a link
+    to it falls back to the absolute path of its source.
+    """
+    return LinkResolver(
+        source_dir=source.source_path.parent,
+        skills={
+            path: sibling.name
+            for path, sibling in source.sibling_skills.items()
+            if sibling.targets.admits(adapter_name)
+        },
+    )
+
+
+def _rewrite_links(
+    resolver: LinkResolver, body: str, rule_files: tuple[ArtifactFile, ...]
+) -> tuple[str, tuple[ArtifactFile, ...]]:
+    """Rewrite the relative links of the entrypoint body and of each rule file."""
+    artifact_paths = frozenset(
+        {ENTRYPOINT_FILENAME, *(f.relative_path for f in rule_files)}
+    )
+    rewritten_body = resolver.rewrite(
+        body, emitter=ENTRYPOINT_FILENAME, artifact_paths=artifact_paths
+    )
+    rewritten_rules = tuple(
+        ArtifactFile(
+            relative_path=f.relative_path,
+            content=resolver.rewrite(
+                f.content, emitter=f.relative_path, artifact_paths=artifact_paths
+            ),
+        )
+        for f in rule_files
+    )
+    return rewritten_body, rewritten_rules
+
+
+def _merge_siblings(
+    adapter_files: tuple[ArtifactFile, ...],
+    rule_files: tuple[ArtifactFile, ...],
+    *,
+    adapter_name: str,
+) -> tuple[ArtifactFile, ...]:
+    """Append the rule files to the adapter siblings, refusing path clashes.
+
+    A passthrough file at the path of a rule file would be silently replaced
+    by one of the two, so the clash is an authoring error.
+    """
+    adapter_paths = {f.relative_path for f in adapter_files}
+    clashes = sorted(
+        f.relative_path for f in rule_files if f.relative_path in adapter_paths
+    )
+    if clashes:
+        raise CommandRenderError(
+            f"Adapter {adapter_name!r} emits sibling files at rule-file "
+            f"paths {clashes}; rename the passthrough files or the rules."
+        )
+    return (*adapter_files, *rule_files)
 
 
 def _body_context(
