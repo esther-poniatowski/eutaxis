@@ -29,6 +29,24 @@ Cross-agent command compilation: load command definitions, render them for each 
    :show-inheritance:
 ```
 
+## Progressive Disclosure
+
+```{eval-rst}
+.. automodule:: eutaxis.commands.disclosure
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Links
+
+```{eval-rst}
+.. automodule:: eutaxis.commands.links
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Templating
 
 ```{eval-rst}

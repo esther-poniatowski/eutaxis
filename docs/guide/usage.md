@@ -153,6 +153,14 @@ The extraction matches heading text exactly and includes every nested subsection
 
 The complementary `exclude_sections` field removes named sections from an otherwise included file. The `heading_offset` field shifts the heading levels of the extracted content when embedding it inside another structure. Full syntax is documented in [Configuration: source entries](configuration.md).
 
+### Fail on malformed rule labels
+
+When a label line violates the [label grammar](concepts.md#rule-blocks), that line defines no rule. Consequently, the rule index, the rule query and the split Skills omit that line. The commands `eutaxis generate` and `eutaxis check` report each such line on standard error. To make a CI run fail on any malformed label, the top-level key below makes both commands exit with code `1` on a rejected line:
+
+```yaml
+strict_rule_labels: true
+```
+
 ### Suppress the task-modules pointer section
 
 When `task_modules` is populated and is also compiled to Skills, the default cumulative file carries a pointer section that is now redundant. Set `task_modules_router_enabled: false` at the top level of the configuration to suppress the pointer section while keeping the list available for the Skills compiler:
@@ -202,13 +210,29 @@ eutaxis skills install all  -c agent-instructions.yaml
 
 Without `--agent`, every registered adapter receives the Skill (see the [Supported agents](../../README.md#supported-agents) table for the current set). Without `--scope`, the install uses the source's declared `scope_default` (typically `user`, writing into the user-scope skill directory of each agent); `--scope project` writes into the project-scope skill directory instead.
 
+### Split a large rule set into one file per rule
+
+A Skill compiled from a large module loads every rule at once. The frontmatter field `disclosure: progressive` makes the compiler emit an index in `SKILL.md` and one file per rule under `rules/`:
+
+```markdown
+---
+name: prose-writing-style
+description: How to write expository prose — documentation, articles, long-form text.
+invocation: [model, user]
+failure-mode: visible
+disclosure: progressive
+---
+```
+
+The next `eutaxis skills install` replaces the installed Skill with the [split layout](concepts.md#progressive-disclosure). A later install removes the file of each rule deleted from the source, and `eutaxis skills diff` reports that file beforehand.
+
 ### Detect drift
 
 ```sh
 eutaxis skills diff -c agent-instructions.yaml
 ```
 
-The command compares each rendered Skill artifact against its installed directory and reports drift. Exit code `1` on drift makes the command usable as a CI check.
+The command compares each rendered Skill artifact against its installed directory and reports drift. Exit code `1` on drift makes the command usable as a CI check. The command also reports on standard error each relative link whose target does not exist, with the source file and the line of the link. Such a link is kept as written in the installed Skill, as described in [Links between modules](concepts.md#links-between-modules).
 
 ### Uninstall
 
@@ -217,6 +241,17 @@ eutaxis skills uninstall <name> -c agent-instructions.yaml --agent claude
 ```
 
 The dual ownership marker prevents the command from removing directories Eutaxis did not write.
+
+## Read one rule
+
+A linter finding or a review comment names a rule by its label. Consequently, the repair needs that rule alone, and often one field of it. The rule query prints that rule without loading its module. The first command below reads the deployed Skills, and the second reads the authored module:
+
+```sh
+eutaxis rule show calibrate-assertion --part exception
+eutaxis rule show calibrate-assertion -c agent-instructions.yaml
+```
+
+The first form runs from any working directory. The location line of the second form points at the source file and the line range to edit. When a source entry of the configuration selects sections, the second form returns only the rules inside those sections. The listing command `eutaxis rule list` prints every label with its first ✓ line, and it reports on standard error each label line that violates the label grammar. Every option and part key of the query is listed in [CLI Reference: rule](cli-reference.md#rule).
 
 ## Verify and maintain
 

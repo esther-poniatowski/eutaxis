@@ -45,10 +45,12 @@ eutaxis generate -c <config-file>
 
 The generator reads the YAML config, resolves all source paths relative to the configured root, and writes one output file per enabled agent. See [Configuration](configuration.md) for the full schema.
 
+A label line that violates the [label grammar](concepts.md#rule-blocks) defines no rule, so the rule index omits that line. Each such line of a declared module is reported on standard error, with its file, its line and the violated part of the grammar. Under the configuration key `strict_rule_labels: true`, a rejected line fails the command before any file is written.
+
 Exit codes:
 
 - `0` -- all agent files generated successfully.
-- `1` -- configuration, source loading or generation failed.
+- `1` -- configuration, source loading or generation failed, or a label line is rejected under `strict_rule_labels`.
 
 ---
 
@@ -67,7 +69,7 @@ eutaxis check -c <config-file>
 | `--agent` | `-a` | all enabled agents | Check only one configured agent output. |
 | `--diff` | | `false` | Print unified diffs for stale outputs. |
 
-Exit code `0` means all selected outputs are current. Exit code `1` means at least one output differs from the generated content.
+Exit code `0` means all selected outputs are current. Exit code `1` means at least one output differs from the generated content. Rejected label lines are reported in the same form as by `generate`. Under the configuration key `strict_rule_labels: true`, they also fail the check.
 
 ---
 
@@ -130,6 +132,68 @@ eutaxis skills diff [<name>] -c <config-file>
 | `diff` | Show drift between rendered output and installed artifacts. |
 
 The failure-mode gate ([failure-mode-as-source-field](../adr/failure-mode-as-source-field.md)) applies at render time: the renderer refuses to emit a `model-invoked` artifact from a silent-failure source and a `user-invoked` artifact whose `required-visibility` is `pre-invocation`. There is no `--force` escape for these checks.
+
+A source whose frontmatter declares `disclosure: progressive` compiles to a [split Skill](concepts.md#progressive-disclosure): an index in `SKILL.md` and one file per rule under `rules/`. The commands `show`, `install` and `diff` handle the rule files together with the other files of the artifact.
+
+The compiler rewrites the relative links of each emitted file, as described in [Links between modules](concepts.md#links-between-modules). The commands `show`, `install` and `diff` report on standard error each relative link whose target does not exist, with the source file and the line of the link.
+
+Exit codes of `diff`:
+
+- `0` -- every artifact matches its render.
+- `1` -- at least one artifact differs from its render: a file is outdated, edited by hand or missing, or a file of a deleted rule remains on disk.
+
+---
+
+### `rule`
+
+Print one rule of an instruction module, or one part of that rule, without reading the whole module. Each rule spans one [rule block](concepts.md#rule-blocks), and each part is one statement or field of that block.
+
+```sh
+eutaxis rule show <label> [--part <key>] [--module <name>] [-c <config-file> | --skills-dir <dir> | --agent <agent>]
+eutaxis rule list [--module <name>] [-c <config-file> | --skills-dir <dir> | --agent <agent>]
+```
+
+| Subcommand | Use it to |
+|------------|-----------|
+| `show` | Print one rule, or the parts selected by `--part`, after a location line: heading path, file and line range. |
+| `list` | Print the label, the module and the first ✓ line of every rule. A label-shaped line is reported on standard error when its label violates the grammar. |
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--part` | `-p` | whole rule | Key of the part to print, from the part keys listed below. |
+| `--module` | `-m` | all modules | Module or Skill that holds the rule. Required when several modules define the label. |
+| `--config` | `-c` | none | Configuration whose modules are read: `common_sources`, agent `sources` and `task_modules`. A source entry that selects sections contributes only the rules inside those sections. |
+| `--skills-dir` | | none | Directory whose eutaxis-owned Skills are read. |
+| `--agent` | `-a` | `claude` | Adapter whose user-scope skill directory is read when neither `--config` nor `--skills-dir` is given. |
+
+The part keys select the statements, the lead or the fields of a rule:
+
+- `valid` and `invalid` select the ✓ and the ✗ statements, and `lead` selects the text before the first statement;
+- `why` selects every field whose title opens on "Why", such as `*Why.*` or `*Why the tiers.*`;
+- `exception` selects `*Exception.*`, `*Exceptions.*` and `*Exception*:`, and `note` selects `*Note.*` and `*Notes.*`;
+- `how-to-apply` selects `*How to apply.*`;
+- `test`, `key`, `scope`, `warning` and `relation` each select the field of that name, its plural, and any title opening on that word, such as `*Relation to the neighbouring rules.*`;
+- the slug of any other title selects that field, as `precedence-among-the-three-enumeration-rules` selects `*Precedence among the three enumeration rules.*`.
+
+The default source is the deployed Skills, so the query runs from any working directory. Always-on modules compile into the cumulative instruction file, so their rules are absent from the Skills and are read with `--config`.
+
+The query below prints the exception clause of one rule from the authored modules:
+
+```sh
+eutaxis rule show warnings-have-a-zero-baseline --part exception -c agent-instructions.yaml
+```
+
+```text
+verification > Verification > warnings-have-a-zero-baseline [exception] (<root>/instructions/global/verification.md:32-35)
+
+*Exception.* Two constructions keep a non-zero count without failing:
+...
+```
+
+Exit codes:
+
+- `0` -- the rule, the part or the listing was printed.
+- `1` -- the label is unknown or ambiguous, the rule lacks the part, or the source cannot be read. The message lists the close labels, the modules or the parts of the rule.
 
 ---
 

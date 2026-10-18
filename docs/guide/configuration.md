@@ -18,6 +18,7 @@ root: .                          # optional root for relative paths
 common_sources:                  # source entries shared across all agents
 task_modules:                    # source entries compiled to Skill artifacts
 task_modules_router_enabled:     # default true; set false to suppress the pointer section
+strict_rule_labels:              # default false; set true to fail generate and check on a rejected label line
 agents:                          # cumulative-file targets
 ```
 

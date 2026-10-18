@@ -29,6 +29,15 @@ Instruction assembly: load YAML configuration, render per-agent instruction file
    :show-inheritance:
 ```
 
+## Rule Parser
+
+```{eval-rst}
+.. automodule:: eutaxis.instructions.rules
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Data Models
 
 ```{eval-rst}

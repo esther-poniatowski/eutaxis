@@ -52,6 +52,8 @@ live under [`docs/open-questions/`](../open-questions/_index.md).
 - [Instruction-file ownership boundaries (navigation only)](instruction-file-ownership-boundaries.md)
 - [Regime translation and permission mapping per adapter](regime-and-permission-mapping.md)
 - [Install registry: atomicity and locking](registry-atomicity-and-locking.md)
+- [Rule-level access: rule query and progressive disclosure](rule-level-access-to-modules.md)
+- [Links between modules in compiled Skills](cross-module-links-in-skills.md)
 
 ## Superseded
 

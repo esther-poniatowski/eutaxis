@@ -51,6 +51,7 @@ Additional agents are added by registering one adapter in `src/eutaxis/commands/
 
 - [X] **Instruction assembly** — render modular Markdown sources into one cumulative instruction file per agent.
 - [X] **Skill compilation** — compile on-demand rule sets into native Agent Skill artifacts.
+- [X] **Rule query** — print one rule, or one field of it, without loading its module; optionally compile each rule of a Skill into its own file.
 - [X] **Drift detection** — compare configuration, sources, and on-disk targets; usable as a CI gate.
 - [X] **Registry hygiene** — surface instruction files present on disk but absent from the configuration, and vice versa.
 - [X] **Project scaffolding** — initialise a starter instruction layout in a project.

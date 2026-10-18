@@ -8,6 +8,7 @@
 - [x] `task_modules_router_enabled` config flag; see [Configuration](docs/guide/configuration.md).
 - [x] User-facing documentation rewrite ([README](README.md), [Concepts](docs/guide/concepts.md), [Usage](docs/guide/usage.md)).
 - [x] [Clean-memory operation as a Skill](docs/adr/dual-ownership-marker.md) (`eutaxis commands install clean-memory` + `eutaxis ops clean-memory`).
+- [x] [Rule query and progressive disclosure](docs/adr/rule-level-access-to-modules.md) (`eutaxis rule show|list`, `disclosure: progressive`).
 
 ## Priority
 

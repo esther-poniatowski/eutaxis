@@ -5,6 +5,7 @@
 
 instructions
 commands
+rule_query
 ops
 toplevel
 ```

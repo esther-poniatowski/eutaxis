@@ -52,6 +52,20 @@ Each source entry in the configuration controls which part of a Markdown file ap
 
 Section selection matches heading text exactly and includes the heading plus every nested subsection until the next heading at the same or higher level. Configuration syntax is documented in [Configuration: source entries](configuration.md).
 
+### Rule blocks
+
+A source module states each rule under a label line: `**<label>**:` alone at the start of a line. A label holds lowercase letters, digits and hyphens, and it opens on a letter. The rule block runs from its label line to the next label line or the next heading. Lines inside fenced code never count as a label line or a heading.
+
+Inside a block, three kinds of line open a part of the rule:
+
+- a line opening on ✓ opens a valid statement, and a line opening on ✗ opens an invalid statement;
+- a line opening on an italic title, such as `*Why.*` or `*Exception*:`, opens a field;
+- any other line after the label line opens the lead, and the lead ends where the first statement or field opens.
+
+Each part runs until the next part opens or the block ends. A line shaped as a label line whose label violates the grammar, such as `**3d-plots**:`, opens no rule. The rejected line still ends the preceding block, and the commands `eutaxis generate`, `eutaxis check` and `eutaxis rule list` report it on standard error.
+
+Rule blocks serve two surfaces: the [rule query](cli-reference.md#rule) and the [progressive disclosure](#progressive-disclosure) of Skills.
+
 ## Configuration shape
 
 The configuration carries four top-level lists, each tied to one role:
@@ -100,9 +114,10 @@ Every Markdown file listed under `task_modules` must declare four frontmatter fi
 | --- | --- | --- | --- |
 | `name` | yes | slug (lowercase, hyphen-separated) | Skill directory name and frontmatter identifier. |
 | `description` | yes | one-line string | Description surfaced to the agent's skill picker. Determines model-invocation activation. |
-| `invocation` | yes | non-empty list of `user`, `model` | Permitted invocation routes (see [Activation regimes](#activation-regimes) below). |
+| `invocation` | yes | non-empty list of `user`, `model` | Permitted invocation routes (see [Invocation routes](#invocation-routes) below). |
 | `failure-mode` | yes | `silent`, `visible` | Silent-failure classification per the [failure-mode-as-source-field](../adr/failure-mode-as-source-field.md) ADR. |
 | `required-visibility` | required when `failure-mode: silent`; forbidden otherwise | `pre-invocation`, `pre-action` | Distinguishes rules that must be visible before the model decides which procedure applies from rules that must be visible before the first irreversible action. |
+| `disclosure` | no | `inline` (default), `progressive` | Layout of the compiled Skill (see [Progressive disclosure](#progressive-disclosure) below). |
 
 The frontmatter block below declares every required field for a Skill-eligible source module:
 
@@ -136,6 +151,25 @@ The compiler refuses two placements:
 - A source with `failure-mode: silent` and `required-visibility: pre-invocation` cannot ship as any Skill. The rule must be visible *before* the agent decides which procedure applies; only the always-on cumulative file provides that guarantee.
 
 Both refusals raise a typed error naming the source path and the violated rule. There is no `--force` escape. The full rationale is recorded in the [failure-mode-as-source-field](../adr/failure-mode-as-source-field.md) ADR; the upstream activation-regime model is in [silent-failure-rules-as-always-on](../adr/silent-failure-rules-as-always-on.md).
+
+### Progressive disclosure
+
+A Skill compiled from a large module places every rule in the context of the agent, although one task may apply only a few of them. Therefore, the field `disclosure: progressive` splits the compiled Skill into an index and one file per [rule block](#rule-blocks):
+
+- `SKILL.md` keeps the headings and every line outside a rule block, and an index replaces each run of consecutive rules. Each index entry gives the label, the first ✓ line and a link to the file of the rule.
+- `rules/<label>.md` holds the whole rule block: the label line, the statements and every field.
+
+Each emitted file is covered by the ownership marker. Consequently, `eutaxis skills diff` reports a rule file when it differs from the render or when the render no longer produces it. The next `eutaxis skills install` replaces or removes that file. A module without labels compiles identically in both layouts. The [rule-level-access](../adr/rule-level-access-to-modules.md) ADR justifies this layout.
+
+### Links between modules
+
+A source module links to sibling modules and to other files by relative Markdown links. Each compiled Skill is installed in its own directory. Therefore, the compiler rewrites each relative link of `SKILL.md` and of each rule file:
+
+- when the target is the source of another Skill of the same configuration, the link points to the `SKILL.md` of that Skill, relative to the emitting file;
+- when the target is any other file on disk, such as an always-on module, the link takes the absolute path of the target;
+- when the target does not exist, it keeps its text, and the commands `skills show`, `skills install` and `skills diff` report it with the file and the line of the link.
+
+Each rewritten target keeps its fragment, such as `#^anchor`. Five kinds of link keep their text: absolute URLs, `mailto:` targets, absolute paths, pure fragments, and links inside code spans or fenced code. Consequently, an illustrative link in a module must sit in a code span to stay unreported: `[link text](path/to/note)`. The rewrite reads only the sources and the files on disk, so `eutaxis skills diff` reports no drift right after an install. The ADR on [links between modules](../adr/cross-module-links-in-skills.md) justifies these targets.
 
 ## Project-level and global use
 
