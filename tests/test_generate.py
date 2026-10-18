@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from eutaxis.cli import app
 from eutaxis.generate import (
     BudgetExceededError,
     ConfigurationError,
@@ -13,6 +15,7 @@ from eutaxis.generate import (
     SourceNotFoundError,
     load_config,
 )
+from eutaxis.instructions import RejectedLabelError
 
 
 def test_load_config_supports_existing_agent_instructions_shape(tmp_path: Path) -> None:
@@ -810,4 +813,77 @@ agents: []
     )
 
     with pytest.raises(ConfigurationError, match="heading_offset"):
+        load_config(config)
+
+
+def _rejected_label_workspace(tmp_path: Path, *, strict: bool | None) -> Path:
+    (tmp_path / "rules.md").write_text(
+        "# Rules\n\n**keep**:\n\n✓ Keep.\n\n**3d-plots**:\n\n✓ Plot.\n\n"
+        "```\n**Fenced**:\n```\n",
+        encoding="utf-8",
+    )
+    strict_line = "" if strict is None else f"strict_rule_labels: {str(strict).lower()}\n"
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        f"common_sources:\n  - rules.md\n{strict_line}"
+        "agents:\n  - name: codex\n    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+    return config
+
+
+def test_rejected_labels_lists_each_rejected_line(tmp_path: Path) -> None:
+    config = _rejected_label_workspace(tmp_path, strict=None)
+
+    rejected = InstructionGenerator(load_config(config)).rejected_labels()
+
+    assert [(path.name, item.line_number) for path, item in rejected] == [
+        ("rules.md", 7)
+    ]
+    assert rejected[0][1].message == (
+        "rejected label line '**3d-plots**:': a label must start with a lowercase letter"
+    )
+
+
+def test_generate_cli_warns_on_rejected_label_and_writes(tmp_path: Path) -> None:
+    config = _rejected_label_workspace(tmp_path, strict=None)
+
+    result = CliRunner().invoke(app, ["generate", "-c", str(config)])
+
+    assert result.exit_code == 0, result.output
+    assert f"warning: {tmp_path / 'rules.md'}:7: rejected label line" in result.stderr
+    assert "**Fenced**" not in result.stderr
+    assert (tmp_path / "AGENTS.md").is_file()
+
+
+def test_strict_rule_labels_fails_generate_before_writing(tmp_path: Path) -> None:
+    config = _rejected_label_workspace(tmp_path, strict=True)
+
+    result = CliRunner().invoke(app, ["generate", "-c", str(config)])
+
+    assert result.exit_code == 1
+    assert "strict_rule_labels is set" in result.stderr
+    assert f"{tmp_path / 'rules.md'}:7" in result.stderr
+    assert not (tmp_path / "AGENTS.md").exists()
+    with pytest.raises(RejectedLabelError):
+        InstructionGenerator(load_config(config)).write_all()
+
+
+def test_strict_rule_labels_fails_check(tmp_path: Path) -> None:
+    config = _rejected_label_workspace(tmp_path, strict=False)
+    assert CliRunner().invoke(app, ["generate", "-c", str(config)]).exit_code == 0
+    assert CliRunner().invoke(app, ["check", "-c", str(config)]).exit_code == 0
+    strict = _rejected_label_workspace(tmp_path, strict=True)
+
+    result = CliRunner().invoke(app, ["check", "-c", str(strict)])
+
+    assert result.exit_code == 1
+    assert "strict_rule_labels is set" in result.stderr
+
+
+def test_strict_rule_labels_must_be_boolean(tmp_path: Path) -> None:
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text('strict_rule_labels: "yes"\nagents: []\n', encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="strict_rule_labels"):
         load_config(config)

@@ -6,20 +6,28 @@ installed as a script. Subcommands:
 
 - ``info`` — display diagnostic information.
 - ``generate`` — assemble agent instruction files.
+- ``rule`` — print individual rules of instruction modules or skills.
 - ``validate`` — validate prompt family layouts (planned).
 - ``init`` — scaffold prompt composition into a project (planned).
 """
+
+from typing import TYPE_CHECKING
 
 import typer
 from . import info as pkg_info, __version__
 from .commands._cli import commands_app
 from .commands._skills_cli import skills_app
 from .ops._cli import ops_app
+from .rule_query._cli import rule_app
+
+if TYPE_CHECKING:
+    from .instructions import InstructionGenerator
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 app.add_typer(commands_app, name="commands")
 app.add_typer(skills_app, name="skills")
 app.add_typer(ops_app, name="ops")
+app.add_typer(rule_app, name="rule")
 
 
 @app.command("info")
@@ -60,13 +68,19 @@ def cli_generate(
         help="Render even if outputs exceed their configured max_bytes.",
     ),
 ) -> None:
-    """Assemble agent instruction files from modular prompt sources."""
+    """Assemble agent instruction files from modular prompt sources.
+
+    Every label line rejected by the label grammar is reported on standard
+    error. Under ``strict_rule_labels``, such a line fails the command before
+    any file is written.
+    """
     from pathlib import Path as P
     from .instructions import InstructionError, InstructionGenerator, load_config
 
     try:
         loaded = load_config(P(config), root=P(root) if root else None)
         generator = InstructionGenerator(loaded)
+        _echo_rejected_labels(generator)
         paths = generator.write_all(
             agent_name=agent,
             dry_run=dry_run,
@@ -113,13 +127,19 @@ def cli_check(
         help="Do not exit non-zero when outputs exceed max_bytes.",
     ),
 ) -> None:
-    """Check whether generated instruction files are up to date."""
+    """Check whether generated instruction files are up to date.
+
+    Rejected label lines are reported as by ``generate``, and they fail the
+    check under ``strict_rule_labels``.
+    """
     from pathlib import Path as P
     from .instructions import InstructionError, InstructionGenerator, load_config
 
     try:
         loaded = load_config(P(config), root=P(root) if root else None)
         generator = InstructionGenerator(loaded)
+        _echo_rejected_labels(generator)
+        generator.enforce_rule_labels()
         diff_reports = list(generator.diff_report(agent_name=agent))
         budget_reports = {
             entry[0].name: (entry[1], entry[2])
@@ -149,6 +169,14 @@ def cli_check(
 
     if stale or over_budget:
         raise typer.Exit(code=1)
+
+
+def _echo_rejected_labels(generator: "InstructionGenerator") -> None:
+    """Print each rejected label line of the declared modules on standard error."""
+    for path, rejection in generator.rejected_labels():
+        typer.echo(
+            f"warning: {path}:{rejection.line_number}: {rejection.message}", err=True
+        )
 
 
 @app.command("list")
