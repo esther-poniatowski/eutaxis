@@ -215,7 +215,12 @@ A procedure formalizes `{P} A {Q}` without treating every predicate as decidable
 - an authorized mutation footprint
 - postcondition and failure terminals
 
-Each action node names a registered operation. The `on-success` field names its successor. The `on-failure` map names one successor for each failure outcome. A registered guard operation supplies the outcomes used for conditional branches.
+Each action node selects one registered operation and defines all transitions:
+
+- `on-success` names the successor after success
+- `on-failure` has one key for each declared failure outcome and contains no other key
+
+A registered guard operation supplies the outcomes used for conditional branches.
 
 To ensure termination, schema version 1 admits no unbounded loop. Every path must reach a declared terminal.
 

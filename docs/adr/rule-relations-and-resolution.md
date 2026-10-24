@@ -21,7 +21,17 @@ Semantic resolution operates inside one compilation unit: the declarations selec
 
 ## Relations and policies
 
-A stable identifier names each rule-local exception. The exception either waives explicitly affected norms or substitutes named local norms. Version 1 assigns each norm to at most one exception and forbids a replacement norm from being affected by another exception. These restrictions make every substitution simultaneous and one-step. Exceptions form a closed list and do not remove the enclosing rule or alter its declaration relations. The relations `requires` and `refines` declare dependencies. The symmetric relation `incompatible-with` declares a conflict. The lifecycle relation `supersedes` never decides a contextual conflict. Directional dependencies must be acyclic.
+A stable identifier names each rule-local exception. The exception either waives explicitly affected norms or substitutes named local norms. Version 1 assigns each norm to at most one exception and forbids a replacement norm from being affected by another exception. These restrictions make every substitution simultaneous and one-step. Exceptions form a closed list and do not remove the enclosing rule or alter its declaration relations.
+
+The cross-record registry classifies `rule-set`, `rule`, and `procedure` as content records. A rule set and each of its member rules remain separately addressable. The registry preserves each member's inherited applicability, source root, and containing rule-set identifier. Only content records may declare relations or serve as relation targets. A `composition-manifest`, `resolution-policy`, `evaluator`, or `operation` must declare an empty `relations` field.
+
+Every declaration named in a manifest section must resolve to a content record. Every identifier in the manifest's `policies` field must resolve to a `resolution-policy`. The referring manifest list item owns a missing or wrong-kind diagnostic.
+
+The relations `requires` and `refines` declare dependencies. Their combined directed graph must be acyclic. The lifecycle relation `supersedes` does not decide a contextual conflict and forms a separate acyclic graph. No declaration may relate to itself. Each `(source, relation type, target)` triple may occur once. The same source may still name both `requires` and `refines` for one target because these are distinct assertions. A repeated triple fails at the later target.
+
+One `incompatible-with` assertion creates one unordered conflict pair. A reverse assertion duplicates the same pair and fails at the later relation target; authors do not repeat the symmetric assertion.
+
+One identifier names either one unversioned record, including a member rule, or one versioned evaluator or operation family. An identifier cannot name both. Every version in a contract family retains one kind and owner, and each `(identifier, version)` pair is unique. Evaluators and operations resolve only through typed exact references. They cannot enter a relation, policy conflict, policy outcome, or manifest section.
 
 A `resolution-policy` records the decision context and strategy for one conflict. The strategy chooses one outcome:
 
@@ -30,9 +40,52 @@ A `resolution-policy` records the decision context and strategy for one conflict
 - combine both declarations through a resultant declaration
 - fail with an unresolved conflict
 
-`combine` cannot mean “keep both”; its resultant declaration owns the composed norms and criteria. The source boundary requires the retained or replaced identifier to belong to the declared conflict. A substitute differs from the declaration that it replaces, and a combine result differs from both conflict members.
+Any two content records may form a conflict pair, including records of different kinds. The strategy preserves the following type rules:
 
-Only declared incompatibilities enter conflict resolution. Among matching policies, the lowest non-negative integer `order` wins; a duplicate order for the same conflict is an error. The resolver does not infer semantic specificity between predicates. A cross-owner policy belongs to the consuming composition manifest and does not mutate either owner's source. The manifest owner must have authority over that compilation unit.
+- `retain` names either conflict member
+- `substitute` replaces one conflict member with a content record of the same kind
+- `combine` requires two conflict members of the same kind and names a distinct result of that kind
+- `error` names no outcome record
+
+`combine` cannot mean “keep both.” Its result is an already-authored declaration that owns the integrated contract. For a procedure result, that contract includes the complete action graph; the registry does not synthesize a graph. The source boundary requires the retained or replaced identifier to belong to the declared conflict. A substitute differs from the declaration that it replaces, and a combine result differs from both conflict members.
+
+Only declared incompatibilities enter conflict resolution. Each policy names the normalized unordered pair created by one incompatibility assertion. For each composition manifest, the registry considers only the policies referenced by that manifest. A duplicate `(conflict pair, order)` within this set is an error; a policy used by another manifest may reuse the same order. Among matching policies, the lowest non-negative integer `order` wins. The resolver does not infer semantic specificity between predicates.
+
+Version 1 gives policy authority to the manifest owner. Every policy referenced by a manifest must have the same owner as that manifest. The manifest may still select content owned elsewhere. An authorized policy affects only that compilation unit and does not mutate a content owner's source.
+
+## Registry diagnostics
+
+The registry establishes one deterministic traversal before it validates cross-record contracts. It resolves every input path, removes repeated canonical paths, and sorts the canonical path strings lexically. Within each source, the registry visits the top-level record before embedded rules. Embedded rules and list fields retain source order.
+
+Each failure belongs to the field that makes the cross-record contract invalid:
+
+- an ordinary identifier collision or a collision between unversioned and versioned families belongs to the later `id`
+- a contract family that changes owner belongs to the later `owner`
+- a contract family that changes declaration kind belongs to the later `kind`
+- a repeated exact contract version belongs to the later `version`
+- a non-content record with relations belongs to its first relation item
+- an unknown, wrong-kind, self-referential, or repeated relation belongs to the referring `target`
+- a dependency or `supersedes` cycle belongs to the target edge that closes the cycle under registry traversal
+- a reciprocal `incompatible-with` assertion belongs to the later relation target
+- an unknown policy conflict member belongs to the corresponding `conflicts` item
+- a policy conflict member that is not content belongs to the corresponding `conflicts` item
+- a policy without a declared incompatibility belongs to its `conflicts` field
+- an invalid `retain`, `with`, or `result` identifier belongs to that strategy field
+- a cross-kind `combine` belongs to `strategy.kind`
+- a repeated `(conflict pair, order)` belongs to the later policy reference in the manifest
+- a policy-owner mismatch belongs to the manifest's policy reference
+- a wrong manifest content or policy kind belongs to the referring manifest list item
+- an unknown exact family or a family of the wrong kind belongs to the reference `id`
+- a known exact family with an absent version belongs to the reference `version`
+- a missing required operation input belongs to the action's `with` mapping, or to the action when `with` is absent
+- an unknown operation input belongs to its binding key
+- an invalid literal belongs to the deepest failing path below `literal`
+- an unknown procedure parameter belongs to `parameter`
+- a parameter whose schema differs from the input schema belongs to `parameter`
+- a missing operation failure outcome belongs to the action's `on-failure` mapping
+- an additional operation failure outcome belongs to that outcome key
+- an operation effect outside the procedure footprint belongs to the action's `operation` reference
+- an invariant observed state changed by an operation belongs to the conflicting `observes` item
 
 ## Monotone resolution algorithm
 
@@ -49,7 +102,9 @@ The resolver returns the effective set and a trace containing every applicabilit
 
 ## Validation
 
-Static validation covers reference existence, inherited applicability narrowing, overlapping exceptions, chained substitutions, directional cycles, symmetric incompatibilities, policy order ties, invalid substitutions and combine results, and owner authority. Scenario fixtures exercise matching and non-matching rule-local exceptions, inapplicable replacement norms, conflicts introduced by dependency closure, policy-based substitutes, and attempted reintroduction of an excluded declaration.
+Static validation covers reference existence, inherited applicability narrowing, overlapping exceptions, chained substitutions, directional cycles, symmetric incompatibilities, policy order ties, invalid substitutions and combine results, and owner authority. Registry tests use a closed fixture corpus whose references all resolve. The individually valid source-boundary fixtures do not form this corpus because their illustrative references are intentionally incomplete.
+
+Scenario fixtures exercise matching and non-matching rule-local exceptions, inapplicable replacement norms, conflicts introduced by dependency closure, policy-based substitutes, and attempted reintroduction of an excluded declaration.
 
 ## Consequences
 
