@@ -7,6 +7,7 @@ dependencies:
   # Data manipulation and formats
   - jsonschema            # declaration-schema validation
   - pyyaml                 # YAML file handling
+  - referencing            # offline JSON Schema resource resolution
   - types-pyyaml           # type stubs for PyYAML
   # Development tools
   - black                  # code formatting

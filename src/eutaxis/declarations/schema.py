@@ -11,12 +11,15 @@ from typing import Mapping, NoReturn, cast
 
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from jsonschema.exceptions import (  # type: ignore[import-untyped]
-    SchemaError,
     ValidationError,
     best_match,
 )
 
 from .. import data_path
+from .embedded_schema import (
+    EmbeddedSchemaContractError,
+    validate_self_contained_schema,
+)
 from .exceptions import DeclarationSchemaError, FacetRegistrySchemaError
 from .source import (
     DocumentPath,
@@ -256,14 +259,11 @@ def validate_embedded_schema(
     document_path: DocumentPath,
     locations: SourceMap,
 ) -> None:
-    """Meta-validate one embedded Draft 2020-12 JSON Schema."""
+    """Validate one self-contained embedded Draft 2020-12 schema."""
     try:
-        Draft202012Validator.check_schema(schema)
-    except SchemaError as exc:
-        parts = document_path + tuple(exc.path)
-        _raise_schema_error(
-            path, parts, f"invalid embedded JSON Schema: {exc.message}", locations
-        )
+        validate_self_contained_schema(schema)
+    except EmbeddedSchemaContractError as exc:
+        _raise_schema_error(path, document_path + exc.path, exc.message, locations)
 
 
 def _raise_schema_error(

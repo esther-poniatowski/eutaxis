@@ -43,6 +43,30 @@ def freeze_json(value: object) -> JsonValue:
     raise TypeError(f"Unsupported JSON value: {type(value).__name__}")
 
 
+def json_values_equal(left: object, right: object) -> bool:
+    """Compare JSON values structurally with JSON numeric semantics."""
+    if isinstance(left, Mapping) and isinstance(right, Mapping):
+        return left.keys() == right.keys() and all(
+            json_values_equal(left[key], right[key]) for key in left
+        )
+    if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+        return len(left) == len(right) and all(
+            json_values_equal(left_item, right_item)
+            for left_item, right_item in zip(left, right)
+        )
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        if isinstance(left, float) and not math.isfinite(left):
+            return False
+        if isinstance(right, float) and not math.isfinite(right):
+            return False
+        return left == right
+    if type(left) is not type(right):
+        return False
+    return left == right
+
+
 class DeclarationKind(StrEnum):
     """Kinds admitted by declaration schema version 1."""
 

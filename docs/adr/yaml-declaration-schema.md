@@ -65,7 +65,7 @@ facets:
 
 Each facet entry contains only an `id` and a `value-schema`. The registry supplies the owner and source revision once.
 
-A facet value schema uses the self-contained Draft 2020-12 dialect and may use local JSON Pointers. The contract excludes a separate `$id`, a dialect change, and external or dynamic references. The validator follows Draft 2020-12 evaluation paths and rejects any reachable cycle. A schema under `$defs` remains inactive until an evaluation path refers to it. The validator records the `format` keyword without asserting it. Therefore, the check operates without network access or an undeclared format checker.
+A facet value schema follows the [shared embedded-schema contract](#^embedded-schema-contract).
 
 The typed declaration route checks every applicability predicate while the YAML source map remains available. The route covers:
 
@@ -84,8 +84,6 @@ Each operator acts uniformly across the JSON domain:
 - `equals` compares the context value with one registered value
 - `in` compares the context value with one or more alternatives; for an array-valued facet, each alternative is an array
 
-Object key order is irrelevant, whereas array order is significant. Booleans remain distinct from numbers. Finite integer and floating-point representations compare numerically.
-
 The following work remains outside schema version 1:
 
 - merging facet registries
@@ -94,6 +92,43 @@ The following work remains outside schema version 1:
 - deriving facets
 
 A later layer may combine registries only after it specifies how registries cross owner boundaries. The same layer must specify how namespaces compose.
+
+## Embedded-schema contract ^embedded-schema-contract
+
+Self-contained Draft 2020-12 schemas govern five fields:
+
+- facet values
+- procedure parameters
+- evaluator evidence
+- operation inputs
+- operation outputs
+
+The static scan examines the root schema and every subschema. This coverage includes schemas under inactive `$defs` and conditional branches. The scan admits local JSON Pointers but rejects:
+
+- a separate `$id`
+- a dialect other than Draft 2020-12
+- external `$ref` values
+- `$dynamicRef` and `$recursiveRef`
+- local `$ref` values that do not resolve within the root schema
+
+Cycle analysis follows Draft 2020-12 evaluation paths and is narrower than the static scan:
+
+- rejects every reachable reference cycle
+- enters a schema under `$defs` only when an evaluation path refers to that schema
+- treats `then` and `else` as unreachable without a sibling `if`
+
+The cycle checker admits a cycle that no evaluation path reaches. Separately, the validator records the `format` keyword without asserting a constraint.
+
+Together, these rules let every schema run offline against its complete root resource.
+
+Exact JSON values compare under four rules:
+
+- objects compare independently of key order
+- arrays compare item by item in order
+- a boolean and a number do not compare equal
+- finite integers and finite floating-point numbers compare numerically
+
+The applicability operators and declaration registry both use these rules. Separately, the registry compares schema forms exactly. The registry does not determine whether two schemas accept the same values. The registry does not classify one schema as a subtype of another.
 
 ## Rules and criteria
 
@@ -192,8 +227,6 @@ The declaration registry requires each binding to satisfy four conditions:
 - no unknown input is bound
 - every literal satisfies its input schema
 - every parameter schema has the same normalized form as its input schema
-
-Schema version 1 does not infer general JSON Schema subtyping.
 
 Each invariant declares its observed state identifiers. The registry rejects an action when its operation may mutate one of these states. The registry also requires the operation footprint to fit within the procedure's authorized footprint. These conservative checks cover every declared outcome.
 

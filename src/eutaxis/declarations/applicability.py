@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from enum import StrEnum
-import math
 from types import MappingProxyType
 from typing import Mapping
 
 from .facets import FacetRegistry
+from .models import json_values_equal
 
 
 class TruthValue(StrEnum):
@@ -76,7 +76,7 @@ def _evaluate_applicability(
     if operator == "equals":
         return (
             TruthValue.TRUE
-            if _json_equal(context[facet], predicate.get("value"))
+            if json_values_equal(context[facet], predicate.get("value"))
             else TruthValue.FALSE
         )
     if operator == "in":
@@ -85,7 +85,7 @@ def _evaluate_applicability(
             raise ValueError("applicability 'in' requires a sequence value")
         return (
             TruthValue.TRUE
-            if any(_json_equal(context[facet], item) for item in candidates)
+            if any(json_values_equal(context[facet], item) for item in candidates)
             else TruthValue.FALSE
         )
     raise ValueError(f"unsupported applicability operator: {operator!r}")
@@ -101,23 +101,3 @@ def _children(value: object, context: Mapping[str, object]) -> tuple[TruthValue,
             raise ValueError("applicability child must be a predicate")
         predicates.append(child)
     return tuple(_evaluate_applicability(child, context) for child in predicates)
-
-
-def _json_equal(left: object, right: object) -> bool:
-    """Compare JSON values with numeric but not Boolean coercion."""
-    if isinstance(left, Mapping) and isinstance(right, Mapping):
-        return left.keys() == right.keys() and all(
-            _json_equal(left[key], right[key]) for key in left
-        )
-    if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
-        return len(left) == len(right) and all(
-            _json_equal(left_item, right_item)
-            for left_item, right_item in zip(left, right)
-        )
-    if isinstance(left, bool) or isinstance(right, bool):
-        return type(left) is type(right) and left == right
-    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
-        return math.isfinite(left) and math.isfinite(right) and left == right
-    if type(left) is not type(right):
-        return False
-    return left == right
