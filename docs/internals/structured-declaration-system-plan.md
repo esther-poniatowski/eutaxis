@@ -40,7 +40,7 @@ The normative contract closes through the following gates.
 - [x] Add semantic and versioned-contract indexes, then validate the static cross-record contracts fixed by the [relation contract](../adr/rule-relations-and-resolution.md).
 - [ ] Package the exact records required by the [shipped execution contract](../adr/yaml-declaration-schema.md#^shipped-contract-execution), including `eutaxis/declaration-corpus-contract` and its named norm and criteria.
 - [x] Implement the versioned YAML fixture schema and deterministic fixture index, including unique identifiers, portable resource paths, typed payload validation, and located errors.
-- [ ] Implement the checker-only runner registry, keyed by exact evaluator reference and linked to one exact operation input contract; reject manual, detector, and unresolved bindings in this gate.
+- [x] Implement the checker-only runner registry, keyed by exact evaluator reference and linked to one exact operation input contract; reject manual, detector, and unresolved bindings in this gate.
 - [ ] Run the valid corpus and every known-failure descriptor. Check evaluator identity, `declaration-v1`, result state, exception class, and the closed evidence schema.
 - [ ] Load the packaged procedure and operation through the static registry, then verify their bindings, outcome map, and empty mutation footprint. Defer operation execution to the compilation fixture.
 - [ ] Plant malformed and duplicate descriptors, invalid payloads, unresolved resources, missing bindings, mismatched results, invalid evidence, action-binding defects, outcome defects, and footprint defects before independent adversarial review.

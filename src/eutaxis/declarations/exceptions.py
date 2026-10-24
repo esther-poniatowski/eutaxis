@@ -124,6 +124,14 @@ class EvaluatorFixtureSemanticError(EvaluatorFixtureError):
         self.column = column
 
 
+class CheckerRunnerRegistryError(Exception):
+    """Report an invalid code-owned checker runner binding."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid checker runner registry at {location}: {message}")
+        self.location = location
+
+
 class FacetRegistryError(Exception):
     """Base exception for context-facet registry failures."""
 

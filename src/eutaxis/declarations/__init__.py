@@ -1,6 +1,7 @@
 """Structured declaration loading and validation."""
 
 from .exceptions import (
+    CheckerRunnerRegistryError,
     DeclarationError,
     DeclarationRegistryError,
     DeclarationSchemaError,
@@ -68,11 +69,21 @@ from .registry import (
     RegisteredDeclaration,
     load_declaration_registry,
 )
+from .runners import (
+    CheckerRunner,
+    CheckerRunnerBinding,
+    CheckerRunnerRegistry,
+    build_checker_runner_registry,
+)
 
 __all__ = [
     "Action",
     "AnyDeclaration",
     "Binding",
+    "CheckerRunner",
+    "CheckerRunnerBinding",
+    "CheckerRunnerRegistry",
+    "CheckerRunnerRegistryError",
     "CompositionManifestDeclaration",
     "ContextFacet",
     "ContractFamily",
@@ -115,6 +126,7 @@ __all__ = [
     "TruthValue",
     "VersionedReference",
     "conjoin_applicability",
+    "build_checker_runner_registry",
     "declaration_schema",
     "evaluate_applicability",
     "evaluator_fixture_schema",
