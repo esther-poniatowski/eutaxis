@@ -55,7 +55,15 @@ from .facets import (
     facet_registry_path,
     load_facet_registry,
 )
-from .applicability import TruthValue, conjoin_applicability, evaluate_applicability
+from .applicability import (
+    ApplicabilityTrace,
+    AtomicApplicabilityTrace,
+    BooleanApplicabilityTrace,
+    TruthValue,
+    conjoin_applicability,
+    evaluate_applicability,
+    evaluate_applicability_with_trace,
+)
 from .loader import (
     LoadedDeclarationSource,
     load_declaration,
@@ -134,8 +142,11 @@ from .static_query import StaticCatalogQuery, StaticField, StaticPredicate
 
 __all__ = [
     "Action",
+    "ApplicabilityTrace",
+    "AtomicApplicabilityTrace",
     "AnyDeclaration",
     "Binding",
+    "BooleanApplicabilityTrace",
     "CheckerExecutionError",
     "CheckerResult",
     "CheckerRunner",
@@ -227,6 +238,7 @@ __all__ = [
     "declaration_registry_checker",
     "declaration_registry_checker_binding",
     "evaluate_applicability",
+    "evaluate_applicability_with_trace",
     "execute_checker",
     "execute_known_failure_fixtures",
     "execute_operation",

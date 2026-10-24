@@ -117,7 +117,7 @@ More than one rule may give candidate anchors to the same record. When the manif
 
 For example, a record named directly at rank 3 keeps rank 3 when a policy also introduces the record from rank 0. By contrast, a prerequisite inherited from dependants at ranks 0 and 2 takes rank 0. A direct anchor can conflict with the required order of `sections`. In that case, the resolver preserves the authored anchor, and the composer rejects the backward edge.
 
-Second, the trace states why each predicate matched. The same trace states why each record remained or disappeared. Only the resolver can issue the certified unit. The composer accepts that unit and never infers absent edges or records from raw sources.
+Second, the evaluator returns a predicate tree. Every node pairs a normalized predicate with its computed truth value. While inheriting parent predicates, the loader may place both predicates below a new `all` node. Consequently, node paths address the normalized tree rather than the source text. The resolver attaches source coordinates to each record. For every record, a semantic event explains whether the resolver retained or removed it. Only the resolver can issue the certified unit. The composer accepts that unit and never infers absent edges or records from raw sources.
 
 ## Validation
 

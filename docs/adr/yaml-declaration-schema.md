@@ -92,6 +92,22 @@ An unknown facet fails even inside an untested branch. By contrast, the local lo
 
 The registry checks every supplied runtime context key and value before it evaluates a predicate. Unknown keys and values outside the registered schema fail rather than returning false. Missing keys remain valid input to the strong Kleene logic.
 
+The traced evaluator returns the normalized predicate tree. Every node records its computed truth value. For each atomic node, the trace records the facet name and its presence. The trace retains the observed value when the facet is present. For `equals` and `in`, the trace also retains the authored comparison operand. The Boolean `observed_present` field distinguishes a missing facet from a facet whose value is JSON `null`. Both observed values and authored operands may be sensitive. Therefore, callers must apply a disclosure policy before logging or serializing a trace.
+
+Both evaluator interfaces run three checks before applying missing-facet semantics:
+
+- accept only a supported operator
+- require a sequence operand for `in`
+- require JSON comparison operands
+
+The canonical source loader additionally performs three checks:
+
+- require or forbid each field according to the operator
+- reject every undeclared field
+- require at least one distinct alternative for `in`
+
+The former scalar evaluator returned `unknown` for some rejected input when the facet was absent. Schema-valid normalized predicates keep the same strong-Kleene results.
+
 Each operator acts uniformly across the JSON domain:
 
 - `exists` tests whether the key is present, including when its value is null

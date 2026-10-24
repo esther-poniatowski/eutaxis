@@ -108,6 +108,7 @@ This phase first turns the validated registry into a static query boundary. Then
 - [x] Implement immutable exact lookups and deterministic JSON indexing over the validated registry.
 - [x] Validate and load persisted indexes into immutable query views without rebuilding source records.
 - [x] Apply exact static field predicates to live and persisted catalogs, and verify that both produce identical ordered keys.
+- [x] Evaluate each applicability predicate and build its immutable trace through one strong-Kleene implementation.
 - [ ] Derive enforcement classes from evaluator contracts in the enforcement phase, then expose their static filter.
 - [ ] Keep the rendered-Markdown parser behind its current public behavior until migration proves its final disposition.
 - [ ] Implement the monotone candidate/excluded/required/effective algorithm and provenance-bearing explanation traces.
