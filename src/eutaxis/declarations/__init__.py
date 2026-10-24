@@ -71,6 +71,13 @@ from .registry import (
     RegisteredDeclaration,
     load_declaration_registry,
 )
+from .registry_checker import (
+    DECLARATION_REGISTRY_EVALUATOR,
+    DECLARATION_REGISTRY_INPUT_REVISION,
+    LOAD_DECLARATION_REGISTRY_OPERATION,
+    declaration_registry_checker,
+    declaration_registry_checker_binding,
+)
 from .runners import (
     CheckerRunner,
     CheckerRunnerBinding,
@@ -97,6 +104,8 @@ __all__ = [
     "DeclarationError",
     "DeclarationRegistry",
     "DeclarationRegistryError",
+    "DECLARATION_REGISTRY_EVALUATOR",
+    "DECLARATION_REGISTRY_INPUT_REVISION",
     "DeclarationKind",
     "DeclarationSchemaError",
     "DeclarationSemanticError",
@@ -116,6 +125,7 @@ __all__ = [
     "FacetRegistrySemanticError",
     "LiteralBinding",
     "LoadedDeclarationSource",
+    "LOAD_DECLARATION_REGISTRY_OPERATION",
     "ManifestSection",
     "Norm",
     "OperationDeclaration",
@@ -134,6 +144,8 @@ __all__ = [
     "conjoin_applicability",
     "build_checker_runner_registry",
     "declaration_schema",
+    "declaration_registry_checker",
+    "declaration_registry_checker_binding",
     "evaluate_applicability",
     "execute_checker",
     "execute_known_failure_fixtures",
