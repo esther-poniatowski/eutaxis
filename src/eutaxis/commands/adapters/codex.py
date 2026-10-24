@@ -37,6 +37,7 @@ import yaml
 
 from ..exceptions import CommandError
 from ..models import ArtifactFile, CommandSource
+from ..names import is_skill_name
 from ..templating import render as render_template
 
 
@@ -52,10 +53,18 @@ class CodexAdapter:
     def artifact_dir(
         self, command_name: str, scope: str, *, home: Path, project_root: Path
     ) -> Path:
+        if not is_skill_name(command_name):
+            raise CommandError(f"Unsafe Skill name: {command_name!r}")
+        root = self.skills_root(scope, home=home, project_root=project_root)
+        return root / command_name
+
+    def skills_root(
+        self, scope: str, *, home: Path, project_root: Path
+    ) -> Path:
         if scope == "user":
-            return home / ".agents" / "skills" / command_name
+            return home / ".agents" / "skills"
         if scope == "project":
-            return project_root / ".agents" / "skills" / command_name
+            return project_root / ".agents" / "skills"
         raise CommandError(f"Unknown scope: {scope!r}")
 
     def skill_frontmatter(

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from eutaxis.commands.exceptions import CommandError
 from eutaxis.commands.models import InstallRecord
 from eutaxis.commands.registry import Registry, RegistryCorruptedError
 
@@ -28,6 +30,43 @@ def test_upsert_round_trip(tmp_path: Path) -> None:
     reg.upsert(_record("beta"))
     rows = sorted(reg.load(), key=lambda r: r.name)
     assert [r.name for r in rows] == ["alpha", "beta"]
+
+
+def test_project_records_are_distinguished_by_path(tmp_path: Path) -> None:
+    reg = Registry(tmp_path / "state")
+    first = replace(
+        _record("alpha"), scope="project", path=tmp_path / "a"
+    )
+    second = replace(first, path=tmp_path / "b")
+
+    reg.upsert(first)
+    reg.upsert(second)
+    reg.remove(
+        name="alpha",
+        adapter="claude",
+        scope="project",
+        path=first.path,
+    )
+
+    assert reg.find(
+        name="alpha",
+        adapter="claude",
+        scope="project",
+        path=first.path,
+    ) is None
+    assert reg.find(
+        name="alpha",
+        adapter="claude",
+        scope="project",
+        path=second.path,
+    ) == second
+
+
+def test_project_lookup_requires_path(tmp_path: Path) -> None:
+    reg = Registry(tmp_path / "state")
+
+    with pytest.raises(CommandError, match="require a path"):
+        reg.find(name="alpha", adapter="claude", scope="project")
 
 
 def test_truncated_registry_raises_actionable_error(tmp_path: Path) -> None:

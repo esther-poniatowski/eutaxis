@@ -42,9 +42,12 @@ eutaxis generate -c <config-file>
 | `--root` | `-r` | config parent or config `root` | Root used to resolve relative source and target paths. |
 | `--agent` | `-a` | all enabled agents | Generate only one configured agent output. |
 | `--dry-run` | `-n` | `false` | Show output targets without writing files. |
+| `--plan` | | `false` | With `--dry-run`, summarize cumulative-file drift and budgets. |
 | `--ignore-budget` | | `false` | Skip generated-target and cumulative-chain budget failures. |
 
 The generator reads the YAML config, resolves all source paths relative to the configured root, and writes one output file per enabled agent. See [Configuration](configuration.md) for the full schema.
+
+The command `eutaxis generate --dry-run --plan` reports the planned state of each target. For a changed target, it reports added and removed line counts without printing the complete generated file. The report also gives every generated-target and cumulative-chain byte budget.
 
 A label line that violates the [label grammar](concepts.md#rule-blocks) defines no rule, so the rule index omits that line. Each such line of a declared module is reported on standard error, with its file, its line and the violated part of the grammar. Under the configuration key `strict_rule_labels: true`, a rejected line fails the command before any file is written.
 
@@ -124,6 +127,7 @@ eutaxis skills show <name> -c <config-file> [--agent claude|codex]
 eutaxis skills install <name|all> -c <config-file> [--agent <agent>] [--scope user|project]
 eutaxis skills uninstall <name> -c <config-file> [--agent <agent>] [--scope user|project]
 eutaxis skills diff [<name>] -c <config-file>
+eutaxis skills sync -c <config-file> [--agent <agent>] [--scope user|project] [--project <root>] [--apply]
 eutaxis skills budget -c <config-file> [--agent claude|codex]
 ```
 
@@ -134,6 +138,7 @@ eutaxis skills budget -c <config-file> [--agent claude|codex]
 | `install` | Install one Skill artifact (by name) or all artifacts (`all`) into the selected adapter and scope. |
 | `uninstall` | Remove one installed Skill artifact from the selected adapter and scope. |
 | `diff` | Show drift between rendered output and installed artifacts. |
+| `sync` | Preview or apply the complete configured Skill set and remove retired artifacts recorded for this configuration. |
 | `budget` | Measure every rendered entrypoint and declared loading unit against its configured byte limit. |
 
 The failure-mode gate ([failure-mode-as-source-field](../adr/failure-mode-as-source-field.md)) applies at render time: the renderer refuses to emit a `model-invoked` artifact from a silent-failure source and a `user-invoked` artifact whose `required-visibility` is `pre-invocation`. There is no `--force` escape for these checks.
@@ -141,6 +146,18 @@ The failure-mode gate ([failure-mode-as-source-field](../adr/failure-mode-as-sou
 A source whose frontmatter declares `disclosure: progressive` compiles to a [split Skill](concepts.md#progressive-disclosure): an index in `SKILL.md` and one file per rule under `rules/`. The commands `show`, `install` and `diff` handle the rule files together with the other files of the artifact.
 
 The compiler rewrites the relative links of each emitted file, as described in [Links between modules](concepts.md#links-between-modules). The commands `show`, `install` and `diff` report on standard error each relative link whose target does not exist, with the source file and the line of the link.
+
+The `sync` command previews changes unless the caller passes `--apply`. During preview, the command renders every configured artifact. The preview rejects populated targets that lack an Eutaxis ownership marker.
+
+With `--apply`, the command:
+
+- installs every configured Skill first;
+- protects every name recorded by another configuration;
+- removes a marked artifact only when this configuration's preceding record contained its name;
+- records the resulting set for the configuration, adapter, and deployment target after all writes and removals succeed;
+- leaves every unmarked directory unchanged.
+
+The first successful sync writes the configuration record. For project scope, Eutaxis records the resolved root. Therefore, one configuration can manage each project independently. The configuration record does not include artifacts installed by other configurations. A corrupted install registry or sync manifest blocks the plan before any write. Each apply stage is idempotent, but the stages can succeed separately. After a write failure, correct its cause and run the same command again.
 
 Exit codes of `diff`:
 

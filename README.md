@@ -53,6 +53,7 @@ Additional agents are added by registering one adapter in `src/eutaxis/commands/
 - [X] **Skill compilation** — compile on-demand rule sets into native Agent Skill artifacts.
 - [X] **Rule query** — print one rule, or one field of it, without loading its module; optionally compile each rule of a Skill into its own file.
 - [X] **Drift detection** — compare configuration, sources, and on-disk targets; usable as a CI gate.
+- [X] **Skill synchronization** — preview and apply a complete configured Skill set while preserving unowned directories.
 - [X] **Registry hygiene** — surface instruction files present on disk but absent from the configuration, and vice versa.
 - [X] **Loading-budget validation** — measure each configured loading route independently.
 - [X] **Project scaffolding** — initialise a starter instruction layout in a project.

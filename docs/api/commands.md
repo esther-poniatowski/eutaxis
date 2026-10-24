@@ -134,7 +134,7 @@ Return all install records currently on disk.
 
 #### upsert(record)
 
-Insert or replace the record matching (name, adapter, scope).
+Insert or replace the record for the same deployment target.
 
 * **Parameters:**
   **record** ([*InstallRecord*](#eutaxis.commands.models.InstallRecord))
@@ -143,7 +143,7 @@ Insert or replace the record matching (name, adapter, scope).
 
 <a id="eutaxis.commands.registry.Registry.remove"></a>
 
-#### remove(\*, name, adapter, scope)
+#### remove(\*, name, adapter, scope, path=None)
 
 Drop the matching record and return it, if any.
 
@@ -151,12 +151,13 @@ Drop the matching record and return it, if any.
   * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
   [*InstallRecord*](#eutaxis.commands.models.InstallRecord) | None
 
 <a id="eutaxis.commands.registry.Registry.find"></a>
 
-#### find(\*, name, adapter, scope)
+#### find(\*, name, adapter, scope, path=None)
 
 Return the matching record, if any.
 
@@ -164,6 +165,7 @@ Return the matching record, if any.
   * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
   [*InstallRecord*](#eutaxis.commands.models.InstallRecord) | None
 
@@ -859,6 +861,156 @@ missing or empty directory is not an artifact and yields `False`.
 * **Return type:**
   [bool](https://docs.python.org/3/builtins/functions.html#bool)
 
+<a id="module-eutaxis.commands.synchronization"></a>
+
+<a id="synchronization"></a>
+
+## Synchronization
+
+Plan and apply the complete config-registered Skill set.
+
+<a id="eutaxis.commands.synchronization.SkillSyncManifest"></a>
+
+### *class* eutaxis.commands.synchronization.SkillSyncManifest(state_dir, config_path)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Skill names recorded for one configuration, adapter, and scope.
+
+* **Parameters:**
+  * **state_dir** (*Path*)
+  * **config_path** (*Path*)
+
+<a id="eutaxis.commands.synchronization.SkillSyncManifest.managed_names"></a>
+
+#### managed_names(\*, adapter, scope, project_root)
+
+Return names recorded for one adapter and scope.
+
+* **Parameters:**
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [frozenset](https://docs.python.org/3/builtins/stdtypes.html#frozenset)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)]
+
+<a id="eutaxis.commands.synchronization.SkillSyncManifest.names_managed_by_other_configs"></a>
+
+#### names_managed_by_other_configs(\*, adapter, scope, project_root)
+
+Return names claimed by every other configuration manifest.
+
+* **Parameters:**
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [frozenset](https://docs.python.org/3/builtins/stdtypes.html#frozenset)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)]
+
+<a id="eutaxis.commands.synchronization.SkillSyncManifest.update"></a>
+
+#### update(\*, scope, project_root, names_by_adapter)
+
+Atomically record the successful result for selected adapters.
+
+* **Parameters:**
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **names_by_adapter** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *]*)
+* **Return type:**
+  None
+
+<a id="eutaxis.commands.synchronization.SkillSyncManifest.locked"></a>
+
+#### locked()
+
+Serialize plans and writes across configuration manifests.
+
+* **Return type:**
+  [*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator)[None]
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction"></a>
+
+### *class* eutaxis.commands.synchronization.SkillSyncAction(action, name, adapter, scope, path, source=None, warnings=())
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+One planned change to an installed Skill.
+
+* **Parameters:**
+  * **action** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **adapter** (*AgentAdapter*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource) *|* *None*)
+  * **warnings** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction.action"></a>
+
+#### action *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction.name"></a>
+
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction.adapter"></a>
+
+#### adapter *: AgentAdapter*
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction.scope"></a>
+
+#### scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction.path"></a>
+
+#### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction.source"></a>
+
+#### source *: [CommandSource](#eutaxis.commands.models.CommandSource) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction.warnings"></a>
+
+#### warnings *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
+
+<a id="eutaxis.commands.synchronization.plan_skill_sync"></a>
+
+### eutaxis.commands.synchronization.plan_skill_sync(sources, adapters, \*, scope, project_root, home, managed_names_by_adapter=None, protected_names_by_adapter=None)
+
+Plan installs and removals without modifying installed Skills.
+
+Render every configured source while building the plan. Any populated
+target without an Eutaxis ownership marker blocks the complete plan. The
+plan considers only names recorded by this configuration. A retired
+name enters the plan only while its directory carries an Eutaxis marker.
+Skills managed by other configurations cannot enter the removal set.
+
+* **Parameters:**
+  * **sources** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*CommandSource*](#eutaxis.commands.models.CommandSource) *]*)
+  * **adapters** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[**AgentAdapter* *]*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **managed_names_by_adapter** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *]*  *|* *None*)
+  * **protected_names_by_adapter** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *]*  *|* *None*)
+* **Return type:**
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction), …]
+
+<a id="eutaxis.commands.synchronization.apply_skill_sync"></a>
+
+### eutaxis.commands.synchronization.apply_skill_sync(actions, \*, project_root, home, registry)
+
+Apply every planned Skill change and return the resulting states.
+
+* **Parameters:**
+  * **actions** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction) *,*  *...* *]*)
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
+* **Return type:**
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction), …]
+
 <a id="module-eutaxis.commands.skill_budgets"></a>
 
 <a id="loading-budgets"></a>
@@ -1483,6 +1635,17 @@ Compile a command source into a Claude skill directory.
 * **Return type:**
   [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
+<a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.skills_root"></a>
+
+#### skills_root(scope, \*, home, project_root)
+
+* **Parameters:**
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
+
 <a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.skill_frontmatter"></a>
 
 #### skill_frontmatter(source, \*, rendered_body)
@@ -1567,6 +1730,17 @@ Compile a command source into a Codex skill directory.
 
 * **Parameters:**
   * **command_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
+
+<a id="eutaxis.commands.adapters.codex.CodexAdapter.skills_root"></a>
+
+#### skills_root(scope, \*, home, project_root)
+
+* **Parameters:**
   * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))

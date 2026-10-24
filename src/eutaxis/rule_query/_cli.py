@@ -158,9 +158,7 @@ def _catalog(
 def _user_skills_dir(agent: str) -> Path:
     """Return the user-scope skills directory that ``agent`` installs into."""
     adapter = get_adapter(agent)
-    return adapter.artifact_dir(
-        "_", "user", home=Path.home(), project_root=Path.cwd()
-    ).parent
+    return adapter.skills_root("user", home=Path.home(), project_root=Path.cwd())
 
 
 def _fail(exc: Exception) -> NoReturn:

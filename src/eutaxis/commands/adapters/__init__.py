@@ -28,7 +28,10 @@ class AgentAdapter(Protocol):
         Adapter identifier (``"claude"``, ``"codex"``, ...).
     """
 
-    name: str
+    @property
+    def name(self) -> str:
+        """Adapter identifier used in configuration and output paths."""
+        ...
 
     def supports_scope(self, scope: str) -> bool:
         """Whether ``scope`` (``"user"`` or ``"project"``) is supported."""
@@ -37,6 +40,11 @@ class AgentAdapter(Protocol):
         self, command_name: str, scope: str, *, home: Path, project_root: Path
     ) -> Path:
         """Return the on-disk directory of an installed skill artifact."""
+
+    def skills_root(
+        self, scope: str, *, home: Path, project_root: Path
+    ) -> Path:
+        """Return the directory containing installed Skill artifacts."""
 
     def skill_frontmatter(
         self, source: CommandSource, *, rendered_body: str

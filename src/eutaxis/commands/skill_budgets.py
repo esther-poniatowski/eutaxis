@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..instructions.loading_units import expand_loading_unit
 from ..instructions.models import InstructionConfig, SkillLoadingUnit
 from .adapters import AgentAdapter
 from .exceptions import CommandRenderError
@@ -111,10 +112,9 @@ def _loading_unit_measurement(
     rendered: dict[str, RenderedArtifact],
     adapter_name: str,
 ) -> SkillBudgetMeasurement:
-    loading_unit_by_name = {item.name: item for item in loading_units}
     files = _loading_unit_files(
         loading_unit,
-        loading_unit_by_name,
+        loading_units,
         rendered,
         adapter_name,
     )
@@ -130,21 +130,12 @@ def _loading_unit_measurement(
 
 def _loading_unit_files(
     loading_unit: SkillLoadingUnit,
-    loading_units: dict[str, SkillLoadingUnit],
+    loading_units: list[SkillLoadingUnit],
     rendered: dict[str, RenderedArtifact],
     adapter_name: str,
 ) -> dict[str, str]:
     files: dict[str, str] = {}
-    for included_name in loading_unit.includes:
-        files.update(
-            _loading_unit_files(
-                loading_units[included_name],
-                loading_units,
-                rendered,
-                adapter_name,
-            )
-        )
-    for member in loading_unit.members:
+    for member in expand_loading_unit(loading_unit, loading_units):
         try:
             artifact = rendered[member.module]
         except KeyError as exc:

@@ -8,6 +8,7 @@ from typing import Any
 import yaml
 
 from .exceptions import ConfigurationError
+from .loading_units import validate_loading_units
 from .markdown import parse_frontmatter
 from .models import (
     AgentConfig,
@@ -97,7 +98,10 @@ class ConfigLoader:
         )
 
         self._resolve_descriptions(config)
-        self._validate_skill_loading_units(config)
+        validate_loading_units(
+            config.skill_loading_units,
+            (module.id for module in config.task_modules),
+        )
         self._validate_instruction_chains(config)
         return config
 
@@ -332,50 +336,6 @@ class ConfigLoader:
                 )
             )
         return tuple(members)
-
-    def _validate_skill_loading_units(self, config: InstructionConfig) -> None:
-        module_ids = {module.id for module in config.task_modules}
-        unit_names = {unit.name for unit in config.skill_loading_units}
-        for unit in config.skill_loading_units:
-            unknown = sorted(
-                member.module
-                for member in unit.members
-                if member.module not in module_ids
-            )
-            if unknown:
-                raise ConfigurationError(
-                    f"Skill loading unit '{unit.name}' references "
-                    f"unknown task modules: {', '.join(unknown)}"
-                )
-            unknown_includes = sorted(set(unit.includes) - unit_names)
-            if unknown_includes:
-                raise ConfigurationError(
-                    f"Skill loading unit '{unit.name}' includes unknown "
-                    f"units: {', '.join(unknown_includes)}"
-                )
-
-        units_by_name = {
-            unit.name: unit for unit in config.skill_loading_units
-        }
-        visited: set[str] = set()
-        active: list[str] = []
-
-        def visit(name: str) -> None:
-            if name in active:
-                cycle = " -> ".join([*active[active.index(name) :], name])
-                raise ConfigurationError(
-                    f"Skill loading units form a cycle: {cycle}"
-                )
-            if name in visited:
-                return
-            active.append(name)
-            for included in units_by_name[name].includes:
-                visit(included)
-            active.pop()
-            visited.add(name)
-
-        for name in units_by_name:
-            visit(name)
 
     def _parse_instruction_chains(self, raw_chains: Any) -> list[InstructionChain]:
         if raw_chains is None:

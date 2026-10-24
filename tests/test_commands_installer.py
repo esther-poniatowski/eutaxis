@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from eutaxis.commands import (
     uninstall_command,
 )
 from eutaxis.commands.installer import diff_command
+from eutaxis.commands.models import AdapterPassthrough
 from eutaxis.commands.registry import Registry
 from eutaxis.commands.rendering import (
     ENTRYPOINT_FILENAME,
@@ -104,6 +106,47 @@ def test_install_then_unchanged_then_uninstall(isolated) -> None:
     assert out.action == "removed"
     assert not first.path.exists()
     assert registry.find(name="clean-memory", adapter="claude", scope="user") is None
+
+
+def test_unchanged_install_repairs_missing_registry_record(
+    isolated,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home, project, registry = isolated
+    src = _builtin_source(home, project)
+    adapter = get_adapter("claude")
+    working_upsert = registry.upsert
+
+    def fail_upsert(_record) -> None:
+        raise RuntimeError("planted registry write failure")
+
+    monkeypatch.setattr(registry, "upsert", fail_upsert)
+    with pytest.raises(RuntimeError, match="planted registry write failure"):
+        install_command(
+            src,
+            adapter,
+            scope="user",
+            project_root=project,
+            home=home,
+            registry=registry,
+        )
+    target = home / ".claude" / "skills" / "clean-memory"
+    assert target.is_dir()
+    assert registry.find(name="clean-memory", adapter="claude", scope="user") is None
+
+    monkeypatch.setattr(registry, "upsert", working_upsert)
+    outcome = install_command(
+        src,
+        adapter,
+        scope="user",
+        project_root=project,
+        home=home,
+        registry=registry,
+    )
+
+    assert outcome.action == "unchanged"
+    record = registry.find(name="clean-memory", adapter="claude", scope="user")
+    assert record is not None and record.path == target
 
 
 def test_project_scope_installs_both_adapters(isolated) -> None:
@@ -202,3 +245,140 @@ def test_diff_reports_drift(isolated) -> None:
         project_root=project, home=home,
     )
     assert diff
+
+
+@pytest.mark.parametrize("unsafe_path", ["../outside.txt", "/tmp/outside.txt"])
+def test_install_rejects_sibling_path_outside_artifact(
+    isolated,
+    unsafe_path: str,
+) -> None:
+    home, project, registry = isolated
+    source = replace(
+        _builtin_source(home, project),
+        adapters={
+            "claude": AdapterPassthrough(files={unsafe_path: "escape\n"})
+        },
+    )
+
+    with pytest.raises(OwnershipError, match="unsafe path"):
+        install_command(
+            source,
+            get_adapter("claude"),
+            scope="user",
+            project_root=project,
+            home=home,
+            registry=registry,
+        )
+
+    assert not (home / ".claude" / "skills" / "clean-memory").exists()
+
+
+def test_install_rejects_sibling_path_through_parent_symlink(isolated) -> None:
+    home, project, registry = isolated
+    source = _builtin_source(home, project)
+    adapter = get_adapter("claude")
+    installed = install_command(
+        source,
+        adapter,
+        scope="user",
+        project_root=project,
+        home=home,
+        registry=registry,
+    )
+    entrypoint = installed.path / ENTRYPOINT_FILENAME
+    original = entrypoint.read_text(encoding="utf-8")
+    outside = home / "outside"
+    outside.mkdir()
+    victim = outside / "victim.txt"
+    victim.write_text("keep", encoding="utf-8")
+    (installed.path / "escape").symlink_to(outside, target_is_directory=True)
+    source = replace(
+        source,
+        adapters={
+            "claude": AdapterPassthrough(
+                files={"escape/victim.txt": "replace\n"}
+            )
+        },
+    )
+
+    with pytest.raises(OwnershipError, match="outside its artifact"):
+        install_command(
+            source,
+            adapter,
+            scope="user",
+            project_root=project,
+            home=home,
+            registry=registry,
+        )
+
+    assert victim.read_text(encoding="utf-8") == "keep"
+    assert entrypoint.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.parametrize("unsafe_path", ["../outside.txt", "/tmp/outside.txt"])
+def test_uninstall_rejects_sidecar_paths_outside_artifact(
+    isolated,
+    unsafe_path: str,
+) -> None:
+    home, project, registry = isolated
+    src = _builtin_source(home, project)
+    adapter = get_adapter("claude")
+    installed = install_command(
+        src,
+        adapter,
+        scope="user",
+        project_root=project,
+        home=home,
+        registry=registry,
+    )
+    sidecar_path = installed.path / SIDECAR_FILENAME
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    sidecar["files"].append({"path": unsafe_path, "sha256": "tampered"})
+    sidecar_path.write_text(json.dumps(sidecar), encoding="utf-8")
+
+    with pytest.raises(OwnershipError, match="unsafe path"):
+        uninstall_command(
+            name=src.name,
+            adapter=adapter,
+            scope="user",
+            project_root=project,
+            home=home,
+            registry=registry,
+        )
+
+    assert (installed.path / ENTRYPOINT_FILENAME).is_file()
+
+
+def test_uninstall_rejects_sidecar_path_through_parent_symlink(isolated) -> None:
+    home, project, registry = isolated
+    src = _builtin_source(home, project)
+    adapter = get_adapter("claude")
+    installed = install_command(
+        src,
+        adapter,
+        scope="user",
+        project_root=project,
+        home=home,
+        registry=registry,
+    )
+    outside = home / "outside"
+    outside.mkdir()
+    victim = outside / "victim.txt"
+    victim.write_text("keep", encoding="utf-8")
+    (installed.path / "escape").symlink_to(outside, target_is_directory=True)
+    sidecar_path = installed.path / SIDECAR_FILENAME
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    sidecar["files"].append({"path": "escape/victim.txt", "sha256": "tampered"})
+    sidecar_path.write_text(json.dumps(sidecar), encoding="utf-8")
+
+    with pytest.raises(OwnershipError, match="outside its artifact"):
+        uninstall_command(
+            name=src.name,
+            adapter=adapter,
+            scope="user",
+            project_root=project,
+            home=home,
+            registry=registry,
+        )
+
+    assert victim.read_text(encoding="utf-8") == "keep"

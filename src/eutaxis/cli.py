@@ -62,6 +62,11 @@ def cli_generate(
         "-n",
         help="Show targets without writing files.",
     ),
+    plan: bool = typer.Option(
+        False,
+        "--plan",
+        help="With --dry-run, report target drift and all cumulative budgets.",
+    ),
     ignore_budget: bool = typer.Option(
         False,
         "--ignore-budget",
@@ -77,6 +82,10 @@ def cli_generate(
     from pathlib import Path as P
     from .instructions import InstructionError, InstructionGenerator, load_config
 
+    if plan and not dry_run:
+        typer.echo("Error: --plan requires --dry-run.", err=True)
+        raise typer.Exit(code=2)
+
     try:
         loaded = load_config(P(config), root=P(root) if root else None)
         generator = InstructionGenerator(loaded)
@@ -90,10 +99,77 @@ def cli_generate(
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=exc.exit_code) from exc
 
+    if plan:
+        _echo_generation_plan(generator, agent_name=agent)
+        return
+
     verb = "Would generate" if dry_run else "Generated"
     typer.echo(f"{verb} {len(paths)} instruction file(s):")
     for path in paths:
         typer.echo(f"  - {path}")
+
+
+def _echo_generation_plan(
+    generator: "InstructionGenerator",
+    *,
+    agent_name: str | None,
+) -> None:
+    """Report cumulative target drift and budgets without printing full files."""
+    budgets = {
+        agent.name: (size, limit)
+        for agent, size, limit in generator.budget_report(agent_name=agent_name)
+    }
+    for agent, path, differs in generator.diff_report(agent_name=agent_name):
+        size, limit = budgets[agent.name]
+        status = "CREATE" if differs and not path.exists() else "UPDATE"
+        if not differs:
+            status = "UNCHANGED"
+        limit_text = "unlimited" if limit is None else str(limit)
+        change_text = ""
+        if differs:
+            added, removed = _line_changes(generator.unified_diff(agent.name))
+            change_text = f", +{added}/-{removed} lines"
+        typer.echo(
+            f"[{status:9}] {agent.name} [{size}/{limit_text} B{change_text}]: "
+            f"{path}"
+        )
+
+    if agent_name is None:
+        standalone = generator.standalone_rule_index_diff()
+        if standalone is not None:
+            path, content, diff = standalone
+            status = "CREATE" if diff and not path.exists() else "UPDATE"
+            if not diff:
+                status = "UNCHANGED"
+            change_text = ""
+            if diff:
+                added, removed = _line_changes(diff)
+                change_text = f", +{added}/-{removed} lines"
+            typer.echo(
+                f"[{status:9}] rule-index "
+                f"[{len(content.encode('utf-8'))} B{change_text}]: {path}"
+            )
+
+    for chain, size, limit in generator.instruction_chain_budget_report(
+        agent_name=agent_name
+    ):
+        typer.echo(
+            f"[CHAIN    ] {chain.name} [{size}/{limit} B]: "
+            f"{chain.agent} + {len(chain.sources)} project file(s)"
+        )
+
+
+def _line_changes(diff: str) -> tuple[int, int]:
+    """Count lines added and deleted in one unified diff."""
+    added = sum(
+        line.startswith("+") and not line.startswith("+++")
+        for line in diff.splitlines()
+    )
+    removed = sum(
+        line.startswith("-") and not line.startswith("---")
+        for line in diff.splitlines()
+    )
+    return added, removed
 
 
 @app.command("check")
