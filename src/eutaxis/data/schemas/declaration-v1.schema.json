@@ -26,6 +26,27 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9]*(?:[./-][a-z0-9]+)*$"
     },
+    "context-facet": {
+      "type": "object",
+      "required": ["id", "value-schema"],
+      "properties": {
+        "id": {"$ref": "#/$defs/facet-id"},
+        "value-schema": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "facet-registry": {
+      "type": "object",
+      "required": ["schema-version", "id", "owner", "source-revision", "facets"],
+      "properties": {
+        "schema-version": {"const": 1},
+        "id": {"$ref": "#/$defs/id"},
+        "owner": {"$ref": "#/$defs/id"},
+        "source-revision": {"type": "string", "minLength": 1},
+        "facets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/context-facet"}}
+      },
+      "additionalProperties": false
+    },
     "applicability": {
       "oneOf": [
         {

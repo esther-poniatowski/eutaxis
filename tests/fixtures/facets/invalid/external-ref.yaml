@@ -1,0 +1,8 @@
+schema-version: 1
+id: tests/external-reference
+owner: eutaxis
+source-revision: fixture-1
+facets:
+  - id: task.kind
+    value-schema:
+      $ref: https://example.com/task-kind.schema.json

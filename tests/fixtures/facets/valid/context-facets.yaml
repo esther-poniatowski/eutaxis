@@ -1,0 +1,52 @@
+schema-version: 1
+id: tests/context-facets
+owner: eutaxis
+source-revision: fixture-1
+facets:
+  - id: a
+    value-schema: {type: boolean}
+  - id: artifact.created
+    value-schema: {type: boolean}
+  - id: artifact.written
+    value-schema: {type: boolean}
+  - id: b
+    value-schema: {type: boolean}
+  - id: claim.quantitative
+    value-schema: {type: boolean}
+  - id: context.available
+    value-schema: {type: boolean}
+  - id: filesystem.writable
+    value-schema: {type: boolean}
+  - id: index.valid
+    value-schema: {type: boolean}
+  - id: sample.array
+    value-schema:
+      type: array
+      items: {type: integer}
+  - id: sample.boolean-or-number
+    value-schema: {type: [boolean, number]}
+  - id: sample.integer
+    value-schema: {type: integer}
+  - id: sample.null
+    value-schema: {type: "null"}
+  - id: sample.number
+    value-schema: {type: number}
+  - id: sample.object
+    value-schema:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: {type: boolean}
+      additionalProperties: false
+  - id: request.mode
+    value-schema: {type: string}
+  - id: request.payload
+    value-schema: {type: object}
+  - id: scope.project
+    value-schema: {type: boolean}
+  - id: source.available
+    value-schema: {type: boolean}
+  - id: target.codex
+    value-schema: {type: boolean}
+  - id: value
+    value-schema: {type: integer}

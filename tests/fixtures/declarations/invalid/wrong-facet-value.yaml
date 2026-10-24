@@ -1,0 +1,25 @@
+schema-version: 1
+id: prose/wrong-facet-value
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: artifact.created
+  operator: equals
+  value: "yes"
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: inspect-result
+    modality: must
+    subject: agent
+    action:
+      verb: inspect
+      object: the result
+criteria:
+  - id: result-inspected
+    norms: [inspect-result]
+    evaluator: {id: eutaxis/manual-judgment, version: 1}
+    statement: The result has been inspected.

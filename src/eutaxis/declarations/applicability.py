@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from enum import StrEnum
+import math
 from types import MappingProxyType
 from typing import Mapping
+
+from .facets import FacetRegistry
 
 
 class TruthValue(StrEnum):
@@ -23,13 +26,22 @@ def conjoin_applicability(
 
 
 def evaluate_applicability(
-    predicate: Mapping[str, object], context: Mapping[str, object]
+    predicate: Mapping[str, object],
+    context: Mapping[str, object],
+    facets: FacetRegistry,
 ) -> TruthValue:
-    """Evaluate a normalized applicability predicate under ``context``.
+    """Validate ``context`` and evaluate one normalized predicate.
 
     Missing facets yield ``unknown`` for comparisons and ``false`` for
     ``exists``. Boolean nodes follow strong-Kleene truth tables.
     """
+    return _evaluate_applicability(predicate, facets.validate_context(context))
+
+
+def _evaluate_applicability(
+    predicate: Mapping[str, object], context: Mapping[str, object]
+) -> TruthValue:
+    """Evaluate one predicate under an already validated context."""
     if "all" in predicate:
         values = _children(predicate["all"], context)
         if TruthValue.FALSE in values:
@@ -48,7 +60,7 @@ def evaluate_applicability(
         child = predicate["not"]
         if not isinstance(child, Mapping):
             raise ValueError("applicability 'not' must contain a predicate")
-        value = evaluate_applicability(child, context)
+        value = _evaluate_applicability(child, context)
         if value is TruthValue.UNKNOWN:
             return value
         return TruthValue.FALSE if value is TruthValue.TRUE else TruthValue.TRUE
@@ -88,11 +100,11 @@ def _children(value: object, context: Mapping[str, object]) -> tuple[TruthValue,
         if not isinstance(child, Mapping):
             raise ValueError("applicability child must be a predicate")
         predicates.append(child)
-    return tuple(evaluate_applicability(child, context) for child in predicates)
+    return tuple(_evaluate_applicability(child, context) for child in predicates)
 
 
 def _json_equal(left: object, right: object) -> bool:
-    """Compare JSON values without Python's Boolean-number coercion."""
+    """Compare JSON values with numeric but not Boolean coercion."""
     if isinstance(left, Mapping) and isinstance(right, Mapping):
         return left.keys() == right.keys() and all(
             _json_equal(left[key], right[key]) for key in left
@@ -102,6 +114,10 @@ def _json_equal(left: object, right: object) -> bool:
             _json_equal(left_item, right_item)
             for left_item, right_item in zip(left, right)
         )
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return math.isfinite(left) and math.isfinite(right) and left == right
     if type(left) is not type(right):
         return False
     return left == right

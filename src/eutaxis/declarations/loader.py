@@ -8,6 +8,7 @@ from typing import Mapping, NoReturn, TypedDict, cast
 
 from .applicability import conjoin_applicability
 from .exceptions import DeclarationSemanticError
+from .facets import FacetRegistry, validate_declaration_facets
 from .models import (
     Action,
     AnyDeclaration,
@@ -62,9 +63,25 @@ class _BaseFields(TypedDict):
 
 
 def load_declaration(path: Path) -> AnyDeclaration:
-    """Load, validate, and normalize one canonical YAML declaration."""
+    """Load one declaration through its local source-boundary validation."""
     document, locations = load_yaml_document(path)
     validated = validate_document(document, path=path, locations=locations)
+    _validate_semantics(validated, path=path, locations=locations)
+    return _build_declaration(validated)
+
+
+def load_facet_validated_declaration(
+    path: Path, facets: FacetRegistry
+) -> AnyDeclaration:
+    """Load a declaration after validating every applicability facet."""
+    document, locations = load_yaml_document(path)
+    validated = validate_document(document, path=path, locations=locations)
+    validate_declaration_facets(
+        validated,
+        facets,
+        path=path,
+        locations=locations,
+    )
     _validate_semantics(validated, path=path, locations=locations)
     return _build_declaration(validated)
 

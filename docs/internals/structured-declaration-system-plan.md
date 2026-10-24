@@ -13,7 +13,7 @@ This plan implements the accepted structured-source decisions and assigns only w
 
 Free-form Markdown remains the production source. The loader for schema version 1 rejects malformed source data. The loader returns complete immutable models and conjoins inherited applicability predicates.
 
-The procedure-contract gate passed its adversarial review. Three registry gates remain in the normative contract. The downstream compilation stages remain pending behind them.
+The facet-registry gate passed adversarial review. Two registry gates remain. Eutaxis will compile downstream artifacts only after both gates pass.
 
 ## Decision log and open prerequisites
 
@@ -34,7 +34,7 @@ The normative contract closes through the following gates.
 - [x] Specify and test applicability semantics and explicit policy ordering.
 - [x] Generate typed models from the schema or prove their conformance against the same fixture corpus.
 - [x] Complete and adversarially review the [procedure contract](../adr/yaml-declaration-schema.md).
-- [ ] Add the canonical YAML facet registry and validate applicability values against registered facet types.
+- [x] Add the canonical YAML facet registry and validate applicability values against registered facet types.
 - [ ] Add semantic and versioned-contract indexes, then validate every cross-record contract.
 - [ ] Register representative evaluator and operation contracts. Execute each checker against its named fixtures.
 

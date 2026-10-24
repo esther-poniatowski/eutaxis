@@ -1,0 +1,8 @@
+schema-version: 1
+id: tests/invalid-schema
+owner: eutaxis
+source-revision: fixture-1
+facets:
+  - id: task.kind
+    value-schema:
+      type: unknown-type

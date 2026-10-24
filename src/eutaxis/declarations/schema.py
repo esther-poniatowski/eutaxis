@@ -17,7 +17,7 @@ from jsonschema.exceptions import (  # type: ignore[import-untyped]
 )
 
 from .. import data_path
-from .exceptions import DeclarationSchemaError
+from .exceptions import DeclarationSchemaError, FacetRegistrySchemaError
 from .source import (
     DocumentPath,
     SourceMap,
@@ -71,6 +71,18 @@ def _validator_for_kind(kind: str) -> Draft202012Validator:
     return Draft202012Validator(schema)
 
 
+@lru_cache(maxsize=1)
+def _facet_registry_validator() -> Draft202012Validator:
+    """Return the validator for the separate context-facet registry source."""
+    root = _declaration_schema()
+    schema = {
+        "$schema": root["$schema"],
+        "$defs": root["$defs"],
+        "$ref": "#/$defs/facet-registry",
+    }
+    return Draft202012Validator(schema)
+
+
 def validate_document(
     document: object,
     *,
@@ -98,19 +110,46 @@ def validate_document(
 
     error = _actionable_schema_error(_validator_for_kind(kind).iter_errors(document))
     if error is not None:
-        parts = tuple(error.absolute_path)
-        schema_parts = tuple(error.absolute_schema_path)
-        if "propertyNames" in schema_parts and isinstance(error.instance, str):
-            parts += (error.instance,)
-        if error.validator == "not" and isinstance(error.instance, dict):
-            forbidden = error.schema.get("not", {}).get("required", [])
-            if len(forbidden) == 1 and forbidden[0] in error.instance:
-                parts += (forbidden[0],)
-        unexpected = _unexpected_property(error, parts, source_map)
-        if unexpected is not None:
-            parts += (unexpected,)
+        parts = _schema_error_parts(error, source_map)
         _raise_schema_error(path, parts, error.message, source_map)
     return cast(Mapping[str, object], document)
+
+
+def validate_facet_registry_document(
+    document: object,
+    *,
+    path: Path,
+    locations: SourceMap | None = None,
+) -> Mapping[str, object]:
+    """Validate one canonical context-facet registry document.
+
+    Raises
+    ------
+    FacetRegistrySchemaError
+        If the document violates the normative registry schema.
+    """
+    source_map = locations or {}
+    error = _actionable_schema_error(_facet_registry_validator().iter_errors(document))
+    if error is not None:
+        parts = _schema_error_parts(error, source_map)
+        _raise_facet_registry_error(path, parts, error.message, source_map)
+    return cast(Mapping[str, object], document)
+
+
+def _schema_error_parts(error: ValidationError, locations: SourceMap) -> DocumentPath:
+    """Return the most specific document path exposed by a schema error."""
+    parts = tuple(error.absolute_path)
+    schema_parts = tuple(error.absolute_schema_path)
+    if "propertyNames" in schema_parts and isinstance(error.instance, str):
+        parts += (error.instance,)
+    if error.validator == "not" and isinstance(error.instance, dict):
+        forbidden = error.schema.get("not", {}).get("required", [])
+        if len(forbidden) == 1 and forbidden[0] in error.instance:
+            parts += (forbidden[0],)
+    unexpected = _unexpected_property(error, parts, locations)
+    if unexpected is not None:
+        parts += (unexpected,)
+    return parts
 
 
 def _actionable_schema_error(
@@ -121,7 +160,16 @@ def _actionable_schema_error(
     concrete = [
         error for error in candidates if error.validator != "unevaluatedProperties"
     ]
-    return best_match(concrete or candidates)
+    selected = best_match(concrete or candidates)
+    while (
+        selected is not None
+        and selected.context
+        and selected.validator == "oneOf"
+        and isinstance(selected.instance, Mapping)
+        and "operator" in selected.instance
+    ):
+        selected = best_match(selected.context)
+    return selected
 
 
 def _unexpected_property(
@@ -227,6 +275,23 @@ def _raise_schema_error(
     """Raise a schema error at the closest known source position."""
     source = nearest_location(locations, parts)
     raise DeclarationSchemaError(
+        path,
+        format_document_path(parts),
+        message,
+        line=source.line if source else None,
+        column=source.column if source else None,
+    )
+
+
+def _raise_facet_registry_error(
+    path: Path,
+    parts: DocumentPath,
+    message: str,
+    locations: SourceMap,
+) -> NoReturn:
+    """Raise a registry-schema error at the closest known source position."""
+    source = nearest_location(locations, parts)
+    raise FacetRegistrySchemaError(
         path,
         format_document_path(parts),
         message,

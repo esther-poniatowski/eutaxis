@@ -11,7 +11,7 @@ import yaml
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode, Node, SequenceNode
 
-from .exceptions import DeclarationSchemaError
+from .exceptions import DeclarationSchemaError, FacetRegistrySchemaError
 
 PathPart: TypeAlias = str | int
 DocumentPath: TypeAlias = tuple[PathPart, ...]
@@ -26,6 +26,9 @@ class SourceLocation:
 
 
 SourceMap: TypeAlias = Mapping[DocumentPath, SourceLocation]
+SchemaErrorType: TypeAlias = (
+    type[DeclarationSchemaError] | type[FacetRegistrySchemaError]
+)
 
 
 class _CanonicalLoader(yaml.SafeLoader):
@@ -67,31 +70,35 @@ class _CanonicalLoader(yaml.SafeLoader):
         return super().construct_mapping(node, deep=deep)
 
 
-def load_yaml_document(path: Path) -> tuple[object, dict[DocumentPath, SourceLocation]]:
+def load_yaml_document(
+    path: Path,
+    *,
+    error_type: SchemaErrorType = DeclarationSchemaError,
+) -> tuple[object, dict[DocumentPath, SourceLocation]]:
     """Load one YAML document and return its value and source map.
 
     Raises
     ------
-    DeclarationSchemaError
+    DeclarationSchemaError or FacetRegistrySchemaError
         If the file cannot be read or the YAML source is invalid.
     """
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise DeclarationSchemaError(path, "$", str(exc)) from exc
+        raise error_type(path, "$", str(exc)) from exc
 
     loader = _CanonicalLoader(text)
     try:
         node = loader.get_single_node()
         if node is None:
-            raise DeclarationSchemaError(path, "$", "declaration is empty")
+            raise error_type(path, "$", "source is empty")
         document = loader.construct_document(node)
         locations: dict[DocumentPath, SourceLocation] = {}
         _collect_locations(node, document, (), locations)
     except yaml.MarkedYAMLError as exc:
         mark = exc.problem_mark
         message = str(exc) if isinstance(exc, ConstructorError) else exc.problem
-        raise DeclarationSchemaError(
+        raise error_type(
             path,
             "$",
             message or str(exc),
@@ -101,7 +108,12 @@ def load_yaml_document(path: Path) -> tuple[object, dict[DocumentPath, SourceLoc
     finally:
         loader.dispose()
 
-    _validate_json_domain(document, path=path, locations=locations)
+    _validate_json_domain(
+        document,
+        path=path,
+        locations=locations,
+        error_type=error_type,
+    )
     return document, locations
 
 
@@ -181,6 +193,7 @@ def _validate_json_domain(
     *,
     path: Path,
     locations: SourceMap,
+    error_type: SchemaErrorType,
     parts: DocumentPath = (),
     active_containers: set[int] | None = None,
 ) -> None:
@@ -189,7 +202,12 @@ def _validate_json_domain(
         active_containers = set()
     if isinstance(value, Mapping):
         identity = _enter_container(
-            value, path=path, locations=locations, parts=parts, active=active_containers
+            value,
+            path=path,
+            locations=locations,
+            parts=parts,
+            active=active_containers,
+            error_type=error_type,
         )
         try:
             for key, item in value.items():
@@ -199,6 +217,7 @@ def _validate_json_domain(
                         locations,
                         parts,
                         f"JSON object key {key!r} is not a string",
+                        error_type=error_type,
                     )
                 _validate_json_domain(
                     item,
@@ -206,13 +225,19 @@ def _validate_json_domain(
                     locations=locations,
                     parts=parts + (key,),
                     active_containers=active_containers,
+                    error_type=error_type,
                 )
         finally:
             active_containers.remove(identity)
         return
     if isinstance(value, list):
         identity = _enter_container(
-            value, path=path, locations=locations, parts=parts, active=active_containers
+            value,
+            path=path,
+            locations=locations,
+            parts=parts,
+            active=active_containers,
+            error_type=error_type,
         )
         try:
             for index, item in enumerate(value):
@@ -222,6 +247,7 @@ def _validate_json_domain(
                     locations=locations,
                     parts=parts + (index,),
                     active_containers=active_containers,
+                    error_type=error_type,
                 )
         finally:
             active_containers.remove(identity)
@@ -235,6 +261,7 @@ def _validate_json_domain(
         locations,
         parts,
         f"{type(value).__name__} is not a JSON value",
+        error_type=error_type,
     )
 
 
@@ -245,6 +272,7 @@ def _enter_container(
     locations: SourceMap,
     parts: DocumentPath,
     active: set[int],
+    error_type: SchemaErrorType = DeclarationSchemaError,
 ) -> int:
     """Enter one JSON container and reject recursive YAML alias graphs."""
     identity = id(value)
@@ -254,6 +282,7 @@ def _enter_container(
             locations,
             parts,
             "cyclic YAML aliases are outside the JSON tree domain",
+            error_type=error_type,
         )
     active.add(identity)
     return identity
@@ -264,10 +293,12 @@ def _raise_domain_error(
     locations: SourceMap,
     parts: DocumentPath,
     message: str,
+    *,
+    error_type: SchemaErrorType,
 ) -> None:
     """Raise one source-located JSON-domain error."""
     source = nearest_location(locations, parts)
-    raise DeclarationSchemaError(
+    raise error_type(
         path,
         format_document_path(parts),
         message,

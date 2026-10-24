@@ -9,7 +9,7 @@ index: "[Architecture decisions](_index.md)"
 
 ## Status
 
-Accepted. The source boundary implements declaration schema version 1. The [normative field contract](../../src/eutaxis/data/schemas/declaration-v1.schema.json) governs its models and fixtures. The next slice adds the checks that require registries.
+Accepted. The [normative field contract](../../src/eutaxis/data/schemas/declaration-v1.schema.json) governs the models and fixtures for declaration schema version 1. The source boundary implements this contract. Eutaxis adds each registry check through a bounded gate. Eutaxis will construct catalogs after those gates pass.
 
 ## Purpose
 
@@ -46,6 +46,54 @@ Applicability is conjunctive across nesting. The normalized version 1 language c
 The boolean nodes use strong Kleene truth tables. `all` returns false if any child is false, true if every child is true, and unknown otherwise. `any` returns true if any child is true, false if every child is false, and unknown otherwise. `not` preserves unknown and reverses true or false. A final unknown is a resolution error. Therefore, `all: [exists(f), equals(f, x)]` returns false when `f` is missing, while an unguarded `equals(f, x)` fails instead of silently omitting the declaration.
 
 A child does not replace its inherited predicate. The loader constructs `all: [<parent>, <child-local>]`, and a norm narrows a rule through the same structural conjunction. This construction proves narrowing without a general implication solver. The resolver reports the expanded normalized predicate and each atomic result. Resolution policies use explicit order rather than an inferred predicate-specificity relation.
+
+## Context-facet registry
+
+One explicitly supplied YAML registry defines the context vocabulary for a typed load. The registry remains separate from the seven-kind declaration union. The registry owns all facet entries and records their owner and source revision:
+
+```yaml
+schema-version: 1
+id: eutaxis/context-facets
+owner: eutaxis
+source-revision: v1
+facets:
+  - id: task.kind
+    value-schema:
+      type: string
+      enum: [writing, programming]
+```
+
+Each facet entry contains only an `id` and a `value-schema`. The registry supplies the owner and source revision once.
+
+A facet value schema uses the self-contained Draft 2020-12 dialect and may use local JSON Pointers. The contract excludes a separate `$id`, a dialect change, and external or dynamic references. The validator follows Draft 2020-12 evaluation paths and rejects any reachable cycle. A schema under `$defs` remains inactive until an evaluation path refers to it. The validator records the `format` keyword without asserting it. Therefore, the check operates without network access or an undeclared format checker.
+
+The typed declaration route checks every applicability predicate while the YAML source map remains available. The route covers:
+
+- common predicates and predicates on member rules
+- predicates that narrow norms or activate exceptions
+- procedure and operation predicates
+- policy predicates
+
+An unknown facet fails even inside an untested branch. By contrast, the local loader checks only the source schema and intrinsic semantics. The local loader does not claim that the registry accepts the declaration.
+
+The registry checks every supplied runtime context key and value before it evaluates a predicate. Unknown keys and values outside the registered schema fail rather than returning false. Missing keys remain valid input to the strong Kleene logic.
+
+Each operator acts uniformly across the JSON domain:
+
+- `exists` tests whether the key is present, including when its value is null
+- `equals` compares the context value with one registered value
+- `in` compares the context value with one or more alternatives; for an array-valued facet, each alternative is an array
+
+Object key order is irrelevant, whereas array order is significant. Booleans remain distinct from numbers. Finite integer and floating-point representations compare numerically.
+
+The following work remains outside schema version 1:
+
+- merging facet registries
+- defining aliases or defaults
+- coercing values
+- deriving facets
+
+A later layer may combine registries only after it specifies how registries cross owner boundaries. The same layer must specify how namespaces compose.
 
 ## Rules and criteria
 
@@ -106,7 +154,13 @@ rules:
 
 ## Evaluator and operation registries
 
-An `evaluator` records its identity, assessment authority, timing, accepted inputs, evidence contract, failure behavior, and known-failure fixtures. Version 1 admits three exact enforcement contracts: `checker` with total coverage and authoritative adjudication, `detector` with partial coverage and candidate adjudication, and `manual` with no mechanical coverage and manual adjudication. Each checker names at least one known-failure fixture. The next slice registers version 1 of the evaluator `eutaxis/manual-judgment`. Its evidence names the reviewer, criterion, observation, and conclusion. The value `manual` is therefore not an unregistered escape value.
+An `evaluator` names who assesses a criterion. The evaluator declares when it runs. The contract specifies accepted inputs and produced evidence. The contract also specifies failures. A checker names its known-failure fixtures. Version 1 admits three exact enforcement contracts:
+
+- `checker` covers every admitted input and decides the result authoritatively
+- `detector` covers only some admitted inputs and proposes candidate results
+- `manual` asks a human reviewer to decide
+
+Each checker names at least one known-failure fixture. During the final registry slice, Eutaxis will register version 1 of `eutaxis/manual-judgment`. Its evidence identifies the reviewer and criterion, then records the observation and conclusion. Therefore, `manual` is not an unregistered escape value.
 
 An `operation` declares a versioned action contract. The contract defines:
 
@@ -156,9 +210,11 @@ The source boundary rejects a source when:
 - a procedure graph omits a transition, contains a cycle, or leaves an action unreachable
 - a closed object schema requires an undeclared property, or an action binds an undeclared procedure parameter
 
+The facet-registry boundary rejects duplicate identifiers and values outside the JSON domain. The same boundary rejects malformed value schemas and schemas that resolve content externally. The typed route rejects unregistered facet names and invalid comparison constants. Before evaluating a predicate, the runtime rejects unknown context keys and invalid present values.
+
 Diagnostics name the document path and closest YAML source position. The loader conjoins each child applicability predicate with its inherited parent predicate. The immutable domain model preserves every normative field.
 
-Three registry slices remain in the normative contract. The facet registry will type applicability values. The declaration registry will enforce contracts that span declarations. Finally, shipped registry records will connect evaluator fixtures to executable results. The catalog and resolver will decide final `unknown` applicability results and cross-declaration conflicts after those gates pass.
+Two registry slices remain in the normative contract. The declaration registry will enforce contracts that span declarations. Finally, shipped registry records will connect evaluator fixtures to executable results. The catalog and resolver will decide final `unknown` applicability results and cross-declaration conflicts after those gates pass.
 
 ## Runtime boundary
 
@@ -168,4 +224,4 @@ Current hosts still require rendered Markdown for cumulative `AGENTS.md` and `CL
 
 ## Consequences
 
-The source boundary now publishes the complete local procedure contract. The remaining registry slices validate every cross-record constraint before catalog construction. External sources cannot adopt the schema until the full normative-contract gate passes.
+The source boundary now publishes the complete local procedure contract and a typed facet-registry boundary. One remaining slice checks contracts across records. The final slice runs evaluator fixtures and compares the results with their declarations. Eutaxis will build the catalog only after both slices pass. External sources cannot adopt the schema until the full normative-contract gate passes.

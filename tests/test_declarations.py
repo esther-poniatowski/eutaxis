@@ -25,10 +25,14 @@ from eutaxis.declarations import (
     declaration_schema,
     evaluate_applicability,
     load_declaration,
+    load_facet_registry,
     schema_path,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "declarations"
+FACETS = load_facet_registry(
+    Path(__file__).parent / "fixtures" / "facets" / "valid" / "context-facets.yaml"
+)
 
 
 def _write_variant(
@@ -157,11 +161,12 @@ def test_strong_kleene_applicability_guards_missing_facets() -> None:
             },
         ]
     }
-    assert evaluate_applicability(guarded, {}) is TruthValue.FALSE
+    assert evaluate_applicability(guarded, {}, FACETS) is TruthValue.FALSE
     assert (
         evaluate_applicability(
             {"facet": "source.available", "operator": "equals", "value": True},
             {},
+            FACETS,
         )
         is TruthValue.UNKNOWN
     )
@@ -176,14 +181,23 @@ def test_strong_kleene_any_and_not_preserve_unknown() -> None:
             ]
         }
     }
-    assert evaluate_applicability(predicate, {"a": False}) is TruthValue.UNKNOWN
+    assert evaluate_applicability(predicate, {"a": False}, FACETS) is TruthValue.UNKNOWN
 
 
 def test_applicability_comparison_is_type_sensitive() -> None:
-    equals_one = {"facet": "value", "operator": "equals", "value": 1}
-    in_one = {"facet": "value", "operator": "in", "value": [1]}
-    assert evaluate_applicability(equals_one, {"value": True}) is TruthValue.FALSE
-    assert evaluate_applicability(in_one, {"value": True}) is TruthValue.FALSE
+    equals_one = {
+        "facet": "sample.boolean-or-number",
+        "operator": "equals",
+        "value": 1,
+    }
+    in_one = {
+        "facet": "sample.boolean-or-number",
+        "operator": "in",
+        "value": [1],
+    }
+    context = {"sample.boolean-or-number": True}
+    assert evaluate_applicability(equals_one, context, FACETS) is TruthValue.FALSE
+    assert evaluate_applicability(in_one, context, FACETS) is TruthValue.FALSE
 
 
 def test_loaded_structured_applicability_matches_ordinary_json_context(
@@ -201,6 +215,7 @@ def test_loaded_structured_applicability_matches_ordinary_json_context(
         evaluate_applicability(
             declaration.applicability,
             {"request.payload": {"items": [1, 2]}},
+            FACETS,
         )
         is TruthValue.TRUE
     )

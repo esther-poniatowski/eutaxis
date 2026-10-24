@@ -4,9 +4,19 @@ from .exceptions import (
     DeclarationError,
     DeclarationSchemaError,
     DeclarationSemanticError,
+    FacetContextError,
+    FacetRegistryError,
+    FacetRegistrySchemaError,
+    FacetRegistrySemanticError,
+)
+from .facets import (
+    ContextFacet,
+    FacetRegistry,
+    facet_registry_path,
+    load_facet_registry,
 )
 from .applicability import TruthValue, conjoin_applicability, evaluate_applicability
-from .loader import load_declaration
+from .loader import load_declaration, load_facet_validated_declaration
 from .models import (
     Action,
     AnyDeclaration,
@@ -39,6 +49,7 @@ __all__ = [
     "AnyDeclaration",
     "Binding",
     "CompositionManifestDeclaration",
+    "ContextFacet",
     "Criterion",
     "Declaration",
     "DeclarationError",
@@ -47,6 +58,11 @@ __all__ = [
     "DeclarationSemanticError",
     "EvaluatorDeclaration",
     "ExceptionClause",
+    "FacetContextError",
+    "FacetRegistry",
+    "FacetRegistryError",
+    "FacetRegistrySchemaError",
+    "FacetRegistrySemanticError",
     "LiteralBinding",
     "ManifestSection",
     "Norm",
@@ -65,7 +81,10 @@ __all__ = [
     "conjoin_applicability",
     "declaration_schema",
     "evaluate_applicability",
+    "facet_registry_path",
     "load_declaration",
+    "load_facet_registry",
+    "load_facet_validated_declaration",
     "schema_path",
     "validate_document",
 ]

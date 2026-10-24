@@ -1,0 +1,31 @@
+schema-version: 1
+id: eutaxis/context-facets
+owner: eutaxis
+source-revision: v1
+facets:
+  - id: artifact.created
+    value-schema: {type: boolean}
+  - id: artifact.is-created-or-revised
+    value-schema: {type: boolean}
+  - id: artifact.written
+    value-schema: {type: boolean}
+  - id: claim.quantitative
+    value-schema: {type: boolean}
+  - id: context.available
+    value-schema: {type: boolean}
+  - id: filesystem.writable
+    value-schema: {type: boolean}
+  - id: index.valid
+    value-schema: {type: boolean}
+  - id: request.payload
+    value-schema: {type: object}
+  - id: scope.project
+    value-schema: {type: boolean}
+  - id: source.available
+    value-schema: {type: boolean}
+  - id: target.codex
+    value-schema: {type: boolean}
+  - id: task.kind
+    value-schema:
+      type: string
+      enum: [writing, programming]

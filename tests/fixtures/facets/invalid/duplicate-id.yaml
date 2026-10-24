@@ -1,0 +1,9 @@
+schema-version: 1
+id: tests/duplicate-facets
+owner: eutaxis
+source-revision: fixture-1
+facets:
+  - id: task.kind
+    value-schema: {type: string}
+  - id: task.kind
+    value-schema: {type: string}
