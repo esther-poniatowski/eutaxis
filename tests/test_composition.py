@@ -118,6 +118,29 @@ def test_multi_component_plan_accepts_dependency_closure_and_is_repeatable() -> 
     )
 
 
+@pytest.mark.parametrize("mechanism", ["separate-directory", "single-slot"])
+def test_cumulative_planner_rejects_other_manifest_mechanisms(
+    tmp_path: Path, mechanism: str
+) -> None:
+    root = _mutable_fixture(tmp_path)
+    path = root / "manifest.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document["mechanism"] = mechanism
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(CompositionError) as captured:
+        plan_cumulative_composition(_registry(root), _unit())
+
+    assert captured.value.location == "$.mechanism"
+    assert captured.value.path == path.resolve()
+    assert captured.value.line == next(
+        index
+        for index, line in enumerate(path.read_text().splitlines(), 1)
+        if line.startswith("mechanism:")
+    )
+    assert f"{mechanism!r} is not cumulative" in str(captured.value)
+
+
 def test_cumulative_assembly_is_byte_identical_and_preserves_fragments() -> None:
     plan = plan_cumulative_composition(_registry(), _unit())
     fragments = _fragments()

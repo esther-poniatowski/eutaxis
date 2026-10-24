@@ -71,7 +71,7 @@ The artifact stores four values:
 
 The derived text view decodes the canonical bytes. This metadata keeps personal and project artifacts distinct when they share a target path.
 
-The target mechanism fixes collision behavior:
+Each composition manifest declares its target mechanism explicitly. Because `target` is opaque, it does not select a mechanism. The declared mechanism fixes collision behavior:
 
 - cumulative files concatenate the ordered sections
 - separate-directory mechanisms emit one artifact per stable identifier and reject duplicate output paths

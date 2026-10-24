@@ -9,7 +9,7 @@ index: "[Architecture decisions](_index.md)"
 
 ## Status
 
-Accepted. The [normative field contract](../../src/eutaxis/data/schemas/declaration-v1.schema.json) governs the models and fixtures for declaration schema version 1. The source boundary implements this contract. Eutaxis adds each registry check through a bounded gate. Eutaxis will construct catalogs after those gates pass.
+Accepted. The [normative field contract](../../src/eutaxis/data/schemas/declaration-v1.schema.json) governs the models and fixtures for declaration schema version 1. The source boundary implements this contract. Eutaxis 0.0.0 has not released schema 1. Therefore, a contract change must migrate the closed repository corpus atomically. Eutaxis adds each registry check through a bounded gate. Eutaxis will construct catalogs after those gates pass.
 
 ## Purpose
 
@@ -29,11 +29,25 @@ The discriminated union contains seven kinds:
 - `rule` declares one addressable artifact or decision constraint
 - `procedure` declares a finite externally observable action graph
 - `resolution-policy` resolves a named class of semantic conflicts inside one compilation unit
-- `composition-manifest` selects declarations and orders the sections of one native-scope artifact
+- `composition-manifest` selects and orders content under one declared artifact mechanism
 - `evaluator` declares how a criterion is assessed and what its evidence means
 - `operation` declares an action node available to procedures
 
 Only rules carry an `axis`: `reasoning-target`, `output-structure`, or `surface-style`. Procedures are a declaration kind, not a fourth axis. A file may contain one declaration or a declared collection; member objects retain their own `kind` and stable identifier.
+
+For a composition manifest, the content kinds are:
+
+- `rule-set`
+- `rule`
+- `procedure`
+
+The `mechanism` field accepts exactly three values:
+
+- `cumulative`
+- `separate-directory`
+- `single-slot`
+
+Authors must provide the field explicitly. The opaque `target` remains independent of the selected mechanism.
 
 ## Common envelope
 

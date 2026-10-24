@@ -337,9 +337,10 @@
         {"$ref": "#/$defs/common"},
         {
           "type": "object",
-          "required": ["scope", "target", "sections"],
+          "required": ["mechanism", "scope", "target", "sections"],
           "properties": {
             "kind": {"const": "composition-manifest"},
+            "mechanism": {"enum": ["cumulative", "separate-directory", "single-slot"]},
             "scope": {"enum": ["personal", "project"]},
             "target": {"type": "string", "minLength": 1},
             "sections": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/section"}},

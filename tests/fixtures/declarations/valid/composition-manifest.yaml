@@ -9,6 +9,7 @@ applicability:
   operator: equals
   value: true
 relations: []
+mechanism: cumulative
 scope: project
 target: AGENTS.md
 sections:

@@ -14,6 +14,7 @@ from .models import (
     Action,
     AnyDeclaration,
     Binding,
+    CompositionMechanism,
     CompositionManifestDeclaration,
     Criterion,
     DeclarationKind,
@@ -338,6 +339,7 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
     if kind is DeclarationKind.COMPOSITION_MANIFEST:
         return CompositionManifestDeclaration(
             **_base(document),
+            mechanism=CompositionMechanism(str(document["mechanism"])),
             scope=str(document["scope"]),
             target=str(document["target"]),
             sections=tuple(

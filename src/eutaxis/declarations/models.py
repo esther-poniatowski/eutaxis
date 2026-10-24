@@ -106,6 +106,14 @@ class RuleAxis(StrEnum):
     SURFACE_STYLE = "surface-style"
 
 
+class CompositionMechanism(StrEnum):
+    """Artifact mechanisms admitted by composition manifests."""
+
+    CUMULATIVE = "cumulative"
+    SEPARATE_DIRECTORY = "separate-directory"
+    SINGLE_SLOT = "single-slot"
+
+
 @dataclass(frozen=True)
 class VersionedReference:
     """An opaque identifier paired with its positive contract version."""
@@ -290,6 +298,7 @@ class ManifestSection:
 class CompositionManifestDeclaration(Declaration):
     """The ordered declaration selection for one native-scope artifact."""
 
+    mechanism: CompositionMechanism
     scope: str
     target: str
     sections: tuple[ManifestSection, ...]

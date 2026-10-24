@@ -10,6 +10,7 @@ from typing import NoReturn, cast
 
 from .exceptions import CompositionError
 from .models import (
+    CompositionMechanism,
     CompositionManifestDeclaration,
     ProcedureDeclaration,
     RuleDeclaration,
@@ -156,6 +157,12 @@ def plan_cumulative_composition(
             f"record {unit.manifest!r} is not a composition manifest",
         )
     manifest = cast(CompositionManifestDeclaration, record.declaration)
+    if manifest.mechanism is not CompositionMechanism.CUMULATIVE:
+        _raise_record_error(
+            record,
+            ("mechanism",),
+            f"manifest mechanism {manifest.mechanism.value!r} is not cumulative",
+        )
     manifest_selections = _index_selections(record, manifest)
     components = _index_resolved_components(
         registry, manifest, manifest_selections, unit

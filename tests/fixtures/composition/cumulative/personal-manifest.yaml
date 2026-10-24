@@ -6,6 +6,7 @@ status: active
 source-revision: fixture-1
 applicability: {facet: target.codex, operator: equals, value: true}
 relations: []
+mechanism: cumulative
 scope: personal
 target: AGENTS.md
 sections:

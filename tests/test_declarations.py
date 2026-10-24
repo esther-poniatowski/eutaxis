@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 from eutaxis.declarations import (
+    CompositionMechanism,
     CompositionManifestDeclaration,
     DeclarationSchemaError,
     DeclarationSemanticError,
@@ -137,6 +138,7 @@ def test_policy_manifest_evaluator_and_operation_models_are_complete() -> None:
     assert policy.when["facet"] == "scope.project"
     assert policy.strategy.retain == "project/format"
     assert isinstance(manifest, CompositionManifestDeclaration)
+    assert manifest.mechanism is CompositionMechanism.CUMULATIVE
     assert manifest.sections[0].declarations == ("prose/core",)
     assert manifest.policies == ("eutaxis/prefer-project-format",)
     assert isinstance(evaluator, EvaluatorDeclaration)
@@ -148,6 +150,50 @@ def test_policy_manifest_evaluator_and_operation_models_are_complete() -> None:
     assert operation.outputs["type"] == "object"
     assert operation.effects == ("filesystem/artifact",)
     assert operation.failure_outcomes == ("write-failed",)
+
+
+def test_composition_mechanism_is_an_exact_closed_enum() -> None:
+    assert {mechanism.value for mechanism in CompositionMechanism} == {
+        "cumulative",
+        "separate-directory",
+        "single-slot",
+    }
+
+
+@pytest.mark.parametrize("mechanism", tuple(CompositionMechanism))
+def test_composition_manifest_preserves_each_typed_mechanism(
+    tmp_path: Path, mechanism: CompositionMechanism
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["mechanism"] = mechanism.value
+
+    declaration = load_declaration(
+        _write_variant(tmp_path, "composition-manifest.yaml", mutate)
+    )
+
+    assert isinstance(declaration, CompositionManifestDeclaration)
+    assert declaration.mechanism is mechanism
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_location"),
+    [(None, "$"), ("implicit-from-target", "$.mechanism")],
+)
+def test_composition_manifest_requires_a_known_mechanism(
+    tmp_path: Path, value: str | None, expected_location: str
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        if value is None:
+            del document["mechanism"]
+        else:
+            document["mechanism"] = value
+
+    path = _write_variant(tmp_path, "composition-manifest.yaml", mutate)
+
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == expected_location
 
 
 def test_strong_kleene_applicability_guards_missing_facets() -> None:

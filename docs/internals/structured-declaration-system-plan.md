@@ -25,7 +25,7 @@ A self-contained cumulative fixture now plans and mechanically assembles a certi
 
 The planner orders each prerequisite before its dependant. Resolver-assigned anchors order unrelated records. The planner rejects malformed supplied graphs and anchors.
 
-The assembler joins an exact set of fixture-projected Markdown blocks into canonical bytes. A second manifest uses the same target for personal and project scopes. The resulting artifacts remain distinct. The separate-directory and single-slot mechanisms remain open.
+The assembler joins an exact set of fixture-projected Markdown blocks into canonical bytes. A second manifest uses the same target for personal and project scopes. The resulting artifacts remain distinct. Every manifest now declares its mechanism without deriving it from the target. The two unimplemented mechanisms are separate-directory and single-slot. The cumulative planner rejects manifests that declare either one.
 
 The catalog phase will decide which context predicates match. The same phase will apply conflict policies and issue certified units for real builds.
 
@@ -77,6 +77,7 @@ The fixture must prove that identical inputs produce identical artifacts. This p
   - run `eutaxis/load-declaration-registry` and return its four declared fields
 - [x] Build a self-contained fixture corpus owned by Eutaxis before reading external repositories.
 - [x] Exercise cumulative assembly with several components.
+- [x] Require each manifest to declare its mechanism, with no target-derived default.
 - [ ] Exercise separate-directory artifacts and a single-slot collision.
 - [x] Put resolved prerequisites before dependants and retain resolver-assigned manifest order among unrelated records.
 - [x] Reject a certified unit that displaces a directly named record from its authored anchor.
