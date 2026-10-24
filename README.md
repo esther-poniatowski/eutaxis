@@ -51,6 +51,8 @@ Additional agents are added by registering one adapter in `src/eutaxis/commands/
 
 ## Features
 
+Eutaxis currently ships the checked features. The unchecked features remain planned.
+
 - [X] **Instruction assembly** — render modular Markdown sources into one cumulative instruction file per agent.
 - [X] **Skill compilation** — compile on-demand rule sets into native Agent Skill artifacts.
 - [X] **Rule query** — print one rule, or one field of it, without loading its module; optionally compile each rule of a Skill into its own file.
@@ -60,7 +62,7 @@ Additional agents are added by registering one adapter in `src/eutaxis/commands/
 - [X] **Loading-budget validation** — measure each configured loading route independently.
 - [X] **Project scaffolding** — initialise a starter instruction layout in a project.
 - [X] **Prompt-writing methodology** — reference notes on agent instruction design under `docs/prompt-writing-methods/`.
-- [X] **Structured declaration validation** — validate all seven version-1 YAML declaration kinds, typed context facets, and immutable domain models.
+- [X] **Structured declaration validation** — validate version-1 YAML sources, typed facets, and links between records.
 - [ ] **Prompt composition framework** — planned. Compose prompts from shells, local fragments, and parameterised bundles.
 - [ ] **Prompt validator** — planned. Enforce family-profile requirements.
 - [ ] **Golden-file output** — planned. Render composed prompts for diff-based review.

@@ -252,7 +252,39 @@ The facet-registry boundary rejects duplicate identifiers and values outside the
 
 Diagnostics name the document path and closest YAML source position. The loader conjoins each child applicability predicate with its inherited parent predicate. The immutable domain model preserves every normative field.
 
-Two registry slices remain in the normative contract. The declaration registry will enforce contracts that span declarations. Finally, shipped registry records will connect evaluator fixtures to executable results. The catalog and resolver will decide final `unknown` applicability results and cross-declaration conflicts after those gates pass.
+The static declaration registry shipped in commit `bb4fb97`. The registry indexes content records and exact contract families, then validates the cross-record contracts fixed by [rule relations and contextual resolution](rule-relations-and-resolution.md). These checks include relation graphs, policies, manifests, and procedure–operation compatibility. Contextual applicability and conflict resolution remain downstream catalog responsibilities.
+
+One normative gate remains before catalog work begins. Shipped evaluator and operation records must connect the static declarations to executable evidence.
+
+## Shipped contract execution ^shipped-contract-execution
+
+Packaged version 1 records live under `src/eutaxis/data/declarations/v1/`. The minimum corpus contains:
+
+- `eutaxis/manual-judgment` version 1, which has no executable runner
+- `eutaxis/declaration-registry` version 1, a total authoritative checker for the static declaration registry
+- `eutaxis/load-declaration-registry` version 1, a side-effect-free operation with one `invalid-registry` failure outcome
+- `eutaxis/validate-declaration-registry`, a procedure that binds schema-identical parameters to that operation and maps every outcome
+- `eutaxis/declaration-corpus-contract`, a rule containing the norm `establish-valid-corpus`
+
+The norm `establish-valid-corpus` requires Eutaxis to establish one mechanically valid and semantically faithful version 1 declaration corpus before catalog work. Criterion `static-contracts-valid` states that the corpus satisfies the version 1 source boundary and every static cross-record contract; it references `eutaxis/declaration-registry` version 1. Criterion `semantic-contracts-faithful` states that the corpus preserves the intended meanings of its rules, procedures, evaluators, and operations; it references `eutaxis/manual-judgment` version 1. Both criteria evaluate `establish-valid-corpus`.
+
+The operation accepts a closed input object with `sources`, an array of path strings, and `facet-registry`, a path string. Its closed output object requires `registry.valid` with the constant value `true` and reports non-negative `record-count`, `family-count`, and `conflict-count` integers. Its effect set is empty. The procedure declares the same input schemas as parameters, binds both parameters to the operation, routes success to a postcondition that reads the `registry.valid` output facet, routes `invalid-registry` to a failure terminal of the same name, and declares no effects. The packaged facet registry defines `registry.valid` as a boolean. Operation execution and general output projection remain part of the later compilation fixture; this gate proves only the static operation–procedure contract.
+
+Executable bindings remain in reviewed Python rather than YAML. For this gate, a code-owned runner registry maps an exact checker reference to one callable and one exact operation reference that supplies its input schema. A detector runner belongs to the later enforcement phase, and a manual evaluator cannot enter the runner registry. Therefore, a declaration cannot introduce an arbitrary command, module path, or executable string.
+
+Packaged known-failure descriptors live under `src/eutaxis/data/evaluator-fixtures/v1/` as YAML and conform to the closed `evaluator-fixture-v1` schema. A descriptor contains `schema-version: 1`, a stable `id`, an exact `evaluator` reference, `input-revision: declaration-v1`, an `input` object, and `expected-state: violated`. The input object contains non-empty `sources` and one `facet-registry`. These resource paths use POSIX separators, are relative to the descriptor directory, contain no `..` segment, and must resolve within the packaged fixture root.
+
+The checker declares exactly one known failure in version 1: `eutaxis/declaration-registry/unresolved-exact-reference`. Its `known-failure-fixtures` field contains that identifier, and the descriptor with that identifier references `eutaxis/declaration-registry` version 1.
+
+The fixture loader resolves descriptor paths canonically and visits their string forms in lexical order. Fixture identifiers are unique across that traversal; a duplicate fails at the later `id`. A malformed descriptor fails at its invalid field. An unresolved source or facet-registry resource fails at the corresponding path value. After the exact evaluator and its registered input operation resolve, the fixture input must satisfy that operation's input schema; a mismatch belongs to `input` at the deepest failing instance path. Every identifier in `known-failure-fixtures` must resolve to one descriptor, and a missing fixture belongs to the referring list item. The descriptor must point back to the same evaluator, or the descriptor's `evaluator` field fails.
+
+A checker runner returns its exact evaluator reference, input revision, one state from `satisfied`, `violated`, and `blocked`, and evidence. A valid registry returns `satisfied`. A declaration or facet source error returns `violated`. Any exception outside the declared source-error boundaries returns `blocked`, as required by `failure-behavior: block`; the runner does not misreport that exception as a source defect.
+
+The `eutaxis/declaration-registry` evidence schema is closed and has three variants. Satisfied evidence contains `outcome: valid` and the three registry counts. Violated evidence contains `outcome: invalid`; `error-class`, restricted to `declaration-schema`, `declaration-semantic`, `declaration-registry`, `facet-registry-schema`, or `facet-registry-semantic`; `source`; `location`; `message`; and optional positive `line` and `column` integers. Blocked evidence contains `outcome: blocked`, `internal-exception-class`, and `message`. The runner maps the corresponding five public source-error classes to the violated error-class values. Every other exception maps to blocked evidence.
+
+The execution gate requires the returned evaluator identity and input revision to match the invocation. It also requires the state to match the fixture expectation and the evidence to satisfy this schema. A missing runner belongs to the evaluator reference under execution. A returned identity, revision, state, or evidence defect belongs to that result field.
+
+The shipped checker wraps facet-registry loading and `load_declaration_registry`. It accepts the same `sources` and `facet-registry` input as its registered operation contract. Its valid packaged corpus must return `satisfied`. Its known-failure corpus contains one unresolved exact reference and must return `violated` with a located registry diagnostic. Separately, the packaged procedure and operation must pass the static procedure–operation checks. Planted tests cover malformed and duplicate fixture descriptors, invalid payloads, unresolved resources, missing runner and fixture bindings, result identity and revision mismatches, wrong states, invalid evidence, action bindings, outcome maps, and mutation footprints.
 
 ## Runtime boundary
 
@@ -262,4 +294,4 @@ Current hosts still require rendered Markdown for cumulative `AGENTS.md` and `CL
 
 ## Consequences
 
-The source boundary now publishes the complete local procedure contract and a typed facet-registry boundary. One remaining slice checks contracts across records. The final slice runs evaluator fixtures and compares the results with their declarations. Eutaxis will build the catalog only after both slices pass. External sources cannot adopt the schema until the full normative-contract gate passes.
+The source boundary, typed facet registry, and static declaration registry now implement the authored version 1 contract. The remaining normative gate packages exact evaluator and operation records, resolves checker fixtures through code-owned runners, and compares each result with its declaration. Eutaxis will build the catalog only after this execution gate passes. External sources cannot adopt the schema until the full normative-contract gate passes.
