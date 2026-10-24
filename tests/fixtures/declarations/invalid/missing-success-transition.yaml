@@ -7,12 +7,12 @@ source-revision: fixture-1
 applicability: {facet: context.available, operator: exists}
 relations: []
 purpose: Plants an incomplete outcome transition
-parameters: {type: object}
+parameters: {type: object, properties: {}, additionalProperties: false}
 preconditions: []
 actions:
   - id: act
     operation: {id: eutaxis/write-artifact, version: 1}
-    on-failure: failed
+    on-failure: {write-failed: failed}
 entry: act
 invariants: []
 effects: []

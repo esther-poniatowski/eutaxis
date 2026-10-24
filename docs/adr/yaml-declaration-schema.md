@@ -108,11 +108,40 @@ rules:
 
 An `evaluator` records its identity, assessment authority, timing, accepted inputs, evidence contract, failure behavior, and known-failure fixtures. Version 1 admits three exact enforcement contracts: `checker` with total coverage and authoritative adjudication, `detector` with partial coverage and candidate adjudication, and `manual` with no mechanical coverage and manual adjudication. Each checker names at least one known-failure fixture. The next slice registers version 1 of the evaluator `eutaxis/manual-judgment`. Its evidence names the reviewer, criterion, observation, and conclusion. The value `manual` is therefore not an unregistered escape value.
 
-An `operation` records `id`, `owner`, semantic version, typed inputs and outputs, preconditions, allowed and forbidden effects, failure outcomes, and recovery contract. Procedures reference operations by identifier. The registry supplies their effect summaries for static comparison with procedure invariants; declarations do not embed arbitrary executable shell commands.
+An `operation` declares a versioned action contract. The contract defines:
+
+- typed inputs and outputs
+- preconditions
+- the closed set of state identifiers that may change on any outcome
+- named failure outcomes and a recovery contract
+
+Procedures select these contracts by identifier. Declarations exclude arbitrary executable shell commands.
 
 ## Procedure contracts
 
-A procedure formalizes `{P} A {Q}` without pretending that every predicate is decidable. Its contract contains typed parameters, typed predicates, a finite acyclic action graph, declared effects, and terminal states. Every node references a registered operation. Each outcome names exactly one successor. Conditional branching uses a registered guard operation whose success and failure outcomes name the two branches. Version 1 admits no unbounded loop. Every path must reach a declared postcondition or failure state, so termination is structurally decidable.
+A procedure formalizes `{P} A {Q}` without treating every predicate as decidable. Its contract defines:
+
+- typed parameters and predicates
+- a finite acyclic action graph
+- an authorized mutation footprint
+- postcondition and failure terminals
+
+Each action node names a registered operation. The `on-success` field names its successor. The `on-failure` map names one successor for each failure outcome. A registered guard operation supplies the outcomes used for conditional branches.
+
+To ensure termination, schema version 1 admits no unbounded loop. Every path must reach a declared terminal.
+
+Schema version 1 restricts operation inputs and procedure parameters to closed object schemas. Each schema declares its `properties`. The schema rejects additional properties and requires only declared properties. Property names and action input keys use the identifier syntax of the declaration schema. Each binding selects a parameter or literal variant. The immutable domain model represents these variants with separate types.
+
+The declaration registry requires each binding to satisfy four conditions:
+
+- every required input is bound
+- no unknown input is bound
+- every literal satisfies its input schema
+- every parameter schema has the same normalized form as its input schema
+
+Schema version 1 does not infer general JSON Schema subtyping.
+
+Each invariant declares its observed state identifiers. The registry rejects an action when its operation may mutate one of these states. The registry also requires the operation footprint to fit within the procedure's authorized footprint. These conservative checks cover every declared outcome.
 
 Procedure predicates reuse the bounded, side-effect-free boolean grammar after typed `before`, `after`, `request`, and `observations` facets are registered. A judgment predicate references the manual evaluator rather than encoding a false mechanical test.
 
@@ -123,12 +152,13 @@ The source boundary rejects a source when:
 - YAML repeats a key, contains a cyclic alias, or produces a non-JSON value
 - a field violates the normative schema or embeds an invalid JSON Schema
 - local identifiers repeat or a local reference does not resolve
-- exception interactions, policy strategies, or effects contradict their surrounding declaration
+- two exceptions contradict each other, or a policy strategy contradicts its declaration
 - a procedure graph omits a transition, contains a cycle, or leaves an action unreachable
+- a closed object schema requires an undeclared property, or an action binds an undeclared procedure parameter
 
 Diagnostics name the document path and closest YAML source position. The loader conjoins each child applicability predicate with its inherited parent predicate. The immutable domain model preserves every normative field.
 
-The registry slice will reject unregistered context facets, evaluators, and operations. The same slice will compare operation effects with procedure invariants, resolve external references, and reject policy-order ties. Next, the catalog and resolver will decide final `unknown` applicability results and cross-declaration conflicts. These later checks are not attributed to the source boundary before their registries exist.
+Three registry slices remain in the normative contract. The facet registry will type applicability values. The declaration registry will enforce contracts that span declarations. Finally, shipped registry records will connect evaluator fixtures to executable results. The catalog and resolver will decide final `unknown` applicability results and cross-declaration conflicts after those gates pass.
 
 ## Runtime boundary
 
@@ -138,4 +168,4 @@ Current hosts still require rendered Markdown for cumulative `AGENTS.md` and `CL
 
 ## Consequences
 
-The first implementation publishes the complete source boundary and its fixture corpus. The next work registers evaluators and operations and completes their fixtures before catalog construction. External sources cannot adopt the schema until the full normative-contract gate passes.
+The source boundary now publishes the complete local procedure contract. The remaining registry slices validate every cross-record constraint before catalog construction. External sources cannot adopt the schema until the full normative-contract gate passes.

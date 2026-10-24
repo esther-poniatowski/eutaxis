@@ -12,19 +12,24 @@ relations: []
 purpose: Writes one artifact after its review
 parameters:
   type: object
+  properties:
+    path: {type: string}
+    content: {type: string}
+  required: [path, content]
+  additionalProperties: false
 preconditions: []
 actions:
   - id: write
     operation: {id: eutaxis/write-artifact, version: 1}
     with:
-      path: request.path
+      path: {parameter: path}
+      content: {literal: Reviewed content}
     on-success: artifact-written
-    on-failure: write-failed
+    on-failure:
+      write-failed: write-failed
 entry: write
 invariants: []
-effects:
-  - state: filesystem/artifact
-    disposition: allowed
+effects: [filesystem/artifact]
 postconditions:
   - id: artifact-written
     class: postcondition

@@ -131,14 +131,24 @@ class Predicate:
     predicate_class: str
     expression: Mapping[str, JsonValue]
     evaluator: VersionedReference | None
+    observes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
-class Effect:
-    """One declared state effect and its disposition."""
+class ParameterBinding:
+    """Bind one operation input to a declared procedure parameter."""
 
-    state: str
-    disposition: str
+    parameter: str
+
+
+@dataclass(frozen=True)
+class LiteralBinding:
+    """Bind one operation input to an immutable JSON literal."""
+
+    value: JsonValue
+
+
+Binding: TypeAlias = ParameterBinding | LiteralBinding
 
 
 @dataclass(frozen=True)
@@ -184,9 +194,9 @@ class ProcedureNode:
 
     id: str
     operation: VersionedReference
-    bindings: Mapping[str, JsonValue]
+    bindings: Mapping[str, Binding]
     on_success: str
-    on_failure: str
+    on_failure: Mapping[str, str]
 
 
 @dataclass(frozen=True)
@@ -199,7 +209,7 @@ class ProcedureDeclaration(Declaration):
     actions: tuple[ProcedureNode, ...]
     entry: str
     invariants: tuple[Predicate, ...]
-    effects: tuple[Effect, ...]
+    effects: tuple[str, ...]
     postconditions: tuple[Predicate, ...]
     failures: tuple[str, ...]
 
@@ -266,7 +276,7 @@ class OperationDeclaration(Declaration):
     inputs: Mapping[str, JsonValue]
     outputs: Mapping[str, JsonValue]
     preconditions: tuple[Predicate, ...]
-    effects: tuple[Effect, ...]
+    effects: tuple[str, ...]
     failure_outcomes: tuple[str, ...]
     recovery: str
 

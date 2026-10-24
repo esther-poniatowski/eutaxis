@@ -7,13 +7,13 @@ source-revision: fixture-1
 applicability: {facet: context.available, operator: exists}
 relations: []
 purpose: Plants a success transition to a failure terminal
-parameters: {type: object}
+parameters: {type: object, properties: {}, additionalProperties: false}
 preconditions: []
 actions:
   - id: act
     operation: {id: eutaxis/write-artifact, version: 1}
     on-success: failed
-    on-failure: failed
+    on-failure: {write-failed: failed}
 entry: act
 invariants: []
 effects: []

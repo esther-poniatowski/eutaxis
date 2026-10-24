@@ -149,13 +149,19 @@ def _collect_locations(
     )
     try:
         if isinstance(node, MappingNode) and isinstance(value, Mapping):
-            for (key, child_value), (_, child_node) in zip(value.items(), node.value):
+            for (key, child_value), (key_node, child_node) in zip(
+                value.items(), node.value
+            ):
+                child_path = path + (str(key),)
                 _collect_locations(
                     child_node,
                     child_value,
-                    path + (str(key),),
+                    child_path,
                     locations,
                     active_nodes,
+                )
+                locations[child_path] = SourceLocation(
+                    key_node.start_mark.line + 1, key_node.start_mark.column + 1
                 )
         elif isinstance(node, SequenceNode) and isinstance(value, list):
             for index, (child_node, child_value) in enumerate(zip(node.value, value)):

@@ -1,5 +1,5 @@
 schema-version: 1
-id: eutaxis/contradictory-effects
+id: eutaxis/duplicate-effects
 kind: operation
 owner: eutaxis
 status: active
@@ -7,11 +7,9 @@ source-revision: fixture-1
 applicability: {facet: context.available, operator: exists}
 relations: []
 version: 1
-inputs: {type: object}
+inputs: {type: object, properties: {}, additionalProperties: false}
 outputs: {type: object}
 preconditions: []
-effects:
-  - {state: artifact, disposition: allowed}
-  - {state: artifact, disposition: forbidden}
+effects: [artifact, artifact]
 failure-outcomes: [failed]
 recovery: Report the failure

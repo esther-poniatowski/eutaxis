@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
-import re
+from collections.abc import Iterable
 from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
 from typing import Mapping, NoReturn, cast
 
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
-from jsonschema.exceptions import SchemaError, best_match  # type: ignore[import-untyped]
+from jsonschema.exceptions import (  # type: ignore[import-untyped]
+    SchemaError,
+    ValidationError,
+    best_match,
+)
 
 from .. import data_path
 from .exceptions import DeclarationSchemaError
@@ -33,7 +37,6 @@ DECLARATION_KINDS = frozenset(
         "operation",
     }
 )
-_UNEXPECTED_PROPERTY = re.compile(r"\('([^']+)' was unexpected\)")
 
 
 def schema_path() -> Path:
@@ -93,14 +96,109 @@ def validate_document(
             source_map,
         )
 
-    error = best_match(_validator_for_kind(kind).iter_errors(document))
+    error = _actionable_schema_error(_validator_for_kind(kind).iter_errors(document))
     if error is not None:
         parts = tuple(error.absolute_path)
-        unexpected = _UNEXPECTED_PROPERTY.search(error.message)
+        schema_parts = tuple(error.absolute_schema_path)
+        if "propertyNames" in schema_parts and isinstance(error.instance, str):
+            parts += (error.instance,)
+        if error.validator == "not" and isinstance(error.instance, dict):
+            forbidden = error.schema.get("not", {}).get("required", [])
+            if len(forbidden) == 1 and forbidden[0] in error.instance:
+                parts += (forbidden[0],)
+        unexpected = _unexpected_property(error, parts, source_map)
         if unexpected is not None:
-            parts += (unexpected.group(1),)
+            parts += (unexpected,)
         _raise_schema_error(path, parts, error.message, source_map)
     return cast(Mapping[str, object], document)
+
+
+def _actionable_schema_error(
+    errors: Iterable[ValidationError],
+) -> ValidationError | None:
+    """Select the deepest concrete cause over composition wrapper errors."""
+    candidates = list(errors)
+    concrete = [
+        error for error in candidates if error.validator != "unevaluatedProperties"
+    ]
+    return best_match(concrete or candidates)
+
+
+def _unexpected_property(
+    error: ValidationError,
+    parts: DocumentPath,
+    locations: SourceMap,
+) -> str | None:
+    """Return the first unexpected property in source order, when present."""
+    if error.validator not in {"additionalProperties", "unevaluatedProperties"}:
+        return None
+    if not isinstance(error.instance, Mapping):
+        return None
+    admitted = _declared_properties(error.schema, _declaration_schema())
+    names = [
+        name
+        for name in error.instance
+        if isinstance(name, str) and name not in admitted
+    ]
+    if not names:
+        return None
+
+    def source_order(name: str) -> tuple[int, int, str]:
+        location = locations.get(parts + (name,))
+        if location is None:
+            return (2**31, 2**31, name)
+        return (location.line, location.column, name)
+
+    return min(names, key=source_order)
+
+
+def _declared_properties(
+    schema: object,
+    root: Mapping[str, object],
+    seen_references: frozenset[str] = frozenset(),
+) -> set[str]:
+    """Return properties declared by one object schema and its compositions."""
+    if not isinstance(schema, Mapping):
+        return set()
+
+    declared: set[str] = set()
+    properties = schema.get("properties")
+    if isinstance(properties, Mapping):
+        declared.update(key for key in properties if isinstance(key, str))
+
+    reference = schema.get("$ref")
+    if isinstance(reference, str) and reference not in seen_references:
+        referenced = _resolve_local_reference(reference, root)
+        declared.update(
+            _declared_properties(
+                referenced,
+                root,
+                seen_references | frozenset({reference}),
+            )
+        )
+
+    compositions = schema.get("allOf")
+    if isinstance(compositions, list):
+        for component in compositions:
+            declared.update(_declared_properties(component, root, seen_references))
+    return declared
+
+
+def _resolve_local_reference(
+    reference: str, root: Mapping[str, object]
+) -> object | None:
+    """Resolve a local JSON Pointer without interpreting external references."""
+    if not reference.startswith("#/"):
+        return None
+    current: object = root
+    for token in reference[2:].split("/"):
+        if not isinstance(current, Mapping):
+            return None
+        decoded = token.replace("~1", "/").replace("~0", "~")
+        if decoded not in current:
+            return None
+        current = current[decoded]
+    return current
 
 
 def validate_embedded_schema(

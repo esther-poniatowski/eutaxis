@@ -193,7 +193,44 @@
         "id": {"$ref": "#/$defs/id"},
         "class": {"enum": ["guard", "authorization", "assumption", "dependency", "invariant", "postcondition"]},
         "expression": {"$ref": "#/$defs/applicability"},
-        "evaluator": {"$ref": "#/$defs/versioned-reference"}
+        "evaluator": {"$ref": "#/$defs/versioned-reference"},
+        "observes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+      },
+      "allOf": [{
+        "if": {"properties": {"class": {"const": "invariant"}}, "required": ["class"]},
+        "then": {"required": ["observes"]},
+        "else": {"not": {"required": ["observes"]}}
+      }],
+      "additionalProperties": false
+    },
+    "binding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["parameter"],
+          "properties": {"parameter": {"$ref": "#/$defs/id"}},
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["literal"],
+          "properties": {"literal": {}},
+          "additionalProperties": false
+        }
+      ]
+    },
+    "closed-object-schema": {
+      "type": "object",
+      "required": ["type", "properties", "additionalProperties"],
+      "properties": {
+        "type": {"const": "object"},
+        "properties": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/id"},
+          "additionalProperties": {"type": "object"}
+        },
+        "required": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "additionalProperties": {"const": false}
       },
       "additionalProperties": false
     },
@@ -203,18 +240,18 @@
       "properties": {
         "id": {"$ref": "#/$defs/id"},
         "operation": {"$ref": "#/$defs/versioned-reference"},
-        "with": {"type": "object"},
+        "with": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/id"},
+          "additionalProperties": {"$ref": "#/$defs/binding"}
+        },
         "on-success": {"$ref": "#/$defs/id"},
-        "on-failure": {"$ref": "#/$defs/id"}
-      },
-      "additionalProperties": false
-    },
-    "effect": {
-      "type": "object",
-      "required": ["state", "disposition"],
-      "properties": {
-        "state": {"$ref": "#/$defs/id"},
-        "disposition": {"enum": ["allowed", "forbidden", "possible"]}
+        "on-failure": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"$ref": "#/$defs/id"},
+          "additionalProperties": {"$ref": "#/$defs/id"}
+        }
       },
       "additionalProperties": false
     },
@@ -227,12 +264,12 @@
           "properties": {
             "kind": {"const": "procedure"},
             "purpose": {"type": "string", "minLength": 1},
-            "parameters": {"type": "object"},
+            "parameters": {"$ref": "#/$defs/closed-object-schema"},
             "preconditions": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
             "actions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/procedure-node"}},
             "entry": {"$ref": "#/$defs/id"},
             "invariants": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
-            "effects": {"type": "array", "items": {"$ref": "#/$defs/effect"}},
+            "effects": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
             "postconditions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/predicate"}},
             "failures": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
           }
@@ -309,36 +346,40 @@
             "failure-behavior": {"enum": ["block", "candidate", "record"]},
             "known-failure-fixtures": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
           },
-          "oneOf": [
+          "allOf": [
             {
-              "properties": {
-                "evaluator-kind": {"const": "checker"},
-                "coverage": {"const": "total"},
-                "adjudication": {"const": "authoritative"}
-              },
-              "required": ["evaluator-kind", "coverage", "adjudication", "known-failure-fixtures"]
+              "if": {"properties": {"evaluator-kind": {"const": "checker"}}, "required": ["evaluator-kind"]},
+              "then": {
+                "properties": {
+                  "coverage": {"const": "total"},
+                  "adjudication": {"const": "authoritative"}
+                },
+                "required": ["known-failure-fixtures"]
+              }
             },
             {
-              "properties": {
-                "evaluator-kind": {"const": "detector"},
-                "coverage": {"const": "partial"},
-                "adjudication": {"const": "candidate"}
-              },
-              "required": ["evaluator-kind", "coverage", "adjudication"]
+              "if": {"properties": {"evaluator-kind": {"const": "detector"}}, "required": ["evaluator-kind"]},
+              "then": {
+                "properties": {
+                  "coverage": {"const": "partial"},
+                  "adjudication": {"const": "candidate"}
+                }
+              }
             },
             {
-              "properties": {
-                "evaluator-kind": {"const": "manual"},
-                "coverage": {"const": "none"},
-                "adjudication": {"const": "manual"}
-              },
-              "required": ["evaluator-kind", "coverage", "adjudication"]
+              "if": {"properties": {"evaluator-kind": {"const": "manual"}}, "required": ["evaluator-kind"]},
+              "then": {
+                "properties": {
+                  "coverage": {"const": "none"},
+                  "adjudication": {"const": "manual"}
+                }
+              }
+            },
+            {
+              "if": {"properties": {"evaluator-kind": {"const": "checker"}}, "required": ["evaluator-kind"]},
+              "then": {"properties": {"known-failure-fixtures": {"minItems": 1}}}
             }
-          ],
-          "allOf": [{
-            "if": {"properties": {"evaluator-kind": {"const": "checker"}}, "required": ["evaluator-kind"]},
-            "then": {"properties": {"known-failure-fixtures": {"minItems": 1}}}
-          }]
+          ]
         }
       ],
       "unevaluatedProperties": false
@@ -352,10 +393,10 @@
           "properties": {
             "kind": {"const": "operation"},
             "version": {"type": "integer", "minimum": 1},
-            "inputs": {"type": "object"},
+            "inputs": {"$ref": "#/$defs/closed-object-schema"},
             "outputs": {"type": "object"},
             "preconditions": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
-            "effects": {"type": "array", "items": {"$ref": "#/$defs/effect"}},
+            "effects": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
             "failure-outcomes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
             "recovery": {"type": "string", "minLength": 1}
           }

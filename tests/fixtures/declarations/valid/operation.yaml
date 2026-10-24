@@ -12,13 +12,15 @@ relations: []
 version: 1
 inputs:
   type: object
+  properties:
+    path: {type: string}
+    content: {type: string}
   required: [path, content]
+  additionalProperties: false
 outputs:
   type: object
   required: [written-path]
 preconditions: []
-effects:
-  - state: filesystem/artifact
-    disposition: allowed
+effects: [filesystem/artifact]
 failure-outcomes: [write-failed]
 recovery: Preserve the previous artifact and report the failed target

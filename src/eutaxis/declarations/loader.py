@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import MappingProxyType
 from typing import Mapping, NoReturn, TypedDict, cast
 
 from .applicability import conjoin_applicability
@@ -10,16 +11,18 @@ from .exceptions import DeclarationSemanticError
 from .models import (
     Action,
     AnyDeclaration,
+    Binding,
     CompositionManifestDeclaration,
     Criterion,
     DeclarationKind,
-    Effect,
     EvaluatorDeclaration,
     ExceptionClause,
     JsonValue,
+    LiteralBinding,
     ManifestSection,
     Norm,
     OperationDeclaration,
+    ParameterBinding,
     Predicate,
     ProcedureDeclaration,
     ProcedureNode,
@@ -91,13 +94,25 @@ def _predicate(value: object) -> Predicate:
         predicate_class=str(item["class"]),
         expression=_frozen_mapping(item["expression"]),
         evaluator=_reference(evaluator) if evaluator is not None else None,
+        observes=tuple(
+            str(state) for state in cast(list[object], item.get("observes", []))
+        ),
     )
 
 
-def _effect(value: object) -> Effect:
-    """Build one typed state effect."""
+def _binding(value: object) -> Binding:
+    """Build one explicit parameter or literal binding."""
     item = _mapping(value)
-    return Effect(state=str(item["state"]), disposition=str(item["disposition"]))
+    if "parameter" in item:
+        return ParameterBinding(parameter=str(item["parameter"]))
+    return LiteralBinding(value=freeze_json(item["literal"]))
+
+
+def _bindings(value: object) -> Mapping[str, Binding]:
+    """Build an immutable mapping of operation inputs to bindings."""
+    return MappingProxyType(
+        {str(name): _binding(binding) for name, binding in _mapping(value).items()}
+    )
 
 
 def _base(
@@ -237,9 +252,14 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
                 ProcedureNode(
                     id=str(item["id"]),
                     operation=_reference(item["operation"]),
-                    bindings=_frozen_mapping(item.get("with", {})),
+                    bindings=_bindings(item.get("with", {})),
                     on_success=str(item["on-success"]),
-                    on_failure=str(item["on-failure"]),
+                    on_failure=MappingProxyType(
+                        {
+                            str(outcome): str(target)
+                            for outcome, target in _mapping(item["on-failure"]).items()
+                        }
+                    ),
                 )
                 for item in map(_mapping, cast(list[object], document["actions"]))
             ),
@@ -248,7 +268,7 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
                 _predicate(item) for item in cast(list[object], document["invariants"])
             ),
             effects=tuple(
-                _effect(item) for item in cast(list[object], document["effects"])
+                str(item) for item in cast(list[object], document["effects"])
             ),
             postconditions=tuple(
                 _predicate(item)
@@ -326,7 +346,7 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
                 for item in cast(list[object], document["preconditions"])
             ),
             effects=tuple(
-                _effect(item) for item in cast(list[object], document["effects"])
+                str(item) for item in cast(list[object], document["effects"])
             ),
             failure_outcomes=tuple(
                 str(item) for item in cast(list[object], document["failure-outcomes"])
@@ -359,13 +379,14 @@ def _validate_semantics(
             document_path=("parameters",),
             locations=locations,
         )
-        _validate_predicate_roles(document, path=path, locations=locations)
-        _validate_effects(
-            cast(list[object], document["effects"]),
-            ("effects",),
+        _validate_closed_object_schema(
+            document["parameters"],
+            ("parameters",),
             path=path,
             locations=locations,
         )
+        _validate_predicate_roles(document, path=path, locations=locations)
+        _validate_procedure_bindings(document, path=path, locations=locations)
         _validate_procedure_graph(document, path=path, locations=locations)
     elif kind == "resolution-policy":
         _validate_resolution_policy(document, path=path, locations=locations)
@@ -384,16 +405,16 @@ def _validate_semantics(
                 document_path=(field,),
                 locations=locations,
             )
+        _validate_closed_object_schema(
+            document["inputs"],
+            ("inputs",),
+            path=path,
+            locations=locations,
+        )
         _validate_predicate_list(
             cast(list[object], document["preconditions"]),
             allowed={"guard", "authorization", "assumption", "dependency"},
             parts=("preconditions",),
-            path=path,
-            locations=locations,
-        )
-        _validate_effects(
-            cast(list[object], document["effects"]),
-            ("effects",),
             path=path,
             locations=locations,
         )
@@ -671,27 +692,45 @@ def _validate_predicate_list(
             )
 
 
-def _validate_effects(
-    effects: list[object],
+def _validate_closed_object_schema(
+    value: object,
     parts: DocumentPath,
     *,
     path: Path,
     locations: SourceMap,
 ) -> None:
-    """Reject contradictory dispositions for the same state."""
-    seen: dict[str, str] = {}
-    for index, value in enumerate(effects):
-        effect = _mapping(value)
-        state = str(effect["state"])
-        disposition = str(effect["disposition"])
-        if state in seen:
+    """Require every required member to have a declared property schema."""
+    schema = _mapping(value)
+    properties = _mapping(schema["properties"])
+    for index, name in enumerate(cast(list[object], schema.get("required", []))):
+        if str(name) not in properties:
             _semantic_error(
                 path,
                 locations,
-                parts + (index,),
-                f"state {state!r} has both {seen[state]!r} and {disposition!r} effects",
+                parts + ("required", index),
+                f"required property {name!r} has no declared schema",
             )
-        seen[state] = disposition
+
+
+def _validate_procedure_bindings(
+    document: Mapping[str, object], *, path: Path, locations: SourceMap
+) -> None:
+    """Require parameter bindings to reference declared procedure parameters."""
+    parameters = _mapping(_mapping(document["parameters"])["properties"])
+    for action_index, action_value in enumerate(
+        cast(list[object], document["actions"])
+    ):
+        action = _mapping(action_value)
+        for input_name, binding_value in _mapping(action.get("with", {})).items():
+            binding = _mapping(binding_value)
+            parameter = binding.get("parameter")
+            if parameter is not None and str(parameter) not in parameters:
+                _semantic_error(
+                    path,
+                    locations,
+                    ("actions", action_index, "with", input_name, "parameter"),
+                    f"binding references unknown procedure parameter {parameter!r}",
+                )
 
 
 def _validate_procedure_graph(
@@ -716,8 +755,10 @@ def _validate_procedure_graph(
     allowed = set(actions) | terminals
     for index, (node_id, node) in enumerate(actions.items()):
         success_target = str(node["on-success"])
-        failure_target = str(node["on-failure"])
-        targets = {success_target, failure_target}
+        failure_targets = {
+            str(target) for target in _mapping(node["on-failure"]).values()
+        }
+        targets = {success_target, *failure_targets}
         unknown = sorted(targets - allowed)
         if unknown:
             _semantic_error(
@@ -733,12 +774,13 @@ def _validate_procedure_graph(
                 ("actions", index, "on-success"),
                 f"action {node_id!r} routes success directly to a failure state",
             )
-        if failure_target in success:
+        misrouted_failures = sorted(failure_targets & success)
+        if misrouted_failures:
             _semantic_error(
                 path,
                 locations,
                 ("actions", index, "on-failure"),
-                f"action {node_id!r} routes failure directly to a postcondition",
+                f"action {node_id!r} routes failure directly to postconditions {misrouted_failures!r}",
             )
 
     visiting: set[str] = set()
@@ -759,7 +801,8 @@ def _validate_procedure_graph(
         visiting.add(node_id)
         node = actions[node_id]
         walk(str(node["on-success"]))
-        walk(str(node["on-failure"]))
+        for target in _mapping(node["on-failure"]).values():
+            walk(str(target))
         visiting.remove(node_id)
         visited.add(node_id)
 

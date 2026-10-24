@@ -11,7 +11,9 @@ This plan implements the accepted structured-source decisions and assigns only w
 
 ## Current state
 
-Free-form Markdown remains the production source. Version 1 now rejects duplicate YAML keys, cyclic aliases, and values outside the JSON domain. The loader returns complete immutable models and conjoins inherited applicability predicates. Diagnostics locate each rejected field in the source. Regression tests cover both adversarial passes, including structured applicability values, exception interactions, evaluator classes, and degenerate policy outcomes. Registries and their exhaustive fixtures remain the final normative-contract work. The catalog, contextual resolution, composition, and enforcement remain pending behind that gate.
+Free-form Markdown remains the production source. The loader for schema version 1 rejects malformed source data. The loader returns complete immutable models and conjoins inherited applicability predicates.
+
+The procedure-contract gate passed its adversarial review. Three registry gates remain in the normative contract. The downstream compilation stages remain pending behind them.
 
 ## Decision log and open prerequisites
 
@@ -26,12 +28,17 @@ Free-form Markdown remains the production source. Version 1 now rejects duplicat
 
 ### Normative contract
 
+The normative contract closes through the following gates.
+
 - [x] Implement the versioned JSON Schema for all seven declaration kinds: rule set, rule, procedure, resolution policy, composition manifest, evaluator, and operation.
-- [ ] Specify and test the typed applicability grammar, registered context facets, three-valued evaluation, structural narrowing, and explicit policy ordering.
+- [x] Specify and test applicability semantics and explicit policy ordering.
 - [x] Generate typed models from the schema or prove their conformance against the same fixture corpus.
-- [ ] Register the typed manual evaluator and representative checker, detector, and operation contracts.
-- [ ] Freeze valid fixtures for nested applicability, exceptions, dependencies, conflict policies, combine results, Markdown scalars, evaluator evidence, effects, and finite procedure graphs.
-- [ ] Freeze invalid fixtures for every conditional field and invariant, including missing context, a broadened child predicate, a policy-order tie, a nonterminating graph, and an unregistered operation.
+- [x] Complete and adversarially review the [procedure contract](../adr/yaml-declaration-schema.md).
+- [ ] Add the canonical YAML facet registry and validate applicability values against registered facet types.
+- [ ] Add semantic and versioned-contract indexes, then validate every cross-record contract.
+- [ ] Register representative evaluator and operation contracts. Execute each checker against its named fixtures.
+
+A gate closes only after its fixture corpus passes both its known-failure check and an independent adversarial review.
 
 **Exit evidence:** all valid fixtures round-trip without semantic loss; every invalid fixture fails at its located cause; a deliberately invalid fixture proves the gate can fail.
 

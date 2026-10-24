@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -14,7 +14,9 @@ from eutaxis.declarations import (
     DeclarationSchemaError,
     DeclarationSemanticError,
     EvaluatorDeclaration,
+    LiteralBinding,
     OperationDeclaration,
+    ParameterBinding,
     ProcedureDeclaration,
     ResolutionPolicyDeclaration,
     RuleDeclaration,
@@ -42,6 +44,15 @@ def _write_variant(
     path = tmp_path / name
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     return path
+
+
+def _line_containing(path: Path, text: str) -> int:
+    """Return the one-based source line containing ``text``."""
+    return next(
+        index
+        for index, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if text in line
+    )
 
 
 @pytest.mark.parametrize(
@@ -100,10 +111,16 @@ def test_procedure_model_preserves_every_contract_field() -> None:
     assert declaration.parameters["type"] == "object"
     assert declaration.actions[0].operation.id == "eutaxis/write-artifact"
     assert declaration.actions[0].operation.version == 1
-    assert declaration.actions[0].bindings["path"] == "request.path"
+    path_binding = declaration.actions[0].bindings["path"]
+    content_binding = declaration.actions[0].bindings["content"]
+    assert isinstance(path_binding, ParameterBinding)
+    assert path_binding.parameter == "path"
+    assert isinstance(content_binding, LiteralBinding)
+    assert content_binding.value == "Reviewed content"
     assert declaration.actions[0].on_success == "artifact-written"
+    assert declaration.actions[0].on_failure == {"write-failed": "write-failed"}
     assert declaration.postconditions[0].predicate_class == "postcondition"
-    assert declaration.effects[0].state == "filesystem/artifact"
+    assert declaration.effects == ("filesystem/artifact",)
 
 
 def test_policy_manifest_evaluator_and_operation_models_are_complete() -> None:
@@ -125,7 +142,7 @@ def test_policy_manifest_evaluator_and_operation_models_are_complete() -> None:
     assert isinstance(operation, OperationDeclaration)
     assert operation.inputs["type"] == "object"
     assert operation.outputs["type"] == "object"
-    assert operation.effects[0].disposition == "allowed"
+    assert operation.effects == ("filesystem/artifact",)
     assert operation.failure_outcomes == ("write-failed",)
 
 
@@ -207,6 +224,7 @@ def test_normalized_documents_are_immutable() -> None:
         "non-json-value.yaml",
         "invalid-embedded-schema.yaml",
         "missing-success-transition.yaml",
+        "duplicate-effects.yaml",
     ],
 )
 def test_schema_invalid_fixtures_fail(filename: str) -> None:
@@ -230,7 +248,6 @@ def test_procedure_cycle_fails_semantic_validation() -> None:
         ("unknown-decision-criterion.yaml", "unknown decision criterion"),
         ("rule-set-id-collision.yaml", "duplicate id"),
         ("wrong-predicate-class.yaml", "is not admitted"),
-        ("contradictory-effects.yaml", "has both"),
         ("retain-outside-conflict.yaml", "not a member"),
         ("misrouted-outcome.yaml", "routes success"),
     ],
@@ -247,6 +264,42 @@ def test_schema_error_reports_source_location() -> None:
     assert str(path) in str(captured.value)
     assert "at $.description" in str(captured.value)
     assert "line 14" in str(captured.value)
+
+
+def test_multiple_unknown_fields_report_the_first_source_field(tmp_path: Path) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["description"] = "First unknown field"
+        document["summary"] = "Second unknown field"
+
+    path = _write_variant(tmp_path, "procedure.yaml", mutate)
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+    assert captured.value.location == "$.description"
+    assert captured.value.line == _line_containing(path, "description:")
+
+
+@pytest.mark.parametrize("unknown_name", ["can't-field", "a'b\"c-field"])
+def test_quoted_unknown_field_reports_its_full_path_and_source_line(
+    tmp_path: Path, unknown_name: str
+) -> None:
+    marker = f"Unknown field {unknown_name}"
+
+    def mutate(document: dict[str, object]) -> None:
+        document[unknown_name] = marker
+
+    path = _write_variant(tmp_path, "procedure.yaml", mutate)
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+    assert captured.value.location == f"$.{unknown_name}"
+    assert captured.value.line == _line_containing(path, marker)
+
+
+def test_evaluator_diagnostic_follows_the_matching_discriminator_branch() -> None:
+    path = FIXTURES / "invalid" / "manual-total.yaml"
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+    assert captured.value.location in {"$.coverage", "$.adjudication"}
+    assert "evaluator-kind" not in str(captured.value)
 
 
 def test_duplicate_key_error_reports_both_source_locations() -> None:
@@ -453,3 +506,282 @@ def test_duplicate_identifier_reports_the_second_id_field() -> None:
     with pytest.raises(DeclarationSemanticError) as captured:
         load_declaration(path)
     assert "$.rules[0].id" in str(captured.value)
+
+
+def test_invariant_observations_and_named_failure_routes_are_preserved(
+    tmp_path: Path,
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["invariants"] = [
+            {
+                "id": "preserve-index",
+                "class": "invariant",
+                "expression": {
+                    "facet": "index.valid",
+                    "operator": "equals",
+                    "value": True,
+                },
+                "observes": ["filesystem/index"],
+            }
+        ]
+        actions = document["actions"]
+        assert isinstance(actions, list)
+        actions[0]["on-failure"] = {
+            "write-failed": "write-failed",
+            "permission-denied": "write-failed",
+        }
+
+    declaration = load_declaration(_write_variant(tmp_path, "procedure.yaml", mutate))
+    assert isinstance(declaration, ProcedureDeclaration)
+    assert declaration.invariants[0].observes == ("filesystem/index",)
+    assert declaration.actions[0].on_failure == {
+        "write-failed": "write-failed",
+        "permission-denied": "write-failed",
+    }
+
+
+def _first_action(document: dict[str, object]) -> dict[str, object]:
+    """Return the first mutable action from a procedure fixture document."""
+    actions = document["actions"]
+    assert isinstance(actions, list)
+    action = actions[0]
+    assert isinstance(action, dict)
+    return action
+
+
+def _bindings(document: dict[str, object]) -> dict[str, object]:
+    """Return the first action's mutable input bindings."""
+    bindings = _first_action(document)["with"]
+    assert isinstance(bindings, dict)
+    return bindings
+
+
+def _set_plain_binding(document: dict[str, object]) -> None:
+    _bindings(document)["path"] = "path"
+
+
+def _set_both_binding_tags(document: dict[str, object]) -> None:
+    _bindings(document)["path"] = {"parameter": "path", "literal": "other"}
+
+
+def _set_neither_binding_tag(document: dict[str, object]) -> None:
+    _bindings(document)["path"] = {}
+
+
+def _set_missing_invariant_observations(document: dict[str, object]) -> None:
+    document["invariants"] = [
+        {
+            "id": "unscoped-invariant",
+            "class": "invariant",
+            "expression": {"facet": "index.valid", "operator": "exists"},
+        }
+    ]
+
+
+def _set_observations_on_guard(document: dict[str, object]) -> None:
+    document["preconditions"] = [
+        {
+            "id": "guard-with-observations",
+            "class": "guard",
+            "expression": {"facet": "index.valid", "operator": "exists"},
+            "observes": ["filesystem/index"],
+        }
+    ]
+
+
+def _set_empty_failure_routes(document: dict[str, object]) -> None:
+    _first_action(document)["on-failure"] = {}
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected_path"),
+    [
+        (_set_plain_binding, "$.actions[0].with.path"),
+        (_set_both_binding_tags, "$.actions[0].with.path"),
+        (_set_neither_binding_tag, "$.actions[0].with.path"),
+        (_set_missing_invariant_observations, "$.invariants[0]"),
+        (_set_observations_on_guard, "$.preconditions[0].observes"),
+        (_set_empty_failure_routes, "$.actions[0].on-failure"),
+    ],
+)
+def test_invalid_procedure_contracts_report_the_nested_cause(
+    tmp_path: Path,
+    mutate: Callable[[dict[str, object]], None],
+    expected_path: str,
+) -> None:
+    path = _write_variant(tmp_path, "procedure.yaml", mutate)
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+    assert captured.value.location == expected_path
+    assert captured.value.line is not None
+    if expected_path.endswith(".observes"):
+        assert captured.value.line == _line_containing(path, "observes:")
+
+
+def test_missing_success_transition_reports_the_action() -> None:
+    path = FIXTURES / "invalid" / "missing-success-transition.yaml"
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+    assert captured.value.location == "$.actions[0]"
+    assert captured.value.line is not None
+
+
+def test_literal_null_and_nested_literals_remain_distinguishable_and_immutable(
+    tmp_path: Path,
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        bindings = _bindings(document)
+        bindings["path"] = {"literal": None}
+        bindings["content"] = {"literal": {"parts": ["reviewed"]}}
+
+    declaration = load_declaration(_write_variant(tmp_path, "procedure.yaml", mutate))
+    assert isinstance(declaration, ProcedureDeclaration)
+    null_binding = declaration.actions[0].bindings["path"]
+    nested_binding = declaration.actions[0].bindings["content"]
+    assert isinstance(null_binding, LiteralBinding)
+    assert null_binding.value is None
+    assert isinstance(nested_binding, LiteralBinding)
+    assert nested_binding.value == {"parts": ("reviewed",)}
+    assert isinstance(nested_binding.value, Mapping)
+    with pytest.raises(TypeError):
+        nested_binding.value["parts"] = ()  # type: ignore[index]
+
+
+def test_procedure_binding_and_failure_maps_are_immutable() -> None:
+    declaration = load_declaration(FIXTURES / "valid" / "procedure.yaml")
+    assert isinstance(declaration, ProcedureDeclaration)
+    with pytest.raises(TypeError):
+        declaration.actions[0].bindings["path"] = ParameterBinding(  # type: ignore[index]
+            "content"
+        )
+    with pytest.raises(TypeError):
+        declaration.actions[0].on_failure["write-failed"] = "other"  # type: ignore[index]
+
+
+def test_empty_mutation_footprints_are_explicitly_admitted(tmp_path: Path) -> None:
+    def clear_operation_effects(document: dict[str, object]) -> None:
+        document["effects"] = []
+
+    def clear_procedure_effects(document: dict[str, object]) -> None:
+        document["effects"] = []
+
+    operation = load_declaration(
+        _write_variant(
+            tmp_path, "operation.yaml", clear_operation_effects, name="op.yaml"
+        )
+    )
+    procedure = load_declaration(
+        _write_variant(
+            tmp_path, "procedure.yaml", clear_procedure_effects, name="procedure.yaml"
+        )
+    )
+    assert isinstance(operation, OperationDeclaration)
+    assert isinstance(procedure, ProcedureDeclaration)
+    assert operation.effects == ()
+    assert procedure.effects == ()
+
+
+@pytest.mark.parametrize("source_name", ["operation.yaml", "procedure.yaml"])
+def test_duplicate_mutation_footprints_report_the_effects_field(
+    tmp_path: Path, source_name: str
+) -> None:
+    def duplicate_effect(document: dict[str, object]) -> None:
+        document["effects"] = ["filesystem/artifact", "filesystem/artifact"]
+
+    path = _write_variant(tmp_path, source_name, duplicate_effect)
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+    assert captured.value.location == "$.effects"
+    assert captured.value.line is not None
+
+
+@pytest.mark.parametrize(
+    ("target", "message"),
+    [
+        ("unknown", "unknown states"),
+        ("artifact-written", "routes failure directly"),
+    ],
+)
+def test_named_failure_routes_must_target_failure_paths(
+    tmp_path: Path, target: str, message: str
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        _first_action(document)["on-failure"] = {"write-failed": target}
+
+    path = _write_variant(tmp_path, "procedure.yaml", mutate)
+    with pytest.raises(DeclarationSemanticError, match=message):
+        load_declaration(path)
+
+
+def test_required_input_must_have_a_property_schema(tmp_path: Path) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        inputs = document["inputs"]
+        assert isinstance(inputs, dict)
+        inputs["required"] = ["undeclared"]
+
+    path = _write_variant(tmp_path, "operation.yaml", mutate)
+    with pytest.raises(DeclarationSemanticError, match="has no declared schema"):
+        load_declaration(path)
+
+
+def test_parameter_binding_must_reference_a_declared_parameter(tmp_path: Path) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        _bindings(document)["path"] = {"parameter": "undeclared"}
+
+    path = _write_variant(tmp_path, "procedure.yaml", mutate)
+    with pytest.raises(DeclarationSemanticError, match="unknown procedure parameter"):
+        load_declaration(path)
+
+
+@pytest.mark.parametrize(
+    ("source_name", "field"),
+    [
+        ("procedure.yaml", "parameters"),
+        ("operation.yaml", "inputs"),
+        ("procedure.yaml", "bindings"),
+    ],
+)
+@pytest.mark.parametrize("name", ["", "bad name"])
+def test_contract_property_names_use_identifier_syntax(
+    tmp_path: Path, source_name: str, field: str, name: str
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        if field == "bindings":
+            _bindings(document)[name] = {"literal": "value"}
+            return
+        contract = document[field]
+        assert isinstance(contract, dict)
+        contract["properties"] = {name: {"type": "string"}}
+        contract["required"] = [name]
+
+    path = _write_variant(tmp_path, source_name, mutate)
+    with pytest.raises(DeclarationSchemaError):
+        load_declaration(path)
+
+
+@pytest.mark.parametrize(
+    ("source_name", "field", "expected_path"),
+    [
+        ("procedure.yaml", "parameters", "$.parameters.properties.bad name"),
+        ("operation.yaml", "inputs", "$.inputs.properties.bad name"),
+        ("procedure.yaml", "bindings", "$.actions[0].with.bad name"),
+    ],
+)
+def test_invalid_contract_key_reports_its_own_path_and_line(
+    tmp_path: Path, source_name: str, field: str, expected_path: str
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        if field == "bindings":
+            _bindings(document)["bad name"] = {"literal": "value"}
+            return
+        contract = document[field]
+        assert isinstance(contract, dict)
+        properties = contract["properties"]
+        assert isinstance(properties, dict)
+        properties["bad name"] = {"type": "string"}
+
+    path = _write_variant(tmp_path, source_name, mutate)
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+    assert captured.value.location == expected_path
+    assert captured.value.line == _line_containing(path, "bad name")

@@ -9,7 +9,11 @@ relations: []
 version: 1
 inputs:
   type: object
-  default: !!set {unexpected: null}
+  properties:
+    value:
+      type: string
+      default: !!set {unexpected: null}
+  additionalProperties: false
 outputs: {type: object}
 preconditions: []
 effects: []

@@ -9,17 +9,17 @@ applicability:
   operator: exists
 relations: []
 purpose: Plants a cycle for the semantic gate
-parameters: {}
+parameters: {type: object, properties: {}, additionalProperties: false}
 preconditions: []
 actions:
   - id: first
     operation: {id: eutaxis/write-artifact, version: 1}
     on-success: second
-    on-failure: failed
+    on-failure: {write-failed: failed}
   - id: second
     operation: {id: eutaxis/write-artifact, version: 1}
     on-success: first
-    on-failure: failed
+    on-failure: {write-failed: failed}
 entry: first
 invariants: []
 effects: []
