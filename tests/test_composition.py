@@ -5,16 +5,20 @@ from __future__ import annotations
 import shutil
 from dataclasses import replace
 from pathlib import Path
+from typing import Mapping, cast
 
 import pytest
 import yaml
 
 from eutaxis.declarations import (
     CompositionError,
+    CumulativeArtifact,
+    CumulativeCompositionPlan,
     PlannedComponent,
     ResolvedCompilationUnit,
     ResolvedComponent,
     ResolvedDependency,
+    assemble_cumulative_artifact,
     load_declaration_registry,
     load_facet_registry,
     plan_cumulative_composition,
@@ -39,6 +43,34 @@ def _mutable_fixture(tmp_path: Path) -> Path:
     target = tmp_path / "cumulative"
     shutil.copytree(FIXTURE_ROOT, target)
     return target
+
+
+def _fragments() -> dict[str, str]:
+    return {
+        "fixture/a-peer": "# Peer π e\u0301  ",
+        "fixture/z-base": "# Base\nKeep two spaces here  \nNext",
+        "fixture/dependant": "# Dependant",
+        "fixture/member": "# Member",
+        "fixture/a-independent": "# Independent  ",
+    }
+
+
+class _ReadOnceMapping(Mapping[str, str]):
+    def __init__(self, values: Mapping[str, str]) -> None:
+        self._values = dict(values)
+        self.read_counts = {key: 0 for key in values}
+
+    def __getitem__(self, key: str) -> str:
+        self.read_counts[key] += 1
+        if self.read_counts[key] > 1:
+            raise RuntimeError(f"caller mapping value read twice: {key}")
+        return self._values[key]
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self) -> int:
+        return len(self._values)
 
 
 def _unit(
@@ -84,6 +116,123 @@ def test_multi_component_plan_accepts_dependency_closure_and_is_repeatable() -> 
         PlannedComponent(section="core", declaration="fixture/member"),
         PlannedComponent(section="additional", declaration="fixture/a-independent"),
     )
+
+
+def test_cumulative_assembly_is_byte_identical_and_preserves_fragments() -> None:
+    plan = plan_cumulative_composition(_registry(), _unit())
+    fragments = _fragments()
+    reversed_fragments = dict(reversed(tuple(fragments.items())))
+
+    first = assemble_cumulative_artifact(plan, fragments)
+    second = assemble_cumulative_artifact(plan, reversed_fragments)
+
+    assert first == second
+    assert first.manifest == "fixture/cumulative"
+    assert first.scope == "project"
+    assert first.target == "AGENTS.md"
+    assert first.content == (
+        "# Peer π e\u0301  \n\n"
+        "# Base\nKeep two spaces here  \nNext\n\n"
+        "# Dependant\n\n"
+        "# Member\n\n"
+        "# Independent  \n"
+    ).encode("utf-8")
+    assert b"e\xcc\x81  \n\n# Base" in first.content
+    assert first.text.endswith("# Independent  \n")
+
+
+def test_cumulative_assembly_snapshots_the_fragment_mapping() -> None:
+    plan = plan_cumulative_composition(_registry(), _unit())
+    fragments = _ReadOnceMapping(_fragments())
+
+    artifact = assemble_cumulative_artifact(plan, fragments)
+
+    assert artifact == assemble_cumulative_artifact(plan, _fragments())
+    assert set(fragments.read_counts.values()) == {1}
+
+
+def test_native_scopes_remain_distinct_for_the_same_target() -> None:
+    registry = _registry()
+    project = assemble_cumulative_artifact(
+        plan_cumulative_composition(registry, _unit()), _fragments()
+    )
+    personal_unit = _unit(
+        manifest="fixture/personal",
+        components=(ResolvedComponent("core", "fixture/a-independent", 0),),
+        dependencies=(),
+    )
+    personal = assemble_cumulative_artifact(
+        plan_cumulative_composition(registry, personal_unit),
+        {"fixture/a-independent": "# Personal"},
+    )
+
+    artifacts = {
+        (artifact.scope, artifact.target): artifact for artifact in (project, personal)
+    }
+
+    assert len(artifacts) == 2
+    assert project.target == personal.target == "AGENTS.md"
+    assert project.scope == "project"
+    assert personal.scope == "personal"
+    assert project.manifest != personal.manifest
+
+
+def test_empty_cumulative_plan_emits_no_synthetic_newline() -> None:
+    plan = plan_cumulative_composition(
+        _registry(), _unit(components=(), dependencies=())
+    )
+
+    artifact = assemble_cumulative_artifact(plan, {})
+
+    assert artifact.content == b""
+    assert artifact.text == ""
+
+
+def test_cumulative_assembly_requires_an_exact_fragment_key_set() -> None:
+    plan = plan_cumulative_composition(_registry(), _unit())
+    missing = _fragments()
+    del missing["fixture/z-base"]
+    del missing["fixture/a-independent"]
+    with pytest.raises(CompositionError) as captured_missing:
+        assemble_cumulative_artifact(plan, missing)
+    assert captured_missing.value.location == '$.fragments["fixture/z-base"]'
+    assert "missing projected fragment" in str(captured_missing.value)
+
+    extras = _fragments()
+    extras["fixture/z-extra"] = "# Z"
+    extras["fixture/a-extra"] = "# A"
+    with pytest.raises(CompositionError) as captured_extra:
+        assemble_cumulative_artifact(plan, extras)
+    assert captured_extra.value.location == '$.fragments["fixture/a-extra"]'
+    assert "unplanned projected fragment" in str(captured_extra.value)
+
+
+@pytest.mark.parametrize(
+    ("fragment", "message"),
+    [
+        (42, "must be text"),
+        ("", "must not be empty"),
+        (" \t", "must not be empty"),
+        ("# Peer\r\nbody", "must use LF newlines"),
+        ("\n# Peer", "must not have a boundary newline"),
+        ("# Peer\n", "must not have a boundary newline"),
+        ("# Peer \ud800", "not valid UTF-8 text"),
+    ],
+)
+def test_cumulative_assembly_rejects_noncanonical_fragments(
+    fragment: object, message: str
+) -> None:
+    plan = plan_cumulative_composition(_registry(), _unit())
+    fragments: dict[str, object] = {
+        identifier: content for identifier, content in _fragments().items()
+    }
+    fragments["fixture/a-peer"] = fragment
+
+    with pytest.raises(CompositionError) as captured:
+        assemble_cumulative_artifact(plan, cast(Mapping[str, str], fragments))
+
+    assert captured.value.location == '$.fragments["fixture/a-peer"]'
+    assert message in str(captured.value)
 
 
 def test_resolved_substitute_can_satisfy_an_absent_authored_dependency() -> None:
@@ -232,6 +381,24 @@ def test_resolved_compilation_unit_requires_resolver_issuance() -> None:
         ResolvedCompilationUnit("fixture/cumulative", (), ())
     with pytest.raises(TypeError, match="issued by semantic resolution"):
         replace(_unit(), dependencies=())
+
+
+def test_cumulative_plan_requires_planner_issuance() -> None:
+    with pytest.raises(TypeError, match="issued by the composition planner"):
+        CumulativeCompositionPlan("fixture/cumulative", "project", "AGENTS.md", ())
+    plan = plan_cumulative_composition(_registry(), _unit())
+    with pytest.raises(TypeError, match="issued by the composition planner"):
+        replace(plan, components=())
+
+
+def test_cumulative_artifact_requires_assembler_issuance() -> None:
+    with pytest.raises(TypeError, match="issued by the cumulative assembler"):
+        CumulativeArtifact("fixture/cumulative", "project", "AGENTS.md", b"")
+    artifact = assemble_cumulative_artifact(
+        plan_cumulative_composition(_registry(), _unit()), _fragments()
+    )
+    with pytest.raises(TypeError, match="issued by the cumulative assembler"):
+        replace(artifact, content=b"forged")
 
 
 def test_duplicate_and_cyclic_resolved_dependencies_fail() -> None:

@@ -1,0 +1,14 @@
+schema-version: 1
+id: fixture/personal
+kind: composition-manifest
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: target.codex, operator: equals, value: true}
+relations: []
+scope: personal
+target: AGENTS.md
+sections:
+  - id: core
+    declarations: [fixture/a-independent]
+policies: []

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import heapq
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import NoReturn, cast
 
@@ -25,14 +27,41 @@ class PlannedComponent:
     declaration: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class CumulativeCompositionPlan:
-    """The deterministic component order for one cumulative artifact."""
+    """Planner-issued component order for one cumulative artifact."""
 
     manifest: str
     scope: str
     target: str
     components: tuple[PlannedComponent, ...]
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        """Reject construction outside the composition planner."""
+        raise TypeError(
+            "CumulativeCompositionPlan instances must be issued by the composition planner"
+        )
+
+
+@dataclass(frozen=True, init=False)
+class CumulativeArtifact:
+    """Assembler-issued cumulative artifact with canonical bytes."""
+
+    manifest: str
+    scope: str
+    target: str
+    content: bytes
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        """Reject construction outside the cumulative assembler."""
+        raise TypeError(
+            "CumulativeArtifact instances must be issued by the cumulative assembler"
+        )
+
+    @property
+    def text(self) -> str:
+        """Decode the canonical bytes as strict UTF-8."""
+        return self.content.decode("utf-8", errors="strict")
 
 
 @dataclass(frozen=True)
@@ -80,6 +109,36 @@ def _issue_resolved_compilation_unit(
     return unit
 
 
+def _issue_cumulative_composition_plan(
+    manifest: str,
+    scope: str,
+    target: str,
+    components: tuple[PlannedComponent, ...],
+) -> CumulativeCompositionPlan:
+    """Issue one plan after composition validation and ordering."""
+    plan = object.__new__(CumulativeCompositionPlan)
+    object.__setattr__(plan, "manifest", manifest)
+    object.__setattr__(plan, "scope", scope)
+    object.__setattr__(plan, "target", target)
+    object.__setattr__(plan, "components", components)
+    return plan
+
+
+def _issue_cumulative_artifact(
+    manifest: str,
+    scope: str,
+    target: str,
+    content: bytes,
+) -> CumulativeArtifact:
+    """Issue one artifact after fragment validation and assembly."""
+    artifact = object.__new__(CumulativeArtifact)
+    object.__setattr__(artifact, "manifest", manifest)
+    object.__setattr__(artifact, "scope", scope)
+    object.__setattr__(artifact, "target", target)
+    object.__setattr__(artifact, "content", content)
+    return artifact
+
+
 def plan_cumulative_composition(
     registry: DeclarationRegistry,
     unit: ResolvedCompilationUnit,
@@ -106,11 +165,11 @@ def plan_cumulative_composition(
         section.id: index for index, section in enumerate(manifest.sections)
     }
     order = _stable_dependency_order(components, dependencies, section_order)
-    return CumulativeCompositionPlan(
-        manifest=manifest.id,
-        scope=manifest.scope,
-        target=manifest.target,
-        components=tuple(
+    return _issue_cumulative_composition_plan(
+        manifest.id,
+        manifest.scope,
+        manifest.target,
+        tuple(
             PlannedComponent(
                 section=components[identifier].section,
                 declaration=identifier,
@@ -118,6 +177,71 @@ def plan_cumulative_composition(
             for identifier in order
         ),
     )
+
+
+def assemble_cumulative_artifact(
+    plan: CumulativeCompositionPlan,
+    fragments: Mapping[str, str],
+) -> CumulativeArtifact:
+    """Join one closed set of projected fragments in planned order."""
+    fragment_map = dict(fragments)
+    fragment_ids = tuple(fragment_map)
+    if any(not isinstance(identifier, str) for identifier in fragment_ids):
+        raise CompositionError("$.fragments", "fragment identifiers must be strings")
+    planned_ids = tuple(component.declaration for component in plan.components)
+    planned_set = set(planned_ids)
+    for identifier in planned_ids:
+        if identifier not in fragment_map:
+            raise CompositionError(
+                _fragment_location(identifier),
+                f"missing projected fragment {identifier!r}",
+            )
+    extras = sorted(
+        identifier for identifier in fragment_ids if identifier not in planned_set
+    )
+    if extras:
+        identifier = extras[0]
+        raise CompositionError(
+            _fragment_location(identifier),
+            f"unplanned projected fragment {identifier!r}",
+        )
+
+    blocks: list[bytes] = []
+    for identifier in planned_ids:
+        location = _fragment_location(identifier)
+        fragment = fragment_map[identifier]
+        if not isinstance(fragment, str):
+            raise CompositionError(location, "projected fragment must be text")
+        if not fragment.strip():
+            raise CompositionError(location, "projected fragment must not be empty")
+        if "\r" in fragment:
+            raise CompositionError(location, "projected fragment must use LF newlines")
+        if fragment.startswith("\n") or fragment.endswith("\n"):
+            raise CompositionError(
+                location,
+                "projected fragment must not have a boundary newline",
+            )
+        try:
+            blocks.append(fragment.encode("utf-8", errors="strict"))
+        except UnicodeEncodeError as error:
+            raise CompositionError(
+                location, "projected fragment is not valid UTF-8 text"
+            ) from error
+
+    content = b"\n\n".join(blocks)
+    if content:
+        content += b"\n"
+    return _issue_cumulative_artifact(
+        plan.manifest,
+        plan.scope,
+        plan.target,
+        content,
+    )
+
+
+def _fragment_location(identifier: str) -> str:
+    """Return a stable diagnostic location for one opaque identifier."""
+    return f"$.fragments[{json.dumps(identifier, ensure_ascii=False)}]"
 
 
 def _index_resolved_components(

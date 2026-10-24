@@ -17,13 +17,17 @@ Independent adversarial reviews approved the complete normative contract on thre
 
 `eutaxis/load-declaration-registry` now runs through a code-owned callable. Before calling it, Eutaxis validates an immutable input. After it returns, Eutaxis validates either immutable outputs or a declared failure.
 
-A self-contained cumulative fixture now plans a certified compilation unit deterministically. The fixture simulates three results from the future resolver:
+A self-contained cumulative fixture now plans and mechanically assembles a certified compilation unit. The fixture simulates three results from the future resolver:
 
 - a prerequisite added from the dependency closure
 - a policy substitute used in place of the authored prerequisite
 - a retained rule-set member not named directly in the manifest
 
-The planner orders each prerequisite before its dependant. Resolver-assigned anchors order unrelated records. The planner rejects malformed supplied graphs and anchors. Next, the fixture must render the plan and cover the other target mechanisms. The catalog phase will decide which context predicates match. The same phase will apply conflict policies and issue certified units for real builds.
+The planner orders each prerequisite before its dependant. Resolver-assigned anchors order unrelated records. The planner rejects malformed supplied graphs and anchors.
+
+The assembler joins an exact set of fixture-projected Markdown blocks into canonical bytes. A second manifest uses the same target for personal and project scopes. The resulting artifacts remain distinct. The separate-directory and single-slot mechanisms remain open.
+
+The catalog phase will decide which context predicates match. The same phase will apply conflict policies and issue certified units for real builds.
 
 ## Decision log and open prerequisites
 
@@ -72,7 +76,8 @@ The fixture must prove that identical inputs produce identical artifacts. This p
   - validate immutable outputs or a declared failure after each call
   - run `eutaxis/load-declaration-registry` and return its four declared fields
 - [x] Build a self-contained fixture corpus owned by Eutaxis before reading external repositories.
-- [ ] Exercise a multi-component cumulative artifact, separate-directory artifacts, and a single-slot collision.
+- [x] Exercise cumulative assembly with several components.
+- [ ] Exercise separate-directory artifacts and a single-slot collision.
 - [x] Put resolved prerequisites before dependants and retain resolver-assigned manifest order among unrelated records.
 - [x] Reject a certified unit that displaces a directly named record from its authored anchor.
 - [x] Accept certified fixture units that contain prerequisites, policy results, and retained rule-set members not named directly in the manifest.
@@ -81,7 +86,10 @@ The fixture must prove that identical inputs produce identical artifacts. This p
   - duplicate manifest membership
   - invalid anchors or endpoints
   - edges that reverse the declared order of `sections`
-- [ ] Prove byte-identical rebuilds and failure on duplicate paths and multiple slot values.
+- [x] Assemble an exact set of fixture-projected blocks without inventing section labels or changing their contents.
+- [x] Prove byte-identical cumulative output and reject missing, additional, or non-canonical blocks.
+- [x] Preserve distinct personal and project artifacts when both use the same target path.
+- [ ] Prove failure on duplicate paths and multiple slot values.
 
 **Dependency:** the normative contract has passed.
 

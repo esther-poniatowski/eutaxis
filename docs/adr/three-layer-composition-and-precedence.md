@@ -46,6 +46,31 @@ Within those constraints, the composer uses a stable topological sort. The assig
 - anchors or edge endpoints that do not exist
 - manifests that name one record twice
 
+Another layer first converts each retained record into a Markdown block. The mechanical assembler receives two inputs after those blocks exist:
+
+- an opaque plan
+- a closed dictionary keyed by record identifier
+
+The dictionary must contain exactly the identifiers in the plan. The assembler reads each block in plan order. Manifest `sections` supply order only. The assembler emits no section labels or wrappers.
+
+Each Markdown block must satisfy four boundary rules:
+
+- contain non-whitespace text
+- use newline characters without carriage returns
+- omit a leading newline
+- omit a trailing newline
+
+The assembler preserves every other character, including internal spaces and Unicode code points. The assembler places one blank line between consecutive blocks. The assembler appends one terminal newline. The assembler uses eight-bit Unicode Transformation Format to encode the result. An empty plan emits empty bytes.
+
+The artifact stores four values:
+
+- manifest identifier
+- native scope
+- target
+- canonical bytes
+
+The derived text view decodes the canonical bytes. This metadata keeps personal and project artifacts distinct when they share a target path.
+
 The target mechanism fixes collision behavior:
 
 - cumulative files concatenate the ordered sections
@@ -67,6 +92,8 @@ The first multi-component fixture must prove:
 - byte-identical ordering under repeated builds
 - dependency-before-dependant ordering
 - manifest-order tie-breaking for unrelated declarations
+- assemble fixture-projected blocks into byte-identical output
+- reject missing, additional, or non-canonical projected blocks
 - accept retained prerequisites, policy results, and rule-set members not named directly in the manifest
 - failure when a supplied edge contains a cycle
 - failure when an anchor or edge endpoint is invalid
@@ -74,7 +101,7 @@ The first multi-component fixture must prove:
 - reject duplicate manifest membership, duplicate output paths, and multiple values for one slot
 - preservation of both artifacts when the same component exists at personal and project scopes
 
-The cumulative renderer cannot pass its implementation gate with a single-component fixture.
+Mechanical cumulative assembly cannot pass its implementation gate with a single-component fixture. Converting semantic records into Markdown remains a later gate.
 
 ## Consequences
 

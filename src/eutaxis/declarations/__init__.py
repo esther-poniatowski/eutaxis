@@ -19,11 +19,13 @@ from .exceptions import (
     OperationRunnerRegistryError,
 )
 from .composition import (
+    CumulativeArtifact,
     CumulativeCompositionPlan,
     PlannedComponent,
     ResolvedCompilationUnit,
     ResolvedComponent,
     ResolvedDependency,
+    assemble_cumulative_artifact,
     plan_cumulative_composition,
 )
 from .execution import execute_checker, execute_known_failure_fixtures
@@ -123,6 +125,7 @@ __all__ = [
     "CheckerRunnerRegistryError",
     "CompositionError",
     "CompositionManifestDeclaration",
+    "CumulativeArtifact",
     "CumulativeCompositionPlan",
     "ContextFacet",
     "ContractFamily",
@@ -180,6 +183,7 @@ __all__ = [
     "RuleSetDeclaration",
     "TruthValue",
     "VersionedReference",
+    "assemble_cumulative_artifact",
     "conjoin_applicability",
     "build_checker_runner_registry",
     "build_operation_runner_registry",
