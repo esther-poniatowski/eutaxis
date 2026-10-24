@@ -1,0 +1,36 @@
+schema-version: 1
+id: resolution/package
+kind: rule-set
+owner: resolution
+status: active
+source-revision: fixture-1
+applicability: {facet: artifact.created, operator: equals, value: true}
+relations: []
+purpose: Selects the packaged resolution rules
+rules:
+  - schema-version: 1
+    id: resolution/base
+    kind: rule
+    owner: resolution
+    status: active
+    source-revision: fixture-1
+    applicability: {facet: context.available, operator: exists}
+    relations: []
+    axis: reasoning-target
+    failure-mode: visible
+    norms:
+      - id: preserve
+        modality: should
+        subject: agent
+        action: {verb: preserve, object: the resolved contract}
+        applies-when: {facet: source.available, operator: equals, value: true}
+    exceptions:
+      - id: unavailable-source
+        when: {facet: source.available, operator: equals, value: false}
+        disposition: waive
+        affects: [preserve]
+    criteria:
+      - id: preservation
+        norms: [preserve]
+        evaluator: {id: resolution/manual, version: 1}
+        statement: The resolved contract is preserved

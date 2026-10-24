@@ -1,0 +1,20 @@
+schema-version: 1
+id: resolution/manifest
+kind: composition-manifest
+owner: resolution
+status: active
+source-revision: fixture-1
+applicability: {facet: target.codex, operator: equals, value: true}
+relations: []
+mechanism: cumulative
+scope: project
+target: AGENTS.md
+sections:
+  - id: core
+    declarations:
+      - resolution/package
+      - resolution/base
+      - resolution/refined
+      - resolution/alternate
+      - resolution/write-artifact
+policies: [resolution/prefer-refined]

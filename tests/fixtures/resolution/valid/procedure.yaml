@@ -1,0 +1,31 @@
+schema-version: 1
+id: resolution/write-artifact
+kind: procedure
+owner: resolution
+status: active
+source-revision: fixture-1
+applicability: {facet: filesystem.writable, operator: equals, value: true}
+relations: [{type: requires, target: resolution/base}]
+purpose: Writes one resolved artifact
+parameters:
+  type: object
+  properties:
+    path: {type: string}
+  required: [path]
+  additionalProperties: false
+preconditions: []
+actions:
+  - id: write
+    operation: {id: resolution/write, version: 1}
+    with:
+      path: {parameter: path}
+    on-success: written
+    on-failure: {write-failed: write-failed}
+entry: write
+invariants: []
+effects: [filesystem/artifact]
+postconditions:
+  - id: written
+    class: postcondition
+    expression: {facet: artifact.written, operator: equals, value: true}
+failures: [write-failed]

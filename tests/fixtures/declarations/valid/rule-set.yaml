@@ -7,9 +7,7 @@ source-revision: fixture-1
 applicability:
   facet: artifact.created
   operator: exists
-relations:
-  - type: requires
-    target: shared/evidence
+relations: []
 purpose: Tests a coherent rule set with inherited applicability
 rules:
   - schema-version: 1

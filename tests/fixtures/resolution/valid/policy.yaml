@@ -1,0 +1,12 @@
+schema-version: 1
+id: resolution/prefer-refined
+kind: resolution-policy
+owner: resolution
+status: active
+source-revision: fixture-1
+applicability: {facet: scope.project, operator: equals, value: true}
+relations: []
+conflicts: [resolution/refined, resolution/alternate]
+when: {facet: scope.project, operator: equals, value: true}
+order: 10
+strategy: {kind: retain, retain: resolution/refined}

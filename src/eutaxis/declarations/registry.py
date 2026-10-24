@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Iterable, Mapping, NoReturn, TypeAlias, cast
+from typing import Callable, Iterable, Mapping, NoReturn, TypeAlias, TypeGuard, cast
 
 from .embedded_schema import normalize_json_subschema, validate_json_subschema
 from .exceptions import DeclarationRegistryError
@@ -28,9 +28,10 @@ from .models import (
 )
 from .source import DocumentPath, format_document_path, nearest_location
 
-ContentDeclaration: TypeAlias = (
+ManifestSelectable: TypeAlias = (
     RuleSetDeclaration | RuleDeclaration | ProcedureDeclaration
 )
+EffectiveContent: TypeAlias = RuleDeclaration | ProcedureDeclaration
 ExactDeclaration: TypeAlias = EvaluatorDeclaration | OperationDeclaration
 ConflictPair: TypeAlias = tuple[str, str]
 
@@ -207,10 +208,10 @@ class _RegistryBuilder:
         family.versions[declaration.version] = record
 
     def _validate_relations(self) -> None:
-        """Resolve content edges and normalize incompatibility pairs."""
+        """Resolve effective-content edges and normalize incompatibility pairs."""
         for record in self.all_records:
             declaration = record.declaration
-            if not _is_content(declaration):
+            if not _is_effective_content(declaration):
                 if declaration.relations:
                     self._raise(
                         record,
@@ -225,7 +226,7 @@ class _RegistryBuilder:
                 if triple in seen:
                     self._raise(record, path, f"duplicate relation {relation.type!r}")
                 seen.add(triple)
-                target = self._content(record, relation.target, path)
+                target = self._effective_content(record, relation.target, path)
                 if target.declaration.id == declaration.id:
                     self._raise(record, path, "a declaration cannot relate to itself")
                 edge = _RelationEdge(
@@ -268,7 +269,10 @@ class _RegistryBuilder:
             states[identifier] = 2
 
         for identifier, record in self.records.items():
-            if _is_content(record.declaration) and states.get(identifier, 0) == 0:
+            if (
+                _is_effective_content(record.declaration)
+                and states.get(identifier, 0) == 0
+            ):
                 visit(identifier)
 
     def _validate_exact_references(self) -> None:
@@ -466,7 +470,7 @@ class _RegistryBuilder:
             if not isinstance(policy, ResolutionPolicyDeclaration):
                 continue
             members = tuple(
-                self._content(record, identifier, ("conflicts", index))
+                self._effective_content(record, identifier, ("conflicts", index))
                 for index, identifier in enumerate(policy.conflicts)
             )
             pair = _conflict_pair(*policy.conflicts)
@@ -481,7 +485,7 @@ class _RegistryBuilder:
                 assert strategy.replace is not None
                 assert strategy.replacement is not None
                 replaced = members[policy.conflicts.index(strategy.replace)]
-                replacement = self._content(
+                replacement = self._effective_content(
                     record, strategy.replacement, ("strategy", "with")
                 )
                 if replacement.declaration.kind is not replaced.declaration.kind:
@@ -498,7 +502,9 @@ class _RegistryBuilder:
                         ("strategy", "kind"),
                         "combine requires conflict members of the same kind",
                     )
-                result = self._content(record, strategy.result, ("strategy", "result"))
+                result = self._effective_content(
+                    record, strategy.result, ("strategy", "result")
+                )
                 if result.declaration.kind is not members[0].declaration.kind:
                     self._raise(
                         record,
@@ -512,12 +518,26 @@ class _RegistryBuilder:
             manifest = record.declaration
             if not isinstance(manifest, CompositionManifestDeclaration):
                 continue
+            selected: set[str] = set()
             for section_index, section in enumerate(manifest.sections):
                 for item_index, identifier in enumerate(section.declarations):
-                    self._content(
+                    selection_path = (
+                        "sections",
+                        section_index,
+                        "declarations",
+                        item_index,
+                    )
+                    if identifier in selected:
+                        self._raise(
+                            record,
+                            selection_path,
+                            f"duplicate manifest selection {identifier!r}",
+                        )
+                    selected.add(identifier)
+                    self._manifest_selectable(
                         record,
                         identifier,
-                        ("sections", section_index, "declarations", item_index),
+                        selection_path,
                     )
             seen_orders: set[tuple[ConflictPair, int]] = set()
             for index, identifier in enumerate(manifest.policies):
@@ -547,25 +567,57 @@ class _RegistryBuilder:
                     )
                 seen_orders.add(key)
 
-    def _content(
+    def _manifest_selectable(
         self,
         referring_record: RegisteredDeclaration,
         identifier: str,
         path: DocumentPath,
     ) -> RegisteredDeclaration:
-        """Resolve one identifier as an unversioned content record."""
+        """Resolve one identifier as a manifest-selectable record."""
+        return self._unversioned_kind(
+            referring_record,
+            identifier,
+            path,
+            _is_manifest_selectable,
+            "manifest-selectable declaration",
+        )
+
+    def _effective_content(
+        self,
+        referring_record: RegisteredDeclaration,
+        identifier: str,
+        path: DocumentPath,
+    ) -> RegisteredDeclaration:
+        """Resolve one identifier as content admitted to a resolved unit."""
+        return self._unversioned_kind(
+            referring_record,
+            identifier,
+            path,
+            _is_effective_content,
+            "effective content declaration",
+        )
+
+    def _unversioned_kind(
+        self,
+        referring_record: RegisteredDeclaration,
+        identifier: str,
+        path: DocumentPath,
+        accepts: Callable[[AnyDeclaration], bool],
+        kind_name: str,
+    ) -> RegisteredDeclaration:
+        """Resolve one identifier under a caller-owned unversioned kind predicate."""
         target = self.records.get(identifier)
         if target is None:
             if identifier in self.families:
-                message = f"{identifier!r} is an exact contract, not content"
+                message = f"{identifier!r} is an exact contract, not {kind_name}"
             else:
-                message = f"unknown content declaration {identifier!r}"
+                message = f"unknown {kind_name} {identifier!r}"
             self._raise(referring_record, path, message)
-        if not _is_content(target.declaration):
+        if not accepts(target.declaration):
             self._raise(
                 referring_record,
                 path,
-                f"{identifier!r} is not a content declaration",
+                f"{identifier!r} does not name {kind_name}",
             )
         return target
 
@@ -584,11 +636,18 @@ class _RegistryBuilder:
         )
 
 
-def _is_content(declaration: AnyDeclaration) -> bool:
-    """Return whether a declaration may participate in semantic resolution."""
+def _is_manifest_selectable(
+    declaration: AnyDeclaration,
+) -> TypeGuard[ManifestSelectable]:
+    """Return whether a manifest may select the declaration directly."""
     return isinstance(
         declaration, (RuleSetDeclaration, RuleDeclaration, ProcedureDeclaration)
     )
+
+
+def _is_effective_content(declaration: AnyDeclaration) -> TypeGuard[EffectiveContent]:
+    """Return whether a declaration may enter a resolved compilation unit."""
+    return isinstance(declaration, (RuleDeclaration, ProcedureDeclaration))
 
 
 def _conflict_pair(left: str, right: str) -> ConflictPair:

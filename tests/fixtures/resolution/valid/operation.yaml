@@ -1,0 +1,24 @@
+schema-version: 1
+id: resolution/write
+kind: operation
+owner: resolution
+status: active
+source-revision: fixture-1
+applicability: {facet: filesystem.writable, operator: equals, value: true}
+relations: []
+version: 1
+inputs:
+  type: object
+  properties:
+    path: {type: string}
+  required: [path]
+  additionalProperties: false
+outputs:
+  type: object
+  properties: {written: {type: boolean}}
+  required: [written]
+  additionalProperties: false
+preconditions: []
+effects: [filesystem/artifact]
+failure-outcomes: [write-failed]
+recovery: Preserve the prior artifact

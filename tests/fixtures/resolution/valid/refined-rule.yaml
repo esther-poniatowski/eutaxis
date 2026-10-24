@@ -1,0 +1,22 @@
+schema-version: 1
+id: resolution/refined
+kind: rule
+owner: resolution
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations:
+  - {type: requires, target: resolution/base}
+  - {type: incompatible-with, target: resolution/alternate}
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: refine
+    modality: must
+    subject: agent
+    action: {verb: apply, object: the refined contract}
+criteria:
+  - id: refined-check
+    norms: [refine]
+    evaluator: {id: resolution/manual, version: 1}
+    statement: The refined contract is applied

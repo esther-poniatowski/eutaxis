@@ -23,15 +23,20 @@ Semantic resolution operates inside one compilation unit: the declarations selec
 
 A stable identifier names each rule-local exception. The exception either waives explicitly affected norms or substitutes named local norms. Version 1 assigns each norm to at most one exception and forbids a replacement norm from being affected by another exception. These restrictions make every substitution simultaneous and one-step. Exceptions form a closed list and do not remove the enclosing rule or alter its declaration relations.
 
-The cross-record registry classifies `rule-set`, `rule`, and `procedure` as content records. A rule set and each of its member rules remain separately addressable. The registry preserves each member's inherited applicability, source root, and containing rule-set identifier. Only content records may declare relations or serve as relation targets. A `composition-manifest`, `resolution-policy`, `evaluator`, or `operation` must declare an empty `relations` field.
+The registry distinguishes two sets of unversioned records:
 
-Every declaration named in a manifest section must resolve to a content record. Every identifier in the manifest's `policies` field must resolve to a `resolution-policy`. The referring manifest list item owns a missing or wrong-kind diagnostic.
+- *manifest-selectable records* are rule sets, rules, and procedures
+- *effective-content records* are rules and procedures
+
+A rule set is only a selection container. It can appear in a manifest. It cannot enter resolver state or connect to another record. It also cannot appear in a policy conflict or outcome. Each member rule remains separately addressable. For each member, the registry preserves its inherited predicate, source root, and containing rule-set identifier.
+
+Every identifier in a manifest section must name a manifest-selectable record. Every identifier in the manifest's `policies` field must name a `resolution-policy`. A manifest may select a rule set and one of its members. In that case, the direct member anchor takes precedence over the container anchor. A repeated direct identifier across any two manifest positions is invalid. The referring manifest list item owns each missing, wrong-kind, or repeated-selection diagnostic.
 
 The relations `requires` and `refines` declare dependencies. Their combined directed graph must be acyclic. The lifecycle relation `supersedes` does not decide a contextual conflict and forms a separate acyclic graph. No declaration may relate to itself. Each `(source, relation type, target)` triple may occur once. The same source may still name both `requires` and `refines` for one target because these are distinct assertions. A repeated triple fails at the later target.
 
 One `incompatible-with` assertion creates one unordered conflict pair. A reverse assertion duplicates the same pair and fails at the later relation target; authors do not repeat the symmetric assertion.
 
-One identifier names either one unversioned record, including a member rule, or one versioned evaluator or operation family. An identifier cannot name both. Every version in a contract family retains one kind and owner, and each `(identifier, version)` pair is unique. Evaluators and operations resolve only through typed exact references. They cannot enter a relation, policy conflict, policy outcome, or manifest section.
+One identifier names either one unversioned record, including a rule-set container or member rule, or one versioned evaluator or operation family. An identifier cannot name both. Every version in a contract family retains one kind and owner, and each `(identifier, version)` pair is unique. Evaluators and operations resolve only through typed exact references. They cannot enter a relation, policy conflict, policy outcome, or manifest section.
 
 A `resolution-policy` records the decision context and strategy for one conflict. The strategy chooses one outcome:
 
@@ -40,10 +45,10 @@ A `resolution-policy` records the decision context and strategy for one conflict
 - combine both declarations through a resultant declaration
 - fail with an unresolved conflict
 
-Any two content records may form a conflict pair, including records of different kinds. The strategy preserves the following type rules:
+Any two effective-content records may form a conflict pair, including records of different kinds. The strategy preserves the following type rules:
 
 - `retain` names either conflict member
-- `substitute` replaces one conflict member with a content record of the same kind
+- `substitute` replaces one conflict member with an effective-content record of the same kind
 - `combine` requires two conflict members of the same kind and names a distinct result of that kind
 - `error` names no outcome record
 
@@ -75,6 +80,7 @@ Each failure belongs to the field that makes the cross-record contract invalid:
 - a repeated `(conflict pair, order)` belongs to the later policy reference in the manifest
 - a policy-owner mismatch belongs to the manifest's policy reference
 - a wrong manifest content or policy kind belongs to the referring manifest list item
+- a repeated direct selection belongs to its later manifest list item
 - an unknown exact family or a family of the wrong kind belongs to the reference `id`
 - a known exact family with an absent version belongs to the reference `version`
 - a missing required operation input belongs to the action's `with` mapping, or to the action when `with` is absent
@@ -89,22 +95,68 @@ Each failure belongs to the field that makes the cross-record contract invalid:
 
 ## Monotone resolution algorithm
 
-For a typed context, the resolver maintains three monotone event sets, `candidate`, `required`, and `excluded`, plus the derived set `effective`. Candidate and required identifiers may later also occur in excluded; exclusion wins. Only `effective` must remain disjoint from `excluded`.
+For a typed context, the resolver maintains three monotone event sets, `candidate`, `required`, and `excluded`, plus the derived set `effective`. These sets contain effective content only. Candidate and required identifiers may later also occur in excluded; exclusion wins. Only `effective` must remain disjoint from `excluded`.
 
-1. Build `candidate` from selected declarations whose full inherited applicability conjunction matches.
-2. Evaluate all rule-local exceptions against the same initial norm set. Their statically disjoint `affects` sets make the matching transformations simultaneous. Remove the union of all matching `affects` sets, then add the union of the matching `substitutes` sets. Add a substitute only when its full inherited applicability is true; otherwise, fail resolution. An exception never adds a declaration to `excluded`.
-3. Expand the dependency closure of non-excluded candidates into `required`. If a dependency is missing, inapplicable, or excluded, then resolution fails unless an active policy names a compatible substitute.
-4. Detect declared conflicts among `candidate ∪ required` minus `excluded`. Select exactly one authorized matching policy for each conflict. Add every loser or replaced declaration to `excluded`; add each named substitute or combine result to `candidate`.
-5. Repeat dependency expansion and conflict resolution until no set changes. Every iteration only adds identifiers to `candidate`, `required`, or `excluded`; it never removes from `excluded`. Finite declarations and acyclic dependencies therefore guarantee termination.
-6. Set `effective = (candidate ∪ required) − excluded`. Recheck that every dependency of every effective declaration is effective or satisfied by its declared substitute. Fail on any unresolved conflict or incomplete dependency.
+1. Evaluate the manifest predicate. Expand each selected rule set into its member rules. Evaluate the full inherited predicate of every directly selected or expanded rule and procedure, then add only true records to `candidate`. The rule-set predicate already appears in each member's inherited predicate, so the resolver does not evaluate the container as a separate gate.
+2. Project the effective norms and criteria of every candidate rule as specified below. Apply the same projection when a rule later enters `candidate` or `required`.
+3. Expand the combined `requires` and `refines` closure of non-excluded candidates. Evaluate each dependency target. Add a true, non-excluded target to `required`. If a true target is already excluded, leave the dependency unsatisfied until the final alias check; exclusion remains irreversible. A false target fails with `dependency-inapplicable`. An unknown target fails with `dependency-applicability-indeterminate`.
+4. Detect declared conflicts among `candidate ∪ required` minus `excluded`. For each conflict, choose the authorized matching policy with the lowest order. Apply its strategy, including its aliases, exclusions, and new candidates.
+5. Repeat dependency expansion and conflict resolution until no set changes. Every iteration only adds identifiers to `candidate`, `required`, or `excluded`; it never removes from `excluded`. A later introduction cannot restore an excluded identifier. Finite declarations and acyclic dependencies therefore guarantee termination.
+6. Set `effective = (candidate ∪ required) − excluded`. Recheck every dependency of every effective declaration. A dependency is complete when its target is effective. A direct alias may instead point from an applicable target excluded by a policy to an effective target. Fail on any incomplete dependency or unresolved conflict.
 
-The resolver returns two objects. First, a resolved compilation unit provides the complete input for the composer. The unit contains:
+The policy strategies update resolver state as follows:
+
+- `error` raises the declared unresolved-conflict error
+- `retain` excludes the non-retained member and creates no alias
+- `substitute` excludes `replace`, adds `with` as a candidate, and creates the direct alias `replace → with`
+- `combine` excludes both members, adds `result` as a candidate, and creates one direct alias from each member to `result`
+
+An alias satisfies a dependency only when the original target was applicable and its immediate alias target is final-effective. Version 1 does not compose aliases transitively. The resolver never uses `supersedes` to satisfy a dependency.
+
+## Norm and criterion projection
+
+Each effective rule produces one `ResolvedRuleProjection` containing the rule, its effective norms, and its effective criteria. Norm and criterion identifiers retain their authored order.
+
+The resolver first evaluates the fully inherited predicate of every norm. A true norm enters the initial set. A false or unknown norm remains inactive. The trace distinguishes those two outcomes. Next, the resolver evaluates every exception predicate against the same initial set and context. Only a true exception matches. All matching exceptions act simultaneously. The resolver removes the union of their `affects` sets, then adds the union of their `substitutes` sets.
+
+Every substitute norm must have true applicability, including a substitute already present in the initial set. A false substitute raises `exception-substitute-inapplicable`; an unknown substitute raises `exception-substitute-indeterminate`. The final norm tuple follows authored order.
+
+A criterion is effective when all of its named norms are effective. It is inactive when none are effective. If a criterion names more than one norm and only a proper nonempty subset is effective, resolution raises `partial-criterion-applicability`. The future resolver-backed composer boundary validates only that projections are one-to-one and contain valid local identifiers. It never repeats these semantic decisions.
+
+## Three-valued decisions
+
+Only `true` activates an object. A policy matches only when both its declaration predicate and its `when` predicate are true. The following table fixes every consequence of `false` and `unknown`.
+
+| Predicate site | `false` | `unknown` |
+|---|---|---|
+| Manifest applicability | fail with `manifest-inapplicable` | fail with `manifest-applicability-indeterminate` |
+| Direct or expanded rule or procedure | omit the candidate and record an inapplicable event | omit the candidate and record an indeterminate event |
+| Initial norm applicability | leave the norm inactive | leave the norm inactive and record indeterminacy |
+| Exception `when` | record a non-matching exception | record an indeterminate non-matching exception |
+| Required dependency target | fail with `dependency-inapplicable` | fail with `dependency-applicability-indeterminate` |
+| Policy declaration or `when` | treat the policy as non-matching | treat the policy as indeterminate and non-matching |
+| Policy substitute `with` record | fail with `policy-substitute-inapplicable` | fail with `policy-substitute-indeterminate` |
+| Policy combine `result` record | fail with `policy-combine-result-inapplicable` | fail with `policy-combine-result-indeterminate` |
+| Exception substitute norm | fail with `exception-substitute-inapplicable` | fail with `exception-substitute-indeterminate` |
+
+An eligible policy is referenced by the manifest, owned by the manifest owner, and names the active conflict pair. If no eligible policy matches, an unknown policy predicate makes the conflict fail with `conflict-policy-indeterminate`. Otherwise, the conflict fails with `unresolved-conflict`. Every predicate-dependent event and error carries its truth value and exact applicability trace. This requirement includes `conflict-policy-indeterminate`. Therefore, false and unknown never collapse into the same explanation.
+
+The future public operation is `resolve_compilation_unit(...) -> ResolutionResult`. Only the resolver may issue four immutable values:
+
+- `ResolutionResult`
+- `ResolutionTrace`
+- `ResolutionEvent`
+- `ResolvedCompilationUnit`
+
+Their constructors are not public. Success returns one correlated unit and trace. Failure raises `ResolutionError`. The error may carry an immutable failure trace, but it never carries a partial unit.
+
+A resolved compilation unit provides the complete input for the composer. The unit contains:
 
 - every retained semantic record needed by the renderer
 - every prerequisite edge retained after the resolver waives local norms and applies conflict policies
 - one manifest section and rank anchor for each retained record
 
-When a manifest names a rule set, the resolver expands its retained member rules. Those members enter the unit instead of the rule-set container. A target renderer may depart from this default only when its contract requires the container itself.
+When a manifest names a rule set, the resolver expands its retained member rules. Those members enter the unit instead of the rule-set container. Version 1 does not project package-level edges because a rule set cannot declare them.
 
 The resolver assigns anchors by four rules:
 
@@ -117,7 +169,16 @@ More than one rule may give candidate anchors to the same record. When the manif
 
 For example, a record named directly at rank 3 keeps rank 3 when a policy also introduces the record from rank 0. By contrast, a prerequisite inherited from dependants at ranks 0 and 2 takes rank 0. A direct anchor can conflict with the required order of `sections`. In that case, the resolver preserves the authored anchor, and the composer rejects the backward edge.
 
-Second, the evaluator returns a predicate tree. Every node pairs a normalized predicate with its computed truth value. While inheriting parent predicates, the loader may place both predicates below a new `all` node. Consequently, node paths address the normalized tree rather than the source text. The resolver attaches source coordinates to each record. For every record, a semantic event explains whether the resolver retained or removed it. Only the resolver can issue the certified unit. The composer accepts that unit and never infers absent edges or records from raw sources.
+Every resolution event contains four required values:
+
+- an ordinal
+- one value from a closed event-kind set
+- the declaration identifier
+- its exact source reference
+
+An event may also name a local norm or criterion. Other optional fields record ordered causes, an anchor, a dependency edge, a dependant, a policy, or an exception. Every predicate-dependent event contains its truth value and exact applicability trace. Other event kinds contain neither field. The event model validates the fields admitted for each event kind. Only applicability traces retain observed context values. Events follow deterministic resolver order.
+
+The applicability evaluator returns a normalized predicate tree in which every node carries its computed truth value. While inheriting parent predicates, the loader may place both predicates below a new `all` node. Consequently, node paths address the normalized tree rather than the source text. The resolver attaches source coordinates to each record and explains every retention or removal. The composer accepts the certified unit and never infers absent edges or records from raw sources.
 
 ## Validation
 

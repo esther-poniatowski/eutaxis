@@ -19,6 +19,7 @@ from eutaxis.declarations import (
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REGISTRY_FIXTURES = FIXTURES / "registry" / "valid"
+RESOLUTION_FIXTURES = FIXTURES / "resolution" / "valid"
 FACET_FIXTURE = FIXTURES / "facets" / "valid" / "context-facets.yaml"
 
 
@@ -99,6 +100,17 @@ def test_closed_registry_indexes_nested_content_and_exact_families(facets) -> No
         registry.families["registry/manual"].versions[2] = nested  # type: ignore[index]
 
 
+def test_future_resolution_corpus_satisfies_static_registry_contracts(
+    facets,
+) -> None:
+    registry = load_declaration_registry(_paths(RESOLUTION_FIXTURES), facets)
+
+    assert registry.records["resolution/base"].containing_rule_set == (
+        "resolution/package"
+    )
+    assert registry.conflicts == {("resolution/alternate", "resolution/refined")}
+
+
 def test_non_content_relations_fail_at_the_first_relation_item(
     tmp_path: Path, facets
 ) -> None:
@@ -129,6 +141,21 @@ def test_repeated_relation_fails_at_the_later_target(tmp_path: Path, facets) -> 
         facets,
         location="$.relations[2].target",
         filename="refined-rule.yaml",
+    )
+
+
+def test_relation_target_must_be_effective_content(tmp_path: Path, facets) -> None:
+    directory = _copy_corpus(tmp_path)
+
+    def target_container(document: dict[str, object]) -> None:
+        document["relations"] = [{"type": "requires", "target": "content/package"}]
+
+    _mutate(directory, "alternate-rule.yaml", target_container)
+    _assert_registry_error(
+        directory,
+        facets,
+        location="$.relations[0].target",
+        filename="alternate-rule.yaml",
     )
 
 
@@ -257,6 +284,19 @@ def test_policy_requires_one_declared_incompatibility(tmp_path: Path, facets) ->
     )
 
 
+def test_policy_conflicts_must_name_effective_content(tmp_path: Path, facets) -> None:
+    directory = _copy_corpus(tmp_path)
+
+    def target_container(document: dict[str, object]) -> None:
+        document["conflicts"] = ["content/package", "content/alternate"]
+        document["strategy"] = {"kind": "retain", "retain": "content/package"}
+
+    _mutate(directory, "policy.yaml", target_container)
+    _assert_registry_error(
+        directory, facets, location="$.conflicts[0]", filename="policy.yaml"
+    )
+
+
 def test_substitution_must_preserve_the_replaced_kind(tmp_path: Path, facets) -> None:
     directory = _copy_corpus(tmp_path)
     _mutate(
@@ -275,6 +315,35 @@ def test_substitution_must_preserve_the_replaced_kind(tmp_path: Path, facets) ->
     _assert_registry_error(
         directory, facets, location="$.strategy.with", filename="policy.yaml"
     )
+
+
+@pytest.mark.parametrize(
+    ("strategy", "location"),
+    [
+        (
+            {
+                "kind": "substitute",
+                "replace": "content/refined",
+                "with": "content/package",
+            },
+            "$.strategy.with",
+        ),
+        (
+            {"kind": "combine", "result": "content/package"},
+            "$.strategy.result",
+        ),
+    ],
+)
+def test_policy_outcomes_must_name_effective_content(
+    tmp_path: Path, facets, strategy: dict[str, object], location: str
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    _mutate(
+        directory,
+        "policy.yaml",
+        lambda document: document.update({"strategy": strategy}),
+    )
+    _assert_registry_error(directory, facets, location=location, filename="policy.yaml")
 
 
 def test_cross_kind_combine_fails_at_the_strategy_kind(tmp_path: Path, facets) -> None:
@@ -312,6 +381,40 @@ def test_manifest_rejects_non_content_section_members(tmp_path: Path, facets) ->
         location="$.sections[0].declarations[0]",
         filename="manifest.yaml",
     )
+
+
+def test_manifest_rejects_duplicate_direct_selections(tmp_path: Path, facets) -> None:
+    directory = _copy_corpus(tmp_path)
+
+    def repeat_selection(document: dict[str, object]) -> None:
+        cast(list[object], document["sections"]).append(
+            {"id": "later", "declarations": ["content/refined"]}
+        )
+
+    _mutate(directory, "manifest.yaml", repeat_selection)
+    _assert_registry_error(
+        directory,
+        facets,
+        location="$.sections[1].declarations[0]",
+        filename="manifest.yaml",
+    )
+
+
+def test_manifest_may_select_container_and_embedded_member(
+    tmp_path: Path, facets
+) -> None:
+    directory = _copy_corpus(tmp_path)
+
+    def select_member(document: dict[str, object]) -> None:
+        document["sections"][0]["declarations"].append(  # type: ignore[index]
+            "content/base"
+        )
+
+    _mutate(directory, "manifest.yaml", select_member)
+
+    registry = load_declaration_registry(_paths(directory), facets)
+
+    assert registry.records["content/base"].containing_rule_set == "content/package"
 
 
 def test_manifest_policy_must_share_the_manifest_owner(tmp_path: Path, facets) -> None:

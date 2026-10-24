@@ -25,7 +25,7 @@ One versioned JSON Schema is the normative field, type, cardinality, conditional
 
 The discriminated union contains seven kinds:
 
-- `rule-set` groups coherent rules and supplies one discovery purpose
+- `rule-set` groups coherent rules and supplies one discovery purpose; it is a selection container, not effective content
 - `rule` declares one addressable artifact or decision constraint
 - `procedure` declares a finite externally observable action graph
 - `resolution-policy` resolves a named class of semantic conflicts inside one compilation unit
@@ -35,7 +35,7 @@ The discriminated union contains seven kinds:
 
 Only rules carry an `axis`: `reasoning-target`, `output-structure`, or `surface-style`. Procedures are a declaration kind, not a fourth axis. A file may contain one declaration or a declared collection; member objects retain their own `kind` and stable identifier.
 
-For a composition manifest, the content kinds are:
+For a composition manifest, the selectable kinds are:
 
 - `rule-set`
 - `rule`
@@ -49,6 +49,8 @@ The `mechanism` field accepts exactly three values:
 
 Authors must provide the field explicitly. The opaque `target` remains independent of the selected mechanism.
 
+Rules and procedures are the only effective-content kinds. They may declare relations and participate in conflict policies. Rule sets must have an empty `relations` field. A rule set expands to its member rules during resolution and never enters a candidate, required, excluded, effective, or certified set.
+
 ## Common envelope
 
 Every declaration has `schema-version`, stable `id`, `kind`, `owner`, lifecycle status, source revision, applicability, and relations. Classification, failure mode, visibility, rationale, title, and purpose appear only where the normative schema admits them. A required per-rule `description` is excluded because it normally paraphrases the norm. A rule set or procedure may carry one `purpose` for discovery.
@@ -57,7 +59,7 @@ At this boundary, each identifier contains one or more non-whitespace characters
 
 Applicability is conjunctive across nesting. The normalized version 1 language contains `all`, `any`, and `not` nodes plus typed atomic tests with operators `equals`, `in`, and `exists`. Atomic tests name registered context facets. A missing facet makes `equals` and `in` return `unknown`; `exists` always returns true or false.
 
-The boolean nodes use strong Kleene truth tables. `all` returns false if any child is false, true if every child is true, and unknown otherwise. `any` returns true if any child is true, false if every child is false, and unknown otherwise. `not` preserves unknown and reverses true or false. A final unknown is a resolution error. Therefore, `all: [exists(f), equals(f, x)]` returns false when `f` is missing, while an unguarded `equals(f, x)` fails instead of silently omitting the declaration.
+The boolean nodes use strong Kleene truth tables. `all` returns false if any child is false, true if every child is true, and unknown otherwise. `any` returns true if any child is true, false if every child is false, and unknown otherwise. `not` preserves unknown and reverses true or false. Only a final true activates an object. The semantic consequence of false or unknown depends on the predicate site and is fixed by the [three-valued decision table](rule-relations-and-resolution.md#three-valued-decisions). Therefore, `all: [exists(f), equals(f, x)]` returns false when `f` is missing, while an unguarded `equals(f, x)` remains unknown.
 
 A child does not replace its inherited predicate. The loader constructs `all: [<parent>, <child-local>]`, and a norm narrows a rule through the same structural conjunction. This construction proves narrowing without a general implication solver. The resolver reports the expanded normalized predicate and each atomic result. Resolution policies use explicit order rather than an inferred predicate-specificity relation.
 
@@ -166,6 +168,8 @@ Rules express modality as data. The values follow [BCP 14](https://www.rfc-edito
 
 `should` and `should-not` require a decision criterion that evaluates the norm or inclusion in the `affects` set of a closed exception. An exception names the local norms affected, its applicability predicate, and either a waiver or replacement norms. Version 1 admits at most one exception for each affected norm and only one-step substitutions: a replacement norm cannot itself be affected by an exception. This direction excludes waivers of the enclosing rule and unrelated declarations. `may` is admitted only for a genuinely discretionary choice. Prohibitions are `must-not` norms, not a parallel prose field. Each success criterion names the norm identifiers that it evaluates and one registered evaluator.
 
+The resolver evaluates each norm under its fully inherited applicability and applies matching exceptions simultaneously. It then projects each effective rule into its effective norms and criteria. A criterion is effective only when all its norms are effective; a proper nonempty subset is an error. The [resolution contract](rule-relations-and-resolution.md#norm-and-criterion-projection) owns the complete projection semantics.
+
 The following rule set demonstrates the common envelope, inherited applicability, modal norms, and a structured evaluator reference:
 
 ```yaml
@@ -273,6 +277,7 @@ The source boundary rejects a source when:
 
 - YAML repeats a key, contains a cyclic alias, or produces a non-JSON value
 - a field violates the normative schema or embeds an invalid JSON Schema
+- a rule set declares a relation
 - local identifiers repeat or a local reference does not resolve
 - two exceptions contradict each other, or a policy strategy contradicts its declaration
 - a procedure graph omits a transition, contains a cycle, or leaves an action unreachable
@@ -282,9 +287,7 @@ The facet-registry boundary rejects duplicate identifiers and values outside the
 
 Diagnostics name the document path and closest YAML source position. The loader conjoins each child applicability predicate with its inherited parent predicate. The immutable domain model preserves every normative field.
 
-The static declaration registry shipped in commit `bb4fb97`. The registry indexes content records and exact contract families, then validates the cross-record contracts fixed by [rule relations and contextual resolution](rule-relations-and-resolution.md). These checks include relation graphs, policies, manifests, and procedure–operation compatibility. Contextual applicability and conflict resolution remain downstream catalog responsibilities.
-
-One normative gate remains before catalog work begins. Shipped evaluator and operation records must connect the static declarations to executable evidence.
+The static declaration registry indexes manifest-selectable records, effective-content records, and exact contract families, then validates the cross-record contracts fixed by [rule relations and contextual resolution](rule-relations-and-resolution.md). These checks include relation graphs, policy endpoints, unique manifest selections, and procedure–operation compatibility. Contextual applicability and conflict resolution remain downstream catalog responsibilities.
 
 ## Shipped contract execution ^shipped-contract-execution
 

@@ -31,6 +31,16 @@ The static catalog now preserves lookup fields and portable provenance without t
 
 The resolver phase will test each context predicate. Then, the resolver will apply conflict policies. Finally, the resolver will issue certified units for real builds.
 
+The resolver contract now distinguishes selectable containers from records admitted to the output. The same contract fixes five further decisions:
+
+- how the resolver chooses norms and criteria
+- how each false or unknown predicate affects its object
+- how a policy redirects one dependency
+- which objects a successful call returns
+- which evidence a failed call may retain
+
+The future-resolution corpus supplies sources for the next implementation gate. At this stage, the corpus passes only the static registry. No fixture simulates a resolver result.
+
 ## Decision log and open prerequisites
 
 - YAML is canonical; tagged Markdown is only an evidence-triggered fallback.
@@ -109,9 +119,11 @@ This phase first turns the validated registry into a static query boundary. Then
 - [x] Validate and load persisted indexes into immutable query views without rebuilding source records.
 - [x] Apply exact static field predicates to live and persisted catalogs, and verify that both produce identical ordered keys.
 - [x] Evaluate each applicability predicate and build its immutable trace through one strong-Kleene implementation.
+- [x] Close the v1 contracts for rule sets, three-valued predicates, policies, projected rules, and issued results.
 - [ ] Derive enforcement classes from evaluator contracts in the enforcement phase, then expose their static filter.
 - [ ] Keep the rendered-Markdown parser behind its current public behavior until migration proves its final disposition.
 - [ ] Implement the monotone candidate/excluded/required/effective algorithm and provenance-bearing explanation traces.
+- [ ] Move certified-unit issuance from the fixture composer to the resolver, reject rule-set containers as effective components, and add rule projections atomically.
 - [ ] Apply the anchor rules fixed by [the resolver contract](../adr/rule-relations-and-resolution.md) when the resolver introduces one record through multiple routes.
 - [ ] Test waived dependencies, explicit substitutes, combine results, policy order ties, owner authority, attempted reintroduction of exclusions, overlap among monotone event sets, and disjointness of effective and excluded results.
 

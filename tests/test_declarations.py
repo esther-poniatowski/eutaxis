@@ -110,6 +110,21 @@ def test_rule_set_contains_typed_rules() -> None:
     assert tuple(rule.exceptions[0].when) == ("all",)
 
 
+def test_rule_set_is_a_selection_only_container(tmp_path: Path) -> None:
+    path = _write_variant(
+        tmp_path,
+        "rule-set.yaml",
+        lambda document: document.update(
+            {"relations": [{"type": "requires", "target": "prose/exact-claims"}]}
+        ),
+    )
+
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.relations"
+
+
 def test_procedure_model_preserves_every_contract_field() -> None:
     declaration = load_declaration(FIXTURES / "valid" / "procedure.yaml")
     assert isinstance(declaration, ProcedureDeclaration)

@@ -200,6 +200,7 @@
           "required": ["purpose", "rules"],
           "properties": {
             "kind": {"const": "rule-set"},
+            "relations": {"type": "array", "maxItems": 0},
             "purpose": {"type": "string", "minLength": 1},
             "rules": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/rule"}}
           }

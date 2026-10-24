@@ -14,6 +14,7 @@ from eutaxis.declarations import (
     CompositionError,
     CumulativeArtifact,
     CumulativeCompositionPlan,
+    DeclarationRegistryError,
     PlannedComponent,
     ResolvedCompilationUnit,
     ResolvedComponent,
@@ -305,11 +306,11 @@ def test_duplicate_manifest_membership_fails_at_the_later_position(
     document["sections"][1]["declarations"].append("fixture/dependant")
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
 
-    with pytest.raises(CompositionError) as captured:
-        plan_cumulative_composition(_registry(root), _unit())
+    with pytest.raises(DeclarationRegistryError) as captured:
+        _registry(root)
     assert captured.value.location == "$.sections[1].declarations[1]"
     assert captured.value.path == path.resolve()
-    assert "more than one manifest position" in str(captured.value)
+    assert "duplicate manifest selection" in str(captured.value)
 
 
 @pytest.mark.parametrize(
