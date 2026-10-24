@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eutaxis.dev/schemas/catalog-index-v1.schema.json",
+  "title": "Eutaxis static catalog index revision 1",
+  "type": "object",
+  "required": ["index-revision", "sources", "declarations", "contracts", "conflicts"],
+  "properties": {
+    "index-revision": {"const": 1},
+    "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
+    "declarations": {"type": "array", "items": {"$ref": "#/$defs/declaration-entry"}},
+    "contracts": {"type": "array", "items": {"$ref": "#/$defs/contract-entry"}},
+    "conflicts": {"type": "array", "items": {"$ref": "#/$defs/conflict"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "pattern": "^(?!.*\\s)[\\s\\S]+$"},
+    "source": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["path", "document-path", "line", "column"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "document-path": {
+          "type": "array",
+          "items": {"oneOf": [{"type": "string"}, {"type": "integer", "minimum": 0}]}
+        },
+        "line": {"type": "integer", "minimum": 1},
+        "column": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "relation": {
+      "type": "object",
+      "required": ["type", "target"],
+      "properties": {
+        "type": {"enum": ["requires", "refines", "incompatible-with", "supersedes"]},
+        "target": {"$ref": "#/$defs/id"}
+      },
+      "additionalProperties": false
+    },
+    "conflict": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "rule-set-query": {
+      "type": "object",
+      "required": ["purpose"],
+      "properties": {"purpose": {"type": "string", "minLength": 1}},
+      "additionalProperties": false
+    },
+    "rule-query": {
+      "type": "object",
+      "required": ["axis", "failure-mode", "required-visibility"],
+      "properties": {
+        "axis": {"enum": ["reasoning-target", "output-structure", "surface-style"]},
+        "failure-mode": {"enum": ["silent", "visible"]},
+        "required-visibility": {"type": ["string", "null"], "enum": ["pre-invocation", "pre-action", null]}
+      },
+      "additionalProperties": false
+    },
+    "procedure-query": {
+      "type": "object",
+      "required": ["purpose"],
+      "properties": {"purpose": {"type": "string", "minLength": 1}},
+      "additionalProperties": false
+    },
+    "policy-query": {
+      "type": "object",
+      "required": ["conflicts", "order", "strategy"],
+      "properties": {
+        "conflicts": {"$ref": "#/$defs/conflict"},
+        "order": {"type": "integer", "minimum": 0},
+        "strategy": {"enum": ["retain", "substitute", "combine", "error"]}
+      },
+      "additionalProperties": false
+    },
+    "manifest-query": {
+      "type": "object",
+      "required": ["mechanism", "scope", "target"],
+      "properties": {
+        "mechanism": {"enum": ["cumulative", "separate-directory", "single-slot"]},
+        "scope": {"enum": ["personal", "project"]},
+        "target": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "evaluator-query": {
+      "type": "object",
+      "required": ["evaluator-kind", "coverage", "adjudication", "timing", "failure-behavior"],
+      "properties": {
+        "evaluator-kind": {"enum": ["checker", "detector", "manual"]},
+        "coverage": {"enum": ["total", "partial", "none"]},
+        "adjudication": {"enum": ["authoritative", "candidate", "manual"]},
+        "timing": {"enum": ["pre-design", "pre-action", "post-action", "post-artifact"]},
+        "failure-behavior": {"enum": ["block", "candidate", "record"]}
+      },
+      "additionalProperties": false
+    },
+    "operation-query": {
+      "type": "object",
+      "required": ["effects", "failure-outcomes"],
+      "properties": {
+        "effects": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "failure-outcomes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+      },
+      "additionalProperties": false
+    },
+    "entry": {
+      "type": "object",
+      "required": ["applicability", "containing-rule-set", "id", "kind", "owner", "query", "relations", "schema-version", "source", "source-revision", "status"],
+      "properties": {
+        "applicability": {"type": "object"},
+        "containing-rule-set": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["rule-set", "rule", "procedure", "resolution-policy", "composition-manifest", "evaluator", "operation"]},
+        "owner": {"$ref": "#/$defs/id"},
+        "query": {"type": "object"},
+        "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}},
+        "schema-version": {"const": 1},
+        "source": {"$ref": "#/$defs/provenance"},
+        "source-revision": {"type": "string", "minLength": 1},
+        "status": {"enum": ["draft", "active", "deprecated", "retired"]},
+        "version": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [
+        {"if": {"properties": {"kind": {"const": "rule-set"}}, "required": ["kind"]}, "then": {"properties": {"query": {"$ref": "#/$defs/rule-set-query"}}}},
+        {"if": {"properties": {"kind": {"const": "rule"}}, "required": ["kind"]}, "then": {"properties": {"query": {"$ref": "#/$defs/rule-query"}}}},
+        {"if": {"properties": {"kind": {"const": "procedure"}}, "required": ["kind"]}, "then": {"properties": {"query": {"$ref": "#/$defs/procedure-query"}}}},
+        {"if": {"properties": {"kind": {"const": "resolution-policy"}}, "required": ["kind"]}, "then": {"properties": {"query": {"$ref": "#/$defs/policy-query"}}}},
+        {"if": {"properties": {"kind": {"const": "composition-manifest"}}, "required": ["kind"]}, "then": {"properties": {"query": {"$ref": "#/$defs/manifest-query"}}}},
+        {"if": {"properties": {"kind": {"const": "evaluator"}}, "required": ["kind"]}, "then": {"properties": {"query": {"$ref": "#/$defs/evaluator-query"}}}},
+        {"if": {"properties": {"kind": {"const": "operation"}}, "required": ["kind"]}, "then": {"properties": {"query": {"$ref": "#/$defs/operation-query"}}}}
+      ],
+      "additionalProperties": false
+    },
+    "declaration-entry": {
+      "allOf": [
+        {"$ref": "#/$defs/entry"},
+        {"properties": {"kind": {"enum": ["rule-set", "rule", "procedure", "resolution-policy", "composition-manifest"]}}, "not": {"required": ["version"]}}
+      ]
+    },
+    "contract-entry": {
+      "allOf": [
+        {"$ref": "#/$defs/entry"},
+        {"required": ["version"], "properties": {"kind": {"enum": ["evaluator", "operation"]}}}
+      ]
+    }
+  }
+}

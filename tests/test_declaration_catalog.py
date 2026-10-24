@@ -153,6 +153,24 @@ def test_catalog_rejects_a_source_file_as_the_root() -> None:
         )
 
 
+def test_empty_catalog_serializes_under_the_shared_index_schema() -> None:
+    registry = DeclarationRegistry(
+        paths=(),
+        records=MappingProxyType({}),
+        families=MappingProxyType({}),
+        conflicts=frozenset(),
+    )
+    catalog = build_declaration_catalog(registry, source_root=REGISTRY_FIXTURES)
+
+    assert json.loads(catalog_json_bytes(catalog)) == {
+        "conflicts": [],
+        "contracts": [],
+        "declarations": [],
+        "index-revision": 1,
+        "sources": [],
+    }
+
+
 def test_catalog_uses_the_source_snapshot_captured_during_loading(
     tmp_path: Path,
 ) -> None:

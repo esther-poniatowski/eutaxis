@@ -27,7 +27,9 @@ The planner orders each prerequisite before its dependant. Resolver-assigned anc
 
 The assembler joins an exact set of fixture-projected Markdown blocks into canonical bytes. A second manifest uses the same target for personal and project scopes. The resulting artifacts remain distinct. Every manifest now declares its mechanism without deriving it from the target. The two unimplemented mechanisms are separate-directory and single-slot. The cumulative planner rejects manifests that declare either one.
 
-The static catalog now preserves lookup fields and portable provenance without testing context predicates. The resolver phase will test each predicate. After those tests, the resolver will apply conflict policies and issue certified units for real builds.
+The static catalog now preserves lookup fields and portable provenance without testing context predicates. The loader validates the schema and cross-row contracts before it builds an immutable view of a persisted index. Both catalog forms apply the same exact static predicates. In both forms, matching rows follow canonical order.
+
+The resolver phase will test each context predicate. Then, the resolver will apply conflict policies. Finally, the resolver will issue certified units for real builds.
 
 ## Decision log and open prerequisites
 
@@ -104,7 +106,9 @@ This phase first turns the validated registry into a static query boundary. Then
 
 - [x] Consolidate the source boundary and cross-record registry in one `declarations` package.
 - [x] Implement immutable exact lookups and deterministic JSON indexing over the validated registry.
-- [ ] Load persisted indexes and implement static field filters behind the catalog interface.
+- [x] Validate and load persisted indexes into immutable query views without rebuilding source records.
+- [x] Apply exact static field predicates to live and persisted catalogs, and verify that both produce identical ordered keys.
+- [ ] Derive enforcement classes from evaluator contracts in the enforcement phase, then expose their static filter.
 - [ ] Keep the rendered-Markdown parser behind its current public behavior until migration proves its final disposition.
 - [ ] Implement the monotone candidate/excluded/required/effective algorithm and provenance-bearing explanation traces.
 - [ ] Apply the anchor rules fixed by [the resolver contract](../adr/rule-relations-and-resolution.md) when the resolver introduces one record through multiple routes.

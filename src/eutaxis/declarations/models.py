@@ -98,6 +98,9 @@ class DeclarationKind(StrEnum):
     OPERATION = "operation"
 
 
+EXACT_CONTRACT_KINDS = frozenset({DeclarationKind.EVALUATOR, DeclarationKind.OPERATION})
+
+
 class RuleAxis(StrEnum):
     """Primary functions admitted for rules."""
 

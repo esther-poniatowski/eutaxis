@@ -8,11 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
+from .catalog_schema import validate_catalog_index_payload
 from .exceptions import DeclarationCatalogError
 from .models import (
     AnyDeclaration,
     CompositionManifestDeclaration,
     DeclarationKind,
+    EXACT_CONTRACT_KINDS,
     EvaluatorDeclaration,
     JsonValue,
     OperationDeclaration,
@@ -23,9 +25,9 @@ from .models import (
 )
 from .registry import DeclarationRegistry, RegisteredDeclaration
 from .source import nearest_location
+from .static_query import StaticCatalogQuery, matches_static_query
 
 CATALOG_INDEX_REVISION = 1
-_EXACT_KINDS = frozenset({DeclarationKind.EVALUATOR, DeclarationKind.OPERATION})
 
 
 @dataclass(frozen=True, order=True)
@@ -66,9 +68,36 @@ class DeclarationCatalog:
         version: int,
     ) -> RegisteredDeclaration | None:
         """Return one exact evaluator or operation contract when present."""
-        if kind not in _EXACT_KINDS:
+        if kind not in EXACT_CONTRACT_KINDS:
             raise ValueError(f"{kind.value!r} is not an exact contract kind")
         return self.contracts.get(ExactContractKey(kind, identifier, version))
+
+    def filter_static(
+        self, query: StaticCatalogQuery
+    ) -> tuple[RegisteredDeclaration, ...]:
+        """Return records whose stored fields satisfy every exact predicate."""
+        declaration_records = tuple(
+            record for _, record in sorted(self.declarations.items())
+        )
+        contract_records = tuple(
+            record
+            for _, record in sorted(
+                self.contracts.items(),
+                key=lambda item: (item[0].kind.value, item[0].id, item[0].version),
+            )
+        )
+        records = (*declaration_records, *contract_records)
+        return tuple(
+            record
+            for record in records
+            if matches_static_query(
+                query,
+                owner=record.declaration.owner,
+                kind=record.declaration.kind,
+                applicability=record.declaration.applicability,
+                query_fields=_query_fields(record.declaration),
+            )
+        )
 
 
 def build_declaration_catalog(
@@ -145,12 +174,19 @@ def catalog_json_bytes(catalog: DeclarationCatalog) -> bytes:
         ],
         "conflicts": [list(pair) for pair in conflicts],
     }
-    text = json.dumps(
-        payload,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
+    validate_catalog_index_payload(payload)
+    try:
+        text = json.dumps(
+            payload,
+            allow_nan=False,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except ValueError as error:
+        raise DeclarationCatalogError(
+            f"catalog index is not strict JSON: {error}"
+        ) from error
     return (text + "\n").encode("utf-8", errors="strict")
 
 

@@ -27,6 +27,7 @@ from .catalog import (
     build_declaration_catalog,
     catalog_json_bytes,
 )
+from .catalog_schema import catalog_index_schema, catalog_index_schema_path
 from .composition import (
     CumulativeArtifact,
     CumulativeCompositionPlan,
@@ -97,6 +98,13 @@ from .operations import (
     build_operation_runner_registry,
     execute_operation,
 )
+from .persisted_catalog import (
+    PersistedCatalogEntry,
+    PersistedCatalogIndex,
+    PersistedCatalogProvenance,
+    PersistedCatalogRelation,
+    load_persisted_catalog_index,
+)
 from .schema import declaration_schema, schema_path, validate_document
 from .registry import (
     ContractFamily,
@@ -122,6 +130,7 @@ from .runners import (
     build_checker_runner_registry,
 )
 from .results import CheckerResult, EvaluationState
+from .static_query import StaticCatalogQuery, StaticField, StaticPredicate
 
 __all__ = [
     "Action",
@@ -184,6 +193,10 @@ __all__ = [
     "OperationRunnerRegistryError",
     "OperationSuccess",
     "ParameterBinding",
+    "PersistedCatalogEntry",
+    "PersistedCatalogIndex",
+    "PersistedCatalogProvenance",
+    "PersistedCatalogRelation",
     "PlannedComponent",
     "Predicate",
     "ProcedureDeclaration",
@@ -197,6 +210,9 @@ __all__ = [
     "ResolvedDependency",
     "RuleDeclaration",
     "RuleSetDeclaration",
+    "StaticCatalogQuery",
+    "StaticField",
+    "StaticPredicate",
     "TruthValue",
     "VersionedReference",
     "assemble_cumulative_artifact",
@@ -205,6 +221,8 @@ __all__ = [
     "build_checker_runner_registry",
     "build_operation_runner_registry",
     "catalog_json_bytes",
+    "catalog_index_schema",
+    "catalog_index_schema_path",
     "declaration_schema",
     "declaration_registry_checker",
     "declaration_registry_checker_binding",
@@ -221,6 +239,7 @@ __all__ = [
     "load_evaluator_fixture_index",
     "load_facet_registry",
     "load_facet_validated_declaration",
+    "load_persisted_catalog_index",
     "load_declaration_registry_operation",
     "load_declaration_registry_operation_binding",
     "plan_cumulative_composition",

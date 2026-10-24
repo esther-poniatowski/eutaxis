@@ -60,10 +60,44 @@ The source coordinates contain a relative file path and a path through the YAML 
 
 The serializer writes compact JSON as `utf-8` bytes. Identical inputs produce identical bytes, followed by one newline.
 
+## Persisted index projection
+
+The persisted index stores only fields needed for static queries. The index lacks the semantic content needed to rebuild a source record. Therefore, `PersistedCatalogIndex` represents query data rather than a source record or registry. No resolver, renderer, or checker may treat the index as semantic input.
+
+One packaged schema validates both emitted and loaded index payloads. The loader also enforces the following cross-row invariants:
+
+- identifiers and exact keys are unique, the two key spaces are disjoint, and each contract family retains one kind and owner across every `version`
+- every source path is portable, and each row names a listed source
+- every listed source has a row, and each source coordinate occurs once
+- top-level rows use the source root, while each embedded rule shares a source with its root rule set and uses a `rules` sequence coordinate
+- content rows alone may link to indexed content; each typed link occurs once and does not target its source
+- dependency and supersedes links form acyclic graphs
+- exactly one content row asserts each unordered incompatibility pair, and the normalized conflict index contains exactly those pairs
+- each resolution policy names a normalized pair contained in the conflict index
+
+These invariants make the stored rows internally consistent. However, the loader cannot revalidate source fields omitted from the index.
+
+The loader accepts valid JSON regardless of whitespace, object-key order, or top-level array order. Then, the loader freezes the values and restores the canonical catalog order. The emitter alone defines canonical bytes. Therefore, equivalent JSON with different whitespace or ordering remains valid input.
+
+Static predicates compare indexed fields. Three comparisons apply to every row:
+
+- `owner`
+- `kind`
+- `applicability`
+
+Three additional comparisons apply only to rule rows:
+
+- `axis`
+- `failure-mode`
+- `required-visibility`
+
+A row passes only when every predicate matches its stored value. A predicate on an absent field fails the row. Matching `applicability` compares JSON structures without testing a context. The static index stores no enforcement class. The enforcement phase must derive that class from evaluator contracts.
+
 The catalog exposes at least these operations:
 
 - retrieve a declaration or one field by stable identifier
-- filter by owner, kind, axis, applicability, failure mode, visibility, and enforcement class
+- filter exact indexed fields
+- filter records by a derived enforcement class
 - resolve exceptions, conflicts, and dependencies for a typed context
 - explain why each declaration was selected, omitted, waived, or overridden
 - group the result into deliberation, assisted inspection, and checker invocations
