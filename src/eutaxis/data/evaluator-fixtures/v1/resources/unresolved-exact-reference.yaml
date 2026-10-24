@@ -1,0 +1,20 @@
+schema-version: 1
+id: eutaxis/fixture-unresolved-exact-reference
+kind: rule
+owner: eutaxis
+status: active
+source-revision: contract-v1
+applicability: {facet: context.available, operator: exists}
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: resolve-exact-reference
+    modality: must
+    subject: fixture
+    action: {verb: resolve, object: its exact evaluator reference}
+criteria:
+  - id: missing-evaluator-is-rejected
+    norms: [resolve-exact-reference]
+    evaluator: {id: eutaxis/missing-evaluator, version: 1}
+    statement: The exact evaluator reference resolves

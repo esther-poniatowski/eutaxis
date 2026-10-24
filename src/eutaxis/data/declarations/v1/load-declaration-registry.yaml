@@ -1,0 +1,32 @@
+schema-version: 1
+id: eutaxis/load-declaration-registry
+kind: operation
+owner: eutaxis
+status: active
+source-revision: contract-v1
+applicability: {facet: context.available, operator: exists}
+relations: []
+version: 1
+inputs:
+  type: object
+  required: [sources, facet-registry]
+  properties:
+    sources:
+      type: array
+      minItems: 1
+      items: {type: string, minLength: 1}
+    facet-registry: {type: string, minLength: 1}
+  additionalProperties: false
+outputs:
+  type: object
+  required: [registry.valid, record-count, family-count, conflict-count]
+  properties:
+    registry.valid: {const: true}
+    record-count: {type: integer, minimum: 0}
+    family-count: {type: integer, minimum: 0}
+    conflict-count: {type: integer, minimum: 0}
+  additionalProperties: false
+preconditions: []
+effects: []
+failure-outcomes: [invalid-registry]
+recovery: Correct the reported source defect before loading the registry again

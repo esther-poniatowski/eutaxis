@@ -1,0 +1,24 @@
+schema-version: 1
+id: eutaxis/manual-judgment
+kind: evaluator
+owner: eutaxis
+status: active
+source-revision: contract-v1
+applicability: {facet: context.available, operator: exists}
+relations: []
+version: 1
+evaluator-kind: manual
+coverage: none
+adjudication: manual
+timing: post-artifact
+input-revisions: [declaration-v1]
+evidence-schema:
+  type: object
+  required: [reviewer, criterion, observation, conclusion]
+  properties:
+    reviewer: {type: string, minLength: 1}
+    criterion: {type: string, minLength: 1}
+    observation: {type: string, minLength: 1}
+    conclusion: {enum: [satisfied, violated, blocked]}
+  additionalProperties: false
+failure-behavior: block

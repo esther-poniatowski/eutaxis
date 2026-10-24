@@ -78,6 +78,7 @@ def test_packaged_facet_registry_is_canonical_yaml() -> None:
         "writing",
         "programming",
     )
+    assert registry.facets["registry.valid"].value_schema == {"type": "boolean"}
 
 
 def test_facet_registry_models_are_immutable(facets) -> None:

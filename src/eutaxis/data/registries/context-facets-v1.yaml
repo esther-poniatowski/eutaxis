@@ -19,6 +19,8 @@ facets:
     value-schema: {type: boolean}
   - id: request.payload
     value-schema: {type: object}
+  - id: registry.valid
+    value-schema: {type: boolean}
   - id: scope.project
     value-schema: {type: boolean}
   - id: source.available

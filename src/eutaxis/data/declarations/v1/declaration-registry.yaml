@@ -1,0 +1,51 @@
+schema-version: 1
+id: eutaxis/declaration-registry
+kind: evaluator
+owner: eutaxis
+status: active
+source-revision: contract-v1
+applicability: {facet: context.available, operator: exists}
+relations: []
+version: 1
+evaluator-kind: checker
+coverage: total
+adjudication: authoritative
+timing: post-artifact
+input-revisions: [declaration-v1]
+evidence-schema:
+  oneOf:
+    - type: object
+      required: [outcome, record-count, family-count, conflict-count]
+      properties:
+        outcome: {const: valid}
+        record-count: {type: integer, minimum: 0}
+        family-count: {type: integer, minimum: 0}
+        conflict-count: {type: integer, minimum: 0}
+      additionalProperties: false
+    - type: object
+      required: [outcome, error-class, source, location, message]
+      properties:
+        outcome: {const: invalid}
+        error-class:
+          enum:
+            - declaration-schema
+            - declaration-semantic
+            - declaration-registry
+            - facet-registry-schema
+            - facet-registry-semantic
+        source: {type: string, minLength: 1}
+        location: {type: string, minLength: 1}
+        message: {type: string}
+        line: {type: integer, minimum: 1}
+        column: {type: integer, minimum: 1}
+      additionalProperties: false
+    - type: object
+      required: [outcome, internal-exception-class, message]
+      properties:
+        outcome: {const: blocked}
+        internal-exception-class: {type: string, minLength: 1}
+        message: {type: string}
+      additionalProperties: false
+failure-behavior: block
+known-failure-fixtures:
+  - eutaxis/declaration-registry/unresolved-exact-reference

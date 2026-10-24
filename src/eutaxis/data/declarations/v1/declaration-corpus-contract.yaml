@@ -1,0 +1,26 @@
+schema-version: 1
+id: eutaxis/declaration-corpus-contract
+kind: rule
+owner: eutaxis
+status: active
+source-revision: contract-v1
+applicability: {facet: context.available, operator: exists}
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: establish-valid-corpus
+    modality: must
+    subject: Eutaxis
+    action:
+      verb: establish
+      object: one mechanically valid and semantically faithful version 1 declaration corpus
+criteria:
+  - id: static-contracts-valid
+    norms: [establish-valid-corpus]
+    evaluator: {id: eutaxis/declaration-registry, version: 1}
+    statement: The corpus satisfies the version 1 source boundary and every static cross-record contract
+  - id: semantic-contracts-faithful
+    norms: [establish-valid-corpus]
+    evaluator: {id: eutaxis/manual-judgment, version: 1}
+    statement: The corpus preserves the intended meanings of its rules, procedures, evaluators, and operations

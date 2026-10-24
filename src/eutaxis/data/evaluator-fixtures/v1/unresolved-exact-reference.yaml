@@ -1,0 +1,8 @@
+schema-version: 1
+id: eutaxis/declaration-registry/unresolved-exact-reference
+evaluator: {id: eutaxis/declaration-registry, version: 1}
+input-revision: declaration-v1
+input:
+  sources: [resources/unresolved-exact-reference.yaml]
+  facet-registry: resources/context-facets.yaml
+expected-state: violated

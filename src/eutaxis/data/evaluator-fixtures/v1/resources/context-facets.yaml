@@ -1,0 +1,7 @@
+schema-version: 1
+id: eutaxis/fixture-context-facets
+owner: eutaxis
+source-revision: contract-v1
+facets:
+  - id: context.available
+    value-schema: {type: boolean}
