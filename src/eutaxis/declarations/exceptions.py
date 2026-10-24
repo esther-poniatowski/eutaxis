@@ -132,6 +132,32 @@ class CheckerRunnerRegistryError(Exception):
         self.location = location
 
 
+class CheckerExecutionError(Exception):
+    """Report an invalid checker invocation, fixture binding, or result."""
+
+    def __init__(
+        self,
+        location: str,
+        message: str,
+        *,
+        document_path: tuple[str | int, ...] | None = None,
+        path: Path | None = None,
+        line: int | None = None,
+        column: int | None = None,
+    ) -> None:
+        source_path = f" in {path}" if path is not None else ""
+        source = f" (line {line}, column {column})" if line and column else ""
+        super().__init__(
+            f"Invalid checker execution{source_path} at {location}{source}: {message}"
+        )
+        self.path = path
+        self.location = location
+        self.document_path = document_path
+        self.detail = message
+        self.line = line
+        self.column = column
+
+
 class FacetRegistryError(Exception):
     """Base exception for context-facet registry failures."""
 

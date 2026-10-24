@@ -27,15 +27,34 @@ def freeze_json(value: object) -> JsonValue:
     TypeError
         If ``value`` contains a non-JSON type or a non-finite number.
     """
+    return _freeze_json(value, set())
+
+
+def _freeze_json(value: object, active: set[int]) -> JsonValue:
+    """Freeze one JSON value while rejecting recursive container graphs."""
     if isinstance(value, Mapping):
+        identity = id(value)
+        if identity in active:
+            raise TypeError("cyclic containers are not JSON values")
+        active.add(identity)
         frozen: dict[str, JsonValue] = {}
-        for key, item in value.items():
-            if not isinstance(key, str):
-                raise TypeError("JSON object keys must be strings")
-            frozen[key] = freeze_json(item)
-        return MappingProxyType(frozen)
+        try:
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise TypeError("JSON object keys must be strings")
+                frozen[key] = _freeze_json(item, active)
+            return MappingProxyType(frozen)
+        finally:
+            active.remove(identity)
     if isinstance(value, (list, tuple)):
-        return tuple(freeze_json(item) for item in value)
+        identity = id(value)
+        if identity in active:
+            raise TypeError("cyclic containers are not JSON values")
+        active.add(identity)
+        try:
+            return tuple(_freeze_json(item, active) for item in value)
+        finally:
+            active.remove(identity)
     if value is None or isinstance(value, (bool, int, str)):
         return value
     if isinstance(value, float) and math.isfinite(value):

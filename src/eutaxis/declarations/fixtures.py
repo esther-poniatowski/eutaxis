@@ -39,6 +39,7 @@ class EvaluatorFixture:
     expected_state: str
     sources: tuple[Path, ...]
     facet_registry: Path
+    locations: SourceMap
 
 
 @dataclass(frozen=True)
@@ -162,6 +163,7 @@ def _load_evaluator_fixture(
             expected_state=str(validated["expected-state"]),
             sources=sources,
             facet_registry=facet_registry,
+            locations=MappingProxyType(dict(locations)),
         ),
         MappingProxyType(dict(locations)),
     )

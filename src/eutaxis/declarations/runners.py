@@ -17,12 +17,13 @@ from .models import (
     VersionedReference,
 )
 from .registry import DeclarationRegistry, RegisteredDeclaration
+from .results import CheckerResult
 
 
 class CheckerRunner(Protocol):
     """A reviewed callable whose result is validated by the execution layer."""
 
-    def __call__(self, input_data: Mapping[str, JsonValue], /) -> object:
+    def __call__(self, input_data: Mapping[str, JsonValue], /) -> CheckerResult:
         """Evaluate one immutable input payload."""
 
 
@@ -39,8 +40,10 @@ class CheckerRunnerBinding:
 class CheckerRunnerRegistry:
     """An immutable registry of validated checker runner bindings."""
 
+    declarations: DeclarationRegistry
     bindings: Mapping[VersionedReference, CheckerRunnerBinding]
     input_contracts: EvaluatorInputContracts
+    evaluator_records: Mapping[VersionedReference, RegisteredDeclaration]
 
 
 def build_checker_runner_registry(
@@ -60,6 +63,7 @@ def build_checker_runner_registry(
     _reject_duplicate_evaluators(ordered)
     registered: dict[VersionedReference, CheckerRunnerBinding] = {}
     input_contracts: dict[VersionedReference, Mapping[str, object]] = {}
+    evaluator_records: dict[VersionedReference, RegisteredDeclaration] = {}
     for index, binding in enumerate(ordered):
         base = f"$.bindings[{index}]"
         evaluator_record = _resolve_exact(
@@ -86,9 +90,12 @@ def build_checker_runner_registry(
         input_contracts[binding.evaluator] = cast(
             Mapping[str, object], operation.inputs
         )
+        evaluator_records[binding.evaluator] = evaluator_record
     return CheckerRunnerRegistry(
+        declarations=declarations,
         bindings=MappingProxyType(registered),
         input_contracts=MappingProxyType(input_contracts),
+        evaluator_records=MappingProxyType(evaluator_records),
     )
 
 

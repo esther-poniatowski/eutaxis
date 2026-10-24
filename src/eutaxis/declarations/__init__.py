@@ -1,6 +1,7 @@
 """Structured declaration loading and validation."""
 
 from .exceptions import (
+    CheckerExecutionError,
     CheckerRunnerRegistryError,
     DeclarationError,
     DeclarationRegistryError,
@@ -14,6 +15,7 @@ from .exceptions import (
     FacetRegistrySchemaError,
     FacetRegistrySemanticError,
 )
+from .execution import execute_checker, execute_known_failure_fixtures
 from .fixture_schema import (
     evaluator_fixture_schema,
     evaluator_fixture_schema_path,
@@ -75,11 +77,14 @@ from .runners import (
     CheckerRunnerRegistry,
     build_checker_runner_registry,
 )
+from .results import CheckerResult, EvaluationState
 
 __all__ = [
     "Action",
     "AnyDeclaration",
     "Binding",
+    "CheckerExecutionError",
+    "CheckerResult",
     "CheckerRunner",
     "CheckerRunnerBinding",
     "CheckerRunnerRegistry",
@@ -102,6 +107,7 @@ __all__ = [
     "EvaluatorFixtureSchemaError",
     "EvaluatorFixtureSemanticError",
     "EvaluatorInputContracts",
+    "EvaluationState",
     "ExceptionClause",
     "FacetContextError",
     "FacetRegistry",
@@ -129,6 +135,8 @@ __all__ = [
     "build_checker_runner_registry",
     "declaration_schema",
     "evaluate_applicability",
+    "execute_checker",
+    "execute_known_failure_fixtures",
     "evaluator_fixture_schema",
     "evaluator_fixture_schema_path",
     "facet_registry_path",
