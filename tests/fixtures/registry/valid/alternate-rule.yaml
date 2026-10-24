@@ -1,0 +1,20 @@
+schema-version: 1
+id: content/alternate
+kind: rule
+owner: imported
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: alternate
+    modality: must
+    subject: agent
+    action: {verb: apply, object: the alternate contract}
+criteria:
+  - id: alternate-check
+    norms: [alternate]
+    evaluator: {id: registry/manual, version: 1}
+    statement: The alternate contract is applied

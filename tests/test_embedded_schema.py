@@ -20,6 +20,7 @@ from eutaxis.declarations import (
     load_declaration,
 )
 from eutaxis.declarations.embedded_schema import (
+    normalize_json_subschema,
     validate_json_subschema,
     validate_self_contained_schema,
 )
@@ -100,6 +101,93 @@ def test_subschema_validation_retains_the_complete_root_resource() -> None:
     assert error is not None
     assert error.message == "0 is less than the minimum of 1"
     assert validate_json_subschema(schema, ("properties", "a/b"), 2) is None
+
+
+def test_subschema_validation_preserves_nested_paths_for_frozen_values() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "item": {
+                "type": "object",
+                "properties": {"count": {"type": "integer"}},
+                "required": ["count"],
+                "additionalProperties": False,
+            }
+        },
+        "required": ["item"],
+        "additionalProperties": False,
+    }
+    instance = freeze_json({"count": "seven"})
+
+    error = validate_json_subschema(schema, ("properties", "item"), instance)
+
+    assert error is not None
+    assert tuple(error.absolute_path) == ("count",)
+
+
+def test_subschema_normalization_expands_transitive_escaped_references() -> None:
+    schema = {
+        "$defs": {
+            "a/b": {"$ref": "#/$defs/c~0d", "minimum": 1},
+            "c~d": {"type": "integer"},
+        },
+        "type": "object",
+        "properties": {
+            "selected": {
+                "$ref": "#/$defs/a~1b",
+                "description": "kept sibling",
+                "examples": [{"$ref": "annotation data"}],
+            }
+        },
+        "additionalProperties": False,
+    }
+    validate_self_contained_schema(schema)
+
+    normalized = normalize_json_subschema(schema, ("properties", "selected"))
+
+    assert normalized == {
+        "$ref": {"$ref": {"type": "integer"}, "minimum": 1},
+        "description": "kept sibling",
+        "examples": [{"$ref": "annotation data"}],
+    }
+
+
+def test_subschema_normalization_depends_on_each_complete_root() -> None:
+    left = {
+        "type": "object",
+        "properties": {
+            "selected": {"$ref": "#/properties/shared"},
+            "shared": {"type": "integer"},
+        },
+        "additionalProperties": False,
+    }
+    equal = {
+        "type": "object",
+        "properties": {
+            "selected": {"$ref": "#/properties/shared"},
+            "shared": {"type": "integer"},
+        },
+        "additionalProperties": False,
+    }
+    different = {
+        "type": "object",
+        "properties": {
+            "selected": {"$ref": "#/properties/shared"},
+            "shared": {"type": "string"},
+        },
+        "additionalProperties": False,
+    }
+
+    normalized = normalize_json_subschema(left, ("properties", "selected"))
+
+    assert json_values_equal(
+        normalized,
+        normalize_json_subschema(equal, ("properties", "selected")),
+    )
+    assert not json_values_equal(
+        normalized,
+        normalize_json_subschema(different, ("properties", "selected")),
+    )
 
 
 def test_unreachable_recursive_definition_remains_admitted() -> None:

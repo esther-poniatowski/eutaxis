@@ -120,7 +120,7 @@ def validate_json_instance(
 ) -> ValidationError | None:
     """Return the most relevant error for an instance under a schema root."""
     validator = _local_reference_validator(schema, _RESOURCE_URI)
-    return best_match(validator.iter_errors(instance))
+    return best_match(validator.iter_errors(_plain_json_containers(instance)))
 
 
 def validate_json_subschema(
@@ -132,7 +132,27 @@ def validate_json_subschema(
     pointer = "/".join(_pointer_token(part) for part in subschema_path)
     reference = f"{_RESOURCE_URI}#/{quote(pointer, safe='/~')}"
     validator = _local_reference_validator(schema, reference)
-    return best_match(validator.iter_errors(instance))
+    return best_match(validator.iter_errors(_plain_json_containers(instance)))
+
+
+def normalize_json_subschema(
+    schema: Mapping[str, object], subschema_path: SchemaPath
+) -> object:
+    """Return one schema fragment with its local-reference closure expanded.
+
+    Only values in JSON Schema positions are traversed as schemas. Annotation
+    values that happen to contain a ``$ref`` key remain ordinary JSON data.
+    """
+    if subschema_path:
+        pointer = "/".join(_pointer_token(part) for part in subschema_path)
+        selected = _resolve_json_pointer(schema, f"#/{pointer}")
+    else:
+        selected = schema
+    if not isinstance(selected, (Mapping, bool)):
+        raise ValueError(
+            f"subschema path does not identify a schema: {subschema_path!r}"
+        )
+    return _normalize_schema_node(schema, selected, set())
 
 
 def _local_reference_validator(
@@ -151,6 +171,59 @@ def _plain_json_containers(value: object) -> object:
     if isinstance(value, (list, tuple)):
         return [_plain_json_containers(item) for item in value]
     return value
+
+
+def _normalize_schema_node(
+    root: Mapping[str, object],
+    node: Mapping[str, object] | bool,
+    active: set[int],
+) -> object:
+    """Expand local references while preserving exact schema structure."""
+    if isinstance(node, bool):
+        return node
+    node_id = id(node)
+    if node_id in active:
+        raise ValueError("cannot normalize a recursive schema reference")
+    active.add(node_id)
+    try:
+        normalized: dict[str, object] = {}
+        for keyword, value in node.items():
+            if keyword == "$ref":
+                if not isinstance(value, str):
+                    raise ValueError("validated $ref is not a string")
+                target = _resolve_json_pointer(root, value)
+                if not isinstance(target, (Mapping, bool)):
+                    raise ValueError(
+                        f"validated $ref does not identify a schema: {value!r}"
+                    )
+                normalized[keyword] = _normalize_schema_node(root, target, active)
+            elif keyword in _SINGLE_SCHEMA_KEYWORDS and isinstance(
+                value, (Mapping, bool)
+            ):
+                normalized[keyword] = _normalize_schema_node(root, value, active)
+            elif keyword in _SCHEMA_ARRAY_KEYWORDS and _is_schema_sequence(value):
+                normalized[keyword] = [
+                    (
+                        _normalize_schema_node(root, item, active)
+                        if isinstance(item, (Mapping, bool))
+                        else _plain_json_containers(item)
+                    )
+                    for item in value
+                ]
+            elif keyword in _SCHEMA_MAP_KEYWORDS and isinstance(value, Mapping):
+                normalized[keyword] = {
+                    name: (
+                        _normalize_schema_node(root, item, active)
+                        if isinstance(item, (Mapping, bool))
+                        else _plain_json_containers(item)
+                    )
+                    for name, item in value.items()
+                }
+            else:
+                normalized[keyword] = _plain_json_containers(value)
+        return normalized
+    finally:
+        active.remove(node_id)
 
 
 def _schema_nodes(

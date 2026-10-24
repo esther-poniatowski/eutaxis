@@ -1,0 +1,30 @@
+schema-version: 1
+id: content/package
+kind: rule-set
+owner: registry
+status: active
+source-revision: fixture-1
+applicability: {facet: artifact.created, operator: equals, value: true}
+relations: []
+purpose: Supplies the base registry rule
+rules:
+  - schema-version: 1
+    id: content/base
+    kind: rule
+    owner: registry
+    status: active
+    source-revision: fixture-1
+    applicability: {facet: context.available, operator: exists}
+    relations: []
+    axis: reasoning-target
+    failure-mode: visible
+    norms:
+      - id: base
+        modality: must
+        subject: agent
+        action: {verb: preserve, object: the base contract}
+    criteria:
+      - id: base-check
+        norms: [base]
+        evaluator: {id: registry/manual, version: 1}
+        statement: The base contract is preserved

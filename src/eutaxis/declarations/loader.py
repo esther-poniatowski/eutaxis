@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping, NoReturn, TypedDict, cast
@@ -62,28 +63,49 @@ class _BaseFields(TypedDict):
     document: Mapping[str, JsonValue]
 
 
+@dataclass(frozen=True)
+class LoadedDeclarationSource:
+    """One validated declaration with the source data needed by registries."""
+
+    path: Path
+    declaration: AnyDeclaration
+    document: Mapping[str, JsonValue]
+    locations: SourceMap
+
+
 def load_declaration(path: Path) -> AnyDeclaration:
     """Load one declaration through its local source-boundary validation."""
-    document, locations = load_yaml_document(path)
-    validated = validate_document(document, path=path, locations=locations)
-    _validate_semantics(validated, path=path, locations=locations)
-    return _build_declaration(validated)
+    return load_declaration_source(path).declaration
 
 
 def load_facet_validated_declaration(
     path: Path, facets: FacetRegistry
 ) -> AnyDeclaration:
     """Load a declaration after validating every applicability facet."""
+    return load_declaration_source(path, facets=facets).declaration
+
+
+def load_declaration_source(
+    path: Path, *, facets: FacetRegistry | None = None
+) -> LoadedDeclarationSource:
+    """Load one declaration and retain its immutable document and source map."""
     document, locations = load_yaml_document(path)
     validated = validate_document(document, path=path, locations=locations)
-    validate_declaration_facets(
-        validated,
-        facets,
-        path=path,
-        locations=locations,
-    )
+    if facets is not None:
+        validate_declaration_facets(
+            validated,
+            facets,
+            path=path,
+            locations=locations,
+        )
     _validate_semantics(validated, path=path, locations=locations)
-    return _build_declaration(validated)
+    declaration = _build_declaration(validated)
+    return LoadedDeclarationSource(
+        path=path,
+        declaration=declaration,
+        document=declaration.document,
+        locations=MappingProxyType(locations),
+    )
 
 
 def _mapping(value: object) -> Mapping[str, object]:

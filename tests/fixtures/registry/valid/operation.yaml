@@ -1,0 +1,25 @@
+schema-version: 1
+id: registry/write
+kind: operation
+owner: registry
+status: active
+source-revision: fixture-1
+applicability: {facet: filesystem.writable, operator: equals, value: true}
+relations: []
+version: 1
+inputs:
+  type: object
+  properties:
+    path: {type: string}
+    content: {type: string}
+  required: [path, content]
+  additionalProperties: false
+outputs:
+  type: object
+  properties: {written: {type: boolean}}
+  required: [written]
+  additionalProperties: false
+preconditions: []
+effects: [filesystem/artifact]
+failure-outcomes: [write-failed]
+recovery: Preserve the prior artifact

@@ -1,0 +1,20 @@
+schema-version: 1
+id: content/combined
+kind: rule
+owner: registry
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: combined
+    modality: must
+    subject: agent
+    action: {verb: apply, object: the authored combined contract}
+criteria:
+  - id: combined-check
+    norms: [combined]
+    evaluator: {id: registry/manual, version: 1}
+    statement: The authored combined contract is applied

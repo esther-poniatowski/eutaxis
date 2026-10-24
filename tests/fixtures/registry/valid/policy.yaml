@@ -1,0 +1,12 @@
+schema-version: 1
+id: registry/prefer-refined
+kind: resolution-policy
+owner: registry
+status: active
+source-revision: fixture-1
+applicability: {facet: scope.project, operator: equals, value: true}
+relations: []
+conflicts: [content/refined, content/alternate]
+when: {facet: scope.project, operator: equals, value: true}
+order: 10
+strategy: {kind: retain, retain: content/refined}

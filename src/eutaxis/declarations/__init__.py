@@ -2,6 +2,7 @@
 
 from .exceptions import (
     DeclarationError,
+    DeclarationRegistryError,
     DeclarationSchemaError,
     DeclarationSemanticError,
     FacetContextError,
@@ -16,7 +17,12 @@ from .facets import (
     load_facet_registry,
 )
 from .applicability import TruthValue, conjoin_applicability, evaluate_applicability
-from .loader import load_declaration, load_facet_validated_declaration
+from .loader import (
+    LoadedDeclarationSource,
+    load_declaration,
+    load_declaration_source,
+    load_facet_validated_declaration,
+)
 from .models import (
     Action,
     AnyDeclaration,
@@ -43,6 +49,12 @@ from .models import (
     VersionedReference,
 )
 from .schema import declaration_schema, schema_path, validate_document
+from .registry import (
+    ContractFamily,
+    DeclarationRegistry,
+    RegisteredDeclaration,
+    load_declaration_registry,
+)
 
 __all__ = [
     "Action",
@@ -50,9 +62,12 @@ __all__ = [
     "Binding",
     "CompositionManifestDeclaration",
     "ContextFacet",
+    "ContractFamily",
     "Criterion",
     "Declaration",
     "DeclarationError",
+    "DeclarationRegistry",
+    "DeclarationRegistryError",
     "DeclarationKind",
     "DeclarationSchemaError",
     "DeclarationSemanticError",
@@ -64,6 +79,7 @@ __all__ = [
     "FacetRegistrySchemaError",
     "FacetRegistrySemanticError",
     "LiteralBinding",
+    "LoadedDeclarationSource",
     "ManifestSection",
     "Norm",
     "OperationDeclaration",
@@ -72,6 +88,7 @@ __all__ = [
     "ProcedureDeclaration",
     "ProcedureNode",
     "Relation",
+    "RegisteredDeclaration",
     "ResolutionPolicyDeclaration",
     "ResolutionStrategy",
     "RuleDeclaration",
@@ -83,6 +100,8 @@ __all__ = [
     "evaluate_applicability",
     "facet_registry_path",
     "load_declaration",
+    "load_declaration_registry",
+    "load_declaration_source",
     "load_facet_registry",
     "load_facet_validated_declaration",
     "schema_path",

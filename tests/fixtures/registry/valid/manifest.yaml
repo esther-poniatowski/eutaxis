@@ -1,0 +1,18 @@
+schema-version: 1
+id: registry/manifest
+kind: composition-manifest
+owner: registry
+status: active
+source-revision: fixture-1
+applicability: {facet: target.codex, operator: equals, value: true}
+relations: []
+scope: project
+target: AGENTS.md
+sections:
+  - id: core
+    declarations:
+      - content/package
+      - content/refined
+      - content/alternate
+      - content/write
+policies: [registry/prefer-refined]
