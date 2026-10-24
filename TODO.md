@@ -1,6 +1,10 @@
 # TODO
 
+This file guides work on Eutaxis. Open entries state unfinished tasks. Completed entries link to the corresponding documentation.
+
 ## Recently shipped
+
+The following work is complete.
 
 - [x] [Config-driven Skills compilation](docs/guide/usage.md#author-on-demand-rule-sets-as-skills) (`eutaxis skills` sub-app).
 - [x] [Source-schema fields and compiler gate](docs/adr/failure-mode-as-source-field.md) (`invocation`, `failure-mode`, `required-visibility`); closes [silent-failure-classification](docs/open-questions/silent-failure-classification.md).
@@ -9,11 +13,12 @@
 - [x] User-facing documentation rewrite ([README](README.md), [Concepts](docs/guide/concepts.md), [Usage](docs/guide/usage.md)).
 - [x] [Clean-memory operation as a Skill](docs/adr/dual-ownership-marker.md) (`eutaxis commands install clean-memory` + `eutaxis ops clean-memory`).
 - [x] [Rule query and progressive disclosure](docs/adr/rule-level-access-to-modules.md) (`eutaxis rule show|list`, `disclosure: progressive`).
+- [x] [Loading-unit budgets](docs/guide/configuration.md#^skill-loading-budgets) for Skill entrypoints, read batches and complete activation routes.
+- [x] [Skills command](docs/guide/cli-reference.md#^skills-command): previews changes, removes only recorded artifacts and recovers idempotently.
 
 ## Priority
 
 - [ ] In Oikos, reformat the rules systematically (label, do, do not with embedded examples).
-- [ ] Clean the TODO itself for outdated or irrelevant items.
 - [ ] Review the archived sources and decide which content to include, which can be deleted safely.
 - [ ] Implement a functionality to cleanup config files. This involves:
   - detecting the configs in Codex (TOML) and Claude code (JSON) that violate the recommended patterns,
