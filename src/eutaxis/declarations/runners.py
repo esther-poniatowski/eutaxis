@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Iterable, Mapping, Protocol, cast
 
+from ._runner_support import validate_synchronous_runner
 from .exceptions import CheckerRunnerRegistryError
 from .fixtures import EvaluatorInputContracts
 from .models import (
@@ -115,21 +115,9 @@ def _reject_duplicate_evaluators(
 
 def _validate_runner(runner: object, location: str) -> None:
     """Require a synchronous callable invocable with one positional payload."""
-    if not callable(runner):
-        raise CheckerRunnerRegistryError(
-            location, "runner must be an in-process callable"
-        )
-    call_method = getattr(runner, "__call__", None)
-    if inspect.iscoroutinefunction(runner) or inspect.iscoroutinefunction(call_method):
-        raise CheckerRunnerRegistryError(location, "runner must be synchronous")
-    try:
-        signature = inspect.signature(runner)
-        signature.bind(object())
-    except (TypeError, ValueError) as exc:
-        raise CheckerRunnerRegistryError(
-            location,
-            "runner must accept one positional input payload without other required arguments",
-        ) from exc
+    validate_synchronous_runner(
+        runner, lambda message: CheckerRunnerRegistryError(location, message)
+    )
 
 
 def _resolve_exact(

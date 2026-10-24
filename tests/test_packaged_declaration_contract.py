@@ -18,17 +18,22 @@ from eutaxis.declarations import (
     EvaluationState,
     EvaluatorDeclaration,
     OperationDeclaration,
+    OperationFailure,
+    OperationSuccess,
     ParameterBinding,
     ProcedureDeclaration,
     RuleDeclaration,
     build_checker_runner_registry,
+    build_operation_runner_registry,
     declaration_registry_checker_binding,
     execute_checker,
     execute_known_failure_fixtures,
+    execute_operation,
     facet_registry_path,
     load_declaration_registry,
     load_evaluator_fixture_index,
     load_facet_registry,
+    load_declaration_registry_operation_binding,
 )
 from eutaxis.declarations.models import JsonValue
 
@@ -95,6 +100,51 @@ def test_packaged_valid_corpus_returns_satisfied_closed_evidence() -> None:
         "conflict-count": 0,
     }
     assert len(declarations.records) == 2
+
+
+def test_packaged_operation_executes_and_projects_declared_outputs() -> None:
+    declarations, _ = _registry_and_runners()
+    operations = build_operation_runner_registry(
+        declarations, [load_declaration_registry_operation_binding()]
+    )
+
+    result = execute_operation(
+        operations,
+        LOAD_DECLARATION_REGISTRY_OPERATION,
+        input_data={
+            "sources": [str(path) for path in _declaration_paths()],
+            "facet-registry": str(facet_registry_path()),
+        },
+    )
+
+    assert isinstance(result, OperationSuccess)
+    assert result.outputs == {
+        "registry.valid": True,
+        "record-count": 5,
+        "family-count": 3,
+        "conflict-count": 0,
+    }
+
+
+def test_packaged_operation_maps_source_defect_to_declared_failure() -> None:
+    declarations, _ = _registry_and_runners()
+    operations = build_operation_runner_registry(
+        declarations, [load_declaration_registry_operation_binding()]
+    )
+
+    result = execute_operation(
+        operations,
+        LOAD_DECLARATION_REGISTRY_OPERATION,
+        input_data={
+            "sources": [str(Path("missing.yaml"))],
+            "facet-registry": str(facet_registry_path()),
+        },
+    )
+
+    assert result == OperationFailure(
+        operation=LOAD_DECLARATION_REGISTRY_OPERATION,
+        outcome="invalid-registry",
+    )
 
 
 def test_packaged_known_failure_returns_located_registry_violation() -> None:

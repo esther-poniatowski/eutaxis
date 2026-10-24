@@ -326,6 +326,29 @@ def test_missing_runner_and_escaped_exception_are_gate_failures(
     assert "RuntimeError" in str(escaped.value)
 
 
+def test_runner_exception_with_broken_string_conversion_stays_located(
+    tmp_path: Path,
+) -> None:
+    class HostileError(Exception):
+        def __str__(self) -> str:
+            raise RuntimeError("formatting failed")
+
+    def runner(input_data: Mapping[str, JsonValue], /) -> CheckerResult:
+        raise HostileError()
+
+    declarations = _declarations(tmp_path)
+    with pytest.raises(CheckerExecutionError) as captured:
+        execute_checker(
+            _runners(declarations, runner),
+            CHECKER,
+            input_revision="declaration-v1",
+            input_data=_valid_input(),
+        )
+    assert captured.value.location == "$.runner"
+    assert "HostileError" in str(captured.value)
+    assert "formatting raised RuntimeError" in str(captured.value)
+
+
 @pytest.mark.parametrize(
     ("returned", "location"),
     [

@@ -6,6 +6,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping, NoReturn, cast
 
+from ._runner_support import exception_detail
 from .embedded_schema import validate_json_instance
 from .exceptions import CheckerExecutionError
 from .fixtures import EvaluatorFixture, EvaluatorFixtureIndex
@@ -52,7 +53,7 @@ def execute_checker(
     except Exception as exc:
         _raise_execution_error(
             ("input",),
-            f"input is not finite JSON: {type(exc).__name__}: {exc}",
+            f"input is not finite JSON: {exception_detail(exc)}",
             path=path,
             cause=exc,
         )
@@ -74,7 +75,7 @@ def execute_checker(
     except Exception as exc:
         _raise_execution_error(
             ("runner",),
-            f"runner raised {type(exc).__name__}: {exc}",
+            f"runner raised {exception_detail(exc)}",
             path=path,
             cause=exc,
         )
@@ -240,7 +241,7 @@ def _validate_result(
     except Exception as exc:
         _raise_execution_error(
             ("result", "evidence"),
-            f"result evidence is not finite JSON: {type(exc).__name__}: {exc}",
+            f"result evidence is not finite JSON: {exception_detail(exc)}",
             path=path,
             cause=exc,
         )

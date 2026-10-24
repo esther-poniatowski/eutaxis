@@ -158,6 +158,23 @@ class CheckerExecutionError(Exception):
         self.column = column
 
 
+class OperationRunnerRegistryError(Exception):
+    """Report an invalid code-owned operation runner binding."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid operation runner registry at {location}: {message}")
+        self.location = location
+
+
+class OperationExecutionError(Exception):
+    """Report an invalid operation invocation or returned result."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid operation execution at {location}: {message}")
+        self.location = location
+        self.detail = message
+
+
 class FacetRegistryError(Exception):
     """Base exception for context-facet registry failures."""
 

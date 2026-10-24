@@ -228,9 +228,29 @@ async def _async_runner(input_data: Mapping[str, JsonValue], /) -> object:
     return {"received": input_data}
 
 
+async def _async_generator_runner(input_data: Mapping[str, JsonValue], /):
+    yield {"received": input_data}
+
+
+class _AsyncCallable:
+    async def __call__(self, input_data: Mapping[str, JsonValue], /) -> object:
+        return {"received": input_data}
+
+
+class _AsyncGeneratorCallable:
+    async def __call__(self, input_data: Mapping[str, JsonValue], /):
+        yield {"received": input_data}
+
+
 def test_async_runner_is_rejected_without_creating_a_coroutine(tmp_path: Path) -> None:
     declarations = _registry(tmp_path)
-    with pytest.raises(CheckerRunnerRegistryError) as captured:
-        build_checker_runner_registry(declarations, [_binding(runner=_async_runner)])
-    assert captured.value.location == "$.bindings[0].runner"
-    assert "must be synchronous" in str(captured.value)
+    for runner in (
+        _async_runner,
+        _async_generator_runner,
+        _AsyncCallable(),
+        _AsyncGeneratorCallable(),
+    ):
+        with pytest.raises(CheckerRunnerRegistryError) as captured:
+            build_checker_runner_registry(declarations, [_binding(runner=runner)])
+        assert captured.value.location == "$.bindings[0].runner"
+        assert "must be synchronous" in str(captured.value)

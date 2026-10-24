@@ -15,7 +15,7 @@ Prompts still originate in free-form Markdown. By contrast, the first schema now
 
 Independent adversarial reviews approved the complete normative contract on three results. First, the valid packaged corpus returns `satisfied`. Second, its unresolved-reference fixture returns a located `violated` diagnostic. Third, the packaged procedure satisfies three static facts. The procedure binds every operation input. The procedure routes every outcome. The procedure declares no effects.
 
-The Eutaxis-owned compilation fixture is active. Catalog work remains separate. The catalog phase will evaluate when each record applies. The catalog phase will also resolve conflicts.
+`eutaxis/load-declaration-registry` now runs through a code-owned callable. Before calling it, Eutaxis validates an immutable input. After it returns, Eutaxis validates either immutable outputs or a declared failure. The active fixture must now compose artifacts. The later catalog phase will evaluate applicability and resolve conflicts.
 
 ## Decision log and open prerequisites
 
@@ -42,7 +42,7 @@ The normative contract closes through the following gates.
 - [x] Implement the versioned YAML fixture schema and deterministic fixture index, including unique identifiers, portable resource paths, typed payload validation, and located errors.
 - [x] Implement the checker-only runner registry, keyed by exact evaluator reference and linked to one exact operation input contract; reject manual, detector, and unresolved bindings in this gate.
 - [x] Run the valid corpus and every known-failure descriptor, then verify that each checker receives the declared input and returns the declared result.
-- [x] Load the packaged procedure and operation through the static registry, then verify their complete static contract. The compilation fixture will execute `eutaxis/load-declaration-registry` and project its outputs.
+- [x] Load the packaged procedure and operation through the static registry, then verify their complete static contract.
 - [x] Plant defects before independent adversarial review:
   - malformed or duplicate descriptors
   - invalid payloads or unresolved resources
@@ -58,6 +58,11 @@ A gate closes only after its fixture corpus passes both its known-failure check 
 
 The fixture must prove that identical inputs produce identical artifacts. This proof precedes catalog work.
 
+- [x] Establish the exact callable boundary:
+  - bind versioned keys to reviewed callables
+  - freeze and validate inputs before each call
+  - validate immutable outputs or a declared failure after each call
+  - run `eutaxis/load-declaration-registry` and return its four declared fields
 - [ ] Build a self-contained fixture corpus owned by Eutaxis before reading external repositories.
 - [ ] Exercise a multi-component cumulative artifact, separate-directory artifacts, and a single-slot collision.
 - [ ] Prove dependency-before-dependant order, manifest tie-breaking, byte-identical rebuilds, and failure on cycles, duplicate membership, duplicate paths, unresolved conflicts, and multiple slot values.

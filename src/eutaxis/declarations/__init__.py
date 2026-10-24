@@ -14,6 +14,8 @@ from .exceptions import (
     FacetRegistryError,
     FacetRegistrySchemaError,
     FacetRegistrySemanticError,
+    OperationExecutionError,
+    OperationRunnerRegistryError,
 )
 from .execution import execute_checker, execute_known_failure_fixtures
 from .fixture_schema import (
@@ -64,6 +66,16 @@ from .models import (
     RuleSetDeclaration,
     VersionedReference,
 )
+from .operations import (
+    OperationFailure,
+    OperationResult,
+    OperationRunner,
+    OperationRunnerBinding,
+    OperationRunnerRegistry,
+    OperationSuccess,
+    build_operation_runner_registry,
+    execute_operation,
+)
 from .schema import declaration_schema, schema_path, validate_document
 from .registry import (
     ContractFamily,
@@ -77,6 +89,10 @@ from .registry_checker import (
     LOAD_DECLARATION_REGISTRY_OPERATION,
     declaration_registry_checker,
     declaration_registry_checker_binding,
+)
+from .registry_operation import (
+    load_declaration_registry_operation,
+    load_declaration_registry_operation_binding,
 )
 from .runners import (
     CheckerRunner,
@@ -129,6 +145,14 @@ __all__ = [
     "ManifestSection",
     "Norm",
     "OperationDeclaration",
+    "OperationExecutionError",
+    "OperationFailure",
+    "OperationResult",
+    "OperationRunner",
+    "OperationRunnerBinding",
+    "OperationRunnerRegistry",
+    "OperationRunnerRegistryError",
+    "OperationSuccess",
     "ParameterBinding",
     "Predicate",
     "ProcedureDeclaration",
@@ -143,12 +167,14 @@ __all__ = [
     "VersionedReference",
     "conjoin_applicability",
     "build_checker_runner_registry",
+    "build_operation_runner_registry",
     "declaration_schema",
     "declaration_registry_checker",
     "declaration_registry_checker_binding",
     "evaluate_applicability",
     "execute_checker",
     "execute_known_failure_fixtures",
+    "execute_operation",
     "evaluator_fixture_schema",
     "evaluator_fixture_schema_path",
     "facet_registry_path",
@@ -158,6 +184,8 @@ __all__ = [
     "load_evaluator_fixture_index",
     "load_facet_registry",
     "load_facet_validated_declaration",
+    "load_declaration_registry_operation",
+    "load_declaration_registry_operation_binding",
     "schema_path",
     "validate_document",
 ]
