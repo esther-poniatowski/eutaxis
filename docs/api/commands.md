@@ -92,7 +92,7 @@ across CLI invocations.
 
 Robustness: writes are atomic (`os.replace` from a sibling `.tmp`
 file) and serialised under a POSIX advisory file lock so concurrent
-`eutaxis commands install` invocations cannot lose each other’s
+`eutaxis commands install` invocations cannot lose each other's
 records. A corrupted registry surfaces as `RegistryCorruptedError`
 with the path; the user can remove the file to rebuild from scratch.
 
@@ -1088,7 +1088,7 @@ Measure every rendered entrypoint and declared loading unit.
 
 Data containers for the commands subsystem.
 
-A “command” is rendered as an **Agent Skill artifact**: a directory whose
+A "command" is rendered as an **Agent Skill artifact**: a directory whose
 canonical entrypoint is `SKILL.md`, optionally accompanied by
 agent-specific sibling files (e.g. `agents/openai.yaml` for Codex). The
 multi-file artifact model is needed because Codex skills require the
@@ -1128,7 +1128,7 @@ Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Per-source allow/deny list of adapter names.
 
-An empty `include` tuple means “all registered adapters”.
+An empty `include` tuple means "all registered adapters".
 
 * **Parameters:**
   * **include** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
@@ -1255,7 +1255,7 @@ Slug used for the artifact directory and the invocation symbol.
 
 #### description *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
-One-line summary surfaced by `commands list` and the agent’s
+One-line summary surfaced by `commands list` and the agent's
 skill picker.
 
 <a id="eutaxis.commands.models.CommandSource.invocation"></a>
@@ -1555,7 +1555,7 @@ Raised when an install/uninstall target is not eutaxis-owned.
 
 Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError)
 
-Raised when a source’s failure-mode classification forbids the target regime.
+Raised when a source's failure-mode classification forbids the target regime.
 
 A `failure-mode: silent` source cannot ship as a `model-invoked` skill;
 the model-judgment activation gate gives no visibility guarantee before the
@@ -1595,7 +1595,7 @@ Invocation translation:
   Claude is free to pick the skill from its description, and user
   invocation via `/<name>` continues to work as well.
 
-Claude has no analogue to Codex’s sibling `agents/openai.yaml`: all
+Claude has no analogue to Codex's sibling `agents/openai.yaml`: all
 metadata (including `allowed-tools`, `argument-hint`) is folded
 into `SKILL.md` frontmatter.
 

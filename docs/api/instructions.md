@@ -315,7 +315,7 @@ Markdown transformations used by instruction-file assembly.
 
 ### eutaxis.instructions.markdown.parse_frontmatter(content)
 
-Parse a Markdown file’s YAML frontmatter block.
+Parse a Markdown file's YAML frontmatter block.
 
 Returns an empty dict when the file has no frontmatter or when the
 frontmatter is empty. Raises `yaml.YAMLError` if the block is malformed.

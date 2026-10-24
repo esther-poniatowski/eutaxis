@@ -133,7 +133,7 @@ Prompt composition framework.
 ## Generate
 
 `eutaxis.generate` is a thin backward-compatibility shim that re-exports
-the public surface of `eutaxis.instructions`. Only the module’s own
+the public surface of `eutaxis.instructions`. Only the module's own
 entry point is documented here; the re-exported classes appear under
 [Instructions](instructions.md).
 
