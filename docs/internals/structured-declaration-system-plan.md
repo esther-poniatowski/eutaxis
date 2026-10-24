@@ -11,11 +11,11 @@ This plan implements the accepted structured-source decisions and assigns only w
 
 ## Current state
 
-Free-form Markdown remains the production source. The loader for schema version 1 rejects malformed source data. The loader returns complete immutable models and conjoins inherited applicability predicates.
+Prompts still originate in free-form Markdown. By contrast, the first schema now governs a canonical `.yaml` corpus. The source loader rejects malformed sources. The source loader returns immutable models and conjoins inherited applicability predicates.
 
-Independent adversarial reviews approved the facet registry and static declaration registry. The declaration registry covers relation graphs, policies, manifests, exact contracts, and procedure–operation compatibility. For each defect, the registry reports the field that makes the corpus invalid. Contextual applicability and conflict resolution remain pending.
+Independent adversarial reviews approved the complete normative contract on three results. First, the valid packaged corpus returns `satisfied`. Second, its unresolved-reference fixture returns a located `violated` diagnostic. Third, the packaged procedure satisfies three static facts. The procedure binds every operation input. The procedure routes every outcome. The procedure declares no effects.
 
-Before Eutaxis may compile downstream artifacts, it must close one normative gate. This gate requires the exact packaged records and executable evidence defined in the [shipped execution contract](../adr/yaml-declaration-schema.md#^shipped-contract-execution). The gate also requires every checker to fail its named known-failure fixture.
+The Eutaxis-owned compilation fixture is active. Catalog work remains separate. The catalog phase will evaluate when each record applies. The catalog phase will also resolve conflicts.
 
 ## Decision log and open prerequisites
 
@@ -38,12 +38,17 @@ The normative contract closes through the following gates.
 - [x] Complete and adversarially review the [procedure contract](../adr/yaml-declaration-schema.md).
 - [x] Add the canonical YAML facet registry and validate applicability values against registered facet types.
 - [x] Add semantic and versioned-contract indexes, then validate the static cross-record contracts fixed by the [relation contract](../adr/rule-relations-and-resolution.md).
-- [ ] Package the exact records required by the [shipped execution contract](../adr/yaml-declaration-schema.md#^shipped-contract-execution), including `eutaxis/declaration-corpus-contract` and its named norm and criteria.
+- [x] Package the exact records required by the [shipped execution contract](../adr/yaml-declaration-schema.md#^shipped-contract-execution), including `eutaxis/declaration-corpus-contract` and its named norm and criteria.
 - [x] Implement the versioned YAML fixture schema and deterministic fixture index, including unique identifiers, portable resource paths, typed payload validation, and located errors.
 - [x] Implement the checker-only runner registry, keyed by exact evaluator reference and linked to one exact operation input contract; reject manual, detector, and unresolved bindings in this gate.
-- [ ] Run the valid corpus and every known-failure descriptor. Check evaluator identity, `declaration-v1`, result state, exception class, and the closed evidence schema.
-- [ ] Load the packaged procedure and operation through the static registry, then verify their bindings, outcome map, and empty mutation footprint. Defer operation execution to the compilation fixture.
-- [ ] Plant malformed and duplicate descriptors, invalid payloads, unresolved resources, missing bindings, mismatched results, invalid evidence, action-binding defects, outcome defects, and footprint defects before independent adversarial review.
+- [x] Run the valid corpus and every known-failure descriptor, then verify that each checker receives the declared input and returns the declared result.
+- [x] Load the packaged procedure and operation through the static registry, then verify their complete static contract. The compilation fixture will execute `eutaxis/load-declaration-registry` and project its outputs.
+- [x] Plant defects before independent adversarial review:
+  - malformed or duplicate descriptors
+  - invalid payloads or unresolved resources
+  - absent fixture or runner bindings
+  - results that mismatch their declared contracts
+  - procedure nodes that violate their static contract
 
 A gate closes only after its fixture corpus passes both its known-failure check and an independent adversarial review.
 
@@ -51,11 +56,13 @@ A gate closes only after its fixture corpus passes both its known-failure check 
 
 ### Eutaxis-owned compilation fixture
 
+The fixture must prove that identical inputs produce identical artifacts. This proof precedes catalog work.
+
 - [ ] Build a self-contained fixture corpus owned by Eutaxis before reading external repositories.
 - [ ] Exercise a multi-component cumulative artifact, separate-directory artifacts, and a single-slot collision.
 - [ ] Prove dependency-before-dependant order, manifest tie-breaking, byte-identical rebuilds, and failure on cycles, duplicate membership, duplicate paths, unresolved conflicts, and multiple slot values.
 
-**Dependency:** the normative contract passes first.
+**Dependency:** the normative contract has passed.
 
 **Exit evidence:** the cumulative renderer passes a genuinely multi-component fixture and preserves independent native-scope artifacts.
 
