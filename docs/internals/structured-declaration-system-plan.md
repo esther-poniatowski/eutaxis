@@ -125,7 +125,7 @@ This phase first turns the validated registry into a static query boundary. Then
 - [ ] Implement the monotone candidate/excluded/required/effective algorithm and provenance-bearing explanation traces.
 - [ ] Move certified-unit issuance from the fixture composer to the resolver, reject rule-set containers as effective components, and add rule projections atomically.
 - [ ] Apply the anchor rules fixed by [the resolver contract](../adr/rule-relations-and-resolution.md) when the resolver introduces one record through multiple routes.
-- [ ] Test waived dependencies, explicit substitutes, combine results, policy order ties, owner authority, attempted reintroduction of exclusions, overlap among monotone event sets, and disjointness of effective and excluded results.
+- [ ] Test waived norms, explicit substitutes, combine results, policy order ties, owner authority, attempted reintroduction of exclusions, overlapping conflict batches, alias collisions, conservative prerequisite retention, and disjointness of effective and excluded results.
 
 **Exit evidence:** every effective declaration is dependency-complete, every omission is explained, and unresolved or unauthorized decisions fail.
 

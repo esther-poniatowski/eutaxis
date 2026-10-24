@@ -33,6 +33,7 @@ live under [`docs/open-questions/`](../open-questions/_index.md).
 - [YAML declaration schema](yaml-declaration-schema.md)
 - [Coherent rule-set packaging](coherent-rule-set-packaging.md)
 - [Rule relations and contextual resolution](rule-relations-and-resolution.md)
+- [Resolution evidence and failure contract](resolution-evidence-and-failures.md): fixes the evidence required to audit one resolver result
 - [Queryable declaration catalog](queryable-declaration-catalog.md)
 - [Enforcement-directed agent attention](enforcement-directed-agent-attention.md)
 - [Three rule axes and the procedure kind](three-rule-axes-and-procedure-kind.md)

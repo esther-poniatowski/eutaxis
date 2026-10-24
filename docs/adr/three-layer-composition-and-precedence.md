@@ -39,7 +39,15 @@ The composer ignores four classes of raw input:
 
 Those raw inputs are unavailable to the composer. The composer cannot contradict choices certified by the resolver.
 
-The resolver returns the certified unit and its explanation trace as one correlated result. A failed resolution may return its immutable trace through the error, but it never supplies a partial unit. The future composer validates the identifiers and one-to-one rule projections in a resolver-backed unit. It does not reevaluate applicability, exceptions, dependencies, or policies.
+The resolver returns the certified unit and its explanation trace as one correlated result. A failed resolution may return its immutable trace through the error, but it never supplies a partial unit. The future composer applies five structural checks to rule projections:
+
+- exactly one projection exists for each rule component
+- no projection exists for a procedure component
+- every norm and criterion identifier belongs to its rule
+- neither identifier tuple contains a duplicate
+- each tuple follows the authored order as a subsequence
+
+The composer does not reevaluate applicability, exceptions, dependencies, or policies.
 
 The current fixture-only `ResolvedCompilationUnit` predates the resolver. It contains the manifest, components, and dependencies, but no rule projections. The vertical resolver slice will replace this fixture issuance boundary atomically rather than expose a partial projected model.
 

@@ -54,9 +54,11 @@ Any two effective-content records may form a conflict pair, including records of
 
 `combine` cannot mean “keep both.” Its result is an already-authored declaration that owns the integrated contract. For a procedure result, that contract includes the complete action graph; the registry does not synthesize a graph. The source boundary requires the retained or replaced identifier to belong to the declared conflict. A substitute differs from the declaration that it replaces, and a combine result differs from both conflict members.
 
-Only declared incompatibilities enter conflict resolution. Each policy names the normalized unordered pair created by one incompatibility assertion. For each composition manifest, the registry considers only the policies referenced by that manifest. A duplicate `(conflict pair, order)` within this set is an error; a policy used by another manifest may reuse the same order. Among matching policies, the lowest non-negative integer `order` wins. The resolver does not infer semantic specificity between predicates.
+Only declared incompatibilities enter conflict resolution. Each policy names the normalized unordered pair created by one incompatibility assertion. For each composition manifest, the registry considers only the policies referenced by that manifest. A duplicate `(conflict pair, order)` within this set is an error; a policy used by another manifest may reuse the same order. The resolver combines the policy declaration predicate and its `when` predicate with strong Kleene `all`. A policy matches only when this result is true. Among matching policies, the lowest non-negative integer `order` wins. The resolver does not infer semantic specificity between predicates.
 
-Version 1 gives policy authority to the manifest owner. Every policy referenced by a manifest must have the same owner as that manifest. The manifest may still select content owned elsewhere. An authorized policy affects only that compilation unit and does not mutate a content owner's source.
+Version 1 gives policy authority to the manifest owner. Every policy referenced by a manifest must have the same owner as that manifest. The manifest may still select records owned elsewhere. An authorized policy affects only that compilation unit and does not mutate the source of another owner.
+
+The live declaration registry retains the exact immutable facet registry used to validate its sources. The public resolver accepts that declaration registry, a manifest identifier, and a context. It accepts no separate facet registry. Therefore, runtime predicates use the same facet definitions as source validation. Persisted catalog indexes cannot enter resolution because they contain neither complete declarations nor this bound facet registry.
 
 ## Registry diagnostics
 
@@ -68,18 +70,18 @@ Each failure belongs to the field that makes the cross-record contract invalid:
 - a contract family that changes owner belongs to the later `owner`
 - a contract family that changes declaration kind belongs to the later `kind`
 - a repeated exact contract version belongs to the later `version`
-- a non-content record with relations belongs to its first relation item
-- an unknown, wrong-kind, self-referential, or repeated relation belongs to the referring `target`
+- a record other than a rule or procedure with relations belongs to its first relation item
+- a relation whose target is unknown, is not effective content, refers to its source, or repeats belongs to the referring `target`
 - a dependency or `supersedes` cycle belongs to the target edge that closes the cycle under registry traversal
 - a reciprocal `incompatible-with` assertion belongs to the later relation target
 - an unknown policy conflict member belongs to the corresponding `conflicts` item
-- a policy conflict member that is not content belongs to the corresponding `conflicts` item
+- a policy conflict member that is not effective content belongs to the corresponding `conflicts` item
 - a policy without a declared incompatibility belongs to its `conflicts` field
 - an invalid `retain`, `with`, or `result` identifier belongs to that strategy field
 - a cross-kind `combine` belongs to `strategy.kind`
 - a repeated `(conflict pair, order)` belongs to the later policy reference in the manifest
 - a policy-owner mismatch belongs to the manifest's policy reference
-- a wrong manifest content or policy kind belongs to the referring manifest list item
+- a manifest selection that is not selectable, or a policy reference of the wrong kind, belongs to the referring manifest list item
 - a repeated direct selection belongs to its later manifest list item
 - an unknown exact family or a family of the wrong kind belongs to the reference `id`
 - a known exact family with an absent version belongs to the reference `version`
@@ -97,12 +99,13 @@ Each failure belongs to the field that makes the cross-record contract invalid:
 
 For a typed context, the resolver maintains three monotone event sets, `candidate`, `required`, and `excluded`, plus the derived set `effective`. These sets contain effective content only. Candidate and required identifiers may later also occur in excluded; exclusion wins. Only `effective` must remain disjoint from `excluded`.
 
-1. Evaluate the manifest predicate. Expand each selected rule set into its member rules. Evaluate the full inherited predicate of every directly selected or expanded rule and procedure, then add only true records to `candidate`. The rule-set predicate already appears in each member's inherited predicate, so the resolver does not evaluate the container as a separate gate.
-2. Project the effective norms and criteria of every candidate rule as specified below. Apply the same projection when a rule later enters `candidate` or `required`.
-3. Expand the combined `requires` and `refines` closure of non-excluded candidates. Evaluate each dependency target. Add a true, non-excluded target to `required`. If a true target is already excluded, leave the dependency unsatisfied until the final alias check; exclusion remains irreversible. A false target fails with `dependency-inapplicable`. An unknown target fails with `dependency-applicability-indeterminate`.
-4. Detect declared conflicts among `candidate ∪ required` minus `excluded`. For each conflict, choose the authorized matching policy with the lowest order. Apply its strategy, including its aliases, exclusions, and new candidates.
+1. Resolve the manifest and validate the complete context once through the facet registry bound to the declaration registry. Evaluate the manifest predicate. Expand each selected rule set into its member rules. Evaluate each discovered rule or procedure at most once, then add only true records to `candidate`. The rule-set predicate already appears in each member's inherited predicate, so the resolver does not evaluate the container as a separate gate.
+2. Expand the combined `requires` and `refines` closure of non-excluded candidates. Evaluate each dependency target at most once. Add a true, non-excluded target to `required`. If a true target is already excluded, leave the dependency unsatisfied until the final alias check; exclusion remains irreversible. A false target fails with `dependency-inapplicable`. An unknown target fails with `dependency-applicability-indeterminate`.
+3. Snapshot the active conflict pairs among `candidate ∪ required` minus `excluded`. Sort the canonical pairs lexically. For each pair, evaluate authorized policies by `(order, identifier)` and choose the first true policy. Compute every winning strategy against the snapshot. An unresolved pair, an indeterminate policy set, or an `error` strategy stops processing at that pair. No part of the round changes state.
+4. After every pair has a valid winning strategy, compute the union of batch exclusions. Then, validate strategy outcomes in canonical pair order. For each substitute or combine result, emit its discovery event and use its cached declaration trace or evaluate it once. False and unknown results fail immediately with the strategy-specific code. Next, validate the result against `excluded ∪ batch_exclusions`; a result in that union fails with `policy-result-excluded`. Finally, compare proposed aliases with both the retained alias map and earlier proposals in this batch. The same source may map repeatedly to the same target, and every cause is retained. A different target for the same source fails with `ambiguous-policy-alias`. Only a fully valid batch simultaneously applies its exclusions, aliases, and candidate additions. A retain decision applies only to its own pair. Results added to `candidate` participate in the next round.
 5. Repeat dependency expansion and conflict resolution until no set changes. Every iteration only adds identifiers to `candidate`, `required`, or `excluded`; it never removes from `excluded`. A later introduction cannot restore an excluded identifier. Finite declarations and acyclic dependencies therefore guarantee termination.
-6. Set `effective = (candidate ∪ required) − excluded`. Recheck every dependency of every effective declaration. A dependency is complete when its target is effective. A direct alias may instead point from an applicable target excluded by a policy to an effective target. Fail on any incomplete dependency or unresolved conflict.
+6. Set `effective = (candidate ∪ required) − excluded`. Recheck every dependency of every effective declaration. A dependency is complete when its target is effective. A direct alias may instead point from an applicable target excluded by a policy to an effective target. A true target without either route fails with `dependency-unsatisfied`. Also fail on any unresolved conflict.
+7. Project norms and criteria only for final-effective rules. Then, assign final components and dependency edges.
 
 The policy strategies update resolver state as follows:
 
@@ -112,6 +115,8 @@ The policy strategies update resolver state as follows:
 - `combine` excludes both members, adds `result` as a candidate, and creates one direct alias from each member to `result`
 
 An alias satisfies a dependency only when the original target was applicable and its immediate alias target is final-effective. Version 1 does not compose aliases transitively. The resolver never uses `supersedes` to satisfy a dependency.
+
+The `required` set remains conservative. A prerequisite discovered through a dependant remains retained when a later conflict excludes every dependant that discovered it. Its anchor comes from the earliest discovery cause, including an excluded dependant. This over-approximation preserves monotonicity and the termination proof. The certified unit does not describe every retained prerequisite as currently necessary. It emits a dependency edge only when both endpoints are effective, after rewriting an aliased prerequisite to its final-effective target.
 
 ## Norm and criterion projection
 
@@ -134,14 +139,14 @@ Only `true` activates an object. A policy matches only when both its declaration
 | Initial norm applicability | leave the norm inactive | leave the norm inactive and record indeterminacy |
 | Exception `when` | record a non-matching exception | record an indeterminate non-matching exception |
 | Required dependency target | fail with `dependency-inapplicable` | fail with `dependency-applicability-indeterminate` |
-| Policy declaration or `when` | treat the policy as non-matching | treat the policy as indeterminate and non-matching |
+| Conjoined policy predicate | treat the policy as non-matching | treat the policy as indeterminate and non-matching |
 | Policy substitute `with` record | fail with `policy-substitute-inapplicable` | fail with `policy-substitute-indeterminate` |
 | Policy combine `result` record | fail with `policy-combine-result-inapplicable` | fail with `policy-combine-result-indeterminate` |
 | Exception substitute norm | fail with `exception-substitute-inapplicable` | fail with `exception-substitute-indeterminate` |
 
 An eligible policy is referenced by the manifest, owned by the manifest owner, and names the active conflict pair. If no eligible policy matches, an unknown policy predicate makes the conflict fail with `conflict-policy-indeterminate`. Otherwise, the conflict fails with `unresolved-conflict`. Every predicate-dependent event and error carries its truth value and exact applicability trace. This requirement includes `conflict-policy-indeterminate`. Therefore, false and unknown never collapse into the same explanation.
 
-The future public operation is `resolve_compilation_unit(...) -> ResolutionResult`. Only the resolver may issue four immutable values:
+The future public operation is `resolve_compilation_unit(registry, manifest_id, context) -> ResolutionResult`. Only the resolver may issue four immutable values:
 
 - `ResolutionResult`
 - `ResolutionTrace`
@@ -152,8 +157,9 @@ Their constructors are not public. Success returns one correlated unit and trace
 
 A resolved compilation unit provides the complete input for the composer. The unit contains:
 
-- every retained semantic record needed by the renderer
-- every prerequisite edge retained after the resolver waives local norms and applies conflict policies
+- every retained semantic record
+- every prerequisite edge retained after the resolver applies conflict policies
+- the projected norms and criteria of every retained rule
 - one manifest section and rank anchor for each retained record
 
 When a manifest names a rule set, the resolver expands its retained member rules. Those members enter the unit instead of the rule-set container. Version 1 does not project package-level edges because a rule set cannot declare them.
@@ -161,7 +167,7 @@ When a manifest names a rule set, the resolver expands its retained member rules
 The resolver assigns anchors by four rules:
 
 - A record named directly by the manifest keeps its authored `(section, rank)` pair.
-- A prerequisite added by closure takes the earliest anchor among its retained dependants.
+- A prerequisite added by closure takes the earliest anchor among all dependants that discovered it, including dependants later excluded.
 - For a policy result, the resolver chooses the earliest anchor of every replaced or satisfied record.
 - A rule-set member takes its containing rule set's anchor unless the manifest names the member directly.
 
@@ -169,14 +175,7 @@ More than one rule may give candidate anchors to the same record. When the manif
 
 For example, a record named directly at rank 3 keeps rank 3 when a policy also introduces the record from rank 0. By contrast, a prerequisite inherited from dependants at ranks 0 and 2 takes rank 0. A direct anchor can conflict with the required order of `sections`. In that case, the resolver preserves the authored anchor, and the composer rejects the backward edge.
 
-Every resolution event contains four required values:
-
-- an ordinal
-- one value from a closed event-kind set
-- the declaration identifier
-- its exact source reference
-
-An event may also name a local norm or criterion. Other optional fields record ordered causes, an anchor, a dependency edge, a dependant, a policy, or an exception. Every predicate-dependent event contains its truth value and exact applicability trace. Other event kinds contain neither field. The event model validates the fields admitted for each event kind. Only applicability traces retain observed context values. Events follow deterministic resolver order.
+The [resolution evidence and failure contract](resolution-evidence-and-failures.md) defines the public models, event kinds, admitted field combinations, error codes, source references, and deterministic traversal. That contract is the sole authority for externally visible resolver evidence.
 
 The applicability evaluator returns a normalized predicate tree in which every node carries its computed truth value. While inheriting parent predicates, the loader may place both predicates below a new `all` node. Consequently, node paths address the normalized tree rather than the source text. The resolver attaches source coordinates to each record and explains every retention or removal. The composer accepts the certified unit and never infers absent edges or records from raw sources.
 
@@ -184,7 +183,7 @@ The applicability evaluator returns a normalized predicate tree in which every n
 
 Static validation covers reference existence, inherited applicability narrowing, overlapping exceptions, chained substitutions, directional cycles, symmetric incompatibilities, policy order ties, invalid substitutions and combine results, and owner authority. Registry tests use a closed fixture corpus whose references all resolve. The individually valid source-boundary fixtures do not form this corpus because their illustrative references are intentionally incomplete.
 
-Scenario fixtures exercise matching and non-matching rule-local exceptions, inapplicable replacement norms, conflicts introduced by dependency closure, policy-based substitutes, and attempted reintroduction of an excluded declaration.
+Scenario fixtures exercise matching and non-matching rule-local exceptions, inapplicable replacement norms, conflicts introduced by dependency closure, policy-based substitutes, overlapping conflict batches, alias collisions, conservative prerequisite retention, and attempted reintroduction of an excluded declaration.
 
 ## Consequences
 
