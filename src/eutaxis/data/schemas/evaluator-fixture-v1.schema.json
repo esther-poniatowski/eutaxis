@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eutaxis.dev/schemas/evaluator-fixture-v1.schema.json",
+  "title": "Eutaxis evaluator fixture version 1",
+  "type": "object",
+  "required": [
+    "schema-version",
+    "id",
+    "evaluator",
+    "input-revision",
+    "input",
+    "expected-state"
+  ],
+  "properties": {
+    "schema-version": {"const": 1},
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!.*\\s)[\\s\\S]+$"
+    },
+    "evaluator": {
+      "type": "object",
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*\\s)[\\s\\S]+$"
+        },
+        "version": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "input-revision": {"const": "declaration-v1"},
+    "input": {
+      "type": "object",
+      "required": ["sources", "facet-registry"],
+      "properties": {
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "facet-registry": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "expected-state": {"const": "violated"}
+  },
+  "additionalProperties": false
+}

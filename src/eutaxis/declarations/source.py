@@ -11,7 +11,11 @@ import yaml
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode, Node, SequenceNode
 
-from .exceptions import DeclarationSchemaError, FacetRegistrySchemaError
+from .exceptions import (
+    DeclarationSchemaError,
+    EvaluatorFixtureSchemaError,
+    FacetRegistrySchemaError,
+)
 
 PathPart: TypeAlias = str | int
 DocumentPath: TypeAlias = tuple[PathPart, ...]
@@ -27,7 +31,9 @@ class SourceLocation:
 
 SourceMap: TypeAlias = Mapping[DocumentPath, SourceLocation]
 SchemaErrorType: TypeAlias = (
-    type[DeclarationSchemaError] | type[FacetRegistrySchemaError]
+    type[DeclarationSchemaError]
+    | type[EvaluatorFixtureSchemaError]
+    | type[FacetRegistrySchemaError]
 )
 
 

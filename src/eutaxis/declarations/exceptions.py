@@ -75,6 +75,55 @@ class DeclarationRegistryError(DeclarationError):
         self.column = column
 
 
+class EvaluatorFixtureError(Exception):
+    """Base exception for evaluator-fixture source failures."""
+
+
+class EvaluatorFixtureSchemaError(EvaluatorFixtureError):
+    """Report a structural violation in an evaluator-fixture descriptor."""
+
+    def __init__(
+        self,
+        path: Path,
+        location: str,
+        message: str,
+        *,
+        line: int | None = None,
+        column: int | None = None,
+    ) -> None:
+        source = f" (line {line}, column {column})" if line and column else ""
+        super().__init__(
+            f"Invalid evaluator fixture in {path} at {location}{source}: {message}"
+        )
+        self.path = path
+        self.location = location
+        self.line = line
+        self.column = column
+
+
+class EvaluatorFixtureSemanticError(EvaluatorFixtureError):
+    """Report a resolved-resource or typed-input fixture violation."""
+
+    def __init__(
+        self,
+        path: Path,
+        location: str,
+        message: str,
+        *,
+        line: int | None = None,
+        column: int | None = None,
+    ) -> None:
+        source = f" (line {line}, column {column})" if line and column else ""
+        super().__init__(
+            f"Invalid evaluator fixture semantics in {path} at {location}{source}: "
+            f"{message}"
+        )
+        self.path = path
+        self.location = location
+        self.line = line
+        self.column = column
+
+
 class FacetRegistryError(Exception):
     """Base exception for context-facet registry failures."""
 
