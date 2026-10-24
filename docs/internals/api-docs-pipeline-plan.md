@@ -11,7 +11,7 @@ A plan to introduce `sphinx-markdown-builder` as the Eutaxis API documentation g
 
 ## Architectural shift from the existing scheme
 
-The sibling projects under `Documents/work/projects/` (morpha, hermeneia, meandra, tessara, khimera, architekta, keystone, glossa, ktisma, loretex, janux, stelion, vitruv, eikon) all share the same documentation pipeline today. The proposed Eutaxis pipeline is a deliberate departure. This distinction must be understood before reading the test plan, because every later decision follows from it.
+The sibling projects under `Documents/projects/` (morpha, hermeneia, meandra, tessara, khimera, architekta, keystone, glossa, ktisma, loretex, janux, stelion, vitruv, eikon) all share the same documentation pipeline today. The proposed Eutaxis pipeline is a deliberate departure. This distinction must be understood before reading the test plan, because every later decision follows from it.
 
 ### Existing scheme (all 14 sibling projects)
 

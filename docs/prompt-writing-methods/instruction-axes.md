@@ -66,7 +66,7 @@ A reasoning-target rule that obeys this discipline names the property the answer
 
 ## Worked example: encoding the gnomon question-hierarchy framework
 
-The [gnomon question-hierarchy framework](/Users/eresther/Documents/work/research/geonexus/vendor/gnomon/docs/references-methods/question-hierarchy-framework.md) is a methodology for decomposing a research question into sub-questions. Its surface form is procedural: five numbered steps, each with sub-operations, plus a revision protocol and a failure-mode catalogue. Encoded naively, it would become a trace-based instruction ("Step 1: do X. Step 2: do Y. ...") and could harm reasoning-model performance.
+The [gnomon question-hierarchy framework](../../../gnomon/docs/methods-reasoning/question-hierarchy-framework.md) is a methodology for decomposing a research question into sub-questions. Its surface form is procedural: five numbered steps, each with sub-operations, plus a revision protocol and a failure-mode catalogue. Encoded naively, it would become a trace-based instruction ("Step 1: do X. Step 2: do Y. ...") and could harm reasoning-model performance.
 
 The right encoding treats the framework as a *family of reasoning-target rules*. The methodology is preserved; the ordering is not prescribed.
 
