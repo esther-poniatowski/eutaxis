@@ -5,6 +5,7 @@ channels:
 dependencies:
   - python=3.12
   # Data manipulation and formats
+  - jsonschema            # declaration-schema validation
   - pyyaml                 # YAML file handling
   - types-pyyaml           # type stubs for PyYAML
   # Development tools

@@ -49,7 +49,7 @@ Each derivation must clearly indicate:
 | Model                                     | Context                                        | Characteristic                                                                               | Consequences for prompt design                                                                                                                              |
 | ----------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Standard instruction-following models** | Non-reasoning or low-latency execution models | No separate hidden reasoning-token budget is exposed. Visible intermediate reasoning can be prompted when useful. | Specify both _what_ the model should reason about and, when needed, _how_ it should externalize that reasoning. |
-| **Native reasoning models**               | OpenAI o-series, Claude with extended thinking | The model has a separate hidden or extended reasoning path; raw reasoning is not a normal prompt-controlled output artifact. | The design task shifts from _inducing_ reasoning structure to _directing_ reasoning targets: specify success criteria, verification conditions, decomposition targets, and output contracts. |
+| **Native reasoning models**               | OpenAI o-series, Claude with extended thinking | The model has a separate hidden or extended reasoning path; raw reasoning is not a normal prompt-controlled output artifact. | The design task shifts from _inducing_ reasoning structure to _directing_ reasoning targets; output structure is specified separately. |
 
 ## Explicit chain-of-thought scaffolding
 
@@ -71,6 +71,7 @@ For these configurations, prompt design should usually specify **reasoning targe
 - the subproblems the model must decompose
 - the assumptions, edge cases, and failure modes the model must check
 - the verification conditions the final answer must pass
-- the required output contract
+
+Required artifact components and their arrangement are output-structure rules. They may accompany reasoning-target rules, but they do not become reasoning targets merely because both govern one response.
 
 This guidance is not an absolute ban on stepwise structure. External steps remain appropriate when the task needs inspectable intermediate artifacts, reproducible process boundaries, tool choreography, compliance evidence, or a teaching-oriented derivation. In those cases, the steps should describe the required external work product, not attempt to micromanage the model's hidden reasoning process.

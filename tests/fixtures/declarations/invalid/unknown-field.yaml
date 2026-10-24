@@ -1,0 +1,24 @@
+schema-version: 1
+id: prose/broken
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: artifact.created
+  operator: equals
+  value: true
+relations: []
+axis: reasoning-target
+failure-mode: visible
+description: This field is deliberately forbidden
+norms:
+  - id: act
+    modality: must
+    subject: agent
+    action: {verb: act, object: correctly}
+criteria:
+  - id: checked
+    norms: [act]
+    evaluator: {id: eutaxis/manual-judgment, version: 1}
+    statement: The action is correct

@@ -1,0 +1,55 @@
+schema-version: 1
+id: prose/core
+kind: rule-set
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: artifact.created
+  operator: exists
+relations:
+  - type: requires
+    target: shared/evidence
+purpose: Tests a coherent rule set with inherited applicability
+rules:
+  - schema-version: 1
+    id: prose/exact-claims
+    kind: rule
+    owner: eutaxis
+    status: active
+    source-revision: fixture-1
+    applicability:
+      facet: claim.quantitative
+      operator: equals
+      value: true
+    relations: []
+    axis: reasoning-target
+    failure-mode: visible
+    norms:
+      - id: support-claim
+        modality: should
+        subject: agent
+        action:
+          verb: support
+          object: every quantitative claim
+        applies-when:
+          facet: claim.quantitative
+          operator: equals
+          value: true
+        guidance: |-
+          Cite the measurement beside the claim.
+
+          If the source is unavailable, state that limitation explicitly.
+    exceptions:
+      - id: source-unavailable
+        when:
+          facet: source.available
+          operator: equals
+          value: false
+        disposition: waive
+        affects: [support-claim]
+    criteria:
+      - id: claims-have-evidence
+        norms: [support-claim]
+        evaluator: {id: eutaxis/manual-judgment, version: 1}
+        statement: Every quantitative claim identifies its evidence

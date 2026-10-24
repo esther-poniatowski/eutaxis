@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue)](https://www.python.org/)
 [![License: GPL](https://img.shields.io/badge/License-GPL--3.0-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
 
-Assemble agent instruction files from modular Markdown sources.
+Assemble agent instruction files from modular sources.
 
 ---
 
@@ -24,13 +24,15 @@ Assemble agent instruction files from modular Markdown sources.
 
 Eutaxis assembles agent instruction files from one configuration. The same rules reach every supported agent and every project that references them, without manual duplication and without per-agent forks.
 
+The current implementation consumes Markdown modules. The target architecture instead stores canonical YAML records in a typed, queryable catalog. Adapters render Markdown for hosts that require it. The [work sequence for structured sources](docs/internals/structured-declaration-system-plan.md) introduces this target without changing the current command contract prematurely.
+
 ### Motivation
 
 Coding-assistant agents read their guidance from on-disk files specific to each platform. Maintaining the same rule sets across several agents and several projects creates duplication, drifts toward inconsistency, and forces every edit to be replayed by hand. Authoring instruction sets as monolithic per-agent files makes review, testing, and reuse harder still.
 
 ### Advantages
 
-- **Single source of truth.** Each rule is authored once as a Markdown module. The configuration declares where it appears; the tool propagates the change.
+- **Single source of truth.** Each rule is currently authored once as a Markdown module. The configuration declares where it appears; the tool propagates the change.
 - **Agent-neutral authoring.** Modules describe what the agent must do; the per-agent translation (file path, frontmatter, marker conventions) is handled by adapters.
 - **Two activation regimes.** Always-on rules compile into the cumulative instruction file each agent loads on every turn; on-demand rule sets compile into native Agent Skill artifacts loaded only when their description matches the active task.
 - **Drift detection.** Configuration, sources, and on-disk targets are kept in sync by explicit drift checks usable in CI.
@@ -58,6 +60,7 @@ Additional agents are added by registering one adapter in `src/eutaxis/commands/
 - [X] **Loading-budget validation** — measure each configured loading route independently.
 - [X] **Project scaffolding** — initialise a starter instruction layout in a project.
 - [X] **Prompt-writing methodology** — reference notes on agent instruction design under `docs/prompt-writing-methods/`.
+- [X] **Structured declaration validation** — validate all seven version-1 YAML declaration kinds and load immutable typed models.
 - [ ] **Prompt composition framework** — planned. Compose prompts from shells, local fragments, and parameterised bundles.
 - [ ] **Prompt validator** — planned. Enforce family-profile requirements.
 - [ ] **Golden-file output** — planned. Render composed prompts for diff-based review.
@@ -101,7 +104,7 @@ The full first-time walkthrough — installation, scaffolding, on-demand Skill c
 | [Configuration](docs/guide/configuration.md) | YAML schema and worked examples. |
 | [Project Scaffolding](docs/guide/project-scaffolding.md) | Starter templates. |
 | [Instruction Assembly API](docs/api/instructions.md) | Python API for embedding generation in another tool. |
-| [Proposal](PROPOSAL.md) | Architectural proposal for the broader composition framework. |
+| [Architecture decisions](docs/adr/_index.md) | Accepted framework decisions and their implementation consequences. |
 
 ### Ecosystem
 

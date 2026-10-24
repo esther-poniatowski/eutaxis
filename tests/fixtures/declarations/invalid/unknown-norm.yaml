@@ -1,0 +1,22 @@
+schema-version: 1
+id: prose/broken-reference
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: artifact.created
+  operator: exists
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: declared
+    modality: must
+    subject: agent
+    action: {verb: act, object: correctly}
+criteria:
+  - id: checked
+    norms: [missing]
+    evaluator: {id: eutaxis/manual-judgment, version: 1}
+    statement: The missing norm is checked

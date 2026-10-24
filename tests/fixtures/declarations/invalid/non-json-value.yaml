@@ -1,0 +1,17 @@
+schema-version: 1
+id: eutaxis/non-json-operation
+kind: operation
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+version: 1
+inputs:
+  type: object
+  default: !!set {unexpected: null}
+outputs: {type: object}
+preconditions: []
+effects: []
+failure-outcomes: [failed]
+recovery: Report the failure

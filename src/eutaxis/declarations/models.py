@@ -1,0 +1,282 @@
+"""Immutable domain models for schema-validated declarations."""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+from enum import StrEnum
+from types import MappingProxyType
+from typing import Mapping, TypeAlias
+
+JsonValue: TypeAlias = (
+    None
+    | bool
+    | int
+    | float
+    | str
+    | tuple["JsonValue", ...]
+    | Mapping[str, "JsonValue"]
+)
+
+
+def freeze_json(value: object) -> JsonValue:
+    """Return an immutable representation of JSON-compatible ``value``.
+
+    Raises
+    ------
+    TypeError
+        If ``value`` contains a non-JSON type or a non-finite number.
+    """
+    if isinstance(value, Mapping):
+        frozen: dict[str, JsonValue] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise TypeError("JSON object keys must be strings")
+            frozen[key] = freeze_json(item)
+        return MappingProxyType(frozen)
+    if isinstance(value, (list, tuple)):
+        return tuple(freeze_json(item) for item in value)
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, float) and math.isfinite(value):
+        return value
+    raise TypeError(f"Unsupported JSON value: {type(value).__name__}")
+
+
+class DeclarationKind(StrEnum):
+    """Kinds admitted by declaration schema version 1."""
+
+    RULE_SET = "rule-set"
+    RULE = "rule"
+    PROCEDURE = "procedure"
+    RESOLUTION_POLICY = "resolution-policy"
+    COMPOSITION_MANIFEST = "composition-manifest"
+    EVALUATOR = "evaluator"
+    OPERATION = "operation"
+
+
+class RuleAxis(StrEnum):
+    """Primary functions admitted for rules."""
+
+    REASONING_TARGET = "reasoning-target"
+    OUTPUT_STRUCTURE = "output-structure"
+    SURFACE_STYLE = "surface-style"
+
+
+@dataclass(frozen=True)
+class VersionedReference:
+    """An opaque identifier paired with its positive contract version."""
+
+    id: str
+    version: int
+
+
+@dataclass(frozen=True)
+class Relation:
+    """One typed relation to another declaration."""
+
+    type: str
+    target: str
+
+
+@dataclass(frozen=True)
+class Action:
+    """The operation prescribed or permitted by one norm."""
+
+    verb: str
+    object: str
+    timing: str | None
+
+
+@dataclass(frozen=True)
+class Norm:
+    """One modal constraint carrying its fully inherited applicability."""
+
+    id: str
+    modality: str
+    subject: str
+    action: Action
+    applicability: Mapping[str, JsonValue]
+    guidance: str | None
+    rationale: str | None
+    decision_criterion: str | None
+
+
+@dataclass(frozen=True)
+class Criterion:
+    """One evaluator-backed success criterion."""
+
+    id: str
+    norms: tuple[str, ...]
+    evaluator: VersionedReference
+    statement: str
+
+
+@dataclass(frozen=True)
+class ExceptionClause:
+    """A conditional waiver or substitution of local rule norms."""
+
+    id: str
+    when: Mapping[str, JsonValue]
+    disposition: str
+    affects: tuple[str, ...]
+    substitutes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Predicate:
+    """A typed, side-effect-free procedure predicate."""
+
+    id: str
+    predicate_class: str
+    expression: Mapping[str, JsonValue]
+    evaluator: VersionedReference | None
+
+
+@dataclass(frozen=True)
+class Effect:
+    """One declared state effect and its disposition."""
+
+    state: str
+    disposition: str
+
+
+@dataclass(frozen=True)
+class Declaration:
+    """Fields shared by every schema-validated declaration."""
+
+    schema_version: int
+    id: str
+    kind: DeclarationKind
+    owner: str
+    status: str
+    source_revision: str
+    applicability: Mapping[str, JsonValue]
+    relations: tuple[Relation, ...]
+    title: str | None
+    rationale: str | None
+    document: Mapping[str, JsonValue]
+
+
+@dataclass(frozen=True)
+class RuleDeclaration(Declaration):
+    """A rule with one axis, modal norms, and evaluator-backed criteria."""
+
+    axis: RuleAxis
+    failure_mode: str
+    required_visibility: str | None
+    norms: tuple[Norm, ...]
+    criteria: tuple[Criterion, ...]
+    exceptions: tuple[ExceptionClause, ...]
+
+
+@dataclass(frozen=True)
+class RuleSetDeclaration(Declaration):
+    """A coherent group of addressable rules."""
+
+    purpose: str
+    rules: tuple[RuleDeclaration, ...]
+
+
+@dataclass(frozen=True)
+class ProcedureNode:
+    """One registered operation and its total outcome transitions."""
+
+    id: str
+    operation: VersionedReference
+    bindings: Mapping[str, JsonValue]
+    on_success: str
+    on_failure: str
+
+
+@dataclass(frozen=True)
+class ProcedureDeclaration(Declaration):
+    """A finite externally observable action graph."""
+
+    purpose: str
+    parameters: Mapping[str, JsonValue]
+    preconditions: tuple[Predicate, ...]
+    actions: tuple[ProcedureNode, ...]
+    entry: str
+    invariants: tuple[Predicate, ...]
+    effects: tuple[Effect, ...]
+    postconditions: tuple[Predicate, ...]
+    failures: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ResolutionStrategy:
+    """The explicit action taken for one matched conflict."""
+
+    kind: str
+    retain: str | None
+    replace: str | None
+    replacement: str | None
+    result: str | None
+
+
+@dataclass(frozen=True)
+class ResolutionPolicyDeclaration(Declaration):
+    """A deterministic policy for one declared conflict."""
+
+    conflicts: tuple[str, str]
+    when: Mapping[str, JsonValue]
+    order: int
+    strategy: ResolutionStrategy
+
+
+@dataclass(frozen=True)
+class ManifestSection:
+    """One ordered manifest section and its declaration selection."""
+
+    id: str
+    declarations: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CompositionManifestDeclaration(Declaration):
+    """The ordered declaration selection for one native-scope artifact."""
+
+    scope: str
+    target: str
+    sections: tuple[ManifestSection, ...]
+    policies: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class EvaluatorDeclaration(Declaration):
+    """A versioned contract for criterion evidence."""
+
+    version: int
+    evaluator_kind: str
+    coverage: str
+    adjudication: str
+    timing: str
+    input_revisions: tuple[str, ...]
+    evidence_schema: Mapping[str, JsonValue]
+    failure_behavior: str
+    known_failure_fixtures: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class OperationDeclaration(Declaration):
+    """A versioned operation contract referenced by procedures."""
+
+    version: int
+    inputs: Mapping[str, JsonValue]
+    outputs: Mapping[str, JsonValue]
+    preconditions: tuple[Predicate, ...]
+    effects: tuple[Effect, ...]
+    failure_outcomes: tuple[str, ...]
+    recovery: str
+
+
+AnyDeclaration: TypeAlias = (
+    RuleSetDeclaration
+    | RuleDeclaration
+    | ProcedureDeclaration
+    | ResolutionPolicyDeclaration
+    | CompositionManifestDeclaration
+    | EvaluatorDeclaration
+    | OperationDeclaration
+)

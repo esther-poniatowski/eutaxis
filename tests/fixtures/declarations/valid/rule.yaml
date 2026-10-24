@@ -1,0 +1,25 @@
+schema-version: 1
+id: prose/reader-purpose
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: artifact.created
+  operator: equals
+  value: true
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: state-purpose
+    modality: must
+    subject: agent
+    action:
+      verb: state
+      object: the reader-facing purpose
+criteria:
+  - id: purpose-is-explicit
+    norms: [state-purpose]
+    evaluator: {id: eutaxis/manual-judgment, version: 1}
+    statement: The artifact states a reader-facing purpose

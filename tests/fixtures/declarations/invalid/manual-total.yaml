@@ -1,0 +1,19 @@
+schema-version: 1
+id: eutaxis/broken-manual
+kind: evaluator
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: context.available
+  operator: exists
+relations: []
+version: 1
+evaluator-kind: manual
+coverage: total
+adjudication: authoritative
+timing: post-artifact
+input-revisions: [declaration-v1]
+evidence-schema: {type: object}
+failure-behavior: block
+known-failure-fixtures: [broken]

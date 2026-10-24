@@ -1,0 +1,35 @@
+schema-version: 1
+id: eutaxis/write-reviewed-artifact
+kind: procedure
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: filesystem.writable
+  operator: equals
+  value: true
+relations: []
+purpose: Writes one artifact after its review
+parameters:
+  type: object
+preconditions: []
+actions:
+  - id: write
+    operation: {id: eutaxis/write-artifact, version: 1}
+    with:
+      path: request.path
+    on-success: artifact-written
+    on-failure: write-failed
+entry: write
+invariants: []
+effects:
+  - state: filesystem/artifact
+    disposition: allowed
+postconditions:
+  - id: artifact-written
+    class: postcondition
+    expression:
+      facet: artifact.written
+      operator: equals
+      value: true
+failures: [write-failed]

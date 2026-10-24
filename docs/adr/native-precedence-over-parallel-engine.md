@@ -27,7 +27,7 @@ Concretely:
 - A component declared at `project` scope is compiled to the project-local equivalent.
 - When the same component appears at both scopes, Eutaxis emits both artifacts; the platform decides which wins at load time.
 
-The decision applies to **cross-scope layering only**. It does not answer how multiple components within a single scope (multiple always-on components into one `CLAUDE.md`, multiple skills into one directory tree) compose; that is **intra-artifact composition**, an unrelated and still-open question.
+The decision applies to **cross-scope layering only**. Deterministic composition of multiple components within one artifact is governed separately by [three-layer composition and precedence](three-layer-composition-and-precedence.md).
 
 ## Discarded alternatives
 
@@ -44,6 +44,6 @@ This principle is the second leg of the build-time stance ([compiler-not-runtime
 ## Consequences
 
 - The same component declared at multiple scopes produces multiple artifacts on each target agent.
-- Intra-artifact composition (multiple components in one `CLAUDE.md`, ordering, conflict policy) is **not** answered by this ADR. It is tracked at [open-questions/intra-artifact-composition](../open-questions/intra-artifact-composition.md).
+- Intra-artifact composition is not answered by this ADR; [three-layer composition and precedence](three-layer-composition-and-precedence.md) owns that layer.
 - A future feature that needs Eutaxis to "select the winner" before emission requires revisiting this decision. The current architecture forecloses that path.
 - Drift detection (`eutaxis check`) compares Eutaxis-emitted artifacts against on-disk state per (scope, target). It does not attempt to reason about which scope is currently winning in the agent.

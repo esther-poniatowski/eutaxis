@@ -1,0 +1,24 @@
+schema-version: 1
+id: eutaxis/write-artifact
+kind: operation
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: filesystem.writable
+  operator: equals
+  value: true
+relations: []
+version: 1
+inputs:
+  type: object
+  required: [path, content]
+outputs:
+  type: object
+  required: [written-path]
+preconditions: []
+effects:
+  - state: filesystem/artifact
+    disposition: allowed
+failure-outcomes: [write-failed]
+recovery: Preserve the previous artifact and report the failed target

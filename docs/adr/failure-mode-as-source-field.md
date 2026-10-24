@@ -9,7 +9,7 @@ index: "[Architecture decisions](_index.md)"
 
 ## Status
 
-Proposed.
+Accepted.
 
 Closes [silent-failure-classification](../open-questions/silent-failure-classification.md).
 
@@ -63,7 +63,7 @@ The enforcement is unconditional. `eutaxis check` surfaces misplacements before 
 - **Three-level scale (`silent | mixed | visible`).** Rejected as not actionable: a `mixed` source is exactly the case where the classification is at the wrong granularity. Mixed sources split at the rule level once structured templates land; until then, the file-level classification is conservative-silent, which is the safe failure mode.
 - **Default to `silent` when omitted.** Rejected after weighing it against the alternative of requiring the field. A default would silently absorb unclassified sources into the conservative bucket — exactly the drift the open question called out. The compiler raising on a missing field forces a classification decision at authoring time.
 - **Advisory classification, no compiler refusal.** Rejected: the gate exists only in author discipline, which is the failure mode the silent-failure test was meant to close.
-- **Carry classification on rules, not sources.** Deferred. The rule-template migration ([rule-template-format-and-vocabulary](../open-questions/rule-template-format-and-vocabulary.md)) will add per-rule fields; until then, the file-level classification is conservative. The current sources are mostly mono-axis at the file level once the four-axis decomposition lands, so the file-level classification is close to the rule-level classification it will eventually replace.
+- **Carry classification on rules, not sources.** Deferred only for the legacy Markdown path. The [YAML declaration schema](yaml-declaration-schema.md) carries the classification per rule; until migration, the file-level classification remains conservative.
 - **Classification stored in a sidecar registry rather than frontmatter.** Rejected: a sidecar is a second source of truth; the frontmatter field travels with the source through copy, rename, and cross-repository sharing.
 
 ## Rationale
@@ -79,5 +79,5 @@ The required-visibility sub-field carries the distinction between rules that gat
 - The existing `clean-memory` command must declare its `failure-mode`. By the checklist it is `silent` (mutates filesystem state) with `required-visibility: pre-action` (explicit user invocation loads the skill before the action runs); its `invocation` is `[user]`. The migration commit adds these fields.
 - The author checklist is documented under `docs/guide/` so authors apply the same gate the compiler enforces. The checklist is reproduced verbatim, not paraphrased.
 - The Phase 1 always-on regime adapter, when it lands, consumes the same field to decide whether a rule belongs in the always-on body or can ship as a skill that admits model invocation.
-- The rule-template migration ([rule-template-format-and-vocabulary](../open-questions/rule-template-format-and-vocabulary.md)) will move the classification from the source-level frontmatter to per-rule fields. The file-level field stays as the source-level placement summary; the per-rule field is the fine-grained version.
+- The structured-source migration will move classification from source-level frontmatter to per-rule fields defined by the [YAML declaration schema](yaml-declaration-schema.md). The file-level field stays as the legacy source-level placement summary during migration.
 - The open question [silent-failure-classification](../open-questions/silent-failure-classification.md) is closed by this ADR.

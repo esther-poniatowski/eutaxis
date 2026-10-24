@@ -1,0 +1,20 @@
+schema-version: 1
+id: eutaxis/manual-judgment
+kind: evaluator
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: context.available
+  operator: exists
+relations: []
+version: 1
+evaluator-kind: manual
+coverage: none
+adjudication: manual
+timing: post-artifact
+input-revisions: [declaration-v1]
+evidence-schema:
+  type: object
+  required: [reviewer, criterion, observation, conclusion]
+failure-behavior: block

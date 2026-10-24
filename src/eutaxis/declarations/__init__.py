@@ -1,0 +1,67 @@
+"""Structured declaration loading and validation."""
+
+from .exceptions import (
+    DeclarationError,
+    DeclarationSchemaError,
+    DeclarationSemanticError,
+)
+from .applicability import TruthValue, conjoin_applicability, evaluate_applicability
+from .loader import load_declaration
+from .models import (
+    Action,
+    AnyDeclaration,
+    CompositionManifestDeclaration,
+    Criterion,
+    Declaration,
+    DeclarationKind,
+    Effect,
+    EvaluatorDeclaration,
+    ExceptionClause,
+    ManifestSection,
+    Norm,
+    OperationDeclaration,
+    Predicate,
+    ProcedureDeclaration,
+    ProcedureNode,
+    Relation,
+    ResolutionPolicyDeclaration,
+    ResolutionStrategy,
+    RuleDeclaration,
+    RuleSetDeclaration,
+    VersionedReference,
+)
+from .schema import declaration_schema, schema_path, validate_document
+
+__all__ = [
+    "Action",
+    "AnyDeclaration",
+    "CompositionManifestDeclaration",
+    "Criterion",
+    "Declaration",
+    "DeclarationError",
+    "DeclarationKind",
+    "DeclarationSchemaError",
+    "DeclarationSemanticError",
+    "Effect",
+    "EvaluatorDeclaration",
+    "ExceptionClause",
+    "ManifestSection",
+    "Norm",
+    "OperationDeclaration",
+    "Predicate",
+    "ProcedureDeclaration",
+    "ProcedureNode",
+    "Relation",
+    "ResolutionPolicyDeclaration",
+    "ResolutionStrategy",
+    "RuleDeclaration",
+    "RuleSetDeclaration",
+    "TruthValue",
+    "VersionedReference",
+    "conjoin_applicability",
+    "declaration_schema",
+    "evaluate_applicability",
+    "load_declaration",
+    "schema_path",
+    "validate_document",
+]

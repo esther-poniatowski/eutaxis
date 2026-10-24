@@ -8,7 +8,7 @@ index: ""
 
 # Eutaxis
 
-Eutaxis assembles agent instruction files from modular Markdown sources. A single YAML configuration drives two compilation surfaces — the cumulative instruction file each agent loads on every turn, and the on-demand Agent Skill artifacts loaded when a skill description matches the active task. The list of currently supported agents is recorded in the [Supported agents](../README.md#supported-agents) table.
+Eutaxis currently assembles agent instruction files from modular Markdown sources. A single YAML configuration drives two compilation surfaces — the cumulative instruction file each agent loads on every turn, and the on-demand Agent Skill artifacts loaded when a skill description matches the active task. The accepted target separates canonical YAML declarations, a typed catalog, and target projections; its [implementation plan](internals/structured-declaration-system-plan.md) preserves the current surfaces during migration. The list of currently supported agents is recorded in the [Supported agents](../README.md#supported-agents) table.
 
 ## Start here
 

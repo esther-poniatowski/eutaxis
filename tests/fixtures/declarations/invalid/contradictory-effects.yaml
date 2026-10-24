@@ -1,0 +1,17 @@
+schema-version: 1
+id: eutaxis/contradictory-effects
+kind: operation
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+version: 1
+inputs: {type: object}
+outputs: {type: object}
+preconditions: []
+effects:
+  - {state: artifact, disposition: allowed}
+  - {state: artifact, disposition: forbidden}
+failure-outcomes: [failed]
+recovery: Report the failure

@@ -24,4 +24,5 @@ Design-time reference documents for the eutaxis governance system. These files d
 | Document                                              | Scope                                                          |
 | ----------------------------------------------------- | -------------------------------------------------------------- |
 | [api-docs-pipeline-plan](api-docs-pipeline-plan.md)   | Staged plan to introduce `sphinx-markdown-builder` for the API |
+| [structured-declaration-system-plan](structured-declaration-system-plan.md) | Implements schema, catalog, resolution, enforcement and rendering |
 

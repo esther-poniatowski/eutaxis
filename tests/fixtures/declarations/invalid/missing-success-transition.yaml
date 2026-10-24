@@ -1,0 +1,23 @@
+schema-version: 1
+id: eutaxis/missing-success
+kind: procedure
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+purpose: Plants an incomplete outcome transition
+parameters: {type: object}
+preconditions: []
+actions:
+  - id: act
+    operation: {id: eutaxis/write-artifact, version: 1}
+    on-failure: failed
+entry: act
+invariants: []
+effects: []
+postconditions:
+  - id: complete
+    class: postcondition
+    expression: {facet: artifact.written, operator: exists}
+failures: [failed]

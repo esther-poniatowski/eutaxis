@@ -1,0 +1,12 @@
+schema-version: 1
+id: eutaxis/invalid-retain
+kind: resolution-policy
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: scope.project, operator: equals, value: true}
+relations: []
+conflicts: [shared/format, project/format]
+when: {facet: scope.project, operator: equals, value: true}
+order: 10
+strategy: {kind: retain, retain: unrelated/format}

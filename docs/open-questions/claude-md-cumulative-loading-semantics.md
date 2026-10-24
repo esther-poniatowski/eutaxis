@@ -38,14 +38,14 @@ The adapter must commit to a rendering strategy without confirmation from vendor
 
 - The Phase 1 always-on regime adapter on the Claude side.
 - The modular rule-set authoring layout proposed in the session (proposal 2 — structured rule templates), insofar as it relies on the platform to merge rendered output.
-- The intra-artifact composition layer ([intra-artifact-composition](intra-artifact-composition.md)) — if the platform merges files, intra-artifact composition is partly platform-delegated on Codex but cannot be delegated on Claude until this question resolves.
+- The deterministic composition layer ([three-layer composition and precedence](../adr/three-layer-composition-and-precedence.md)) — if the platform merges files, part of composition is platform-delegated on Codex but cannot be delegated on Claude until this question resolves.
 
 ## Candidate resolution
 
 The defensible default is the **concatenation strategy**:
 
 - The Claude adapter renders a single `CLAUDE.md` per scope (global, project) by concatenating all rule modules at compile time.
-- Section ordering inside the file is governed by [intra-artifact-composition](intra-artifact-composition.md); ordering does not depend on a platform-merge contract.
+- Section ordering inside the file is governed by [three-layer composition and precedence](../adr/three-layer-composition-and-precedence.md); ordering does not depend on a platform-merge contract.
 - Modular authoring is preserved at the source level; on-disk rendering is a single file per scope.
 
 Two reasons to keep this conservative:

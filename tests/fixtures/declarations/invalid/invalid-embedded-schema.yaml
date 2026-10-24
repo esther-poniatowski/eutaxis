@@ -1,0 +1,16 @@
+schema-version: 1
+id: eutaxis/invalid-evaluator-schema
+kind: evaluator
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+version: 1
+evaluator-kind: detector
+coverage: partial
+adjudication: candidate
+timing: post-artifact
+input-revisions: [declaration-v1]
+evidence-schema: {type: not-a-json-schema-type}
+failure-behavior: candidate

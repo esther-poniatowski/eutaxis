@@ -25,7 +25,7 @@ Empirically, no target agent exposes per-prompt activation: output styles are fi
 
 ## Decision
 
-Eutaxis is a **cross-agent configuration compiler**, not a runtime activation mechanism. A single authoritative source — Markdown fragments plus a declarative manifest — is compiled into the native customisation artifacts of each target agent. Compilation is deterministic and one-way; "synchronisation" denotes regeneration together with drift detection, not bidirectional reconciliation. Bidirectional merge is out of scope.
+Eutaxis is a **cross-agent configuration compiler**, not a runtime activation mechanism. A single authoritative source — currently Markdown fragments plus a declarative manifest, and ultimately the accepted YAML declarations — is compiled into the native customisation artifacts of each target agent. Compilation is deterministic and one-way; "synchronisation" denotes regeneration together with drift detection, not bidirectional reconciliation. Bidirectional merge is out of scope.
 
 The build-time stance has direct architectural consequences, codified in separate ADRs:
 

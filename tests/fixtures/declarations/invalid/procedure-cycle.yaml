@@ -1,0 +1,32 @@
+schema-version: 1
+id: eutaxis/cyclic-procedure
+kind: procedure
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: context.available
+  operator: exists
+relations: []
+purpose: Plants a cycle for the semantic gate
+parameters: {}
+preconditions: []
+actions:
+  - id: first
+    operation: {id: eutaxis/write-artifact, version: 1}
+    on-success: second
+    on-failure: failed
+  - id: second
+    operation: {id: eutaxis/write-artifact, version: 1}
+    on-success: first
+    on-failure: failed
+entry: first
+invariants: []
+effects: []
+postconditions:
+  - id: complete
+    class: postcondition
+    expression:
+      facet: artifact.written
+      operator: exists
+failures: [failed]

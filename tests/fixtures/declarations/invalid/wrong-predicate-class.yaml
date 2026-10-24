@@ -1,0 +1,24 @@
+schema-version: 1
+id: eutaxis/wrong-predicate-class
+kind: procedure
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+purpose: Plants a predicate in the wrong role
+parameters: {type: object}
+preconditions: []
+actions:
+  - id: act
+    operation: {id: eutaxis/write-artifact, version: 1}
+    on-success: complete
+    on-failure: failed
+entry: act
+invariants: []
+effects: []
+postconditions:
+  - id: complete
+    class: guard
+    expression: {facet: artifact.written, operator: exists}
+failures: [failed]

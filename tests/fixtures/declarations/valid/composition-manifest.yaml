@@ -1,0 +1,17 @@
+schema-version: 1
+id: eutaxis/example-manifest
+kind: composition-manifest
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: target.codex
+  operator: equals
+  value: true
+relations: []
+scope: project
+target: AGENTS.md
+sections:
+  - id: core
+    declarations: [prose/core]
+policies: [eutaxis/prefer-project-format]
