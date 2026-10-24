@@ -15,7 +15,15 @@ Prompts still originate in free-form Markdown. By contrast, the first schema now
 
 Independent adversarial reviews approved the complete normative contract on three results. First, the valid packaged corpus returns `satisfied`. Second, its unresolved-reference fixture returns a located `violated` diagnostic. Third, the packaged procedure satisfies three static facts. The procedure binds every operation input. The procedure routes every outcome. The procedure declares no effects.
 
-`eutaxis/load-declaration-registry` now runs through a code-owned callable. Before calling it, Eutaxis validates an immutable input. After it returns, Eutaxis validates either immutable outputs or a declared failure. The active fixture must now compose artifacts. The later catalog phase will evaluate applicability and resolve conflicts.
+`eutaxis/load-declaration-registry` now runs through a code-owned callable. Before calling it, Eutaxis validates an immutable input. After it returns, Eutaxis validates either immutable outputs or a declared failure.
+
+A self-contained cumulative fixture now plans a certified compilation unit deterministically. The fixture simulates three results from the future resolver:
+
+- a prerequisite added from the dependency closure
+- a policy substitute used in place of the authored prerequisite
+- a retained rule-set member not named directly in the manifest
+
+The planner orders each prerequisite before its dependant. Resolver-assigned anchors order unrelated records. The planner rejects malformed supplied graphs and anchors. Next, the fixture must render the plan and cover the other target mechanisms. The catalog phase will decide which context predicates match. The same phase will apply conflict policies and issue certified units for real builds.
 
 ## Decision log and open prerequisites
 
@@ -63,9 +71,17 @@ The fixture must prove that identical inputs produce identical artifacts. This p
   - freeze and validate inputs before each call
   - validate immutable outputs or a declared failure after each call
   - run `eutaxis/load-declaration-registry` and return its four declared fields
-- [ ] Build a self-contained fixture corpus owned by Eutaxis before reading external repositories.
+- [x] Build a self-contained fixture corpus owned by Eutaxis before reading external repositories.
 - [ ] Exercise a multi-component cumulative artifact, separate-directory artifacts, and a single-slot collision.
-- [ ] Prove dependency-before-dependant order, manifest tie-breaking, byte-identical rebuilds, and failure on cycles, duplicate membership, duplicate paths, unresolved conflicts, and multiple slot values.
+- [x] Put resolved prerequisites before dependants and retain resolver-assigned manifest order among unrelated records.
+- [x] Reject a certified unit that displaces a directly named record from its authored anchor.
+- [x] Accept certified fixture units that contain prerequisites, policy results, and retained rule-set members not named directly in the manifest.
+- [x] Reject malformed supplied units:
+  - cycles among resolved edges
+  - duplicate manifest membership
+  - invalid anchors or endpoints
+  - edges that reverse the declared order of `sections`
+- [ ] Prove byte-identical rebuilds and failure on duplicate paths and multiple slot values.
 
 **Dependency:** the normative contract has passed.
 
@@ -79,6 +95,7 @@ This phase turns the validated registry into resolved, queryable outputs.
 - [ ] Implement catalog interfaces and deterministic JSON indexing over the validated registry.
 - [ ] Keep the rendered-Markdown parser behind its current public behavior until migration proves its final disposition.
 - [ ] Implement the monotone candidate/excluded/required/effective algorithm and provenance-bearing explanation traces.
+- [ ] Apply the anchor rules fixed by [the resolver contract](../adr/rule-relations-and-resolution.md) when the resolver introduces one record through multiple routes.
 - [ ] Test waived dependencies, explicit substitutes, combine results, policy order ties, owner authority, attempted reintroduction of exclusions, overlap among monotone event sets, and disjointness of effective and excluded results.
 
 **Exit evidence:** every effective declaration is dependency-complete, every omission is explained, and unresolved or unauthorized decisions fail.

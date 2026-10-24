@@ -1,0 +1,12 @@
+schema-version: 1
+id: fixture/use-substitute
+kind: resolution-policy
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+conflicts: [fixture/blocker, fixture/z-base]
+when: {facet: context.available, operator: exists}
+order: 10
+strategy: {kind: substitute, replace: fixture/z-base, with: fixture/substitute}

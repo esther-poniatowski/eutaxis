@@ -175,6 +175,30 @@ class OperationExecutionError(Exception):
         self.detail = message
 
 
+class CompositionError(Exception):
+    """Report a deterministic composition-plan failure."""
+
+    def __init__(
+        self,
+        location: str,
+        message: str,
+        *,
+        path: Path | None = None,
+        line: int | None = None,
+        column: int | None = None,
+    ) -> None:
+        source_path = f" in {path}" if path is not None else ""
+        source = f" (line {line}, column {column})" if line and column else ""
+        super().__init__(
+            f"Invalid composition plan{source_path} at {location}{source}: {message}"
+        )
+        self.path = path
+        self.location = location
+        self.detail = message
+        self.line = line
+        self.column = column
+
+
 class FacetRegistryError(Exception):
     """Base exception for context-facet registry failures."""
 

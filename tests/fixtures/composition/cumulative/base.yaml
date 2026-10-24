@@ -1,0 +1,20 @@
+schema-version: 1
+id: fixture/z-base
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: base
+    modality: must
+    subject: agent
+    action: {verb: preserve, object: the base component}
+criteria:
+  - id: base-check
+    norms: [base]
+    evaluator: {id: fixture/manual, version: 1}
+    statement: The base component is preserved

@@ -23,7 +23,28 @@ A project composition manifest may choose project declarations and imported shar
 
 ## Deterministic composition inside one artifact
 
-After semantic resolution, the composer converts the selected declarations into one ordered intermediate artifact. The composition manifest provides an ordered `sections` list. Each section has a stable identifier and ordered declaration references. Dependencies must precede their dependants. The composer performs a stable topological sort whose tie-break is the order declared by the manifest, followed by stable declaration identifier. Cycles and references to the same declaration in two sections are errors.
+The semantic resolver alone issues a certified compilation unit. The unit supplies three inputs to the composer:
+
+- the retained records
+- the prerequisite edges retained by the resolver
+- the manifest anchor assigned to each record
+
+The composer ignores four classes of raw input:
+
+- edges between source records
+- context predicates
+- conflict policies
+- membership of rule sets
+
+Those raw inputs are unavailable to the composer. The composer cannot contradict choices certified by the resolver.
+
+The manifest declares its `sections` in order. Each `section` lists its records in order. A directly named record keeps its authored anchor. The resolver assigns an existing `(section, rank)` pair to every added record. Every prerequisite precedes its dependant. The renderer keeps the declared order of `sections`. An edge from a later `section` to an earlier one would violate that order.
+
+Within those constraints, the composer uses a stable topological sort. The assigned rank forms the first tie-break key. The stable record identifier forms the second key. The composer rejects three malformed inputs:
+
+- supplied edges that contain a cycle
+- anchors or edge endpoints that do not exist
+- manifests that name one record twice
 
 The target mechanism fixes collision behavior:
 
@@ -46,7 +67,11 @@ The first multi-component fixture must prove:
 - byte-identical ordering under repeated builds
 - dependency-before-dependant ordering
 - manifest-order tie-breaking for unrelated declarations
-- failure on a dependency cycle, duplicate section membership, duplicate output path, unresolved semantic conflict, and multiple values for one slot
+- accept retained prerequisites, policy results, and rule-set members not named directly in the manifest
+- failure when a supplied edge contains a cycle
+- failure when an anchor or edge endpoint is invalid
+- reject an edge that points from a later `section` to an earlier `section`
+- reject duplicate manifest membership, duplicate output paths, and multiple values for one slot
 - preservation of both artifacts when the same component exists at personal and project scopes
 
 The cumulative renderer cannot pass its implementation gate with a single-component fixture.

@@ -1,0 +1,20 @@
+schema-version: 1
+id: fixture/a-peer
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: peer
+    modality: must
+    subject: agent
+    action: {verb: preserve, object: the peer prerequisite}
+criteria:
+  - id: peer-check
+    norms: [peer]
+    evaluator: {id: fixture/manual, version: 1}
+    statement: The peer prerequisite is preserved

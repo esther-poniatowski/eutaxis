@@ -1,0 +1,22 @@
+schema-version: 1
+id: fixture/dependant
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations:
+  - {type: requires, target: fixture/a-peer}
+  - {type: requires, target: fixture/z-base}
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: dependant
+    modality: must
+    subject: agent
+    action: {verb: apply, object: the dependant component}
+criteria:
+  - id: dependant-check
+    norms: [dependant]
+    evaluator: {id: fixture/manual, version: 1}
+    statement: The dependant component is applied after its dependency

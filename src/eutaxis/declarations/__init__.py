@@ -3,6 +3,7 @@
 from .exceptions import (
     CheckerExecutionError,
     CheckerRunnerRegistryError,
+    CompositionError,
     DeclarationError,
     DeclarationRegistryError,
     DeclarationSchemaError,
@@ -16,6 +17,14 @@ from .exceptions import (
     FacetRegistrySemanticError,
     OperationExecutionError,
     OperationRunnerRegistryError,
+)
+from .composition import (
+    CumulativeCompositionPlan,
+    PlannedComponent,
+    ResolvedCompilationUnit,
+    ResolvedComponent,
+    ResolvedDependency,
+    plan_cumulative_composition,
 )
 from .execution import execute_checker, execute_known_failure_fixtures
 from .fixture_schema import (
@@ -112,7 +121,9 @@ __all__ = [
     "CheckerRunnerBinding",
     "CheckerRunnerRegistry",
     "CheckerRunnerRegistryError",
+    "CompositionError",
     "CompositionManifestDeclaration",
+    "CumulativeCompositionPlan",
     "ContextFacet",
     "ContractFamily",
     "Criterion",
@@ -154,6 +165,7 @@ __all__ = [
     "OperationRunnerRegistryError",
     "OperationSuccess",
     "ParameterBinding",
+    "PlannedComponent",
     "Predicate",
     "ProcedureDeclaration",
     "ProcedureNode",
@@ -161,6 +173,9 @@ __all__ = [
     "RegisteredDeclaration",
     "ResolutionPolicyDeclaration",
     "ResolutionStrategy",
+    "ResolvedCompilationUnit",
+    "ResolvedComponent",
+    "ResolvedDependency",
     "RuleDeclaration",
     "RuleSetDeclaration",
     "TruthValue",
@@ -186,6 +201,7 @@ __all__ = [
     "load_facet_validated_declaration",
     "load_declaration_registry_operation",
     "load_declaration_registry_operation_binding",
+    "plan_cumulative_composition",
     "schema_path",
     "validate_document",
 ]

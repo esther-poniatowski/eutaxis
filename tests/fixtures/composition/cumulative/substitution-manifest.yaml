@@ -1,0 +1,16 @@
+schema-version: 1
+id: fixture/substitution
+kind: composition-manifest
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: target.codex, operator: equals, value: true}
+relations: []
+scope: project
+target: SUBSTITUTION.md
+sections:
+  - id: core
+    declarations: [fixture/dependant, fixture/blocker, fixture/package]
+  - id: additional
+    declarations: [fixture/a-independent]
+policies: [fixture/use-substitute]

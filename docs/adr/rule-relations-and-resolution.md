@@ -98,7 +98,26 @@ For a typed context, the resolver maintains three monotone event sets, `candidat
 5. Repeat dependency expansion and conflict resolution until no set changes. Every iteration only adds identifiers to `candidate`, `required`, or `excluded`; it never removes from `excluded`. Finite declarations and acyclic dependencies therefore guarantee termination.
 6. Set `effective = (candidate ∪ required) − excluded`. Recheck that every dependency of every effective declaration is effective or satisfied by its declared substitute. Fail on any unresolved conflict or incomplete dependency.
 
-The resolver returns the effective set and a trace containing every applicability decision, waiver, substitution, dependency, policy match, exclusion, and inclusion. A caller can therefore ask why a declaration is present or absent without treating absence as completion evidence.
+The resolver returns two objects. First, a resolved compilation unit provides the complete input for the composer. The unit contains:
+
+- every retained semantic record needed by the renderer
+- every prerequisite edge retained after the resolver waives local norms and applies conflict policies
+- one manifest section and rank anchor for each retained record
+
+When a manifest names a rule set, the resolver expands its retained member rules. Those members enter the unit instead of the rule-set container. A target renderer may depart from this default only when its contract requires the container itself.
+
+The resolver assigns anchors by four rules:
+
+- A record named directly by the manifest keeps its authored `(section, rank)` pair.
+- A prerequisite added by closure takes the earliest anchor among its retained dependants.
+- For a policy result, the resolver chooses the earliest anchor of every replaced or satisfied record.
+- A rule-set member takes its containing rule set's anchor unless the manifest names the member directly.
+
+More than one rule may give candidate anchors to the same record. When the manifest names that record directly, the authored anchor wins. Otherwise, the candidate with the lowest manifest rank wins. The rank identifies one exact `(section, rank)` pair, so no separate section tie-break exists.
+
+For example, a record named directly at rank 3 keeps rank 3 when a policy also introduces the record from rank 0. By contrast, a prerequisite inherited from dependants at ranks 0 and 2 takes rank 0. A direct anchor can conflict with the required order of `sections`. In that case, the resolver preserves the authored anchor, and the composer rejects the backward edge.
+
+Second, the trace states why each predicate matched. The same trace states why each record remained or disappeared. Only the resolver can issue the certified unit. The composer accepts that unit and never infers absent edges or records from raw sources.
 
 ## Validation
 

@@ -1,0 +1,20 @@
+schema-version: 1
+id: fixture/a-independent
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+axis: output-structure
+failure-mode: visible
+norms:
+  - id: independent
+    modality: must
+    subject: agent
+    action: {verb: retain, object: the independent component}
+criteria:
+  - id: independent-check
+    norms: [independent]
+    evaluator: {id: fixture/manual, version: 1}
+    statement: The independent component is retained

@@ -1,0 +1,30 @@
+schema-version: 1
+id: fixture/package
+kind: rule-set
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+purpose: Groups one member used by the composition fixture
+rules:
+  - schema-version: 1
+    id: fixture/member
+    kind: rule
+    owner: eutaxis
+    status: active
+    source-revision: fixture-1
+    applicability: {facet: context.available, operator: exists}
+    relations: []
+    axis: surface-style
+    failure-mode: visible
+    norms:
+      - id: member
+        modality: must
+        subject: agent
+        action: {verb: include, object: the effective rule-set member}
+    criteria:
+      - id: member-check
+        norms: [member]
+        evaluator: {id: fixture/manual, version: 1}
+        statement: The effective member is included

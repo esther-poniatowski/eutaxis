@@ -1,0 +1,9 @@
+schema-version: 1
+id: fixture/context-facets
+owner: eutaxis
+source-revision: fixture-1
+facets:
+  - id: context.available
+    value-schema: {type: boolean}
+  - id: target.codex
+    value-schema: {type: boolean}

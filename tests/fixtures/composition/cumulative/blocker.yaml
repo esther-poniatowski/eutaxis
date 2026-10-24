@@ -1,0 +1,21 @@
+schema-version: 1
+id: fixture/blocker
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations:
+  - {type: incompatible-with, target: fixture/z-base}
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: blocker
+    modality: must
+    subject: agent
+    action: {verb: preserve, object: the conflicting selected rule}
+criteria:
+  - id: blocker-check
+    norms: [blocker]
+    evaluator: {id: fixture/manual, version: 1}
+    statement: The conflicting selected rule is preserved
