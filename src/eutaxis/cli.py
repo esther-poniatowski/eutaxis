@@ -145,6 +145,9 @@ def cli_check(
             entry[0].name: (entry[1], entry[2])
             for entry in generator.budget_report(agent_name=agent)
         }
+        chain_reports = list(
+            generator.instruction_chain_budget_report(agent_name=agent)
+        )
     except InstructionError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=exc.exit_code) from exc
@@ -166,6 +169,16 @@ def cli_check(
         stale = stale or differs
         if diff and differs:
             typer.echo(generator.unified_diff(agent_config.name))
+
+    for chain, size, limit in chain_reports:
+        over = size > limit
+        if over and not ignore_budget:
+            over_budget = True
+        flag = "OVER" if over else "ok"
+        typer.echo(
+            f"[CHAIN   ] {chain.name} [{size}/{limit} B {flag}]: "
+            f"{chain.agent} + {len(chain.sources)} project file(s)"
+        )
 
     if stale or over_budget:
         raise typer.Exit(code=1)

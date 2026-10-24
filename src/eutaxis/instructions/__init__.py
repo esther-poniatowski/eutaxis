@@ -4,6 +4,7 @@ from .config import ConfigLoader, load_config
 from .exceptions import (
     BudgetExceededError,
     ConfigurationError,
+    InstructionChainBudgetExceededError,
     InstructionError,
     RejectedLabelError,
     SourceNotFoundError,
@@ -12,10 +13,13 @@ from .generator import InstructionGenerator
 from .markdown import MarkdownAssembler, parse_frontmatter
 from .models import (
     AgentConfig,
+    InstructionChain,
     InstructionConfig,
     ReferenceDoc,
     Section,
     SourceFile,
+    SkillLoadingUnit,
+    SkillLoadingMember,
     TargetConfig,
     TaskModule,
 )
@@ -43,6 +47,8 @@ __all__ = [
     "ConfigLoader",
     "ConfigurationError",
     "InstructionConfig",
+    "InstructionChain",
+    "InstructionChainBudgetExceededError",
     "InstructionError",
     "InstructionGenerator",
     "MarkdownAssembler",
@@ -55,6 +61,8 @@ __all__ = [
     "ScanReport",
     "Section",
     "SourceFile",
+    "SkillLoadingUnit",
+    "SkillLoadingMember",
     "SourceNotFoundError",
     "TargetConfig",
     "TaskModule",

@@ -48,3 +48,18 @@ class BudgetExceededError(InstructionError):
         self.agent_name = agent_name
         self.size = size
         self.limit = limit
+
+
+class InstructionChainBudgetExceededError(InstructionError):
+    """Raised when a global-plus-project instruction chain exceeds its budget."""
+
+    exit_code = 2
+
+    def __init__(self, chain_name: str, size: int, limit: int) -> None:
+        super().__init__(
+            f"Instruction chain {chain_name!r} measures {size} bytes, "
+            f"over the {limit}-byte budget."
+        )
+        self.chain_name = chain_name
+        self.size = size
+        self.limit = limit

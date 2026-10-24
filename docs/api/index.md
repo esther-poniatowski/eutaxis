@@ -17,6 +17,7 @@
   * [Links](commands.md#module-eutaxis.commands.links)
   * [Templating](commands.md#module-eutaxis.commands.templating)
   * [Installer](commands.md#module-eutaxis.commands.installer)
+  * [Loading Budgets](commands.md#module-eutaxis.commands.skill_budgets)
   * [Data Models](commands.md#module-eutaxis.commands.models)
   * [Exceptions](commands.md#module-eutaxis.commands.exceptions)
   * [Agent Adapters](commands.md#agent-adapters)

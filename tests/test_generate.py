@@ -15,7 +15,7 @@ from eutaxis.generate import (
     SourceNotFoundError,
     load_config,
 )
-from eutaxis.instructions import RejectedLabelError
+from eutaxis.instructions import InstructionChainBudgetExceededError, RejectedLabelError
 
 
 def test_load_config_supports_existing_agent_instructions_shape(tmp_path: Path) -> None:
@@ -695,6 +695,86 @@ agents:
         enforce_budget=False
     )
     assert "Rules" in output["codex"]
+
+
+def _write_instruction_chain_config(tmp_path: Path, limit: int) -> Path:
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        f"""
+common_sources:
+  - rules.md
+instruction_chains:
+  - name: codex-project
+    agent: codex
+    sources:
+      - project/AGENTS.md
+    max_bytes: {limit}
+agents:
+  - name: codex
+    target: generated/AGENTS.md
+""".lstrip(),
+        encoding="utf-8",
+    )
+    return config
+
+
+def test_instruction_chain_budget_accepts_exact_limit_and_rejects_next_byte(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
+    (tmp_path / "project").mkdir()
+    (tmp_path / "project" / "AGENTS.md").write_text(
+        "# Project\n\nSpecialize.\n", encoding="utf-8"
+    )
+    config = _write_instruction_chain_config(tmp_path, 10000)
+    measured = list(
+        InstructionGenerator(load_config(config)).instruction_chain_budget_report()
+    )[0][1]
+    rendered_size = len(
+        InstructionGenerator(load_config(config))
+        .generate_all(enforce_budget=False)["codex"]
+        .encode("utf-8")
+    )
+    project_size = len((tmp_path / "project" / "AGENTS.md").read_bytes())
+    assert measured == rendered_size + 2 + project_size
+
+    config = _write_instruction_chain_config(tmp_path, measured)
+    exact = InstructionGenerator(load_config(config))
+    assert exact.generate_all()["codex"].startswith("# Rules")
+
+    config = _write_instruction_chain_config(tmp_path, measured - 1)
+    with pytest.raises(InstructionChainBudgetExceededError) as exc_info:
+        InstructionGenerator(load_config(config)).write_all()
+    assert exc_info.value.chain_name == "codex-project"
+    assert exc_info.value.size == measured
+    assert exc_info.value.limit == measured - 1
+    assert not (tmp_path / "generated" / "AGENTS.md").exists()
+
+
+def test_check_cli_reports_instruction_chain_budget(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
+    (tmp_path / "project").mkdir()
+    (tmp_path / "project" / "AGENTS.md").write_text(
+        "# Project\n\nSpecialize.\n", encoding="utf-8"
+    )
+    config = _write_instruction_chain_config(tmp_path, 10000)
+    InstructionGenerator(load_config(config)).write_all()
+
+    result = CliRunner().invoke(app, ["check", "-c", str(config)])
+
+    assert result.exit_code == 0, result.output
+    assert "[CHAIN   ] codex-project" in result.output
+    assert "codex + 1 project file(s)" in result.output
+
+
+def test_instruction_chain_budget_reports_missing_project_source(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
+    config = _write_instruction_chain_config(tmp_path, 10000)
+
+    with pytest.raises(SourceNotFoundError, match="project/AGENTS.md"):
+        InstructionGenerator(load_config(config)).generate_all()
 
 
 def test_non_positive_max_bytes_raises(tmp_path: Path) -> None:

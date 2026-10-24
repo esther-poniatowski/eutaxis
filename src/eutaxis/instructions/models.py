@@ -44,6 +44,35 @@ class TaskModule:
 
 
 @dataclass(frozen=True)
+class SkillLoadingMember:
+    """One Skill and the files selected from it for a loading unit."""
+
+    module: str
+    rules: tuple[str, ...] = ()
+    include_entrypoint: bool = True
+
+
+@dataclass(frozen=True)
+class SkillLoadingUnit:
+    """A finite, budgeted set of Skill files loaded for one task."""
+
+    name: str
+    max_bytes: int
+    members: tuple[SkillLoadingMember, ...] = ()
+    includes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class InstructionChain:
+    """A generated global output and its project-level instruction files."""
+
+    name: str
+    agent: str
+    sources: tuple[Path, ...]
+    max_bytes: int
+
+
+@dataclass(frozen=True)
 class ReferenceDoc:
     """An authoritative external reference doc with a local path and GitHub fallback."""
 
@@ -78,6 +107,9 @@ class InstructionConfig:
     task_modules_heading: str = "Task modules"
     task_modules_intro: str = ""
     task_modules_router_enabled: bool = True
+    skill_entrypoint_max_bytes: int | None = None
+    skill_loading_units: list[SkillLoadingUnit] = field(default_factory=list)
+    instruction_chains: list[InstructionChain] = field(default_factory=list)
     reference_docs: list[ReferenceDoc] = field(default_factory=list)
     reference_docs_heading: str = "Reference docs"
     reference_docs_intro: str = ""

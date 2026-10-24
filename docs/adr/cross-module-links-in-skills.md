@@ -13,7 +13,7 @@ Accepted.
 
 ## Context
 
-A source module links to its sibling modules and to other files by relative Markdown links, such as `[the audit protocol](audit-protocol.md)` or `[verification](../global/verification.md)`. These links resolve against the directory of the source. The compiler installs each task module as its own Skill directory. That directory holds only the files of one compiled Skill. In a split Skill, each rule file sits one directory below `SKILL.md`. Consequently, a relative link copied verbatim resolves to no file, whether the Skill is inline or split.
+A source module links to its sibling modules and to other files by relative Markdown links, such as `[the prose authoring workflow](prose-authoring-workflow.md)` or `[verification](../global/verification.md)`. These links resolve against the directory of the source. The compiler installs each task module as its own Skill directory. That directory holds only the files of one compiled Skill. In a split Skill, each rule file sits one directory below `SKILL.md`. Consequently, a relative link copied verbatim resolves to no file, whether the Skill is inline or split.
 
 The targets of these links fall into three kinds:
 
@@ -49,6 +49,6 @@ Every Skill of one adapter and one scope is installed under one parent directory
 
 ## Consequences
 
-- A link from a sibling module to an anchored rule of another Skill, such as `audit-protocol.md#^anchor`, points to the `SKILL.md` of that Skill. Therefore, the fragment resolves only when that Skill is inline: in a split Skill, the anchored line sits in a rule file.
+- A link from a sibling module to an anchored rule of another Skill, such as `prose-authoring-workflow.md#^anchor`, points to the `SKILL.md` of that Skill. Therefore, the fragment resolves only when that Skill is inline: in a split Skill, the anchored line sits in a rule file.
 - A deployed Skill holds absolute paths into the source tree. When a machine holds the source tree at another path, the render on that machine holds other targets, and `skills diff` reports them as drift.
 - An illustrative link written outside a code span is read as a link. The compiler reports its target as missing, and the report disappears once the example sits in a code span.

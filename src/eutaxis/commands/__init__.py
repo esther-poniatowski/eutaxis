@@ -35,6 +35,7 @@ from .adapters import (
     get_adapter,
     register_adapter,
 )
+from .skill_budgets import SkillBudgetMeasurement, measure_skill_budgets
 from .exceptions import (
     CommandError,
     CommandNotFoundError,
@@ -67,6 +68,7 @@ __all__ = [
     "Registry",
     "RegistryCorruptedError",
     "RenderedArtifact",
+    "SkillBudgetMeasurement",
     "TemplateError",
     "all_adapters",
     "check_failure_mode",
@@ -76,6 +78,7 @@ __all__ = [
     "is_eutaxis_owned",
     "load_from_instruction_config",
     "load_sources",
+    "measure_skill_budgets",
     "register_adapter",
     "render_command",
     "uninstall_command",

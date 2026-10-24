@@ -18,6 +18,9 @@ root: .                          # optional root for relative paths
 common_sources:                  # source entries shared across all agents
 task_modules:                    # source entries compiled to Skill artifacts
 task_modules_router_enabled:     # default true; set false to suppress the pointer section
+skill_entrypoint_max_bytes:      # optional byte limit checked by `skills budget`
+skill_loading_units:       # finite task-specific Skill reads and their limits
+instruction_chains:              # generated targets plus project instruction files
 strict_rule_labels:              # default false; set true to fail generate and check on a rejected label line
 agents:                          # cumulative-file targets
 ```
@@ -74,6 +77,49 @@ Each referenced file must declare the source-schema frontmatter required by the 
 
 The default cumulative file carries a pointer section that lists each `task_modules` entry. When the rule sets are also compiled to Skills via `eutaxis skills install`, the pointer section is redundant; suppress it by setting `task_modules_router_enabled: false` at the top level of the configuration.
 
+## Skill loading budgets
+
+The configuration key `skill_entrypoint_max_bytes` limits each rendered `SKILL.md`. A declared loading unit lists the exact entrypoints and rule files for one task:
+
+```yaml
+skill_entrypoint_max_bytes: 16384
+skill_loading_units:
+  - name: prose-batch
+    max_bytes: 40000
+    members:
+      - module: prose-authoring-workflow
+        rules:
+          - prose-section-tier
+          - prose-reading-pass
+      - module: prose-writing-style
+        include_entrypoint: false
+        rules:
+          - priority-core
+  - name: prose-route
+    max_bytes: 92160
+    includes:
+      - prose-batch
+```
+
+Each `module` must match a task-module `id`. The optional `rules` list selects files in `rules/` for that skill. The field `include_entrypoint` defaults to `true`. Set it to `false` only for a direct rule-file dependency that does not activate the Skill. The optional `includes` list composes other declared loading units. Eutaxis deduplicates files shared by several included units and rejects composition cycles.
+
+Use small loading units for tool-read batches and composite loading units for complete task routes. A batch limit prevents one tool response from truncating. A route limit constrains the full context activated by the task. The command `eutaxis skills budget -c <config> --agent <adapter>` reports every entrypoint, batch, and route. The command fails when bytes cross a declared limit or the rendered skill lacks a named rule.
+
+## Cumulative instruction chains
+
+The agent can append project instruction files to one generated target. An instruction chain measures their total bytes:
+
+```yaml
+instruction_chains:
+  - name: codex-largest-project
+    agent: global-codex
+    sources:
+      - /path/to/largest/project/AGENTS.md
+    max_bytes: 106496
+```
+
+The `agent` value names an entry in `agents`. Relative source paths resolve against `root`. The measured chain includes the generated target, every project source, and the two newline bytes inserted before each project source. Before writing a target, `eutaxis generate` checks every applicable chain. `eutaxis check` prints the generated-target budget and each cumulative-chain budget separately. Both commands fail if a project source is missing or a chain exceeds its limit.
+
 ## Agent definitions
 
 Each entry in `agents` has the following structure:
@@ -101,6 +147,7 @@ Each entry in `agents` has the following structure:
 | `enabled` | bool | no | `true` | Set to `false` to skip generation for this agent. |
 | `target` | mapping | yes | -- | Output file configuration. |
 | `sources` | list of source entries | no | `[]` | Agent-specific source files appended after common sources. |
+| `max_bytes` | positive integer | no | top-level `max_bytes` or unlimited | Maximum encoded size of this generated target; it does not include project instruction files. |
 
 ### Target fields
 

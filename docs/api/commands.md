@@ -422,7 +422,7 @@ Split a skill body into an index body and one file per rule.
 Rewrite the relative links of a compiled skill for its installed location.
 
 A source module links to sibling modules and files by relative Markdown links,
-such as `[the audit protocol](audit-protocol.md)`. Once compiled, each task
+such as `[the prose authoring workflow](prose-authoring-workflow.md)`. Once compiled, each task
 module is installed as its own skill directory, so a link relative to the
 source directory resolves nowhere. The renderer therefore rewrites the target
 of each relative link in every emitted Markdown file:
@@ -858,6 +858,75 @@ missing or empty directory is not an artifact and yields `False`.
   **target_dir** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
   [bool](https://docs.python.org/3/builtins/functions.html#bool)
+
+<a id="module-eutaxis.commands.skill_budgets"></a>
+
+<a id="loading-budgets"></a>
+
+## Loading Budgets
+
+Measure Skill entrypoints and declared loading units.
+
+<a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement"></a>
+
+### *class* eutaxis.commands.skill_budgets.SkillBudgetMeasurement(kind, name, adapter, byte_size, byte_budget, files)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+One measured Skill entrypoint or loading unit.
+
+* **Parameters:**
+  * **kind** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **byte_size** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **byte_budget** ([*int*](https://docs.python.org/3/builtins/functions.html#int) *|* *None*)
+  * **files** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+
+<a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.kind"></a>
+
+#### kind *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.name"></a>
+
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.adapter"></a>
+
+#### adapter *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.byte_size"></a>
+
+#### byte_size *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+
+<a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.byte_budget"></a>
+
+#### byte_budget *: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None)*
+
+<a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.files"></a>
+
+#### files *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+
+<a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.over_budget"></a>
+
+#### *property* over_budget *: [bool](https://docs.python.org/3/builtins/functions.html#bool)*
+
+Return whether the measured size exceeds its configured budget.
+
+<a id="eutaxis.commands.skill_budgets.measure_skill_budgets"></a>
+
+### eutaxis.commands.skill_budgets.measure_skill_budgets(config, sources, adapter, \*, project_root, home)
+
+Measure every rendered entrypoint and declared loading unit.
+
+* **Parameters:**
+  * **config** ([*InstructionConfig*](instructions.md#eutaxis.instructions.models.InstructionConfig))
+  * **sources** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*CommandSource*](#eutaxis.commands.models.CommandSource) *]*)
+  * **adapter** (*AgentAdapter*)
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillBudgetMeasurement*](#eutaxis.commands.skill_budgets.SkillBudgetMeasurement), …]
 
 <a id="module-eutaxis.commands.models"></a>
 

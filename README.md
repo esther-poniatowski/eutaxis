@@ -54,6 +54,7 @@ Additional agents are added by registering one adapter in `src/eutaxis/commands/
 - [X] **Rule query** — print one rule, or one field of it, without loading its module; optionally compile each rule of a Skill into its own file.
 - [X] **Drift detection** — compare configuration, sources, and on-disk targets; usable as a CI gate.
 - [X] **Registry hygiene** — surface instruction files present on disk but absent from the configuration, and vice versa.
+- [X] **Loading-budget validation** — measure each configured loading route independently.
 - [X] **Project scaffolding** — initialise a starter instruction layout in a project.
 - [X] **Prompt-writing methodology** — reference notes on agent instruction design under `docs/prompt-writing-methods/`.
 - [ ] **Prompt composition framework** — planned. Compose prompts from shells, local fragments, and parameterised bundles.

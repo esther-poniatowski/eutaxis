@@ -11,8 +11,11 @@ from .exceptions import ConfigurationError
 from .markdown import parse_frontmatter
 from .models import (
     AgentConfig,
+    InstructionChain,
     InstructionConfig,
     ReferenceDoc,
+    SkillLoadingMember,
+    SkillLoadingUnit,
     SourceFile,
     TargetConfig,
     TaskModule,
@@ -57,6 +60,16 @@ class ConfigLoader:
                 raw.get("task_modules_router_enabled", True),
                 "task_modules_router_enabled",
             ),
+            skill_entrypoint_max_bytes=self._as_optional_positive_int(
+                raw.get("skill_entrypoint_max_bytes"),
+                "skill_entrypoint_max_bytes",
+            ),
+            skill_loading_units=self._parse_skill_loading_units(
+                raw.get("skill_loading_units", [])
+            ),
+            instruction_chains=self._parse_instruction_chains(
+                raw.get("instruction_chains", [])
+            ),
             reference_docs=self._parse_reference_docs(
                 raw.get("reference_docs", [])
             ),
@@ -84,6 +97,8 @@ class ConfigLoader:
         )
 
         self._resolve_descriptions(config)
+        self._validate_skill_loading_units(config)
+        self._validate_instruction_chains(config)
         return config
 
     def _resolve_root(self, raw: dict[str, Any]) -> Path:
@@ -224,6 +239,196 @@ class ConfigLoader:
             description=str(description) if description is not None else None,
         )
 
+    def _parse_skill_loading_units(
+        self, raw_units: Any
+    ) -> list[SkillLoadingUnit]:
+        if raw_units is None:
+            return []
+        if not isinstance(raw_units, list):
+            raise ConfigurationError("skill_loading_units must be a list")
+
+        loading_units: list[SkillLoadingUnit] = []
+        seen: set[str] = set()
+        for raw in raw_units:
+            if not isinstance(raw, dict):
+                raise ConfigurationError(f"Invalid skill loading unit: {raw!r}")
+            for required in ("name", "max_bytes"):
+                if required not in raw:
+                    raise ConfigurationError(
+                        "skill_loading_units entries must specify "
+                        f"'{required}'"
+                    )
+            name = str(raw["name"])
+            if name in seen:
+                raise ConfigurationError(
+                    f"Duplicate skill loading unit name: {name}"
+                )
+            seen.add(name)
+            members = self._parse_skill_loading_members(
+                raw.get("members", []), name
+            )
+            includes = self._as_tuple(raw.get("includes", ()))
+            if not members and not includes:
+                raise ConfigurationError(
+                    f"Skill loading unit '{name}' must declare "
+                    "members or includes"
+                )
+            if len(set(includes)) != len(includes):
+                raise ConfigurationError(
+                    f"Skill loading unit '{name}' includes another unit "
+                    "more than once"
+                )
+            loading_units.append(
+                SkillLoadingUnit(
+                    name=name,
+                    max_bytes=self._as_positive_int(
+                        raw["max_bytes"],
+                        f"skill_loading_units[{name}].max_bytes",
+                    ),
+                    members=members,
+                    includes=includes,
+                )
+            )
+        return loading_units
+
+    def _parse_skill_loading_members(
+        self, raw_members: Any, unit_name: str
+    ) -> tuple[SkillLoadingMember, ...]:
+        if not isinstance(raw_members, list):
+            raise ConfigurationError(
+                f"Members of skill loading unit '{unit_name}' "
+                "must be a list"
+            )
+        members: list[SkillLoadingMember] = []
+        seen: set[str] = set()
+        for raw in raw_members:
+            if not isinstance(raw, dict) or "module" not in raw:
+                raise ConfigurationError(
+                    f"Members of skill loading unit '{unit_name}' "
+                    "must be mappings with a 'module' key"
+                )
+            module = str(raw["module"])
+            if module in seen:
+                raise ConfigurationError(
+                    f"Skill loading unit '{unit_name}' declares "
+                    f"module '{module}' more than once"
+                )
+            seen.add(module)
+            rules = self._as_tuple(raw.get("rules", ()))
+            if len(set(rules)) != len(rules):
+                raise ConfigurationError(
+                    f"Skill loading unit '{unit_name}' declares a "
+                    f"rule of module '{module}' more than once"
+                )
+            members.append(
+                SkillLoadingMember(
+                    module=module,
+                    rules=rules,
+                    include_entrypoint=self._as_bool(
+                        raw.get("include_entrypoint", True),
+                        f"skill_loading_units[{unit_name}]."
+                        f"members[{module}].include_entrypoint",
+                    ),
+                )
+            )
+        return tuple(members)
+
+    def _validate_skill_loading_units(self, config: InstructionConfig) -> None:
+        module_ids = {module.id for module in config.task_modules}
+        unit_names = {unit.name for unit in config.skill_loading_units}
+        for unit in config.skill_loading_units:
+            unknown = sorted(
+                member.module
+                for member in unit.members
+                if member.module not in module_ids
+            )
+            if unknown:
+                raise ConfigurationError(
+                    f"Skill loading unit '{unit.name}' references "
+                    f"unknown task modules: {', '.join(unknown)}"
+                )
+            unknown_includes = sorted(set(unit.includes) - unit_names)
+            if unknown_includes:
+                raise ConfigurationError(
+                    f"Skill loading unit '{unit.name}' includes unknown "
+                    f"units: {', '.join(unknown_includes)}"
+                )
+
+        units_by_name = {
+            unit.name: unit for unit in config.skill_loading_units
+        }
+        visited: set[str] = set()
+        active: list[str] = []
+
+        def visit(name: str) -> None:
+            if name in active:
+                cycle = " -> ".join([*active[active.index(name) :], name])
+                raise ConfigurationError(
+                    f"Skill loading units form a cycle: {cycle}"
+                )
+            if name in visited:
+                return
+            active.append(name)
+            for included in units_by_name[name].includes:
+                visit(included)
+            active.pop()
+            visited.add(name)
+
+        for name in units_by_name:
+            visit(name)
+
+    def _parse_instruction_chains(self, raw_chains: Any) -> list[InstructionChain]:
+        if raw_chains is None:
+            return []
+        if not isinstance(raw_chains, list):
+            raise ConfigurationError("instruction_chains must be a list")
+
+        chains: list[InstructionChain] = []
+        seen: set[str] = set()
+        for raw in raw_chains:
+            if not isinstance(raw, dict):
+                raise ConfigurationError(
+                    f"Invalid instruction chain specification: {raw!r}"
+                )
+            for required in ("name", "agent", "sources", "max_bytes"):
+                if required not in raw:
+                    raise ConfigurationError(
+                        "instruction_chains entries must specify "
+                        f"'{required}'"
+                    )
+            name = str(raw["name"])
+            if name in seen:
+                raise ConfigurationError(
+                    f"Duplicate instruction chain name: {name}"
+                )
+            seen.add(name)
+            raw_sources = raw["sources"]
+            if not isinstance(raw_sources, list) or not raw_sources:
+                raise ConfigurationError(
+                    f"Instruction chain '{name}' must declare sources"
+                )
+            chains.append(
+                InstructionChain(
+                    name=name,
+                    agent=str(raw["agent"]),
+                    sources=tuple(Path(str(path)) for path in raw_sources),
+                    max_bytes=self._as_positive_int(
+                        raw["max_bytes"],
+                        f"instruction_chains[{name}].max_bytes",
+                    ),
+                )
+            )
+        return chains
+
+    def _validate_instruction_chains(self, config: InstructionConfig) -> None:
+        agent_names = {agent.name for agent in config.agents}
+        for chain in config.instruction_chains:
+            if chain.agent not in agent_names:
+                raise ConfigurationError(
+                    f"Instruction chain '{chain.name}' references unknown "
+                    f"agent: {chain.agent}"
+                )
+
     def _parse_reference_docs(self, raw_docs: Any) -> list[ReferenceDoc]:
         if raw_docs is None:
             return []
@@ -331,6 +536,12 @@ class ConfigLoader:
         if value <= 0:
             raise ConfigurationError(f"Field '{field}' must be positive")
         return value
+
+    def _as_positive_int(self, value: Any, field: str) -> int:
+        parsed = self._as_optional_positive_int(value, field)
+        if parsed is None:
+            raise ConfigurationError(f"Field '{field}' must be a positive integer")
+        return parsed
 
     def _as_non_negative_int(self, value: Any, field: str) -> int:
         if not isinstance(value, int):
