@@ -97,7 +97,9 @@ def load_facet_registry(path: Path) -> FacetRegistry:
     FacetRegistrySemanticError
         If facet identifiers repeat or a value schema is invalid or non-local.
     """
-    document, locations = load_yaml_document(path, error_type=FacetRegistrySchemaError)
+    document, locations, _source_sha256 = load_yaml_document(
+        path, error_type=FacetRegistrySchemaError
+    )
     validated = validate_facet_registry_document(
         document, path=path, locations=locations
     )

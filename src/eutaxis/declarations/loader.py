@@ -72,6 +72,7 @@ class LoadedDeclarationSource:
     declaration: AnyDeclaration
     document: Mapping[str, JsonValue]
     locations: SourceMap
+    sha256: str
 
 
 def load_declaration(path: Path) -> AnyDeclaration:
@@ -90,7 +91,7 @@ def load_declaration_source(
     path: Path, *, facets: FacetRegistry | None = None
 ) -> LoadedDeclarationSource:
     """Load one declaration and retain its immutable document and source map."""
-    document, locations = load_yaml_document(path)
+    document, locations, source_sha256 = load_yaml_document(path)
     validated = validate_document(document, path=path, locations=locations)
     if facets is not None:
         validate_declaration_facets(
@@ -106,6 +107,7 @@ def load_declaration_source(
         declaration=declaration,
         document=declaration.document,
         locations=MappingProxyType(locations),
+        sha256=source_sha256,
     )
 
 

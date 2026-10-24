@@ -199,6 +199,10 @@ class CompositionError(Exception):
         self.column = column
 
 
+class DeclarationCatalogError(Exception):
+    """Report a static catalog construction or serialization failure."""
+
+
 class FacetRegistryError(Exception):
     """Base exception for context-facet registry failures."""
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -80,8 +81,8 @@ def load_yaml_document(
     path: Path,
     *,
     error_type: SchemaErrorType = DeclarationSchemaError,
-) -> tuple[object, dict[DocumentPath, SourceLocation]]:
-    """Load one YAML document and return its value and source map.
+) -> tuple[object, dict[DocumentPath, SourceLocation], str]:
+    """Load one YAML document and return its value, source map, and byte hash.
 
     Raises
     ------
@@ -89,9 +90,11 @@ def load_yaml_document(
         If the file cannot be read or the YAML source is invalid.
     """
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
+        source_bytes = path.read_bytes()
+        text = source_bytes.decode("utf-8", errors="strict")
+    except (OSError, UnicodeError) as exc:
         raise error_type(path, "$", str(exc)) from exc
+    source_sha256 = hashlib.sha256(source_bytes).hexdigest()
 
     loader = _CanonicalLoader(text)
     try:
@@ -120,7 +123,7 @@ def load_yaml_document(
         locations=locations,
         error_type=error_type,
     )
-    return document, locations
+    return document, locations, source_sha256
 
 
 def format_document_path(parts: DocumentPath) -> str:

@@ -108,7 +108,7 @@ def _load_evaluator_fixture(
     input_contracts: EvaluatorInputContracts,
 ) -> tuple[EvaluatorFixture, SourceMap]:
     """Load one descriptor and validate its resources and typed input."""
-    document, locations = load_yaml_document(
+    document, locations, _source_sha256 = load_yaml_document(
         path, error_type=EvaluatorFixtureSchemaError
     )
     validated = validate_evaluator_fixture_document(

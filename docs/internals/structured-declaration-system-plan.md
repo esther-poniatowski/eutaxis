@@ -27,7 +27,7 @@ The planner orders each prerequisite before its dependant. Resolver-assigned anc
 
 The assembler joins an exact set of fixture-projected Markdown blocks into canonical bytes. A second manifest uses the same target for personal and project scopes. The resulting artifacts remain distinct. Every manifest now declares its mechanism without deriving it from the target. The two unimplemented mechanisms are separate-directory and single-slot. The cumulative planner rejects manifests that declare either one.
 
-The catalog phase will decide which context predicates match. The same phase will apply conflict policies and issue certified units for real builds.
+The static catalog now preserves lookup fields and portable provenance without testing context predicates. The resolver phase will test each predicate. After those tests, the resolver will apply conflict policies and issue certified units for real builds.
 
 ## Decision log and open prerequisites
 
@@ -78,7 +78,7 @@ The fixture must prove that identical inputs produce identical artifacts. This p
 - [x] Build a self-contained fixture corpus owned by Eutaxis before reading external repositories.
 - [x] Exercise cumulative assembly with several components.
 - [x] Require each manifest to declare its mechanism, with no target-derived default.
-- [ ] Exercise separate-directory artifacts and a single-slot collision.
+- [ ] Exercise separate-directory artifacts and a single-slot collision after the required architecture contracts are settled.
 - [x] Put resolved prerequisites before dependants and retain resolver-assigned manifest order among unrelated records.
 - [x] Reject a certified unit that displaces a directly named record from its authored anchor.
 - [x] Accept certified fixture units that contain prerequisites, policy results, and retained rule-set members not named directly in the manifest.
@@ -90,7 +90,9 @@ The fixture must prove that identical inputs produce identical artifacts. This p
 - [x] Assemble an exact set of fixture-projected blocks without inventing section labels or changing their contents.
 - [x] Prove byte-identical cumulative output and reject missing, additional, or non-canonical blocks.
 - [x] Preserve distinct personal and project artifacts when both use the same target path.
-- [ ] Prove failure on duplicate paths and multiple slot values.
+- [ ] Verify that duplicate paths and multiple slot values fail after those target contracts are specified.
+
+Separate-directory output requires a contract from identifiers to paths. The same output requires rules for directory owners. Single-slot output requires the [session-preset contract](../open-questions/session-preset-regime.md) and the [subagent-routing contract](../open-questions/subagent-vs-role-routing.md). By contrast, catalog work is independent of both target mechanisms and may proceed.
 
 **Dependency:** the normative contract has passed.
 
@@ -98,10 +100,11 @@ The fixture must prove that identical inputs produce identical artifacts. This p
 
 ### Catalog, registries, and resolution
 
-This phase turns the validated registry into resolved, queryable outputs.
+This phase first turns the validated registry into a static query boundary. Then, the resolver will produce outputs for a supplied context.
 
 - [x] Consolidate the source boundary and cross-record registry in one `declarations` package.
-- [ ] Implement catalog interfaces and deterministic JSON indexing over the validated registry.
+- [x] Implement immutable exact lookups and deterministic JSON indexing over the validated registry.
+- [ ] Load persisted indexes and implement static field filters behind the catalog interface.
 - [ ] Keep the rendered-Markdown parser behind its current public behavior until migration proves its final disposition.
 - [ ] Implement the monotone candidate/excluded/required/effective algorithm and provenance-bearing explanation traces.
 - [ ] Apply the anchor rules fixed by [the resolver contract](../adr/rule-relations-and-resolution.md) when the resolver introduces one record through multiple routes.
