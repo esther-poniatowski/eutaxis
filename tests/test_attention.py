@@ -30,13 +30,19 @@ from eutaxis.declarations import (
     EvaluatorDeclaration,
     EvaluatorInput,
     MechanicalAttentionEntry,
+    OperationFailure,
     OperationObligationSnapshot,
     OperationPredicateEnforcement,
     OperationPredicateKey,
+    OperationRunner,
+    OperationRunnerBinding,
+    OperationRunnerRegistry,
     PredicatePhase,
     ProcedureObligationSnapshot,
     ProcedurePredicateEnforcement,
     ProcedurePredicateKey,
+    ProcedureRunPlan,
+    ProcedureRunPlanningError,
     RuleCriterionEnforcement,
     RuleCriterionKey,
     RuleObligationSnapshot,
@@ -45,16 +51,19 @@ from eutaxis.declarations import (
     build_checker_runner_registry,
     build_declaration_catalog,
     build_detector_runner_registry,
+    build_operation_runner_registry,
     derive_attention_requirements,
     execute_known_failure_fixtures,
     load_declaration_registry,
     load_evaluator_fixture_index,
     load_facet_registry,
     plan_attention,
+    prepare_procedure_run,
     resolve_compilation_unit,
 )
 from eutaxis.declarations.attention import _is_issued_attention_plan
 from eutaxis.declarations.models import JsonValue
+from eutaxis.declarations.procedure_runs import _is_issued_procedure_run_plan
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REGISTRY_FIXTURES = FIXTURES / "registry" / "valid"
@@ -311,6 +320,9 @@ def _prepare_registry(tmp_path: Path, mode: Mode):
         second_action = copy.deepcopy(first_action)
         second_action["id"] = "write-second"
         second_action["on-success"] = "checked-postcondition"
+        cast(
+            dict[str, object], cast(dict[str, object], second_action["with"])["content"]
+        )["literal"] = "Second content"
         actions[:] = [first_action, second_action]
         procedure["entry"] = "write-first"
         operation["preconditions"] = [
@@ -434,6 +446,220 @@ def _mixed_plan(tmp_path: Path):
         assurance=assurance,
     )
     return root, requirements, fixtures, assurance, plan
+
+
+def test_procedure_run_preflight_retains_authorities_inputs_and_requirements(
+    tmp_path: Path,
+) -> None:
+    _, requirements, _, _, attention = _mixed_plan(tmp_path)
+
+    def runner(input_data: Mapping[str, JsonValue], /) -> OperationFailure:
+        return OperationFailure(WRITE, "write-failed")
+
+    operation_registry = build_operation_runner_registry(
+        attention.resolution.registry,
+        [OperationRunnerBinding(WRITE, cast(OperationRunner, runner))],
+    )
+    source_parameters = {"path": "artifact.txt"}
+    first = prepare_procedure_run(
+        attention, "content/write", source_parameters, operation_registry
+    )
+    second = prepare_procedure_run(
+        attention, "content/write", {"path": "artifact.txt"}, operation_registry
+    )
+
+    assert first is not second
+    assert first != second
+    assert _is_issued_procedure_run_plan(first)
+    source_parameters["path"] = "changed.txt"
+    assert first.attention is attention
+    assert first.operation_registry is operation_registry
+    assert (
+        first.procedure
+        is attention.resolution.registry.records["content/write"].declaration
+    )
+    assert first.parameters == {"path": "artifact.txt"}
+    assert tuple(item.key for item in first.requirements) == tuple(
+        item.key
+        for item in requirements.completion
+        if isinstance(item.key, (ProcedurePredicateKey, OperationPredicateKey))
+        and (
+            getattr(item.key, "declaration", None) == "content/write"
+            or getattr(item.key, "procedure", None) == "content/write"
+        )
+    )
+    expected_requirements = tuple(
+        item
+        for item in requirements.completion
+        if isinstance(item.key, (ProcedurePredicateKey, OperationPredicateKey))
+        and (
+            getattr(item.key, "declaration", None) == "content/write"
+            or getattr(item.key, "procedure", None) == "content/write"
+        )
+    )
+    assert all(
+        actual is expected
+        for actual, expected in zip(first.requirements, expected_requirements)
+    )
+    assert any(
+        isinstance(item.key, ProcedurePredicateKey)
+        and item.key.phase is PredicatePhase.POSTCONDITION
+        and item.evaluator is not None
+        for item in first.requirements
+    )
+    assert all(item.evaluator is None for item in first.executable_requirements)
+    assert all(
+        not (
+            isinstance(item.key, ProcedurePredicateKey)
+            and item.key.phase is PredicatePhase.POSTCONDITION
+        )
+        for item in first.pre_action_requirements
+    )
+    assert all(
+        item.evaluator is not None
+        for item in first.evaluator_backed_pre_action_requirements
+    )
+    assert [item.node.id for item in first.actions] == ["write-first", "write-second"]
+    assert first.actions[0].contract is first.actions[1].contract
+    assert first.actions[0].input_data == {
+        "path": "artifact.txt",
+        "content": "Reviewed content",
+    }
+    assert first.actions[1].input_data == {
+        "path": "artifact.txt",
+        "content": "Second content",
+    }
+    with pytest.raises(TypeError, match="issued by preflight"):
+        ProcedureRunPlan()
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.copy(first)
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.deepcopy(first)
+    with pytest.raises(TypeError, match="cannot be serialized"):
+        pickle.dumps(first)
+    reconstructed = object.__new__(ProcedureRunPlan)
+    for field in (
+        "attention",
+        "operation_registry",
+        "procedure",
+        "parameters",
+        "requirements",
+        "executable_requirements",
+        "pre_action_requirements",
+        "evaluator_backed_pre_action_requirements",
+        "actions",
+    ):
+        object.__setattr__(reconstructed, field, getattr(first, field))
+    assert not _is_issued_procedure_run_plan(reconstructed)
+
+
+def test_procedure_run_preflight_retains_evaluatorless_postconditions(
+    tmp_path: Path,
+) -> None:
+    _, declarations, resolution, _, _ = _prepare_registry(tmp_path, "none")
+    requirements = derive_attention_requirements(resolution)
+    attention = plan_attention(requirements, {})
+    operation_registry = build_operation_runner_registry(
+        declarations,
+        [
+            OperationRunnerBinding(
+                WRITE,
+                cast(
+                    OperationRunner,
+                    lambda input_data: OperationFailure(WRITE, "write-failed"),
+                ),
+            )
+        ],
+    )
+
+    run = prepare_procedure_run(
+        attention, "content/write", {"path": "artifact.txt"}, operation_registry
+    )
+
+    assert run.requirements == run.executable_requirements
+    assert any(
+        isinstance(item.key, ProcedurePredicateKey)
+        and item.key.phase is PredicatePhase.POSTCONDITION
+        for item in run.executable_requirements
+    )
+
+
+def test_procedure_run_preflight_rejects_authority_and_input_defects(
+    tmp_path: Path,
+) -> None:
+    _, _, _, _, attention = _mixed_plan(tmp_path / "primary")
+    _, foreign_declarations, _, _, _ = _prepare_registry(tmp_path / "foreign", "none")
+    runner = cast(
+        OperationRunner,
+        lambda input_data: OperationFailure(WRITE, "write-failed"),
+    )
+    foreign_registry = build_operation_runner_registry(
+        foreign_declarations, [OperationRunnerBinding(WRITE, runner)]
+    )
+    valid_registry = build_operation_runner_registry(
+        attention.resolution.registry, [OperationRunnerBinding(WRITE, runner)]
+    )
+    empty_registry = build_operation_runner_registry(attention.resolution.registry, [])
+
+    forged_attention = object.__new__(AttentionPlan)
+    object.__setattr__(forged_attention, "_issuer", object())
+    with pytest.raises(ProcedureRunPlanningError) as bad_attention:
+        prepare_procedure_run(
+            forged_attention,
+            "content/write",
+            {"path": "artifact.txt"},
+            valid_registry,
+        )
+    assert bad_attention.value.location == "$.attention"
+
+    forged_registry = object.__new__(OperationRunnerRegistry)
+    object.__setattr__(forged_registry, "_issuer", object())
+    with pytest.raises(ProcedureRunPlanningError) as bad_registry:
+        prepare_procedure_run(
+            attention,
+            "content/write",
+            {"path": "artifact.txt"},
+            forged_registry,
+        )
+    assert bad_registry.value.location == "$.operation-registry"
+
+    with pytest.raises(ProcedureRunPlanningError) as cross_registry:
+        prepare_procedure_run(
+            attention,
+            "content/write",
+            {"path": "artifact.txt"},
+            foreign_registry,
+        )
+    assert cross_registry.value.location == "$.operation-registry"
+
+    with pytest.raises(ProcedureRunPlanningError) as missing_runner:
+        prepare_procedure_run(
+            attention, "content/write", {"path": "artifact.txt"}, empty_registry
+        )
+    assert missing_runner.value.location == "$.actions[0].operation"
+
+    for parameters in ({}, {"path": "artifact.txt", "extra": True}):
+        with pytest.raises(ProcedureRunPlanningError) as invalid_parameters:
+            prepare_procedure_run(
+                attention, "content/write", parameters, valid_registry
+            )
+        assert invalid_parameters.value.location.startswith("$.parameters")
+
+    cyclic: dict[str, object] = {}
+    cyclic["path"] = cyclic
+    with pytest.raises(ProcedureRunPlanningError) as cyclic_parameters:
+        prepare_procedure_run(attention, "content/write", cyclic, valid_registry)
+    assert cyclic_parameters.value.location == "$.parameters"
+
+    for identifier in ("registry/manual", "content/base"):
+        with pytest.raises(ProcedureRunPlanningError) as wrong_procedure:
+            prepare_procedure_run(
+                attention,
+                identifier,
+                {"path": "artifact.txt"},
+                valid_registry,
+            )
+        assert wrong_procedure.value.location == "$.procedure"
 
 
 def test_mixed_plan_preserves_complete_context_order_and_authority(

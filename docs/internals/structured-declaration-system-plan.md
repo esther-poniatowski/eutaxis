@@ -150,6 +150,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Retain one canonical completion-requirement sequence, including evaluator-less predicates, and derive all three attention classes from it.
 - [x] Require the canonical three-state conclusion fragment in every manual evaluator authored under declaration schema version 1 while preserving the persisted catalog as a lossy query index.
 - [x] Make operation-runner registries process-local authorities and reject unissued registries before any runner mapping is read.
+- [x] Issue immutable procedure-run preflight plans with validated parameters, exact per-action inputs, and canonical executable and pre-action requirement projections.
 - [ ] Issue correlated procedure and operation predicate evidence at defined execution phases.
 - [ ] Validate manual submissions and assisted detector-plus-residual submissions against exact retained contracts.
 - [ ] Execute mechanical requirements inside the ledger transaction with repeated assurance-freshness checks.

@@ -196,6 +196,15 @@ class AttentionPlanningError(Exception):
         self.detail = message
 
 
+class ProcedureRunPlanningError(Exception):
+    """Report a failed procedure-run preflight boundary."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid procedure run plan at {location}: {message}")
+        self.location = location
+        self.detail = message
+
+
 class OperationRunnerRegistryError(Exception):
     """Report an invalid code-owned operation runner binding."""
 

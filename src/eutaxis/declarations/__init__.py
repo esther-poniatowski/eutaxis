@@ -46,6 +46,7 @@ from .exceptions import (
     FacetRegistrySemanticError,
     OperationExecutionError,
     OperationRunnerRegistryError,
+    ProcedureRunPlanningError,
 )
 from .catalog import (
     CATALOG_INDEX_REVISION,
@@ -149,6 +150,11 @@ from .operations import (
     OperationSuccess,
     build_operation_runner_registry,
     execute_operation,
+)
+from .procedure_runs import (
+    PreparedProcedureAction,
+    ProcedureRunPlan,
+    prepare_procedure_run,
 )
 from .persisted_catalog import (
     PersistedCatalogEntry,
@@ -307,9 +313,12 @@ __all__ = [
     "PlannedComponent",
     "Predicate",
     "PredicatePhase",
+    "PreparedProcedureAction",
     "ProcedureObligationSnapshot",
     "ProcedureDeclaration",
     "ProcedureNode",
+    "ProcedureRunPlan",
+    "ProcedureRunPlanningError",
     "ProcedurePredicateEnforcement",
     "ProcedurePredicateKey",
     "Relation",
@@ -372,6 +381,7 @@ __all__ = [
     "load_declaration_registry_operation_binding",
     "plan_cumulative_composition",
     "plan_attention",
+    "prepare_procedure_run",
     "resolve_compilation_unit",
     "schema_path",
     "validate_document",

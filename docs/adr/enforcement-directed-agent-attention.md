@@ -301,6 +301,17 @@ results, but the runner does not claim to enforce procedure or operation precond
 Only the future procedure executor may consume a prepared procedure run and
 interpret an operation invocation as part of precondition-gated semantics.
 
+`prepare_procedure_run` establishes the preflight authority for that future
+executor. The builder accepts the issued attention plan, the effective procedure,
+the validated parameter object, and the builder-issued operation registry tied
+to the same declaration registry. The resulting process-local plan retains those
+exact authorities, every procedure-specific completion requirement in canonical
+order, and every authored action with its exact operation contract and frozen
+bound input. Executable and pre-action tuples are overlapping projections of the
+authoritative requirements; neither projection can remove a postcondition from
+the authoritative tuple. Preflight issues no observation, predicate verdict,
+clearance, operation result, transcript, or completion evidence.
+
 The ledger uses one atomic builder:
 `build_completion_ledger(plan, *, manual, assisted, executable, clock)`. The
 builder accepts only a privately issued plan and derives every record from its
