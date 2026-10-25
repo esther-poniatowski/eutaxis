@@ -243,6 +243,15 @@ class PreActionEvidenceError(Exception):
         self.detail = message
 
 
+class ProcedureExecutionError(Exception):
+    """Report an invalid high-level procedure execution request."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid procedure execution at {location}: {message}")
+        self.location = location
+        self.detail = message
+
+
 class OperationRunnerRegistryError(Exception):
     """Report an invalid code-owned operation runner binding."""
 

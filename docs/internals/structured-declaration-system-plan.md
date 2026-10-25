@@ -77,12 +77,17 @@ otherwise unreachable run graph. A separate per-session execution claim rejects
 concurrent and reentrant calls. One publication snapshot couples terminal state
 with issued evidence. The correlation plan retains every detached evaluator
 input produced during planning.
-The reviewed lifecycle contract next places the remaining evidence in one
-exact-once procedure-execution session. Action boundaries combine invariants and
-the selected operation preconditions before invocation; terminal boundaries
-combine invariants with only the reached postcondition. A terminal transcript
-separates graph disposition from adjudication, retains partial failure evidence,
-and distinguishes path-inapplicable obligations from abort-unchecked obligations.
+The evaluator-less `ProcedureExecutionSession` now owns the later lifecycle for
+runs without evaluator-backed invariants, postconditions, or operation
+preconditions. Its action boundaries combine invariants with the selected
+operation preconditions before invocation; its terminal boundaries combine
+invariants with only the reached postcondition. The exact-once weak run claim,
+detached factory-time authority, and privately issued transcript preserve the
+authorized operation path across hostile callbacks and interruptions. Each
+terminal transcript separates graph disposition from adjudication, retains
+partial failure evidence, and distinguishes path-inapplicable obligations from
+abort-unchecked obligations. Runs with evaluator-backed lifecycle requirements
+remain rejected before a claim until the next extension supplies their evidence.
 
 ## Decision log and open prerequisites
 
@@ -188,7 +193,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Retain each detached validated evaluator input in its assisted or mechanical precondition correlation record.
 - [x] Define and implement one single-use pre-action evidence transaction that requires the issued evaluator-less observation aggregate, validates exact manual-judgment keys, enters a non-reentrant running state before callbacks or evaluators, executes each detector before requesting and validating its residual judgment, executes each mechanical evaluator exactly once, retains all evidence for completion, and derives clearance from the combined results. Map runner and result failures to blocked evidence only after authority revalidation; make every other post-start failure terminal; and preserve distinct authorities for observing, evaluating, and authorizing.
 - [x] Define and adversarially review the exact-once procedure lifecycle contract, including action and terminal boundaries, shared snapshots, graph and adjudication dispositions, partial failure transcripts, repeated invariant aggregation, and path applicability.
-- [ ] Implement the evaluator-less `ProcedureExecutionSession` skeleton: consume exact cleared entry evidence; claim the run once; own boundary observation, authorization, operation invocation, graph transition, partial transcripts, and terminal publication; and fail closed when a lifecycle requirement is evaluator-backed.
+- [x] Implement the evaluator-less `ProcedureExecutionSession` skeleton: consume exact cleared entry evidence; claim the run once; own boundary observation, authorization, operation invocation, graph transition, partial transcripts, and terminal publication; and fail closed when a lifecycle requirement is evaluator-backed.
 - [ ] Extend the lifecycle session to request and validate manual and assisted detector-plus-residual evidence at exact realized invariant, postcondition, and operation-precondition boundaries.
 - [ ] Extend the lifecycle session with assurance-freshness checks for every realized mechanical occurrence, without rerunning retained entry evidence.
 - [ ] Issue the complete immutable ledger from the exact terminal lifecycle transcript and require admissible evidence for every effective obligation.

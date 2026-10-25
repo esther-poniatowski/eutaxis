@@ -301,6 +301,8 @@ def _prepare_registry(
     duplicate_preconditions: bool = False,
     local_precondition_operator: str = "exists",
     later_requirements: bool = False,
+    evaluator_backed_lifecycle: bool = False,
+    two_actions: bool = False,
 ):
     """Build one registry whose effective obligations match ``mode``."""
     root = tmp_path / "registry"
@@ -437,7 +439,11 @@ def _prepare_registry(
                 "value": True,
             }
         if later_requirements:
-            stable = _predicate("stable", "invariant", None)
+            stable = _predicate(
+                "stable",
+                "invariant",
+                DETECTOR if evaluator_backed_lifecycle else None,
+            )
             stable["observes"] = ["registry/stable"]
             procedure["invariants"] = [stable]
         else:
@@ -448,6 +454,18 @@ def _prepare_registry(
             if later_requirements
             else []
         )
+        if two_actions:
+            actions = cast(list[object], procedure["actions"])
+            first_action = cast(dict[str, object], actions[0])
+            first_action["id"] = "write-first"
+            first_action["on-success"] = "write-second"
+            first_action["on-failure"] = {"write-failed": "write-second"}
+            second_action = copy.deepcopy(first_action)
+            second_action["id"] = "write-second"
+            second_action["on-success"] = "written"
+            second_action["on-failure"] = {"write-failed": "write-failed"}
+            actions[:] = [first_action, second_action]
+            procedure["entry"] = "write-first"
     else:
         procedure["preconditions"] = []
         procedure["invariants"] = []
@@ -567,7 +585,12 @@ def _mixed_plan(tmp_path: Path):
     return root, requirements, fixtures, assurance, plan
 
 
-def _procedure_run(attention: AttentionPlan) -> ProcedureRunPlan:
+def _procedure_run(
+    attention: AttentionPlan,
+    operation_runner: OperationRunner = cast(
+        OperationRunner, lambda input_data: OperationFailure(WRITE, "write-failed")
+    ),
+) -> ProcedureRunPlan:
     """Prepare one content/write run under ``attention``."""
     operation_registry = build_operation_runner_registry(
         attention.resolution.registry,
@@ -576,7 +599,7 @@ def _procedure_run(attention: AttentionPlan) -> ProcedureRunPlan:
                 WRITE,
                 cast(
                     OperationRunner,
-                    lambda input_data: OperationFailure(WRITE, "write-failed"),
+                    operation_runner,
                 ),
             )
         ],
@@ -596,6 +619,11 @@ def _precondition_run(
     duplicate_preconditions: bool = False,
     local_precondition_operator: str = "exists",
     later_requirements: bool = False,
+    evaluator_backed_lifecycle: bool = False,
+    two_actions: bool = False,
+    operation_runner: OperationRunner = cast(
+        OperationRunner, lambda input_data: OperationFailure(WRITE, "write-failed")
+    ),
 ):
     """Build one prepared run with every evaluator enforcement class."""
     root, declarations, resolution, checker_registry, detector_registry = (
@@ -607,6 +635,8 @@ def _precondition_run(
             duplicate_preconditions=duplicate_preconditions,
             local_precondition_operator=local_precondition_operator,
             later_requirements=later_requirements,
+            evaluator_backed_lifecycle=evaluator_backed_lifecycle,
+            two_actions=two_actions,
         )
     )
     assert checker_registry is not None and detector_registry is not None
@@ -623,7 +653,7 @@ def _precondition_run(
         fixture_index=fixtures,
         assurance=assurance,
     )
-    return root, fixtures, assurance, _procedure_run(attention)
+    return root, fixtures, assurance, _procedure_run(attention, operation_runner)
 
 
 def _provider_inputs(
@@ -4304,6 +4334,12 @@ def _pre_action_authorities(
     observation_provider: ObservationProvider | None = None,
     duplicate_preconditions: bool = False,
     local_precondition_operator: str = "exists",
+    later_requirements: bool = False,
+    evaluator_backed_lifecycle: bool = False,
+    two_actions: bool = False,
+    operation_runner: OperationRunner = cast(
+        OperationRunner, lambda input_data: OperationFailure(WRITE, "write-failed")
+    ),
 ):
     """Build exact pre-action authorities and their external judgment inputs."""
     _, _, _, run = _precondition_run(
@@ -4312,8 +4348,16 @@ def _pre_action_authorities(
         detector_runner=detector_runner,
         duplicate_preconditions=duplicate_preconditions,
         local_precondition_operator=local_precondition_operator,
+        later_requirements=later_requirements,
+        evaluator_backed_lifecycle=evaluator_backed_lifecycle,
+        two_actions=two_actions,
+        operation_runner=operation_runner,
     )
-    supplied = _provider_inputs(run)
+    supplied = {
+        key: value
+        for key, value in _provider_inputs(run).items()
+        if key.phase is PredicatePhase.PRECONDITION
+    }
     evaluation_plan = plan_procedure_precondition_evaluations(
         run,
         {key: (lambda request, value=value: value) for key, value in supplied.items()},

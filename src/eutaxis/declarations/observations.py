@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import NoReturn, Protocol, SupportsIndex, cast
 
 from ._runner_support import exception_detail, validate_synchronous_runner
@@ -26,7 +27,7 @@ from .exceptions import (
     ProcedureObservationError,
 )
 from .facets import FacetRegistry
-from .models import JsonValue, freeze_json, json_values_equal
+from .models import JsonValue, VersionedReference, freeze_json, json_values_equal
 from .procedure_runs import ProcedureRunPlan, _is_issued_procedure_run_plan
 from .registry import DeclarationRegistry
 from .source import format_document_path
@@ -49,10 +50,38 @@ class ObservationRequest:
         raise TypeError("ObservationRequest instances must be issued by observation")
 
 
+class ProcedureBoundaryKind(StrEnum):
+    """Identify one emitted procedure-execution boundary."""
+
+    ACTION = "action"
+    TERMINAL = "terminal"
+
+
+@dataclass(frozen=True, init=False)
+class ProcedureLifecycleObservationRequest:
+    """Expose the minimum immutable input for one lifecycle snapshot."""
+
+    procedure: str
+    kind: ProcedureBoundaryKind
+    occurrence: int
+    action: str | None
+    operation: VersionedReference | None
+    terminal: str | None
+    facets: tuple[str, ...]
+    parameters: Mapping[str, JsonValue]
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        raise TypeError("lifecycle observation requests must be issued by execution")
+
+
 class ObservationProvider(Protocol):
     """A reviewed synchronous provider of one requested facet snapshot."""
 
-    def __call__(self, request: ObservationRequest, /) -> Mapping[str, object]:
+    def __call__(
+        self,
+        request: ObservationRequest | ProcedureLifecycleObservationRequest,
+        /,
+    ) -> Mapping[str, object]:
         """Return the present values for the requested boundary facets."""
 
 
