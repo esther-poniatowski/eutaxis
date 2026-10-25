@@ -269,7 +269,7 @@ Checker and detector execution share private input-freezing, operation-schema, a
 
 Resolution and completion use separate ledgers. Events such as `declaration-evaluated`, `declaration-excluded`, `norm-removed`, and `norm-substituted` explain selection, exclusion, and final norm projection. Resolution events never count as completion evidence.
 
-The completion ledger contains one record for every criterion of every effective rule, every predicate of every effective procedure, and every operation precondition expanded per effective procedure action. Evaluator-less predicates receive evidence from procedure or operation execution. Evaluator-backed obligations also record their enforcement class. Ledger states are `satisfied`, `violated`, `blocked`, and `unchecked`, with evaluator identity when present, evidence, and timestamp. `unchecked`, `violated`, or `blocked` prevents successful completion. The only terminal non-blocking exception is an explicit migration baseline that names the finding, owner, expiry condition, and migration it awaits; a baseline cannot be created silently by a run under evaluation.
+The completion ledger contains one record for every criterion of every effective rule, every predicate of every effective procedure, and every operation precondition expanded per effective procedure action. Evaluator-less predicates receive evidence from procedure or operation execution. Evaluator-backed obligations also record their enforcement class. Ledger completion states are `satisfied`, `violated`, `blocked`, `unchecked`, and `inapplicable`. This ledger enumeration is distinct from `EvaluationState`: an evaluator may return only `satisfied`, `violated`, or `blocked`. A ledger record becomes `inapplicable` only after a declared procedure terminal closes the realized path and excludes that requirement. `unchecked`, `violated`, or `blocked` prevents successful completion. The only other terminal non-blocking exception is an explicit migration baseline that names the finding, owner, expiry condition, and migration it awaits; a baseline cannot be created silently by a run under evaluation.
 
 ### Completion ledger boundary
 
@@ -319,11 +319,9 @@ value maps to a completion state or authorizes procedure entry at this boundary.
 
 The evaluator-backed procedure-precondition input boundary is now correlated,
 and the pre-action evidence session evaluates those preconditions before it
-derives clearance. The remaining execution contract must define where
-invariants and postconditions are observed. It must separately locate each
-operation precondition before runner invocation. Those later boundaries may
-extend the coordinate and retained action data. However, each boundary must
-preserve five separate authorities:
+derives clearance. The lifecycle contract below fixes the later invariant,
+postcondition, and per-action operation-precondition boundaries. Each boundary
+preserves five separate authorities:
 
 - an observer acquires context
 - an evaluator decides a predicate
@@ -334,7 +332,7 @@ preserve five separate authorities:
 `execute_operation` remains a low-level exact-contract runner. The runner accepts only a
 builder-issued, process-local operation registry and validates inputs and
 results, but the runner does not claim to enforce procedure or operation preconditions.
-Only the future procedure executor may consume a prepared procedure run and
+Only the procedure executor defined below may consume a prepared procedure run and
 interpret an operation invocation as part of precondition-gated semantics.
 
 `prepare_procedure_run` establishes the preflight authority for that future
@@ -412,8 +410,8 @@ The completed aggregate contains one typed record for every item in
 `run.procedure_precondition_requirements`, in that exact canonical order
 regardless of submission-mapping order. Evaluator-less records retain the exact
 requirement, mapped state, and predicate trace. Manual records retain the exact
-requirement, state derived from `conclusion`, and frozen evidence. Successful assisted
-records retain the exact requirement, residual state, issued
+requirement, state derived from `conclusion`, and frozen evidence. Successful
+assisted records retain the exact requirement, residual state, issued
 `DetectorExecution`, and frozen residual judgment. A detector runner or result
 failure instead retains the exact requirement, `blocked` state, and diagnostic,
 with no residual judgment. Successful mechanical records retain the exact
@@ -447,17 +445,119 @@ these records and never executes a retained precondition evaluator again.
 State and evidence publish as one immutable control snapshot, so an interrupted
 completion cannot expose evidence from a failed session.
 
+### Procedure lifecycle execution boundary
+
+`ProcedureExecutionSession` is the only high-level authority that assigns
+procedure semantics to operation results. Its factory accepts exact issued
+`PreActionEvidence` whose `cleared` value is true and the exact observation
+provider registry of the run. The factory atomically installs one module-owned
+weak claim on the retained `ProcedureRunPlan`. The claim stores an opaque token,
+not the session, and survives session collection and every terminal result while
+the run remains reachable. A second session for that run fails before any
+callback. A separate per-session claim rejects concurrent or reentrant execution.
+
+The lifecycle state is `ready`, `running`, or `terminal`. Callback-free authority
+and provider-map validation may fail while the session remains `ready`. The
+session snapshots each custom provider mapping exactly once while it owns the
+execution claim, because mapping traversal can execute Python code. It validates
+exact provider keys over the canonical evaluator-backed lifecycle universe:
+procedure invariants, procedure postconditions, and operation preconditions
+expanded per action. This universe excludes procedure-entry evidence and rule
+criteria. The session enters `running` before the first observation, manual,
+residual, detector, checker, or operation callback. Every exit after that
+transition is terminal and non-retryable, and no callback runs after an abort.
+Locks protect only claims and publication; no lock is held across a callback.
+
+Each emitted boundary has a monotonically increasing `occurrence`, starting at
+zero. The occurrence is the actual execution-boundary ordinal, not the authored
+action index or predicate occurrence. An `action` boundary names the exact
+prepared action and operation. One coherent provider snapshot evaluates every
+evaluator-less procedure invariant and every evaluator-less precondition of that
+operation occurrence. The first action boundary is also the initial invariant
+check. Every enforcement class at the boundary must be `satisfied` before the
+operation runner is invoked. A `violated` or `blocked` record aborts authorization,
+publishes the complete boundary evidence, and invokes no operation.
+
+After a declared operation result, the session selects the authored transition
+without an external callback. A transition to another action emits the next
+action boundary. That boundary is simultaneously the post-previous and pre-next
+invariant checkpoint. A transition to a terminal emits a `terminal` boundary.
+That boundary observes every invariant and, for a success terminal, only the
+reached postcondition. A failure terminal selects no postcondition. The issued
+terminal evidence retains the predecessor action, exact operation, validated
+operation result and declared outcome, selected transition, and terminal
+identifier. Therefore, convergent paths remain distinguishable even when they
+reach the same terminal.
+
+The provider-facing lifecycle request exposes only the procedure identifier,
+boundary kind and ordinal, immutable parameters, requested facets, and the
+minimum boundary coordinate. An action request includes the action identifier
+and exact operation reference. A terminal request includes the terminal
+identifier. The privately issued boundary evidence retains the fuller authority
+correlation described above. Concrete manual and residual judgments are not
+supplied before execution. Their exact providers are selected from the validated
+maps only after a boundary is realized. Each request carries the exact boundary
+coordinate and requirement, and each returned judgment must match both. The
+same invariant provider may therefore be invoked once at each realized
+occurrence. Mechanical assurance freshness is rechecked at each mechanical
+occurrence; retained procedure-entry evidence is never rerun.
+
+Every terminal publication atomically couples the lifecycle state with an
+immutable transcript. The transcript retains the completed boundary and action
+prefix, the exact current coordinate, all retained authorities, and a failure
+record when execution did not complete normally. That record identifies the
+active stage, including observation, manual judgment, detector, residual
+judgment, checker, authorization, operation runner or result, authority, and
+interruption. It also retains a diagnostic when one can be produced safely. A
+`BaseException` is re-raised only after this terminal snapshot is published.
+
+Two orthogonal fields state the result. `graph_disposition` is
+`success-terminal`, `failure-terminal`, or `no-terminal`.
+`adjudication_disposition` is `accepted`, `terminal-evidence-rejected`,
+`authorization-aborted`, `evidence-aborted`, `execution-aborted`, or
+`authority-aborted`. Neither field overrides the other. For example, a reached
+failure terminal may pair with rejected invariant evidence, and a reached
+success terminal may pair with an interrupted terminal observation. Procedure
+success is exactly `success-terminal` plus `accepted`.
+
+Path applicability is assigned only after a declared success or failure terminal
+is reached. At that point, requirements of unvisited actions and unselected
+postconditions become `inapplicable`. If the session aborts before a graph
+terminal, every not-yet-reached requirement remains `unchecked`. An authorization
+abort has `no-terminal` and `authorization-aborted`; it publishes the completed
+boundary records and leaves the runner uncalled. A runner or result exception has
+`no-terminal` and `execution-aborted`. A declared `OperationFailure` instead
+follows its authored transition and may reach either another action or a failure
+terminal.
+
+Every invariant occurrence remains in the transcript. The invariant's canonical
+ledger record aggregates those occurrences as `violated` when any occurrence is
+violated, otherwise `blocked` when any occurrence is blocked or an expected
+record is missing from an already emitted boundary that selected the invariant,
+and otherwise `satisfied`. A boundary never emitted after an abort creates no
+expected occurrence; its later requirements remain `unchecked`. A reached
+operation precondition and the selected postcondition use their retained
+occurrence state.
+The terminal graph and adjudication dispositions remain separate ledger
+authorities: obligation records alone cannot convert a declared failure or an
+aborted run into successful completion.
+
 The ledger uses one atomic builder. The builder accepts only a privately issued
-plan and derives every record from its canonical completion tuple. For
-procedure preconditions, it accepts only a
-completed pre-action evidence aggregate and imports its records. The builder
-snapshots each remaining submitted mapping once. An
+plan and derives every record from its canonical completion tuple. For every
+procedure-owned record, it accepts only the exact terminal lifecycle transcript.
+That transcript retains the completed pre-action aggregate, later boundary
+evidence, partial prefixes, path applicability, and both terminal dispositions.
+The ledger imports these records without rerunning or replacing their evidence.
+Separately submitted mappings are restricted to non-procedure obligations such
+as rule criteria, and the builder snapshots each such mapping once. An
 additional key, malformed carrier, invalid authority, or invalid evidence
 raises `CompletionLedgerError` and prevents issuance. Missing evidence instead
 produces an `unchecked` record. Every issued ledger contains the complete tuple
 in canonical order, including records after a blocked evaluation. The ledger is
-successful exactly when every record is `satisfied`. Migration baselines remain
-outside this first ledger contract.
+successful exactly when the procedure lifecycle reports `success-terminal` and
+`accepted`, every applicable record is `satisfied`, and every remaining record
+is an admitted `inapplicable` record. Migration baselines remain outside this
+first ledger contract.
 
 A `ManualJudgmentSubmission` is an untrusted human assertion. The assertion contains the
 exact obligation key, evaluator reference, admitted input revision, and evidence
@@ -488,8 +588,10 @@ public submission into machine evidence. Contract tests plant each malformed
 canonical fragment at the source boundary and prove that checker and detector
 schemas remain unconstrained by this manual-only contract. The later ledger
 imports these precondition records without revalidating their submissions or
-deriving their states again. Its analogous validation applies only to manual
-obligations evaluated at later phases.
+deriving their states again. For a manual obligation at a later phase, the
+lifecycle session requests and validates the judgment only after its exact
+boundary has been realized. The ledger imports that retained record without
+repeating the validation.
 
 Assisted completion uses a fixed version 1 residual-judgment contract rather
 than applying the detector's evidence schema to a different object. A
