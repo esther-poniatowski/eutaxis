@@ -4098,6 +4098,68 @@ def test_precondition_evaluation_plan_handles_empty_and_wrong_timing(
         plan_procedure_precondition_evaluations(_procedure_run(late_attention), {})
 
 
+def test_precondition_evaluation_plan_retains_detached_provider_inputs(
+    tmp_path: Path,
+) -> None:
+    _, _, _, run = _precondition_run(tmp_path)
+    supplied = _provider_inputs(run)
+    calls = 0
+
+    def provider(request: ProcedureEvaluatorInputRequest) -> EvaluatorInput:
+        nonlocal calls
+        calls += 1
+        return supplied[request.key]
+
+    plan = plan_procedure_precondition_evaluations(
+        run, {key: provider for key in supplied}
+    )
+
+    assert calls == len(supplied)
+    for record in (*plan.assisted, *plan.mechanical):
+        invocation = record.entry.invocation
+        assert record.evaluator_input.input_revision == invocation.input_revision
+        assert record.evaluator_input.input_data == invocation.input_data
+        assert record.evaluator_input.input_data is not invocation.input_data
+        assert type(record.evaluator_input.input_data) is MappingProxyType
+    assert calls == len(supplied)
+    assert _is_issued_procedure_precondition_evaluation_plan(plan)
+
+
+def test_precondition_evaluation_plan_binds_retained_input_carriers(
+    tmp_path: Path,
+) -> None:
+    def build(path: Path) -> ProcedurePreconditionEvaluationPlan:
+        _, _, _, run = _precondition_run(path)
+        supplied = _provider_inputs(run)
+        return plan_procedure_precondition_evaluations(
+            run,
+            {
+                key: (lambda request, value=value: value)
+                for key, value in supplied.items()
+            },
+        )
+
+    replaced = build(tmp_path / "replaced")
+    replaced_record = replaced.assisted[0]
+    retained = replaced_record.evaluator_input
+    object.__setattr__(
+        replaced_record,
+        "evaluator_input",
+        EvaluatorInput(retained.input_revision, retained.input_data),
+    )
+    assert not _is_issued_procedure_precondition_evaluation_plan(replaced)
+
+    mutable = build(tmp_path / "mutable")
+    mutable_input = mutable.mechanical[0].evaluator_input
+    object.__setattr__(mutable_input, "input_data", dict(mutable_input.input_data))
+    assert not _is_issued_procedure_precondition_evaluation_plan(mutable)
+
+    changed = build(tmp_path / "changed")
+    changed_input = changed.assisted[0].evaluator_input
+    object.__setattr__(changed_input, "input_revision", "different-revision")
+    assert not _is_issued_procedure_precondition_evaluation_plan(changed)
+
+
 def test_precondition_evaluation_plan_rejects_forgery_copying_and_tampering(
     tmp_path: Path,
 ) -> None:

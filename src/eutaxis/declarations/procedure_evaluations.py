@@ -145,6 +145,7 @@ class AssistedPreconditionEvaluation:
 
     requirement: CompletionRequirement
     entry: AssistedAttentionEntry
+    evaluator_input: EvaluatorInput
     provider: ProcedureEvaluatorInputProvider
 
 
@@ -154,6 +155,7 @@ class MechanicalPreconditionEvaluation:
 
     requirement: CompletionRequirement
     entry: MechanicalAttentionEntry
+    evaluator_input: EvaluatorInput
     provider: ProcedureEvaluatorInputProvider
 
 
@@ -182,6 +184,7 @@ class ProcedurePreconditionEvaluationPlan:
     _registry_contents: tuple[object, ...]
     _invocation_state: tuple[object, ...]
     _predicate_state: tuple[object, ...]
+    _evaluator_input_state: tuple[object, ...]
     _run_graph: tuple[object, ...]
     _issuer: object
 
@@ -340,13 +343,19 @@ def plan_procedure_precondition_evaluations(
         if enforcement is EnforcementClass.ASSISTED:
             records.append(
                 AssistedPreconditionEvaluation(
-                    requirement, cast(AssistedAttentionEntry, entry), provider
+                    requirement,
+                    cast(AssistedAttentionEntry, entry),
+                    EvaluatorInput(revision, immutable),
+                    provider,
                 )
             )
         else:
             records.append(
                 MechanicalPreconditionEvaluation(
-                    requirement, cast(MechanicalAttentionEntry, entry), provider
+                    requirement,
+                    cast(MechanicalAttentionEntry, entry),
+                    EvaluatorInput(revision, immutable),
+                    provider,
                 )
             )
     plan = _issue_plan(
@@ -1916,6 +1925,7 @@ def _issue_plan(
     predicate_state: tuple[object, ...],
     run_graph: tuple[object, ...],
 ) -> ProcedurePreconditionEvaluationPlan:
+    evaluator_input_state = _capture_retained_evaluator_input_state(records)
     plan = object.__new__(ProcedurePreconditionEvaluationPlan)
     object.__setattr__(plan, "run", run)
     object.__setattr__(plan, "parameters", parameters)
@@ -1945,6 +1955,7 @@ def _issue_plan(
     object.__setattr__(plan, "_registry_contents", registry_contents)
     object.__setattr__(plan, "_invocation_state", invocation_state)
     object.__setattr__(plan, "_predicate_state", predicate_state)
+    object.__setattr__(plan, "_evaluator_input_state", evaluator_input_state)
     object.__setattr__(plan, "_run_graph", run_graph)
     object.__setattr__(plan, "_issuer", _PLAN_ISSUER)
     return plan
@@ -2001,6 +2012,11 @@ def _is_issued_procedure_precondition_evaluation_plan(plan: object) -> bool:
             or not _same_semantic_state(
                 plan._predicate_state, _capture_predicate_state(requirements)
             )
+            or type(plan._evaluator_input_state) is not tuple
+            or not _same_semantic_state(
+                plan._evaluator_input_state,
+                _capture_retained_evaluator_input_state(plan.records),
+            )
         ):
             return False
         parameters = _snapshot_run_parameters(run)
@@ -2032,10 +2048,18 @@ def _is_issued_procedure_precondition_evaluation_plan(plan: object) -> bool:
                     return False
                 if record.provider is not plan.providers[key]:
                     return False
+                if not _retained_input_matches_invocation(
+                    record.evaluator_input, record.entry.invocation
+                ):
+                    return False
             elif requirement.enforcement is EnforcementClass.MECHANICAL:
                 if type(record) is not MechanicalPreconditionEvaluation:
                     return False
                 if record.provider is not plan.providers[key]:
+                    return False
+                if not _retained_input_matches_invocation(
+                    record.evaluator_input, record.entry.invocation
+                ):
                     return False
             else:
                 return False
@@ -2072,6 +2096,69 @@ def _is_issued_procedure_precondition_evaluation_plan(plan: object) -> bool:
     except Exception:
         return False
     return True
+
+
+def _capture_retained_evaluator_input_state(
+    records: tuple[ProcedurePreconditionEvaluation, ...],
+) -> tuple[object, ...]:
+    """Bind each runnable record to its exact detached evaluator input."""
+    state: list[object] = []
+    for index, record in enumerate(records):
+        if type(record) is ManualPreconditionEvaluation:
+            continue
+        if type(record) not in {
+            AssistedPreconditionEvaluation,
+            MechanicalPreconditionEvaluation,
+        }:
+            _fail(("records", index), "precondition evaluation record is invalid")
+        runnable = cast(
+            AssistedPreconditionEvaluation | MechanicalPreconditionEvaluation,
+            record,
+        )
+        evaluator_input = runnable.evaluator_input
+        if type(evaluator_input) is not EvaluatorInput:
+            _fail(("records", index, "evaluator-input"), "carrier is invalid")
+        if type(evaluator_input.input_revision) is not str:
+            _fail(
+                ("records", index, "evaluator-input", "input-revision"),
+                "revision must be text",
+            )
+        if type(evaluator_input.input_data) is not MappingProxyType:
+            _fail(
+                ("records", index, "evaluator-input", "input"),
+                "input must be an immutable JSON object",
+            )
+        frozen = _freeze_mapping_snapshot(
+            evaluator_input.input_data,
+            ("records", index, "evaluator-input", "input"),
+        )
+        state.append(
+            (
+                (evaluator_input, evaluator_input.input_data),
+                (evaluator_input.input_revision, frozen),
+            )
+        )
+    return tuple(state)
+
+
+def _retained_input_matches_invocation(
+    evaluator_input: object, invocation: object
+) -> bool:
+    """Return whether one detached input reproduces its admitted invocation."""
+    if (
+        type(evaluator_input) is not EvaluatorInput
+        or type(invocation) is not EvaluatorInvocation
+    ):
+        return False
+    typed = cast(EvaluatorInput, evaluator_input)
+    admitted = cast(EvaluatorInvocation, invocation)
+    return (
+        type(typed.input_revision) is str
+        and typed.input_revision == admitted.input_revision
+        and type(typed.input_data) is MappingProxyType
+        and typed.input_data is not admitted.input_data
+        and json_values_equal(typed.input_data, admitted.input_data)
+    )
 
 
 def _same_identity_projection(

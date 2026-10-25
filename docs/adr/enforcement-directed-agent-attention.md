@@ -390,23 +390,35 @@ correlation, aborts issuance.
 
 The resulting `ProcedurePreconditionEvaluationPlan` is a process-local
 correlation plan. It retains separate manual, assisted, and mechanical records,
-the detached parameters, and the exact provider mapping. It executes no
+the detached parameters, the exact provider mapping, and each detached
+validated evaluator input returned during planning. It executes no
 evaluator, makes no predicate judgment, records no completion evidence, and
 grants no clearance. The next design must define one pre-action evidence
-transaction. That transaction must validate manual judgments, execute detectors
-and checkers through their retained authorities exactly once, and pair each
-detector execution with a validated residual judgment. It must also consume the
-issued evaluator-less precondition observation aggregate. Clearance is derived
-from the combined evaluator-less, manual, assisted, and mechanical precondition
-results. The transaction retains all resulting evidence for later completion.
-The mechanical precondition run must either begin or participate in the
-completion-ledger transaction; a later ledger step must not execute the same
-evaluator again.
+transaction. The caller creates one process-local transaction session from the
+correlation plan and an issuer-stamped evaluator-less observation aggregate,
+including an empty aggregate when that class has no requirements. The session
+validates every authority and exact submission key set before execution. It then
+executes each detector once, passes the issued execution to the corresponding
+injected residual-judgment provider, validates the returned judgment, and
+retains both records atomically. It executes each checker once through the
+retained authority and detached evaluator input. Clearance is derived from the
+combined evaluator-less, manual, assisted, and mechanical results and is true
+only when every precondition is satisfied.
 
-The ledger uses one atomic builder:
-`build_completion_ledger(plan, *, manual, assisted, executable, clock)`. The
-builder accepts only a privately issued plan and derives every record from its
-canonical completion tuple. The builder snapshots each submitted mapping once. An
+The session is single-use. Its state is `ready` before execution and becomes
+terminal when execution starts: either `completed`, with one immutable evidence
+aggregate, or `failed-after-execution`, with no retry permitted. Thus, a stale
+authority found after a runner call cannot lead the same session to invoke that
+runner twice. A caller that needs a new attempt must prepare a new run and new
+observation and evaluation plans. The completed aggregate retains all
+precondition evidence for later completion. The completion ledger consumes
+these records and never executes a retained precondition evaluator again.
+
+The ledger uses one atomic builder. The builder accepts only a privately issued
+plan and derives every record from its
+canonical completion tuple. For procedure preconditions, it accepts only a
+completed pre-action evidence aggregate and imports its records. The builder
+snapshots each remaining submitted mapping once. An
 additional key, malformed carrier, invalid authority, or invalid evidence
 raises `CompletionLedgerError` and prevents issuance. Missing evidence instead
 produces an `unchecked` record. Every issued ledger contains the complete tuple
@@ -416,7 +428,9 @@ outside this first ledger contract.
 
 A `ManualJudgmentSubmission` is an untrusted human assertion. The assertion contains the
 exact obligation key, evaluator reference, admitted input revision, and evidence
-object. Every manual evaluator authored under declaration schema version 1,
+object. The revision identifies the manual evidence protocol used to construct
+the assertion and must belong to the retained evaluator's `input_revisions`.
+Every manual evaluator authored under declaration schema version 1,
 regardless of its evaluator contract version, uses one canonical fragment. Its
 root evidence schema has object type, requires a top-level `conclusion` property,
 and declares that property's schema as exactly the closed enum `satisfied`,
@@ -431,41 +445,47 @@ the catalog revision 1 schema and evaluator query payload remain unchanged. A
 future consumer that requires persisted semantic contracts needs a separately
 designed index revision rather than a copied summary field.
 
-The builder freezes the evidence, validates it against the exact manual
+For procedure preconditions, the pre-action transaction snapshots each manual
+submission, freezes its evidence, validates it against the exact manual
 evaluator schema retained by the plan, and checks the key, evaluator, and
-revision. The ledger derives its state from `conclusion`; the submission carries
-no second state that could contradict the evidence. This validation
+revision. The transaction derives the state from `conclusion`; the submission
+carries no second state that could contradict the evidence. This validation
 authenticates the shape and correlation of the assertion. Schema validation does not turn the
 public submission into machine evidence. Contract tests plant each malformed
 canonical fragment at the source boundary and prove that checker and detector
-schemas remain unconstrained by this manual-only contract.
+schemas remain unconstrained by this manual-only contract. The later ledger
+imports these precondition records without revalidating their submissions or
+deriving their states again. Its analogous validation applies only to manual
+obligations evaluated at later phases.
 
 Assisted completion uses a fixed version 1 residual-judgment contract rather
 than applying the detector's evidence schema to a different object. A
 `ResidualJudgmentSubmission` contains its schema version, exact obligation key,
 detector evaluator reference, admitted input revision, explicit completion
-state, and non-empty rationale. An `AssistedCompletionSubmission` pairs that
-judgment with one issuer-stamped `DetectorExecution`. The builder compares the
-execution registry by identity and requires its evaluator, revision, and frozen
-input to equal the packet invocation. The builder also requires the residual
-judgment to name that obligation and invocation. Detector evidence without a residual
-judgment leaves the record `unchecked`; a residual judgment paired with the
-wrong execution is invalid evidence and prevents issuance.
+state, and non-empty rationale. One injected provider receives the exact
+obligation, residual question, and issuer-stamped `DetectorExecution` after the
+transaction has executed the detector. The transaction validates the returned
+judgment against that execution and the retained detached invocation. A missing
+or mismatched judgment is invalid evidence and terminates the session; no
+separately executed detector may be submitted.
 
 Mechanical completion accepts no caller-supplied checker result. Version 1
 completion first restricts checker failure behavior to `block` at both source
-and persisted-schema boundaries. The ledger then invokes checkers through the
-registry retained by the plan and in canonical completion order. Before the
-batch, after each invocation, and immediately before issuance, the builder
+and persisted-schema boundaries. The pre-action transaction invokes
+precondition checkers through the registry retained by the plan and in canonical
+order. Before the batch, after each invocation, and immediately before issuance,
+the transaction
 revalidates the assurance stamp, retained identities, authored fixture
 sequences, and fixture digests. A stale or unreadable fixture prevents issuance
 and takes precedence over a simultaneous runner or result failure. A validated
 checker result maps its state directly. A registry stamp, retained identity,
 binding, evaluator, revision, invocation input, assurance, fixture sequence, or
-digest defect raises `CompletionLedgerError` and prevents issuance. After those
-checks pass, an exception raised by the reviewed runner or an invalid runner
-return produces a `blocked` record with a separate diagnostic, provided that
-the builder re-establishes freshness. Tests plant both diagnostic classes.
+digest defect terminates the session as `failed-after-execution` and prevents
+issuance. After those checks pass, an error located at the runner or returned
+result boundary produces a `blocked` record with a separate diagnostic,
+provided that the transaction re-establishes freshness. Registry, correlation,
+input, assurance, and fixture errors are authority failures, never blocked
+evidence. Tests plant both diagnostic classes.
 
 Privately issued executable predicate evidence has a total state mapping.
 `true` maps to `satisfied`, `false` maps to `violated`, and `unknown` maps to
