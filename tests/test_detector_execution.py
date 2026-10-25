@@ -54,6 +54,12 @@ def _setup(
             "adjudication": "candidate",
             "residual-question": "Does the candidate violate the obligation?",
             "failure-behavior": "block",
+            "evidence-schema": {
+                "type": "object",
+                "properties": {"accepted": {"type": "boolean"}},
+                "required": ["accepted"],
+                "additionalProperties": False,
+            },
         }
     )
     if evidence_schema is not None:

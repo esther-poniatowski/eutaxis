@@ -62,6 +62,7 @@ def _registry(tmp_path: Path):
                 "adjudication": "candidate",
                 "residual-question": "Does the candidate violate the obligation?",
                 "failure-behavior": "block",
+                "evidence-schema": {"type": "object"},
             }
         )
         (directory / f"detector-{index}.yaml").write_text(
@@ -75,6 +76,7 @@ def _registry(tmp_path: Path):
             "coverage": "total",
             "adjudication": "authoritative",
             "known-failure-fixtures": ["fixture/known-failure"],
+            "evidence-schema": {"type": "object"},
         }
     )
     (directory / "checker.yaml").write_text(

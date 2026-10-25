@@ -308,16 +308,29 @@ outside this first ledger contract.
 
 A `ManualJudgmentSubmission` is an untrusted human assertion. The assertion contains the
 exact obligation key, evaluator reference, admitted input revision, and evidence
-object. Version 1 manual evaluator schemas must require one top-level
-`conclusion` field whose closed values are `satisfied`, `violated`, and
-`blocked`. This invariant applies at the source and persisted-schema boundaries.
+object. Every manual evaluator authored under declaration schema version 1,
+regardless of its evaluator contract version, uses one canonical fragment. Its
+root evidence schema has object type, requires a top-level `conclusion` property,
+and declares that property's schema as exactly the closed enum `satisfied`,
+`violated`, and `blocked`; the enum order has no significance. The source schema
+enforces this syntactic contract while the embedded-schema validator validates
+the complete evidence schema.
+
+The persisted query index deliberately omits evidence schemas. An index emitted
+from validated sources inherits the source guarantee through its provenance,
+but a standalone persisted index cannot prove the omitted contract. Therefore,
+the catalog revision 1 schema and evaluator query payload remain unchanged. A
+future consumer that requires persisted semantic contracts needs a separately
+designed index revision rather than a copied summary field.
+
 The builder freezes the evidence, validates it against the exact manual
 evaluator schema retained by the plan, and checks the key, evaluator, and
 revision. The ledger derives its state from `conclusion`; the submission carries
 no second state that could contradict the evidence. This validation
 authenticates the shape and correlation of the assertion. Schema validation does not turn the
-public submission into machine evidence. Contract tests plant missing and
-out-of-domain conclusion fields at both schema boundaries.
+public submission into machine evidence. Contract tests plant each malformed
+canonical fragment at the source boundary and prove that checker and detector
+schemas remain unconstrained by this manual-only contract.
 
 Assisted completion uses a fixed version 1 residual-judgment contract rather
 than applying the detector's evidence schema to a different object. A

@@ -225,6 +225,12 @@ def _prepare_registry(tmp_path: Path, mode: Mode):
             "coverage": "total",
             "adjudication": "authoritative",
             "known-failure-fixtures": [KNOWN_FAILURE],
+            "evidence-schema": {
+                "type": "object",
+                "properties": {"accepted": {"type": "boolean"}},
+                "required": ["accepted"],
+                "additionalProperties": False,
+            },
         }
     )
     _write(root, "checker.yaml", checker)
@@ -237,6 +243,12 @@ def _prepare_registry(tmp_path: Path, mode: Mode):
             "adjudication": "candidate",
             "residual-question": "Does the candidate violate the obligation?",
             "failure-behavior": "block",
+            "evidence-schema": {
+                "type": "object",
+                "properties": {"accepted": {"type": "boolean"}},
+                "required": ["accepted"],
+                "additionalProperties": False,
+            },
         }
     )
     _write(root, "detector.yaml", detector)
@@ -659,7 +671,7 @@ def test_single_and_empty_class_boundaries(
         assert entry.evaluator.adjudication == "manual"
         assert entry.evaluator.timing == "post-artifact"
         assert entry.evaluator.input_revisions == ("declaration-v1",)
-        assert entry.evaluator.evidence_schema["required"] == ("accepted",)
+        assert entry.evaluator.evidence_schema["required"] == ("conclusion",)
         assert entry.evaluator.failure_behavior == "block"
 
 

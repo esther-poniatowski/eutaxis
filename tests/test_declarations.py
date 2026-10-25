@@ -167,6 +167,157 @@ def test_policy_manifest_evaluator_and_operation_models_are_complete() -> None:
     assert operation.failure_outcomes == ("write-failed",)
 
 
+@pytest.mark.parametrize(
+    ("case", "evidence_schema"),
+    [
+        (
+            "missing-type",
+            {
+                "required": ["conclusion"],
+                "properties": {
+                    "conclusion": {"enum": ["satisfied", "violated", "blocked"]}
+                },
+            },
+        ),
+        (
+            "missing-required",
+            {
+                "type": "object",
+                "properties": {
+                    "conclusion": {"enum": ["satisfied", "violated", "blocked"]}
+                },
+            },
+        ),
+        (
+            "missing-properties",
+            {"type": "object", "required": ["conclusion"]},
+        ),
+        (
+            "conclusion-not-required",
+            {
+                "type": "object",
+                "required": ["reviewer"],
+                "properties": {
+                    "conclusion": {"enum": ["satisfied", "violated", "blocked"]}
+                },
+            },
+        ),
+        (
+            "conclusion-not-declared",
+            {
+                "type": "object",
+                "required": ["conclusion"],
+                "properties": {"reviewer": {"type": "string"}},
+            },
+        ),
+        (
+            "missing-conclusion-state",
+            {
+                "type": "object",
+                "required": ["conclusion"],
+                "properties": {"conclusion": {"enum": ["satisfied", "violated"]}},
+            },
+        ),
+        (
+            "additional-conclusion-state",
+            {
+                "type": "object",
+                "required": ["conclusion"],
+                "properties": {
+                    "conclusion": {
+                        "enum": ["satisfied", "violated", "blocked", "unchecked"]
+                    }
+                },
+            },
+        ),
+        (
+            "duplicate-conclusion-state",
+            {
+                "type": "object",
+                "required": ["conclusion"],
+                "properties": {
+                    "conclusion": {"enum": ["satisfied", "violated", "violated"]}
+                },
+            },
+        ),
+        (
+            "noncanonical-conclusion-schema",
+            {
+                "type": "object",
+                "required": ["conclusion"],
+                "properties": {"conclusion": {"type": "string"}},
+            },
+        ),
+        (
+            "extended-conclusion-schema",
+            {
+                "type": "object",
+                "required": ["conclusion"],
+                "properties": {
+                    "conclusion": {
+                        "enum": ["satisfied", "violated", "blocked"],
+                        "title": "Conclusion",
+                    }
+                },
+            },
+        ),
+    ],
+)
+def test_manual_evaluator_requires_canonical_conclusion_schema(
+    tmp_path: Path, case: str, evidence_schema: dict[str, object]
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["evidence-schema"] = evidence_schema
+
+    path = _write_variant(tmp_path, "evaluator.yaml", mutate, name=f"{case}.yaml")
+
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location.startswith("$.evidence-schema")
+
+
+def test_manual_conclusion_enum_order_and_evaluator_version_are_independent(
+    tmp_path: Path,
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["version"] = 2
+        document["evidence-schema"] = {
+            "type": "object",
+            "required": ["conclusion"],
+            "properties": {
+                "conclusion": {"enum": ["blocked", "satisfied", "violated"]}
+            },
+        }
+
+    declaration = load_declaration(_write_variant(tmp_path, "evaluator.yaml", mutate))
+
+    assert isinstance(declaration, EvaluatorDeclaration)
+    assert declaration.version == 2
+
+
+@pytest.mark.parametrize("evaluator_kind", ["checker", "detector"])
+def test_manual_conclusion_contract_does_not_constrain_machine_evaluators(
+    tmp_path: Path, evaluator_kind: str
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["evaluator-kind"] = evaluator_kind
+        document["evidence-schema"] = {"type": "array", "items": {"type": "integer"}}
+        if evaluator_kind == "checker":
+            document["coverage"] = "total"
+            document["adjudication"] = "authoritative"
+            document["known-failure-fixtures"] = ["fixture/known-failure"]
+        else:
+            document["coverage"] = "partial"
+            document["adjudication"] = "candidate"
+            document["residual-question"] = "Which candidates remain?"
+
+    declaration = load_declaration(_write_variant(tmp_path, "evaluator.yaml", mutate))
+
+    assert isinstance(declaration, EvaluatorDeclaration)
+    assert declaration.evaluator_kind == evaluator_kind
+
+
 def test_composition_mechanism_is_an_exact_closed_enum() -> None:
     assert {mechanism.value for mechanism in CompositionMechanism} == {
         "cumulative",

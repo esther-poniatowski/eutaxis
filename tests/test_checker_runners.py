@@ -49,6 +49,7 @@ def _registry(tmp_path: Path):
     evaluator["coverage"] = "total"
     evaluator["adjudication"] = "authoritative"
     evaluator["known-failure-fixtures"] = ["fixture/known-failure"]
+    evaluator["evidence-schema"] = {"type": "object"}
     evaluator_path.write_text(
         yaml.safe_dump(evaluator, sort_keys=False), encoding="utf-8"
     )
@@ -58,6 +59,7 @@ def _registry(tmp_path: Path):
     detector["coverage"] = "partial"
     detector["adjudication"] = "candidate"
     detector["residual-question"] = "Does the candidate violate the obligation?"
+    detector["evidence-schema"] = {"type": "object"}
     detector.pop("known-failure-fixtures")
     (directory / "detector.yaml").write_text(
         yaml.safe_dump(detector, sort_keys=False), encoding="utf-8"

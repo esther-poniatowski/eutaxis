@@ -57,6 +57,7 @@ def _catalog(tmp_path: Path) -> DeclarationCatalog:
             "coverage": "total",
             "adjudication": "authoritative",
             "known-failure-fixtures": ["registry/checker/planted"],
+            "evidence-schema": {"type": "object"},
         }
     )
     _write(root, "checker.yaml", checker)
@@ -68,6 +69,7 @@ def _catalog(tmp_path: Path) -> DeclarationCatalog:
             "coverage": "partial",
             "adjudication": "candidate",
             "residual-question": "Does the candidate violate the selected obligation?",
+            "evidence-schema": {"type": "object"},
         }
     )
     _write(root, "detector.yaml", detector)

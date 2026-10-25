@@ -16,5 +16,8 @@ timing: post-artifact
 input-revisions: [declaration-v1]
 evidence-schema:
   type: object
-  required: [reviewer, criterion, observation, conclusion]
+  required: [conclusion]
+  properties:
+    conclusion: {enum: [satisfied, violated, blocked]}
+  additionalProperties: false
 failure-behavior: block

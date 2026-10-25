@@ -399,7 +399,38 @@
               "then": {
                 "properties": {
                   "coverage": {"const": "none"},
-                  "adjudication": {"const": "manual"}
+                  "adjudication": {"const": "manual"},
+                  "evidence-schema": {
+                    "type": "object",
+                    "required": ["type", "required", "properties"],
+                    "properties": {
+                      "type": {"const": "object"},
+                      "required": {
+                        "type": "array",
+                        "contains": {"const": "conclusion"}
+                      },
+                      "properties": {
+                        "type": "object",
+                        "required": ["conclusion"],
+                        "properties": {
+                          "conclusion": {
+                            "type": "object",
+                            "required": ["enum"],
+                            "properties": {
+                              "enum": {
+                                "type": "array",
+                                "minItems": 3,
+                                "maxItems": 3,
+                                "uniqueItems": true,
+                                "items": {"enum": ["satisfied", "violated", "blocked"]}
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
             },

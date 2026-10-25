@@ -58,7 +58,15 @@ def _write_variant(
         (
             "evaluator.yaml",
             ("evidence-schema",),
-            {"$defs": {}, "$ref": "#/$defs/missing"},
+            {
+                "$defs": {},
+                "$ref": "#/$defs/missing",
+                "type": "object",
+                "required": ["conclusion"],
+                "properties": {
+                    "conclusion": {"enum": ["satisfied", "violated", "blocked"]}
+                },
+            },
             "$.evidence-schema.$ref",
         ),
         (
