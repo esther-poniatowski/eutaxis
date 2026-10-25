@@ -23,7 +23,7 @@ A project composition manifest may choose project declarations and imported shar
 
 ## Deterministic composition inside one artifact
 
-The future semantic resolver alone issues a certified compilation unit. The resolver-backed unit supplies four inputs to the composer:
+The semantic resolver alone issues a certified compilation unit. The resolver-backed unit supplies four inputs to the composer:
 
 - the retained records
 - the effective norm and criterion projection of each retained rule
@@ -39,7 +39,7 @@ The composer ignores four classes of raw input:
 
 Those raw inputs are unavailable to the composer. The composer cannot contradict choices certified by the resolver.
 
-The resolver returns the certified unit and its explanation trace as one correlated result. A failed resolution may return its immutable trace through the error, but it never supplies a partial unit. The future composer applies five structural checks to rule projections:
+The resolver returns the certified unit and its explanation trace as one correlated result. A failed resolution may return its immutable trace through the error, but it never supplies a partial unit. The composer applies five structural checks to rule projections:
 
 - exactly one projection exists for each rule component
 - no projection exists for a procedure component
@@ -49,11 +49,11 @@ The resolver returns the certified unit and its explanation trace as one correla
 
 The composer does not reevaluate applicability, exceptions, dependencies, or policies.
 
-The current fixture-only `ResolvedCompilationUnit` predates the resolver. It contains the manifest, components, and dependencies, but no rule projections. The vertical resolver slice will replace this fixture issuance boundary atomically rather than expose a partial projected model.
+`ResolvedCompilationUnit` is resolver-issued and contains the manifest, components, dependencies, and final rule projections. Composer boundary tests use deliberately unsafe local fixtures to verify rejection without exposing a second production issuer.
 
 The manifest declares its `sections` in order. Each `section` lists its records in order. A directly named record keeps its authored anchor. The resolver assigns an existing `(section, rank)` pair to every added record. Every prerequisite precedes its dependant. The renderer keeps the declared order of `sections`. An edge from a later `section` to an earlier one would violate that order.
 
-Within those constraints, the composer uses a stable topological sort. The assigned rank forms the first tie-break key. The stable record identifier forms the second key. The composer rejects three malformed inputs:
+Within those constraints, the composer uses a stable topological sort. The assigned rank forms the first tie-break key. The stable record identifier forms the second key. In addition to the projection checks above, the composer rejects three malformed ordering inputs:
 
 - supplied edges that contain a cycle
 - anchors or edge endpoints that do not exist

@@ -126,7 +126,7 @@ The resolver first evaluates the fully inherited predicate of every norm. A true
 
 Every substitute norm must have true applicability, including a substitute already present in the initial set. A false substitute raises `exception-substitute-inapplicable`; an unknown substitute raises `exception-substitute-indeterminate`. The final norm tuple follows authored order.
 
-A criterion is effective when all of its named norms are effective. It is inactive when none are effective. If a criterion names more than one norm and only a proper nonempty subset is effective, resolution raises `partial-criterion-applicability`. The future resolver-backed composer boundary validates only that projections are one-to-one and contain valid local identifiers. It never repeats these semantic decisions.
+A criterion is effective when all of its named norms are effective. It is inactive when none are effective. If a criterion names more than one norm and only a proper nonempty subset is effective, resolution raises `partial-criterion-applicability`. The resolver-backed composer boundary validates only that projections are one-to-one and contain valid local identifiers in authored subsequence order. It never repeats these semantic decisions.
 
 ## Three-valued decisions
 
@@ -146,7 +146,7 @@ Only `true` activates an object. A policy matches only when both its declaration
 
 An eligible policy is referenced by the manifest, owned by the manifest owner, and names the active conflict pair. If no eligible policy matches, an unknown policy predicate makes the conflict fail with `conflict-policy-indeterminate`. Otherwise, the conflict fails with `unresolved-conflict`. Every predicate-dependent event and error carries its truth value and exact applicability trace. This requirement includes `conflict-policy-indeterminate`. Therefore, false and unknown never collapse into the same explanation.
 
-The future public operation is `resolve_compilation_unit(registry, manifest_id, context) -> ResolutionResult`. Only the resolver may issue four immutable values:
+The public operation is `resolve_compilation_unit(registry, manifest_id, context) -> ResolutionResult`. Only the resolver may issue four immutable values:
 
 - `ResolutionResult`
 - `ResolutionTrace`

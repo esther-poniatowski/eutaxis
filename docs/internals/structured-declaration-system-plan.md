@@ -17,19 +17,19 @@ Independent adversarial reviews approved the complete normative contract on thre
 
 `eutaxis/load-declaration-registry` now runs through a code-owned callable. Before calling it, Eutaxis validates an immutable input. After it returns, Eutaxis validates either immutable outputs or a declared failure.
 
-A self-contained cumulative fixture now plans and mechanically assembles a certified compilation unit. The fixture simulates three results from the future resolver:
+A self-contained cumulative fixture plans and mechanically assembles a certified compilation unit. The public resolver now supplies the same boundary from validated sources and one typed context. The fixture covers three resolution results:
 
 - a prerequisite added from the dependency closure
 - a policy substitute used in place of the authored prerequisite
 - a retained rule-set member not named directly in the manifest
 
-The planner orders each prerequisite before its dependant. Resolver-assigned anchors order unrelated records. The planner rejects malformed supplied graphs and anchors.
+The planner orders each prerequisite before its dependant. Resolver-assigned anchors order unrelated records. The planner rejects malformed supplied graphs, anchors, and rule projections.
 
 The assembler joins an exact set of fixture-projected Markdown blocks into canonical bytes. A second manifest uses the same target for personal and project scopes. The resulting artifacts remain distinct. Every manifest now declares its mechanism without deriving it from the target. The two unimplemented mechanisms are separate-directory and single-slot. The cumulative planner rejects manifests that declare either one.
 
 The static catalog now preserves lookup fields and portable provenance without testing context predicates. The loader validates the schema and cross-row contracts before it builds an immutable view of a persisted index. Both catalog forms apply the same exact static predicates. In both forms, matching rows follow canonical order.
 
-The resolver phase will test each context predicate. Then, the resolver will apply conflict policies. Finally, the resolver will issue certified units for real builds.
+The resolver tests each context predicate, applies conflict policies in simultaneous canonical batches, and issues one certified unit with its explanation trace. The unit contains final-effective rules and procedures, rewritten dependency edges, stable manifest anchors, and final rule-local norm and criterion projections.
 
 The resolver contract now distinguishes selectable containers from records admitted to the output. The same contract fixes five further decisions:
 
@@ -39,7 +39,7 @@ The resolver contract now distinguishes selectable containers from records admit
 - which objects a successful call returns
 - which evidence a failed call may retain
 
-The future-resolution corpus supplies sources for the next implementation gate. At this stage, the corpus passes only the static registry. No fixture simulates a resolver result.
+The resolution corpus exercises the public resolver and the composer boundary. Its scenarios cover the completed resolution work listed below.
 
 ## Decision log and open prerequisites
 
@@ -112,7 +112,7 @@ Separate-directory output requires a contract from identifiers to paths. The sam
 
 ### Catalog, registries, and resolution
 
-This phase first turns the validated registry into a static query boundary. Then, the resolver will produce outputs for a supplied context.
+This phase has turned the validated registry into a static query boundary and now resolves certified outputs for a supplied context. Its remaining work belongs to enforcement classification and the temporary rendered-Markdown compatibility boundary.
 
 - [x] Consolidate the source boundary and cross-record registry in one `declarations` package.
 - [x] Implement immutable exact lookups and deterministic JSON indexing over the validated registry.
@@ -122,10 +122,10 @@ This phase first turns the validated registry into a static query boundary. Then
 - [x] Close the v1 contracts for rule sets, three-valued predicates, policies, projected rules, and issued results.
 - [ ] Derive enforcement classes from evaluator contracts in the enforcement phase, then expose their static filter.
 - [ ] Keep the rendered-Markdown parser behind its current public behavior until migration proves its final disposition.
-- [ ] Implement the monotone candidate/excluded/required/effective algorithm and provenance-bearing explanation traces.
-- [ ] Move certified-unit issuance from the fixture composer to the resolver, reject rule-set containers as effective components, and add rule projections atomically.
-- [ ] Apply the anchor rules fixed by [the resolver contract](../adr/rule-relations-and-resolution.md) when the resolver introduces one record through multiple routes.
-- [ ] Test waived norms, explicit substitutes, combine results, policy order ties, owner authority, attempted reintroduction of exclusions, overlapping conflict batches, alias collisions, conservative prerequisite retention, and disjointness of effective and excluded results.
+- [x] Implement the monotone candidate/excluded/required/effective algorithm and provenance-bearing explanation traces.
+- [x] Move certified-unit issuance from the fixture composer to the resolver, reject rule-set containers as effective components, and add rule projections atomically.
+- [x] Apply the anchor rules fixed by [the resolver contract](../adr/rule-relations-and-resolution.md) when the resolver introduces one record through multiple routes.
+- [x] Test waived norms, explicit substitutes, combine results, policy order ties, owner authority, attempted reintroduction of exclusions, overlapping conflict batches, alias collisions, conservative prerequisite retention, and disjointness of effective and excluded results.
 
 **Exit evidence:** every effective declaration is dependency-complete, every omission is explained, and unresolved or unauthorized decisions fail.
 

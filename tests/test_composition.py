@@ -19,12 +19,12 @@ from eutaxis.declarations import (
     ResolvedCompilationUnit,
     ResolvedComponent,
     ResolvedDependency,
+    ResolvedRuleProjection,
     assemble_cumulative_artifact,
     load_declaration_registry,
     load_facet_registry,
     plan_cumulative_composition,
 )
-from eutaxis.declarations.composition import _issue_resolved_compilation_unit
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "composition" / "cumulative"
 
@@ -78,6 +78,7 @@ def _unit(
     *,
     components: tuple[ResolvedComponent, ...] | None = None,
     dependencies: tuple[ResolvedDependency, ...] | None = None,
+    projections: tuple[ResolvedRuleProjection, ...] | None = None,
     manifest: str = "fixture/cumulative",
 ) -> ResolvedCompilationUnit:
     if components is None:
@@ -93,14 +94,51 @@ def _unit(
             ResolvedDependency("fixture/a-peer", "fixture/dependant"),
             ResolvedDependency("fixture/z-base", "fixture/dependant"),
         )
-    return _issue_resolved_compilation_unit(manifest, components, dependencies)
+    if projections is None:
+        local_ids = {
+            "fixture/a-independent": ("independent", "independent-check"),
+            "fixture/a-peer": ("peer", "peer-check"),
+            "fixture/blocker": ("blocker", "blocker-check"),
+            "fixture/dependant": ("dependant", "dependant-check"),
+            "fixture/member": ("member", "member-check"),
+            "fixture/substitute": ("substitute", "substitute-check"),
+            "fixture/z-base": ("base", "base-check"),
+        }
+        projections = tuple(
+            ResolvedRuleProjection(
+                component.declaration,
+                (local_ids[component.declaration][0],),
+                (local_ids[component.declaration][1],),
+            )
+            for component in components
+            if component.declaration in local_ids
+        )
+    return _unsafe_unit(manifest, components, dependencies, projections)
+
+
+def _unsafe_unit(
+    manifest: str,
+    components: tuple[ResolvedComponent, ...],
+    dependencies: tuple[ResolvedDependency, ...],
+    projections: tuple[ResolvedRuleProjection, ...],
+) -> ResolvedCompilationUnit:
+    """Build malformed certified values only for composer boundary tests."""
+    unit = object.__new__(ResolvedCompilationUnit)
+    object.__setattr__(unit, "manifest", manifest)
+    object.__setattr__(unit, "components", components)
+    object.__setattr__(unit, "dependencies", dependencies)
+    object.__setattr__(unit, "rule_projections", projections)
+    return unit
 
 
 def test_multi_component_plan_accepts_dependency_closure_and_is_repeatable() -> None:
     registry = _registry()
     unit = _unit()
-    reversed_unit = _issue_resolved_compilation_unit(
-        unit.manifest, tuple(reversed(unit.components)), unit.dependencies
+    reversed_unit = _unsafe_unit(
+        unit.manifest,
+        tuple(reversed(unit.components)),
+        unit.dependencies,
+        tuple(reversed(unit.rule_projections)),
     )
 
     first = plan_cumulative_composition(registry, unit)
@@ -405,6 +443,114 @@ def test_resolved_compilation_unit_requires_resolver_issuance() -> None:
         ResolvedCompilationUnit("fixture/cumulative", (), ())
     with pytest.raises(TypeError, match="issued by semantic resolution"):
         replace(_unit(), dependencies=())
+
+
+@pytest.mark.parametrize(
+    ("defect", "location", "message"),
+    [
+        ("missing", "$.rule_projections", "missing projection"),
+        (
+            "unknown-rule",
+            "$.rule_projections[5].declaration",
+            "unknown projected rule",
+        ),
+        (
+            "duplicate-rule",
+            "$.rule_projections[5].declaration",
+            "duplicate projection",
+        ),
+        (
+            "unknown-norm",
+            "$.rule_projections[0].norms[0]",
+            "unknown local norm identifier",
+        ),
+        (
+            "duplicate-norm",
+            "$.rule_projections[0].norms[1]",
+            "duplicate norm identifier",
+        ),
+        (
+            "unknown-criterion",
+            "$.rule_projections[0].criteria[0]",
+            "unknown local criterion identifier",
+        ),
+        (
+            "duplicate-criterion",
+            "$.rule_projections[0].criteria[1]",
+            "duplicate criterion identifier",
+        ),
+    ],
+)
+def test_rule_projections_are_a_complete_unique_local_mapping(
+    defect: str, location: str, message: str
+) -> None:
+    unit = _unit()
+    projections = list(unit.rule_projections)
+    if defect == "missing":
+        projections = projections[1:]
+    elif defect == "unknown-rule":
+        projections.append(ResolvedRuleProjection("fixture/missing", (), ()))
+    elif defect == "duplicate-rule":
+        projections.append(projections[0])
+    elif defect == "unknown-norm":
+        projections[0] = replace(projections[0], norms=("missing",))
+    elif defect == "duplicate-norm":
+        projections[0] = replace(projections[0], norms=projections[0].norms * 2)
+    elif defect == "unknown-criterion":
+        projections[0] = replace(projections[0], criteria=("missing",))
+    else:
+        projections[0] = replace(projections[0], criteria=projections[0].criteria * 2)
+
+    with pytest.raises(CompositionError) as captured:
+        plan_cumulative_composition(_registry(), _unit(projections=tuple(projections)))
+
+    assert captured.value.location == location
+    assert message in str(captured.value)
+
+
+def test_rule_projection_identifiers_follow_authored_subsequence_order(
+    tmp_path: Path,
+) -> None:
+    root = _mutable_fixture(tmp_path)
+    path = root / "base.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document["norms"].append(
+        {
+            "id": "base-two",
+            "modality": "must",
+            "subject": "agent",
+            "action": {"verb": "preserve", "object": "the second base component"},
+        }
+    )
+    document["criteria"].append(
+        {
+            "id": "base-two-check",
+            "norms": ["base-two"],
+            "evaluator": {"id": "fixture/manual", "version": 1},
+            "statement": "The second base component is preserved",
+        }
+    )
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    unit = _unit()
+    projections = list(unit.rule_projections)
+    index = next(
+        index
+        for index, projection in enumerate(projections)
+        if projection.declaration == "fixture/z-base"
+    )
+    projections[index] = ResolvedRuleProjection(
+        "fixture/z-base",
+        ("base-two", "base"),
+        ("base-two-check", "base-check"),
+    )
+
+    with pytest.raises(CompositionError) as captured:
+        plan_cumulative_composition(
+            _registry(root), _unit(projections=tuple(projections))
+        )
+
+    assert captured.value.location == f"$.rule_projections[{index}].norms[1]"
+    assert "authored order" in str(captured.value)
 
 
 def test_cumulative_plan_requires_planner_issuance() -> None:

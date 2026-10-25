@@ -93,6 +93,7 @@ def test_catalog_json_is_deterministic_under_registry_iteration_changes() -> Non
         records=MappingProxyType(dict(reversed(tuple(registry.records.items())))),
         families=MappingProxyType(dict(reversed(tuple(registry.families.items())))),
         conflicts=frozenset(reversed(tuple(registry.conflicts))),
+        facet_registry=registry.facet_registry,
     )
 
     first = catalog_json_bytes(
@@ -159,6 +160,7 @@ def test_empty_catalog_serializes_under_the_shared_index_schema() -> None:
         records=MappingProxyType({}),
         families=MappingProxyType({}),
         conflicts=frozenset(),
+        facet_registry=_registry().facet_registry,
     )
     catalog = build_declaration_catalog(registry, source_root=REGISTRY_FIXTURES)
 

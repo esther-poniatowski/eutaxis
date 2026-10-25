@@ -14,9 +14,13 @@ from .models import (
     CompositionManifestDeclaration,
     ProcedureDeclaration,
     RuleDeclaration,
-    RuleSetDeclaration,
 )
 from .registry import DeclarationRegistry, RegisteredDeclaration
+from .resolution import (
+    ResolvedCompilationUnit,
+    ResolvedComponent,
+    ResolvedDependency,
+)
 from .source import DocumentPath, format_document_path, nearest_location
 
 
@@ -63,51 +67,6 @@ class CumulativeArtifact:
     def text(self) -> str:
         """Decode the canonical bytes as strict UTF-8."""
         return self.content.decode("utf-8", errors="strict")
-
-
-@dataclass(frozen=True)
-class ResolvedComponent:
-    """One effective record with its resolver-assigned manifest anchor."""
-
-    section: str
-    declaration: str
-    rank: int
-
-
-@dataclass(frozen=True)
-class ResolvedDependency:
-    """One prerequisite edge retained after semantic resolution."""
-
-    prerequisite: str
-    dependant: str
-
-
-@dataclass(frozen=True, init=False)
-class ResolvedCompilationUnit:
-    """Certified resolver output consumed by deterministic composition."""
-
-    manifest: str
-    components: tuple[ResolvedComponent, ...]
-    dependencies: tuple[ResolvedDependency, ...]
-
-    def __init__(self, *_args: object, **_kwargs: object) -> None:
-        """Reject construction outside the resolver-owned issuer."""
-        raise TypeError(
-            "ResolvedCompilationUnit instances must be issued by semantic resolution"
-        )
-
-
-def _issue_resolved_compilation_unit(
-    manifest: str,
-    components: tuple[ResolvedComponent, ...],
-    dependencies: tuple[ResolvedDependency, ...],
-) -> ResolvedCompilationUnit:
-    """Issue one certified unit after semantic resolution or in boundary tests."""
-    unit = object.__new__(ResolvedCompilationUnit)
-    object.__setattr__(unit, "manifest", manifest)
-    object.__setattr__(unit, "components", components)
-    object.__setattr__(unit, "dependencies", dependencies)
-    return unit
 
 
 def _issue_cumulative_composition_plan(
@@ -167,6 +126,7 @@ def plan_cumulative_composition(
     components = _index_resolved_components(
         registry, manifest, manifest_selections, unit
     )
+    _validate_rule_projections(registry, unit, components)
     dependencies = _index_resolved_dependencies(unit, components)
     section_order = {
         section.id: index for index, section in enumerate(manifest.sections)
@@ -279,7 +239,7 @@ def _index_resolved_components(
             )
         if not isinstance(
             registered.declaration,
-            (RuleSetDeclaration, RuleDeclaration, ProcedureDeclaration),
+            (RuleDeclaration, ProcedureDeclaration),
         ):
             raise CompositionError(
                 f"{base}.declaration",
@@ -309,6 +269,86 @@ def _index_resolved_components(
             )
         components[component.declaration] = component
     return components
+
+
+def _validate_rule_projections(
+    registry: DeclarationRegistry,
+    unit: ResolvedCompilationUnit,
+    components: dict[str, ResolvedComponent],
+) -> None:
+    """Validate the resolver's final local norm and criterion projections."""
+    projections: dict[str, int] = {}
+    for index, projection in enumerate(unit.rule_projections):
+        base = f"$.rule_projections[{index}]"
+        if projection.declaration not in components:
+            raise CompositionError(
+                f"{base}.declaration",
+                f"unknown projected rule {projection.declaration!r}",
+            )
+        declaration = registry.records[projection.declaration].declaration
+        if not isinstance(declaration, RuleDeclaration):
+            raise CompositionError(
+                f"{base}.declaration",
+                f"procedure {projection.declaration!r} cannot have a rule projection",
+            )
+        if projection.declaration in projections:
+            raise CompositionError(
+                f"{base}.declaration",
+                f"duplicate projection for rule {projection.declaration!r}",
+            )
+        projections[projection.declaration] = index
+        _validate_projection_identifiers(
+            base,
+            "norms",
+            projection.norms,
+            tuple(norm.id for norm in declaration.norms),
+        )
+        _validate_projection_identifiers(
+            base,
+            "criteria",
+            projection.criteria,
+            tuple(criterion.id for criterion in declaration.criteria),
+        )
+
+    for identifier, component in components.items():
+        declaration = registry.records[identifier].declaration
+        if isinstance(declaration, RuleDeclaration) and identifier not in projections:
+            raise CompositionError(
+                "$.rule_projections",
+                f"missing projection for rule {identifier!r}",
+            )
+
+
+def _validate_projection_identifiers(
+    base: str,
+    field: str,
+    selected: tuple[str, ...],
+    authored: tuple[str, ...],
+) -> None:
+    """Require unique local identifiers in their authored subsequence order."""
+    singular = {"norms": "norm", "criteria": "criterion"}[field]
+    authored_positions = {
+        identifier: index for index, identifier in enumerate(authored)
+    }
+    seen: set[str] = set()
+    previous_position = -1
+    for index, identifier in enumerate(selected):
+        location = f"{base}.{field}[{index}]"
+        position = authored_positions.get(identifier)
+        if position is None:
+            raise CompositionError(
+                location,
+                f"unknown local {singular} identifier {identifier!r}",
+            )
+        if identifier in seen:
+            raise CompositionError(location, f"duplicate {singular} identifier")
+        if position <= previous_position:
+            raise CompositionError(
+                location,
+                f"{field} must follow authored order",
+            )
+        seen.add(identifier)
+        previous_position = position
 
 
 def _index_selections(

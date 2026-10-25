@@ -101,7 +101,14 @@ def evaluate_applicability_with_trace(
     schema validation.
     """
     validated_context = facets.validate_context(context)
-    return _evaluate_applicability(predicate, validated_context, ())
+    return _evaluate_validated_applicability_with_trace(predicate, validated_context)
+
+
+def _evaluate_validated_applicability_with_trace(
+    predicate: Mapping[str, object], context: Mapping[str, JsonValue]
+) -> ApplicabilityTrace:
+    """Evaluate one predicate against a context validated by the caller."""
+    return _evaluate_applicability(predicate, context, ())
 
 
 def _evaluate_applicability(

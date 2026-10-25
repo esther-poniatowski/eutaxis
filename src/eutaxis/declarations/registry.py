@@ -61,6 +61,7 @@ class DeclarationRegistry:
     """An immutable, cross-record validated declaration index."""
 
     paths: tuple[Path, ...]
+    facet_registry: FacetRegistry
     records: Mapping[str, RegisteredDeclaration]
     families: Mapping[str, ContractFamily]
     conflicts: frozenset[ConflictPair]
@@ -127,6 +128,7 @@ class _RegistryBuilder:
         }
         return DeclarationRegistry(
             paths=self.paths,
+            facet_registry=self.facets,
             records=MappingProxyType(dict(self.records)),
             families=MappingProxyType(families),
             conflicts=frozenset(self.conflicts),
