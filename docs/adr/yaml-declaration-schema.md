@@ -229,7 +229,7 @@ An `evaluator` names who assesses an obligation. The evaluator declares when it 
 - `detector` covers only some admitted inputs, proposes candidate results, and states the residual judgment question
 - `manual` asks a human reviewer to decide
 
-Each checker names at least one known-failure fixture. Each detector states a non-empty `residual-question`; checker and manual contracts omit that field. Eutaxis registers version 1 of `eutaxis/manual-judgment`. Its evidence identifies the reviewer and obligation, then records the observation and conclusion. Therefore, `manual` is not an unregistered escape value.
+Each checker names at least one known-failure fixture. Each detector states a non-empty `residual-question` and uses `failure-behavior: block`; checker and manual contracts omit the residual question. The candidate and record failure behaviors remain outside version 1 detector execution because their exception, evidence, and completion semantics are not defined. Eutaxis registers version 1 of `eutaxis/manual-judgment`. Its evidence identifies the reviewer and obligation, then records the observation and conclusion. Therefore, `manual` is not an unregistered escape value.
 
 An `operation` declares a versioned action contract. The contract defines:
 

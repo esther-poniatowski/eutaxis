@@ -296,6 +296,26 @@ def test_persisted_evaluator_projection_preserves_class_invariants(
         _load_document(document)
 
 
+@pytest.mark.parametrize("failure_behavior", ["candidate", "record"])
+def test_persisted_detector_requires_blocking_failure_behavior(
+    failure_behavior: str,
+) -> None:
+    document = _document()
+    query = _evaluator_query(document)
+    query.update(
+        {
+            "evaluator-kind": "detector",
+            "coverage": "partial",
+            "adjudication": "candidate",
+            "residual-question": "Does the candidate remain?",
+            "failure-behavior": failure_behavior,
+        }
+    )
+
+    with pytest.raises(DeclarationCatalogError, match="Invalid catalog index"):
+        _load_document(document)
+
+
 @pytest.mark.parametrize(
     "value",
     [

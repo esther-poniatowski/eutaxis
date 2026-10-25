@@ -308,6 +308,14 @@ def test_schema_invalid_fixtures_fail(filename: str) -> None:
         load_declaration(FIXTURES / "invalid" / filename)
 
 
+def test_invalid_embedded_schema_fixture_reaches_its_named_defect() -> None:
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(FIXTURES / "invalid" / "invalid-embedded-schema.yaml")
+
+    assert captured.value.location == "$.evidence-schema.type"
+    assert "not-a-json-schema-type" in str(captured.value)
+
+
 def test_unknown_norm_reference_fails_semantic_validation() -> None:
     with pytest.raises(DeclarationSemanticError, match="unknown norms"):
         load_declaration(FIXTURES / "invalid" / "unknown-norm.yaml")
@@ -471,6 +479,24 @@ def test_detector_requires_its_residual_question(tmp_path: Path) -> None:
 
     assert captured.value.location == "$"
     assert "residual-question" in str(captured.value)
+
+
+@pytest.mark.parametrize("failure_behavior", ["candidate", "record"])
+def test_detector_requires_blocking_failure_behavior(
+    tmp_path: Path, failure_behavior: str
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["evaluator-kind"] = "detector"
+        document["coverage"] = "partial"
+        document["adjudication"] = "candidate"
+        document["residual-question"] = "Does the candidate violate the criterion?"
+        document["failure-behavior"] = failure_behavior
+
+    path = _write_variant(tmp_path, "evaluator.yaml", mutate)
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.failure-behavior"
 
 
 @pytest.mark.parametrize("evaluator_kind", ["checker", "manual"])

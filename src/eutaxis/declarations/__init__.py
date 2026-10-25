@@ -9,6 +9,7 @@ from .exceptions import (
     DeclarationRegistryError,
     DeclarationSchemaError,
     DeclarationSemanticError,
+    DetectorRunnerRegistryError,
     EvaluatorFixtureError,
     EvaluatorFixtureSchemaError,
     EvaluatorFixtureSemanticError,
@@ -164,9 +165,13 @@ from .runners import (
     CheckerRunner,
     CheckerRunnerBinding,
     CheckerRunnerRegistry,
+    DetectorRunner,
+    DetectorRunnerBinding,
+    DetectorRunnerRegistry,
     build_checker_runner_registry,
+    build_detector_runner_registry,
 )
-from .results import CheckerResult, EvaluationState
+from .results import CheckerResult, DetectorResult, EvaluationState
 from .static_query import StaticCatalogQuery, StaticField, StaticPredicate
 
 __all__ = [
@@ -203,6 +208,11 @@ __all__ = [
     "DeclarationKind",
     "DeclarationSchemaError",
     "DeclarationSemanticError",
+    "DetectorResult",
+    "DetectorRunner",
+    "DetectorRunnerBinding",
+    "DetectorRunnerRegistry",
+    "DetectorRunnerRegistryError",
     "EvaluatorDeclaration",
     "EvaluatorFixture",
     "EvaluatorFixtureDigest",
@@ -279,6 +289,7 @@ __all__ = [
     "build_declaration_catalog",
     "conjoin_applicability",
     "build_checker_runner_registry",
+    "build_detector_runner_registry",
     "build_operation_runner_registry",
     "catalog_json_bytes",
     "catalog_index_schema",

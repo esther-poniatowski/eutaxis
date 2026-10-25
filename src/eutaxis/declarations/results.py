@@ -1,4 +1,4 @@
-"""Immutable result values returned by checker runners."""
+"""Immutable result values returned by evaluator runners."""
 
 from __future__ import annotations
 
@@ -24,4 +24,13 @@ class CheckerResult:
     evaluator: VersionedReference
     input_revision: str
     state: EvaluationState
+    evidence: Mapping[str, JsonValue]
+
+
+@dataclass(frozen=True)
+class DetectorResult:
+    """One detector-identified successful candidate-evidence result."""
+
+    evaluator: VersionedReference
+    input_revision: str
     evidence: Mapping[str, JsonValue]

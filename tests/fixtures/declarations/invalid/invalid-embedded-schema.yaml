@@ -10,7 +10,8 @@ version: 1
 evaluator-kind: detector
 coverage: partial
 adjudication: candidate
+residual-question: Does the candidate violate the obligation?
 timing: post-artifact
 input-revisions: [declaration-v1]
 evidence-schema: {type: not-a-json-schema-type}
-failure-behavior: candidate
+failure-behavior: block

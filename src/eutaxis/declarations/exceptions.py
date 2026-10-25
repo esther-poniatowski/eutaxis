@@ -132,6 +132,14 @@ class CheckerRunnerRegistryError(Exception):
         self.location = location
 
 
+class DetectorRunnerRegistryError(Exception):
+    """Report an invalid code-owned detector runner binding."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid detector runner registry at {location}: {message}")
+        self.location = location
+
+
 class CheckerExecutionError(Exception):
     """Report an invalid checker invocation, fixture binding, or result."""
 

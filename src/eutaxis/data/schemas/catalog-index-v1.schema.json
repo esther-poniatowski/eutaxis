@@ -121,7 +121,8 @@
           "then": {
             "properties": {
               "coverage": {"const": "partial"},
-              "adjudication": {"const": "candidate"}
+              "adjudication": {"const": "candidate"},
+              "failure-behavior": {"const": "block"}
             },
             "required": ["residual-question"]
           },
