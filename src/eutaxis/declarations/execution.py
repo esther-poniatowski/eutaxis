@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping, NoReturn, cast
+from typing import NoReturn, SupportsIndex, cast
 
 from ._runner_support import exception_detail
 from .embedded_schema import validate_json_instance
 from .exceptions import CheckerExecutionError
-from .fixtures import EvaluatorFixture, EvaluatorFixtureIndex
+from .fixtures import (
+    EvaluatorFixture,
+    EvaluatorFixtureIndex,
+    _is_loader_issued_fixture_index,
+)
 from .models import (
     DeclarationKind,
     EvaluatorDeclaration,
@@ -21,6 +28,80 @@ from .registry import DeclarationRegistry, RegisteredDeclaration
 from .results import CheckerResult, EvaluationState
 from .runners import CheckerRunnerRegistry
 from .source import DocumentPath, SourceMap, format_document_path, nearest_location
+
+_ASSURANCE_ISSUER = object()
+
+
+@dataclass(frozen=True)
+class KnownFailureFixtureResult:
+    """One declared fixture identifier paired with its validated result."""
+
+    fixture_id: str
+    result: CheckerResult
+
+
+@dataclass(frozen=True)
+class KnownFailureEvaluatorAssurance:
+    """The complete authored fixture sequence validated for one checker."""
+
+    evaluator: VersionedReference
+    fixtures: tuple[KnownFailureFixtureResult, ...]
+
+
+@dataclass(frozen=True, init=False, eq=False)
+class KnownFailureAssurance(Mapping[str, CheckerResult]):
+    """Process-local proof that one exact known-failure run succeeded."""
+
+    declarations: DeclarationRegistry
+    fixtures: EvaluatorFixtureIndex
+    runners: CheckerRunnerRegistry
+    evaluators: Mapping[VersionedReference, KnownFailureEvaluatorAssurance]
+    _results: Mapping[str, CheckerResult]
+    _issuer: object
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        """Reject construction outside known-failure execution."""
+        raise TypeError(
+            "KnownFailureAssurance instances must be issued by known-failure execution"
+        )
+
+    def __getitem__(self, fixture_id: str) -> CheckerResult:
+        """Return the validated result for one declared fixture."""
+        return self._results[fixture_id]
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate fixture identifiers in canonical execution order."""
+        return iter(self._results)
+
+    def __len__(self) -> int:
+        """Return the number of executed declared fixtures."""
+        return len(self._results)
+
+    def __eq__(self, other: object) -> bool:
+        """Compare assurances only by process-local object identity."""
+        return self is other
+
+    def __ne__(self, other: object) -> bool:
+        """Distinguish assurances only by process-local object identity."""
+        return self is not other
+
+    __hash__ = object.__hash__
+
+    def __copy__(self) -> NoReturn:
+        """Reject reconstruction by shallow copying."""
+        raise TypeError("KnownFailureAssurance instances cannot be copied")
+
+    def __deepcopy__(self, _memo: object) -> NoReturn:
+        """Reject reconstruction by deep copying."""
+        raise TypeError("KnownFailureAssurance instances cannot be copied")
+
+    def __reduce__(self) -> NoReturn:
+        """Reject serialization and reconstruction."""
+        raise TypeError("KnownFailureAssurance instances cannot be serialized")
+
+    def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
+        """Reject protocol-specific serialization and reconstruction."""
+        raise TypeError("KnownFailureAssurance instances cannot be serialized")
 
 
 def execute_checker(
@@ -93,14 +174,25 @@ def execute_known_failure_fixtures(
     declarations: DeclarationRegistry,
     fixtures: EvaluatorFixtureIndex,
     runners: CheckerRunnerRegistry,
-) -> Mapping[str, CheckerResult]:
-    """Resolve and execute every checker-declared known-failure fixture."""
+) -> KnownFailureAssurance:
+    """Execute every declared known failure and issue its correlated assurance."""
+    if not _is_loader_issued_fixture_index(fixtures):
+        raise CheckerExecutionError(
+            "$",
+            "fixture index was not issued by validated fixture loading",
+        )
     if declarations is not runners.declarations:
         raise CheckerExecutionError(
             "$",
             "runner registry was built from a different declaration registry",
         )
-    owners: dict[str, VersionedReference] = {}
+    plans: list[
+        tuple[
+            VersionedReference,
+            RegisteredDeclaration,
+            tuple[EvaluatorFixture, ...],
+        ]
+    ] = []
     for family_id in sorted(declarations.families):
         family = declarations.families[family_id]
         if family.kind is not DeclarationKind.EVALUATOR:
@@ -113,6 +205,7 @@ def execute_known_failure_fixtures(
             reference = VersionedReference(
                 evaluator_contract.id, evaluator_contract.version
             )
+            authored_fixtures: list[EvaluatorFixture] = []
             for index, fixture_id in enumerate(
                 evaluator_contract.known_failure_fixtures
             ):
@@ -129,67 +222,144 @@ def execute_known_failure_fixtures(
                         ("evaluator",),
                         f"fixture points to {fixture.evaluator.id!r}@{fixture.evaluator.version}, not {reference.id!r}@{reference.version}",
                     )
-                owners[fixture_id] = reference
+                authored_fixtures.append(fixture)
+            plans.append((reference, record, tuple(authored_fixtures)))
 
     results: dict[str, CheckerResult] = {}
-    for fixture_id, fixture in fixtures.fixtures.items():
-        owner_reference = owners.get(fixture_id)
-        if owner_reference is None:
-            continue
-        if owner_reference not in runners.bindings:
-            _raise_fixture_error(
-                fixture,
-                ("evaluator",),
-                f"no runner is registered for evaluator {owner_reference.id!r}@{owner_reference.version}",
+    evaluator_assurances: dict[VersionedReference, KnownFailureEvaluatorAssurance] = {}
+    for reference, _record, plan_fixtures in plans:
+        paired_results: list[KnownFailureFixtureResult] = []
+        for fixture in plan_fixtures:
+            if reference not in runners.bindings:
+                _raise_fixture_error(
+                    fixture,
+                    ("evaluator",),
+                    f"no runner is registered for evaluator {reference.id!r}@{reference.version}",
+                )
+            raw_input_error = validate_json_instance(
+                runners.input_contracts[reference], fixture.input
             )
-        raw_input_error = validate_json_instance(
-            runners.input_contracts[owner_reference], fixture.input
+            if raw_input_error is not None:
+                _raise_fixture_error(
+                    fixture,
+                    ("input",) + tuple(raw_input_error.absolute_path),
+                    f"input violates the registered operation contract: {raw_input_error.message}",
+                )
+            invocation_input: Mapping[str, object] = {
+                "sources": [str(path) for path in fixture.sources],
+                "facet-registry": str(fixture.facet_registry),
+            }
+            try:
+                expected_state = EvaluationState(fixture.expected_state)
+            except ValueError:
+                _raise_fixture_error(
+                    fixture,
+                    ("expected-state",),
+                    f"unknown expected state {fixture.expected_state!r}",
+                )
+            _verify_fixture_digests(fixture)
+            try:
+                try:
+                    result = execute_checker(
+                        runners,
+                        reference,
+                        input_revision=fixture.input_revision,
+                        input_data=invocation_input,
+                        expected_state=expected_state,
+                        path=fixture.path,
+                    )
+                finally:
+                    _verify_fixture_digests(fixture)
+            except CheckerExecutionError as exc:
+                _relocate_fixture_execution_error(fixture, exc)
+            results[fixture.id] = result
+            paired_results.append(
+                KnownFailureFixtureResult(fixture_id=fixture.id, result=result)
+            )
+        expected_ids = tuple(fixture.id for fixture in plan_fixtures)
+        actual_ids = tuple(pair.fixture_id for pair in paired_results)
+        if len(paired_results) != len(expected_ids) or actual_ids != expected_ids:
+            raise AssertionError("known-failure assurance lost declared fixture order")
+        evaluator_assurances[reference] = KnownFailureEvaluatorAssurance(
+            evaluator=reference,
+            fixtures=tuple(paired_results),
         )
-        if raw_input_error is not None:
+
+    for _reference, _record, plan_fixtures in plans:
+        for fixture in plan_fixtures:
+            _verify_fixture_digests(fixture)
+
+    return _issue_known_failure_assurance(
+        declarations,
+        fixtures,
+        runners,
+        evaluator_assurances,
+        results,
+    )
+
+
+def _issue_known_failure_assurance(
+    declarations: DeclarationRegistry,
+    fixtures: EvaluatorFixtureIndex,
+    runners: CheckerRunnerRegistry,
+    evaluators: Mapping[VersionedReference, KnownFailureEvaluatorAssurance],
+    results: Mapping[str, CheckerResult],
+) -> KnownFailureAssurance:
+    """Issue one process-local aggregate after complete execution validation."""
+    assurance = object.__new__(KnownFailureAssurance)
+    object.__setattr__(assurance, "declarations", declarations)
+    object.__setattr__(assurance, "fixtures", fixtures)
+    object.__setattr__(assurance, "runners", runners)
+    object.__setattr__(assurance, "evaluators", MappingProxyType(dict(evaluators)))
+    object.__setattr__(assurance, "_results", MappingProxyType(dict(results)))
+    object.__setattr__(assurance, "_issuer", _ASSURANCE_ISSUER)
+    return assurance
+
+
+def _verify_fixture_digests(fixture: EvaluatorFixture) -> None:
+    """Reject a fixture file occurrence that differs from its loaded bytes."""
+    cache: dict[Path, str] = {}
+    for digest in fixture.digests:
+        try:
+            if digest.path not in cache:
+                cache[digest.path] = hashlib.sha256(
+                    digest.path.read_bytes()
+                ).hexdigest()
+            observed = cache[digest.path]
+        except OSError as exc:
             _raise_fixture_error(
                 fixture,
-                ("input",) + tuple(raw_input_error.absolute_path),
-                f"input violates the registered operation contract: {raw_input_error.message}",
+                digest.document_path,
+                f"{digest.role} file cannot be read during assurance: {exc}",
             )
-        invocation_input: Mapping[str, object] = {
-            "sources": [str(path) for path in fixture.sources],
-            "facet-registry": str(fixture.facet_registry),
-        }
-        try:
-            expected_state = EvaluationState(fixture.expected_state)
-        except ValueError:
+        if observed != digest.sha256:
             _raise_fixture_error(
                 fixture,
-                ("expected-state",),
-                f"unknown expected state {fixture.expected_state!r}",
+                digest.document_path,
+                f"{digest.role} file changed after the fixture index was loaded",
             )
-        try:
-            results[fixture_id] = execute_checker(
-                runners,
-                owner_reference,
-                input_revision=fixture.input_revision,
-                input_data=invocation_input,
-                expected_state=expected_state,
-                path=fixture.path,
-            )
-        except CheckerExecutionError as exc:
-            if exc.document_path in {
-                ("evaluator",),
-                ("input-revision",),
-            }:
-                _raise_fixture_error(
-                    fixture,
-                    cast(DocumentPath, exc.document_path),
-                    exc.detail,
-                )
-            if exc.document_path and exc.document_path[0] == "input":
-                _raise_fixture_error(
-                    fixture,
-                    cast(DocumentPath, exc.document_path),
-                    exc.detail,
-                )
-            raise
-    return MappingProxyType(results)
+
+
+def _relocate_fixture_execution_error(
+    fixture: EvaluatorFixture, error: CheckerExecutionError
+) -> NoReturn:
+    """Move input-contract failures from invocation paths to descriptor fields."""
+    if error.document_path in {
+        ("evaluator",),
+        ("input-revision",),
+    }:
+        _raise_fixture_error(
+            fixture,
+            cast(DocumentPath, error.document_path),
+            error.detail,
+        )
+    if error.document_path and error.document_path[0] == "input":
+        _raise_fixture_error(
+            fixture,
+            cast(DocumentPath, error.document_path),
+            error.detail,
+        )
+    raise error
 
 
 def _validate_result(

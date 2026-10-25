@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
-from typing import Iterable, Mapping, NoReturn, TypeAlias, cast
+from typing import (
+    Iterable,
+    Literal,
+    Mapping,
+    NoReturn,
+    SupportsIndex,
+    TypeAlias,
+    cast,
+)
 
 from .embedded_schema import validate_json_instance
 from .exceptions import (
@@ -24,6 +33,18 @@ from .source import (
 
 EvaluatorInputContracts: TypeAlias = Mapping[VersionedReference, Mapping[str, object]]
 _PATH_RESOLUTION_ERRORS = (OSError, RuntimeError, ValueError)
+_FIXTURE_INDEX_ISSUER = object()
+
+
+@dataclass(frozen=True)
+class EvaluatorFixtureDigest:
+    """One fixture-owned file occurrence and its loaded SHA-256 digest."""
+
+    path: Path
+    sha256: str
+    fixture_id: str
+    role: Literal["descriptor", "source", "facet-registry"]
+    document_path: DocumentPath
 
 
 @dataclass(frozen=True)
@@ -39,16 +60,40 @@ class EvaluatorFixture:
     expected_state: str
     sources: tuple[Path, ...]
     facet_registry: Path
+    digests: tuple[EvaluatorFixtureDigest, ...]
     locations: SourceMap
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False, eq=False)
 class EvaluatorFixtureIndex:
-    """A deterministic, immutable index of evaluator fixtures."""
+    """A deterministic fixture index issued only by the validated loader."""
 
     root: Path
     paths: tuple[Path, ...]
     fixtures: Mapping[str, EvaluatorFixture]
+    _issuer: object
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        """Reject construction outside validated fixture loading."""
+        raise TypeError(
+            "EvaluatorFixtureIndex instances must be issued by fixture loading"
+        )
+
+    def __copy__(self) -> NoReturn:
+        """Reject reconstruction by shallow copying."""
+        raise TypeError("EvaluatorFixtureIndex instances cannot be copied")
+
+    def __deepcopy__(self, _memo: object) -> NoReturn:
+        """Reject reconstruction by deep copying."""
+        raise TypeError("EvaluatorFixtureIndex instances cannot be copied")
+
+    def __reduce__(self) -> NoReturn:
+        """Reject serialization and reconstruction."""
+        raise TypeError("EvaluatorFixtureIndex instances cannot be serialized")
+
+    def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
+        """Reject protocol-specific serialization and reconstruction."""
+        raise TypeError("EvaluatorFixtureIndex instances cannot be serialized")
 
 
 def load_evaluator_fixture_index(
@@ -94,10 +139,28 @@ def load_evaluator_fixture_index(
                 f"duplicate fixture id {fixture.id!r}",
             )
         fixtures[fixture.id] = fixture
-    return EvaluatorFixtureIndex(
-        root=canonical_root,
-        paths=canonical_paths,
-        fixtures=MappingProxyType(fixtures),
+    return _issue_fixture_index(canonical_root, canonical_paths, fixtures)
+
+
+def _issue_fixture_index(
+    root: Path,
+    paths: tuple[Path, ...],
+    fixtures: Mapping[str, EvaluatorFixture],
+) -> EvaluatorFixtureIndex:
+    """Issue one aggregate after every descriptor passes validated loading."""
+    index = object.__new__(EvaluatorFixtureIndex)
+    object.__setattr__(index, "root", root)
+    object.__setattr__(index, "paths", paths)
+    object.__setattr__(index, "fixtures", MappingProxyType(dict(fixtures)))
+    object.__setattr__(index, "_issuer", _FIXTURE_INDEX_ISSUER)
+    return index
+
+
+def _is_loader_issued_fixture_index(index: object) -> bool:
+    """Return whether ``index`` carries this process's loader authority."""
+    return (
+        isinstance(index, EvaluatorFixtureIndex)
+        and getattr(index, "_issuer", None) is _FIXTURE_INDEX_ISSUER
     )
 
 
@@ -108,7 +171,7 @@ def _load_evaluator_fixture(
     input_contracts: EvaluatorInputContracts,
 ) -> tuple[EvaluatorFixture, SourceMap]:
     """Load one descriptor and validate its resources and typed input."""
-    document, locations, _source_sha256 = load_yaml_document(
+    document, locations, source_sha256 = load_yaml_document(
         path, error_type=EvaluatorFixtureSchemaError
     )
     validated = validate_evaluator_fixture_document(
@@ -152,20 +215,78 @@ def _load_evaluator_fixture(
         parts=("input", "facet-registry"),
         locations=locations,
     )
+    fixture_id = str(validated["id"])
+    digests = (
+        EvaluatorFixtureDigest(
+            path=path,
+            sha256=source_sha256,
+            fixture_id=fixture_id,
+            role="descriptor",
+            document_path=(),
+        ),
+        *(
+            _resource_digest(
+                resource,
+                fixture_id=fixture_id,
+                role="source",
+                document_path=("input", "sources", index),
+                descriptor=path,
+                locations=locations,
+            )
+            for index, resource in enumerate(sources)
+        ),
+        _resource_digest(
+            facet_registry,
+            fixture_id=fixture_id,
+            role="facet-registry",
+            document_path=("input", "facet-registry"),
+            descriptor=path,
+            locations=locations,
+        ),
+    )
     return (
         EvaluatorFixture(
             path=path,
             schema_version=cast(int, validated["schema-version"]),
-            id=str(validated["id"]),
+            id=fixture_id,
             evaluator=evaluator,
             input_revision=str(validated["input-revision"]),
             input=cast(Mapping[str, JsonValue], freeze_json(input_data)),
             expected_state=str(validated["expected-state"]),
             sources=sources,
             facet_registry=facet_registry,
+            digests=digests,
             locations=MappingProxyType(dict(locations)),
         ),
         MappingProxyType(dict(locations)),
+    )
+
+
+def _resource_digest(
+    path: Path,
+    *,
+    fixture_id: str,
+    role: Literal["source", "facet-registry"],
+    document_path: DocumentPath,
+    descriptor: Path,
+    locations: SourceMap,
+) -> EvaluatorFixtureDigest:
+    """Hash one resolved resource and retain its descriptor occurrence."""
+    try:
+        sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as exc:
+        _raise_fixture_semantic(
+            descriptor,
+            locations,
+            document_path,
+            f"fixture resource cannot be read: {exc}",
+        )
+    return EvaluatorFixtureDigest(
+        path=path,
+        sha256=sha256,
+        fixture_id=fixture_id,
+        role=role,
+        document_path=document_path,
     )
 
 

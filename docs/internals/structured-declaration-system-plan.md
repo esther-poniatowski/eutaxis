@@ -132,6 +132,7 @@ This phase has turned the validated registry into a static query boundary, resol
 ### Enforcement and completion
 
 - [x] Derive mechanical, assisted, and deliberative classes from evaluator contracts without claiming runner readiness.
+- [x] Issue one process-local known-failure assurance with immutable per-evaluator fixture/result pairs and verified descriptor and resource digests.
 - [ ] Emit three attention packets and a separate resolution trace.
 - [ ] Require evidence for every effective obligation in the completion ledger.
 - [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.

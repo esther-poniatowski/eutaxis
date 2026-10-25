@@ -35,7 +35,13 @@ from .composition import (
     assemble_cumulative_artifact,
     plan_cumulative_composition,
 )
-from .execution import execute_checker, execute_known_failure_fixtures
+from .execution import (
+    KnownFailureAssurance,
+    KnownFailureEvaluatorAssurance,
+    KnownFailureFixtureResult,
+    execute_checker,
+    execute_known_failure_fixtures,
+)
 from .enforcement import (
     EnforcementClass,
     EnforcementClassificationError,
@@ -52,6 +58,7 @@ from .fixture_schema import (
 )
 from .fixtures import (
     EvaluatorFixture,
+    EvaluatorFixtureDigest,
     EvaluatorFixtureIndex,
     EvaluatorInputContracts,
     load_evaluator_fixture_index,
@@ -198,6 +205,7 @@ __all__ = [
     "DeclarationSemanticError",
     "EvaluatorDeclaration",
     "EvaluatorFixture",
+    "EvaluatorFixtureDigest",
     "EvaluatorFixtureError",
     "EvaluatorFixtureIndex",
     "EvaluatorFixtureSchemaError",
@@ -217,6 +225,9 @@ __all__ = [
     "LiteralBinding",
     "LoadedDeclarationSource",
     "LOAD_DECLARATION_REGISTRY_OPERATION",
+    "KnownFailureAssurance",
+    "KnownFailureEvaluatorAssurance",
+    "KnownFailureFixtureResult",
     "ManifestAnchor",
     "ManifestSection",
     "Norm",
