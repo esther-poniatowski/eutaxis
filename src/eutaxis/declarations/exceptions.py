@@ -234,6 +234,15 @@ class ProcedureObservationError(Exception):
         self.detail = message
 
 
+class PreActionEvidenceError(Exception):
+    """Report an invalid pre-action evidence transaction."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid pre-action evidence at {location}: {message}")
+        self.location = location
+        self.detail = message
+
+
 class OperationRunnerRegistryError(Exception):
     """Report an invalid code-owned operation runner binding."""
 

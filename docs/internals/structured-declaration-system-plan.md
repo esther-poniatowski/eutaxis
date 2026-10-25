@@ -56,11 +56,11 @@ all of them against one coherent provider snapshot. The resulting aggregate does
 not authorize the executor to enter the procedure. Evaluator-backed procedure
 preconditions are now correlated with the exact run through detached canonical
 parameters, predicates, invocation inputs, and schemas. This correlation runs no
-evaluator and grants no clearance. The executor must next validate or execute
-the three enforcement classes in one pre-action evidence transaction. That
-transaction must consume the evaluator-less observation aggregate, pair each
-assisted execution with a validated residual judgment, retain all evidence for
-completion, and derive clearance from the combined precondition results without
+evaluator and grants no clearance. The pre-action evidence session now validates
+or executes the three enforcement classes in one transaction. That transaction
+consumes the evaluator-less observation aggregate, pairs each
+assisted execution with a validated residual judgment, retains all evidence for
+completion, and derives clearance from the combined precondition results without
 executing the same evaluator again. It is a single-use session that enters a
 non-reentrant `running` state before any evaluator or callback, executes
 detectors before requesting residual judgments, and becomes terminal after
@@ -71,8 +71,12 @@ The completed aggregate retains one typed record per canonical pre-action
 requirement, with the trace, frozen human evidence, issued detector execution
 and residual judgment, validated checker result, or blocking diagnostic owned
 by its enforcement class. Separate exact key sets govern manual submissions and
-residual providers. The correlation plan must first retain every detached
-evaluator input produced during planning.
+residual providers. One atomic run-scoped claim prevents a second evaluation
+plan from claiming the same live run; the weak claim does not retain an
+otherwise unreachable run graph. A separate per-session execution claim rejects
+concurrent and reentrant calls. One publication snapshot couples terminal state
+with issued evidence. The correlation plan retains every detached evaluator
+input produced during planning.
 The remaining execution phases then extend the same evidence lifecycle.
 
 ## Decision log and open prerequisites
@@ -177,7 +181,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Observe every evaluator-less precondition of a procedure from one minimal, schema-valid provider snapshot without authorizing procedure entry.
 - [x] Correlate evaluator-backed procedure preconditions with exact run parameters and detached canonical evaluator inputs without executing evaluators or granting clearance.
 - [x] Retain each detached validated evaluator input in its assisted or mechanical precondition correlation record.
-- [ ] Define and implement one single-use pre-action evidence transaction that requires the issued evaluator-less observation aggregate, validates exact manual-judgment keys, enters a non-reentrant running state before callbacks or evaluators, executes each detector before requesting and validating its residual judgment, executes each mechanical evaluator exactly once, retains all evidence for completion, and derives clearance from the combined results. Map runner and result failures to blocked evidence only after authority revalidation; make every other post-start failure terminal; and preserve distinct authorities for observing, evaluating, and authorizing.
+- [x] Define and implement one single-use pre-action evidence transaction that requires the issued evaluator-less observation aggregate, validates exact manual-judgment keys, enters a non-reentrant running state before callbacks or evaluators, executes each detector before requesting and validating its residual judgment, executes each mechanical evaluator exactly once, retains all evidence for completion, and derives clearance from the combined results. Map runner and result failures to blocked evidence only after authority revalidation; make every other post-start failure terminal; and preserve distinct authorities for observing, evaluating, and authorizing.
 - [ ] Observe invariants and postconditions at their defined phases; observe each operation predicate before invoking its runner.
 - [ ] Extend the evidence transaction to validate manual submissions and assisted detector-plus-residual submissions for invariant, postcondition, and operation-precondition occurrences against exact retained contracts.
 - [ ] Extend the evidence transaction with repeated assurance-freshness checks for later mechanical requirements, without rerunning retained pre-action evidence.

@@ -317,13 +317,13 @@ that shared context. Consequently, an accepted aggregate cannot combine
 evidence from two snapshots. False and unknown remain evidence values. Neither
 value maps to a completion state or authorizes procedure entry at this boundary.
 
-The evaluator-backed procedure-precondition input boundary is now correlated.
-The remaining execution contract must evaluate those preconditions before it
-defines clearance. Then, the contract must define where invariants and
-postconditions are observed. The contract must separately locate each operation
-precondition before runner invocation. Those later boundaries may extend the
-coordinate and retained action data. However, each boundary must preserve five
-separate authorities:
+The evaluator-backed procedure-precondition input boundary is now correlated,
+and the pre-action evidence session evaluates those preconditions before it
+derives clearance. The remaining execution contract must define where
+invariants and postconditions are observed. It must separately locate each
+operation precondition before runner invocation. Those later boundaries may
+extend the coordinate and retained action data. However, each boundary must
+preserve five separate authorities:
 
 - an observer acquires context
 - an evaluator decides a predicate
@@ -393,8 +393,8 @@ correlation plan. It retains separate manual, assisted, and mechanical records,
 the detached parameters, the exact provider mapping, and each detached
 validated evaluator input returned during planning. It executes no
 evaluator, makes no predicate judgment, records no completion evidence, and
-grants no clearance. The next design must define one pre-action evidence
-transaction. The caller creates one process-local transaction session from the
+grants no clearance. `create_pre_action_evidence_session` creates one
+process-local transaction session from the
 correlation plan and an issuer-stamped evaluator-less observation aggregate,
 including an empty aggregate when that class has no requirements. The session
 validates every authority and exact submission key set before execution. It then
@@ -426,7 +426,11 @@ Manual submissions and residual providers use separate exact key sets derived
 from the correlation plan. A missing or additional key fails before `running`,
 and mapping order has no semantic effect.
 
-The session is single-use. Its state is `ready` during pre-execution validation
+The session is single-use per exact `ProcedureRunPlan`; issuing a second
+evaluation plan cannot reclaim the same run. A module-owned weak claim preserves
+that ownership without retaining an unreachable run graph. Factory claims and
+execution claims are atomic under separate locks, while callbacks execute
+without either lock held. Its state is `ready` during pre-execution validation
 and changes to `running` before the first evaluator invocation or residual
 provider callback. A reentrant execution attempt therefore fails. Every exit
 from `running` is terminal: either `completed`, with one immutable evidence
@@ -437,6 +441,8 @@ runner twice. A caller that needs a new attempt must prepare a new run and new
 observation and evaluation plans. The completed aggregate retains all
 precondition evidence for later completion. The completion ledger consumes
 these records and never executes a retained precondition evaluator again.
+State and evidence publish as one immutable control snapshot, so an interrupted
+completion cannot expose evidence from a failed session.
 
 The ledger uses one atomic builder. The builder accepts only a privately issued
 plan and derives every record from its canonical completion tuple. For

@@ -3,20 +3,26 @@
 from __future__ import annotations
 
 import copy
+import gc
 import inspect
 import pickle
 import shutil
+import sys
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Barrier, Event
 from types import MappingProxyType
 from typing import Literal, cast
+from weakref import ref as weakref_ref
 
 import pytest
 import yaml
 
 from eutaxis.declarations import (
     AssistedAttentionEntry,
+    AssistedPreconditionEvidence,
     AttentionPlan,
     AttentionPlanningError,
     AttentionRequirements,
@@ -35,7 +41,12 @@ from eutaxis.declarations import (
     EvaluatorInput,
     EvaluatorInvocation,
     LiteralBinding,
+    ManualJudgmentSubmission,
+    ManualPreconditionEvidence,
     MechanicalAttentionEntry,
+    MechanicalPreconditionEvidence,
+    ObservationProvider,
+    ObservedPreconditionEvidence,
     OperationDeclaration,
     OperationFailure,
     OperationObligationSnapshot,
@@ -55,6 +66,12 @@ from eutaxis.declarations import (
     ProcedurePredicateKey,
     ProcedureRunPlan,
     ProcedureRunPlanningError,
+    PreActionEvidenceError,
+    PreActionEvidenceSession,
+    PreActionEvidenceSessionState,
+    ResidualJudgmentProvider,
+    ResidualJudgmentRequest,
+    ResidualJudgmentSubmission,
     RuleCriterionEnforcement,
     RuleCriterionKey,
     RuleObligationSnapshot,
@@ -64,11 +81,14 @@ from eutaxis.declarations import (
     build_declaration_catalog,
     build_detector_runner_registry,
     build_operation_runner_registry,
+    build_observation_provider_registry,
+    create_pre_action_evidence_session,
     derive_attention_requirements,
     execute_known_failure_fixtures,
     load_declaration_registry,
     load_evaluator_fixture_index,
     load_facet_registry,
+    observe_procedure_preconditions,
     plan_attention,
     plan_procedure_precondition_evaluations,
     prepare_procedure_run,
@@ -79,6 +99,10 @@ from eutaxis.declarations.models import JsonValue
 from eutaxis.declarations.procedure_runs import _is_issued_procedure_run_plan
 from eutaxis.declarations.procedure_evaluations import (
     _is_issued_procedure_precondition_evaluation_plan,
+)
+from eutaxis.declarations.pre_action_evidence import (
+    _SESSION_CONTROLS,
+    _is_issued_pre_action_evidence,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -241,6 +265,22 @@ def _checker_result() -> CheckerResult:
     )
 
 
+def _checker_result_for_input(input_data: Mapping[str, JsonValue]) -> CheckerResult:
+    """Fail the known-failure fixture and satisfy ordinary candidate input."""
+    sources = cast(tuple[str, ...], input_data["sources"])
+    state = (
+        EvaluationState.VIOLATED
+        if any(source.endswith("invalid.yaml") for source in sources)
+        else EvaluationState.SATISFIED
+    )
+    return CheckerResult(
+        evaluator=CHECKER,
+        input_revision="declaration-v1",
+        state=state,
+        evidence={"accepted": True},
+    )
+
+
 def _detector_result() -> DetectorResult:
     """Return one schema-valid detector carrier for registry construction."""
     return DetectorResult(
@@ -250,7 +290,17 @@ def _detector_result() -> DetectorResult:
     )
 
 
-def _prepare_registry(tmp_path: Path, mode: Mode):
+def _prepare_registry(
+    tmp_path: Path,
+    mode: Mode,
+    *,
+    checker_runner: CheckerRunner = cast(CheckerRunner, _checker_result_for_input),
+    detector_runner: DetectorRunner = cast(
+        DetectorRunner, lambda input_data: _detector_result()
+    ),
+    duplicate_preconditions: bool = False,
+    local_precondition_operator: str = "exists",
+):
     """Build one registry whose effective obligations match ``mode``."""
     root = tmp_path / "registry"
     shutil.copytree(REGISTRY_FIXTURES, root)
@@ -369,6 +419,22 @@ def _prepare_registry(tmp_path: Path, mode: Mode):
             _predicate("checked-precondition", "assumption", CHECKER),
             _predicate("local-precondition", "assumption", None),
         ]
+        if duplicate_preconditions:
+            cast(list[object], procedure["preconditions"]).extend(
+                [
+                    _predicate("manual-precondition-two", "assumption", MANUAL),
+                    _predicate("detected-precondition-two", "assumption", DETECTOR),
+                ]
+            )
+        if local_precondition_operator == "equals":
+            local = cast(
+                dict[str, object], cast(list[object], procedure["preconditions"])[3]
+            )
+            local["expression"] = {
+                "facet": "scope.project",
+                "operator": "equals",
+                "value": True,
+            }
         procedure["invariants"] = []
         procedure["postconditions"] = [_predicate("written", "postcondition", None)]
         operation["preconditions"] = []
@@ -405,7 +471,7 @@ def _prepare_registry(tmp_path: Path, mode: Mode):
                 CheckerRunnerBinding(
                     CHECKER,
                     CHECK_INPUT,
-                    cast(CheckerRunner, lambda input_data: _checker_result()),
+                    checker_runner,
                 )
             ],
         )
@@ -417,7 +483,7 @@ def _prepare_registry(tmp_path: Path, mode: Mode):
                 DetectorRunnerBinding(
                     DETECTOR,
                     WRITE,
-                    cast(DetectorRunner, lambda input_data: _detector_result()),
+                    detector_runner,
                 )
             ],
         )
@@ -510,10 +576,26 @@ def _procedure_run(attention: AttentionPlan) -> ProcedureRunPlan:
     )
 
 
-def _precondition_run(tmp_path: Path):
+def _precondition_run(
+    tmp_path: Path,
+    *,
+    checker_runner: CheckerRunner = cast(CheckerRunner, _checker_result_for_input),
+    detector_runner: DetectorRunner = cast(
+        DetectorRunner, lambda input_data: _detector_result()
+    ),
+    duplicate_preconditions: bool = False,
+    local_precondition_operator: str = "exists",
+):
     """Build one prepared run with every evaluator enforcement class."""
     root, declarations, resolution, checker_registry, detector_registry = (
-        _prepare_registry(tmp_path, "preconditions")
+        _prepare_registry(
+            tmp_path,
+            "preconditions",
+            checker_runner=checker_runner,
+            detector_runner=detector_runner,
+            duplicate_preconditions=duplicate_preconditions,
+            local_precondition_operator=local_precondition_operator,
+        )
     )
     assert checker_registry is not None and detector_registry is not None
     requirements = derive_attention_requirements(
@@ -4158,6 +4240,884 @@ def test_precondition_evaluation_plan_binds_retained_input_carriers(
     changed_input = changed.assisted[0].evaluator_input
     object.__setattr__(changed_input, "input_revision", "different-revision")
     assert not _is_issued_procedure_precondition_evaluation_plan(changed)
+
+
+def _pre_action_authorities(
+    tmp_path: Path,
+    *,
+    checker_runner: CheckerRunner = cast(CheckerRunner, _checker_result_for_input),
+    detector_runner: DetectorRunner = cast(
+        DetectorRunner, lambda input_data: _detector_result()
+    ),
+    observation_provider: ObservationProvider | None = None,
+    duplicate_preconditions: bool = False,
+    local_precondition_operator: str = "exists",
+):
+    """Build exact pre-action authorities and their external judgment inputs."""
+    _, _, _, run = _precondition_run(
+        tmp_path,
+        checker_runner=checker_runner,
+        detector_runner=detector_runner,
+        duplicate_preconditions=duplicate_preconditions,
+        local_precondition_operator=local_precondition_operator,
+    )
+    supplied = _provider_inputs(run)
+    evaluation_plan = plan_procedure_precondition_evaluations(
+        run,
+        {key: (lambda request, value=value: value) for key, value in supplied.items()},
+    )
+    declarations = run.attention.resolution.registry
+    observation_registry = build_observation_provider_registry(
+        declarations,
+        declarations.facet_registry,
+        observation_provider
+        or cast(
+            ObservationProvider,
+            lambda request: {facet: True for facet in request.facets},
+        ),
+    )
+    observation = observe_procedure_preconditions(run, observation_registry)
+    manual = {
+        cast(ProcedurePredicateKey, record.requirement.key): ManualJudgmentSubmission(
+            cast(ProcedurePredicateKey, record.requirement.key),
+            VersionedReference(
+                record.entry.evaluator.id, record.entry.evaluator.version
+            ),
+            record.entry.evaluator.input_revisions[0],
+            {"conclusion": "satisfied"},
+        )
+        for record in evaluation_plan.manual
+    }
+    residual: dict[ProcedurePredicateKey, ResidualJudgmentProvider] = {}
+    for record in evaluation_plan.assisted:
+        key = cast(ProcedurePredicateKey, record.requirement.key)
+
+        def provider(
+            request: ResidualJudgmentRequest,
+            *,
+            expected_key: ProcedurePredicateKey = key,
+        ) -> ResidualJudgmentSubmission:
+            invocation = next(
+                item.entry.invocation
+                for item in evaluation_plan.assisted
+                if item.requirement.key is expected_key
+            )
+            assert request.requirement.key is expected_key
+            return ResidualJudgmentSubmission(
+                1,
+                expected_key,
+                invocation.evaluator,
+                invocation.input_revision,
+                EvaluationState.SATISFIED,
+                "The detector evidence leaves no violating candidate.",
+            )
+
+        residual[key] = cast(ResidualJudgmentProvider, provider)
+    return evaluation_plan, observation, manual, residual
+
+
+def _pre_action_session_inputs(
+    tmp_path: Path,
+    **kwargs: object,
+):
+    """Build one ready session and its exact external judgment inputs."""
+    plan, observation, manual, residual = _pre_action_authorities(tmp_path, **kwargs)
+    return create_pre_action_evidence_session(plan, observation), manual, residual
+
+
+def test_pre_action_evidence_session_issues_complete_canonical_clearance(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path)
+
+    evidence = session.execute(manual=manual, residual_providers=residual)
+
+    assert session.state is PreActionEvidenceSessionState.COMPLETED
+    assert session.evidence is evidence
+    assert evidence.cleared
+    assert _is_issued_pre_action_evidence(evidence)
+    assert tuple(record.requirement for record in evidence.records) == (
+        evidence.plan.run.pre_action_requirements
+    )
+    assert tuple(type(record) for record in evidence.records) == (
+        ManualPreconditionEvidence,
+        AssistedPreconditionEvidence,
+        MechanicalPreconditionEvidence,
+        ObservedPreconditionEvidence,
+    )
+    assert all(record.state is EvaluationState.SATISFIED for record in evidence.records)
+    with pytest.raises(PreActionEvidenceError, match="completed"):
+        session.execute(manual=manual, residual_providers=residual)
+
+
+def test_pre_action_evidence_rejects_key_errors_before_execution(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path)
+    manual.clear()
+
+    with pytest.raises(PreActionEvidenceError, match="exact required keys"):
+        session.execute(manual=manual, residual_providers=residual)
+
+    assert session.state is PreActionEvidenceSessionState.READY
+    assert session.evidence is None
+
+
+def test_pre_action_evidence_session_rejects_reentrant_execution(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path)
+    key = next(iter(residual))
+    original = residual[key]
+    attempts = 0
+
+    def reentrant(request: ResidualJudgmentRequest) -> ResidualJudgmentSubmission:
+        nonlocal attempts
+        attempts += 1
+        with pytest.raises(PreActionEvidenceError):
+            session.execute(manual=manual, residual_providers=residual)
+        return original(request)
+
+    residual[key] = cast(ResidualJudgmentProvider, reentrant)
+    evidence = session.execute(manual=manual, residual_providers=residual)
+
+    assert attempts == 1
+    assert evidence.cleared
+    assert session.state is PreActionEvidenceSessionState.COMPLETED
+
+
+def test_invalid_residual_judgment_is_terminal_after_detector_execution(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path)
+    key = next(iter(residual))
+
+    residual[key] = cast(
+        ResidualJudgmentProvider,
+        lambda request: ResidualJudgmentSubmission(
+            1,
+            key,
+            request.execution.evaluator,
+            request.execution.input_revision,
+            EvaluationState.SATISFIED,
+            "",
+        ),
+    )
+    with pytest.raises(PreActionEvidenceError, match="rationale"):
+        session.execute(manual=manual, residual_providers=residual)
+
+    assert session.state is PreActionEvidenceSessionState.FAILED_AFTER_EXECUTION
+    with pytest.raises(PreActionEvidenceError, match="failed-after-execution"):
+        session.execute(manual=manual, residual_providers=residual)
+
+
+def test_pre_action_runner_failures_are_blocked_and_batch_continues(
+    tmp_path: Path,
+) -> None:
+    detector_calls = 0
+    checker_calls = 0
+
+    def detector_runner(input_data: Mapping[str, JsonValue]) -> DetectorResult:
+        nonlocal detector_calls
+        detector_calls += 1
+        raise RuntimeError("detector unavailable")
+
+    def checker_runner(input_data: Mapping[str, JsonValue]) -> CheckerResult:
+        nonlocal checker_calls
+        sources = cast(tuple[str, ...], input_data["sources"])
+        if any(source.endswith("invalid.yaml") for source in sources):
+            return _checker_result()
+        checker_calls += 1
+        raise RuntimeError("checker unavailable")
+
+    session, manual, residual = _pre_action_session_inputs(
+        tmp_path,
+        checker_runner=cast(CheckerRunner, checker_runner),
+        detector_runner=cast(DetectorRunner, detector_runner),
+    )
+    residual_calls = 0
+    assisted_key = next(iter(residual))
+
+    def forbidden_residual(
+        request: ResidualJudgmentRequest,
+    ) -> ResidualJudgmentSubmission:
+        nonlocal residual_calls
+        residual_calls += 1
+        raise AssertionError("residual judgment must not run after detector failure")
+
+    residual[assisted_key] = cast(ResidualJudgmentProvider, forbidden_residual)
+    evidence = session.execute(manual=manual, residual_providers=residual)
+
+    assert detector_calls == 1
+    assert checker_calls == 1
+    assert residual_calls == 0
+    assert session.state is PreActionEvidenceSessionState.COMPLETED
+    assert not evidence.cleared
+    assisted = next(
+        record
+        for record in evidence.records
+        if type(record) is AssistedPreconditionEvidence
+    )
+    mechanical = next(
+        record
+        for record in evidence.records
+        if type(record) is MechanicalPreconditionEvidence
+    )
+    assert assisted.state is EvaluationState.BLOCKED
+    assert assisted.execution is None and assisted.judgment is None
+    assert "detector unavailable" in cast(str, assisted.diagnostic)
+    assert mechanical.state is EvaluationState.BLOCKED
+    assert mechanical.result is None
+    assert "checker unavailable" in cast(str, mechanical.diagnostic)
+    assert _is_issued_pre_action_evidence(evidence)
+
+
+def test_pre_action_evidence_requires_observation_from_the_same_run(
+    tmp_path: Path,
+) -> None:
+    session, _, _ = _pre_action_session_inputs(tmp_path / "first")
+    foreign, _, _ = _pre_action_session_inputs(tmp_path / "second")
+
+    with pytest.raises(PreActionEvidenceError, match="another run"):
+        create_pre_action_evidence_session(session.plan, foreign.observation)
+
+
+def test_pre_action_evidence_accepts_issued_empty_observation(
+    tmp_path: Path,
+) -> None:
+    _, declarations, resolution, _, _ = _prepare_registry(tmp_path, "none")
+    attention = plan_attention(derive_attention_requirements(resolution), {})
+    run = _procedure_run(attention)
+    plan = plan_procedure_precondition_evaluations(run, {})
+
+    def forbidden_observation(request: object) -> Mapping[str, object]:
+        raise AssertionError("empty observation must not call its provider")
+
+    registry = build_observation_provider_registry(
+        declarations,
+        declarations.facet_registry,
+        cast(ObservationProvider, forbidden_observation),
+    )
+    observation = observe_procedure_preconditions(run, registry)
+    session = create_pre_action_evidence_session(plan, observation)
+
+    evidence = session.execute(manual={}, residual_providers={})
+
+    assert evidence.records == ()
+    assert evidence.cleared
+    assert _is_issued_pre_action_evidence(evidence)
+
+
+def test_residual_provider_cannot_mutate_issued_detector_execution(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path)
+    key = next(iter(residual))
+    original = residual[key]
+
+    def mutating_provider(
+        request: ResidualJudgmentRequest,
+    ) -> ResidualJudgmentSubmission:
+        judgment = original(request)
+        object.__setattr__(
+            request.execution,
+            "evidence",
+            MappingProxyType({"accepted": False}),
+        )
+        return judgment
+
+    residual[key] = cast(ResidualJudgmentProvider, mutating_provider)
+
+    with pytest.raises(PreActionEvidenceError, match="execution"):
+        session.execute(manual=manual, residual_providers=residual)
+
+    assert session.state is PreActionEvidenceSessionState.FAILED_AFTER_EXECUTION
+
+
+def test_issued_pre_action_evidence_detects_result_carrier_mutation(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path)
+    evidence = session.execute(manual=manual, residual_providers=residual)
+    mechanical = next(
+        record
+        for record in evidence.records
+        if type(record) is MechanicalPreconditionEvidence
+    )
+    assert mechanical.result is not None
+
+    object.__setattr__(mechanical.result, "state", EvaluationState.VIOLATED)
+
+    assert not _is_issued_pre_action_evidence(evidence)
+
+
+def test_pre_action_session_authority_rejects_duplication_and_reset(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path)
+
+    with pytest.raises(PreActionEvidenceError, match="already owns"):
+        create_pre_action_evidence_session(session.plan, session.observation)
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.copy(session)
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.deepcopy(session)
+    with pytest.raises(TypeError, match="cannot be serialized"):
+        pickle.dumps(session)
+    forged = object.__new__(PreActionEvidenceSession)
+    with pytest.raises(PreActionEvidenceError, match="not issued"):
+        forged.execute(manual=manual, residual_providers=residual)
+
+    session.execute(manual=manual, residual_providers=residual)
+    with pytest.raises(AttributeError):
+        session.state = PreActionEvidenceSessionState.READY  # type: ignore[misc]
+    with pytest.raises(PreActionEvidenceError, match="completed"):
+        session.execute(manual=manual, residual_providers=residual)
+
+    token_session, token_manual, token_residual = _pre_action_session_inputs(
+        tmp_path / "token"
+    )
+    assert not hasattr(token_session, "_control")
+    object.__setattr__(token_session, "_token", object())
+    with pytest.raises(PreActionEvidenceError, match="authority differs"):
+        token_session.execute(manual=token_manual, residual_providers=token_residual)
+
+    issuer_session, issuer_manual, issuer_residual = _pre_action_session_inputs(
+        tmp_path / "session-issuer"
+    )
+    object.__setattr__(issuer_session, "_issuer", object())
+    with pytest.raises(PreActionEvidenceError, match="not issued"):
+        issuer_session.execute(manual=issuer_manual, residual_providers=issuer_residual)
+
+
+def test_pre_action_session_cleans_up_every_base_exception(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path / "before")
+
+    class InterruptingMapping(dict[ProcedurePredicateKey, ManualJudgmentSubmission]):
+        def items(self):
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        session.execute(manual=InterruptingMapping(manual), residual_providers=residual)
+    assert session.state is PreActionEvidenceSessionState.READY
+    assert session.execute(manual=manual, residual_providers=residual).cleared
+
+    terminal, terminal_manual, terminal_residual = _pre_action_session_inputs(
+        tmp_path / "after"
+    )
+    key = next(iter(terminal_residual))
+
+    def interrupt(request: ResidualJudgmentRequest) -> ResidualJudgmentSubmission:
+        raise SystemExit(3)
+
+    terminal_residual[key] = cast(ResidualJudgmentProvider, interrupt)
+    with pytest.raises(SystemExit):
+        terminal.execute(manual=terminal_manual, residual_providers=terminal_residual)
+    assert terminal.state is PreActionEvidenceSessionState.FAILED_AFTER_EXECUTION
+
+
+def test_pre_action_session_cleans_up_transition_interruptions(
+    tmp_path: Path,
+) -> None:
+    class ExitInterruptingLock:
+        def __init__(self, delegate: object) -> None:
+            self.delegate = delegate
+            self.interrupted = False
+
+        def __enter__(self):
+            return self.delegate.__enter__()  # type: ignore[attr-defined]
+
+        def __exit__(self, *args: object):
+            result = self.delegate.__exit__(*args)  # type: ignore[attr-defined]
+            if not self.interrupted:
+                self.interrupted = True
+                raise KeyboardInterrupt
+            return result
+
+    class InterruptingLock:
+        def __init__(self, delegate: object, fail_on: int) -> None:
+            self.delegate = delegate
+            self.fail_on = fail_on
+            self.entries = 0
+
+        def __enter__(self):
+            self.entries += 1
+            if self.entries == self.fail_on:
+                raise KeyboardInterrupt
+            return self.delegate.__enter__()  # type: ignore[attr-defined]
+
+        def __exit__(self, *args: object):
+            return self.delegate.__exit__(*args)  # type: ignore[attr-defined]
+
+    claim, claim_manual, claim_residual = _pre_action_session_inputs(
+        tmp_path / "claim-transition"
+    )
+    claim_control = _SESSION_CONTROLS[claim]
+    claim_control.lock = cast(
+        object, ExitInterruptingLock(claim_control.lock)
+    )  # type: ignore[assignment]
+    with pytest.raises(KeyboardInterrupt):
+        claim.execute(manual=claim_manual, residual_providers=claim_residual)
+    assert claim.state is PreActionEvidenceSessionState.READY
+    assert claim.execute(manual=claim_manual, residual_providers=claim_residual).cleared
+
+    traced, traced_manual, traced_residual = _pre_action_session_inputs(
+        tmp_path / "claim-bytecode"
+    )
+    source, start = inspect.getsourcelines(PreActionEvidenceSession.execute)
+    active_line = start + next(
+        index for index, line in enumerate(source) if "control.active = True" in line
+    )
+
+    def interrupt_before_active(frame: object, event: str, arg: object):
+        if (
+            event == "line"
+            and frame.f_code is PreActionEvidenceSession.execute.__code__  # type: ignore[attr-defined]
+            and frame.f_lineno == active_line  # type: ignore[attr-defined]
+        ):
+            sys.settrace(None)
+            raise KeyboardInterrupt
+        return interrupt_before_active
+
+    sys.settrace(interrupt_before_active)
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            traced.execute(manual=traced_manual, residual_providers=traced_residual)
+    finally:
+        sys.settrace(None)
+    assert traced.state is PreActionEvidenceSessionState.READY
+    assert traced.execute(
+        manual=traced_manual, residual_providers=traced_residual
+    ).cleared
+
+    before, before_manual, before_residual = _pre_action_session_inputs(
+        tmp_path / "before-transition"
+    )
+    before_control = _SESSION_CONTROLS[before]
+    before_control.lock = cast(
+        object, InterruptingLock(before_control.lock, 2)
+    )  # type: ignore[assignment]
+    with pytest.raises(KeyboardInterrupt):
+        before.execute(manual=before_manual, residual_providers=before_residual)
+    assert before.state is PreActionEvidenceSessionState.READY
+
+    after, after_manual, after_residual = _pre_action_session_inputs(
+        tmp_path / "after-transition"
+    )
+    after_control = _SESSION_CONTROLS[after]
+    after_control.lock = cast(
+        object, InterruptingLock(after_control.lock, 3)
+    )  # type: ignore[assignment]
+    with pytest.raises(KeyboardInterrupt):
+        after.execute(manual=after_manual, residual_providers=after_residual)
+    assert after.state is PreActionEvidenceSessionState.FAILED_AFTER_EXECUTION
+    assert after.evidence is None
+
+
+def test_pre_action_inputs_require_canonical_keys_and_valid_manual_contracts(
+    tmp_path: Path,
+) -> None:
+    copied, copied_manual, copied_residual = _pre_action_session_inputs(
+        tmp_path / "copied"
+    )
+    canonical = next(iter(copied_residual))
+    copied_key = ProcedurePredicateKey(
+        canonical.declaration, canonical.phase, canonical.predicate
+    )
+    copied_provider = copied_residual.pop(canonical)
+    copied_residual[copied_key] = copied_provider
+    with pytest.raises(PreActionEvidenceError, match="exact required key"):
+        copied.execute(manual=copied_manual, residual_providers=copied_residual)
+    assert copied.state is PreActionEvidenceSessionState.READY
+
+    malformed, malformed_manual, malformed_residual = _pre_action_session_inputs(
+        tmp_path / "malformed"
+    )
+    manual_key = next(iter(malformed_manual))
+    original = malformed_manual[manual_key]
+    malformed_manual[manual_key] = ManualJudgmentSubmission(
+        manual_key, original.evaluator, "unadmitted", {"conclusion": "satisfied"}
+    )
+    with pytest.raises(PreActionEvidenceError, match="not admitted"):
+        malformed.execute(
+            manual=malformed_manual, residual_providers=malformed_residual
+        )
+    assert malformed.state is PreActionEvidenceSessionState.READY
+
+
+def test_aggregate_authority_rejects_detector_and_evaluator_corruption(
+    tmp_path: Path,
+) -> None:
+    registry_session, manual, residual = _pre_action_session_inputs(
+        tmp_path / "registry"
+    )
+    registry_evidence = registry_session.execute(
+        manual=manual, residual_providers=residual
+    )
+    assisted = next(
+        item
+        for item in registry_evidence.records
+        if type(item) is AssistedPreconditionEvidence
+    )
+    assert assisted.execution is not None
+    object.__setattr__(
+        assisted.execution,
+        "registry",
+        registry_session.plan.run.attention.checker_registry,
+    )
+    assert not _is_issued_pre_action_evidence(registry_evidence)
+
+    issuer_session, issuer_manual, issuer_residual = _pre_action_session_inputs(
+        tmp_path / "issuer"
+    )
+    issuer_evidence = issuer_session.execute(
+        manual=issuer_manual, residual_providers=issuer_residual
+    )
+    issuer_assisted = next(
+        item
+        for item in issuer_evidence.records
+        if type(item) is AssistedPreconditionEvidence
+    )
+    assert issuer_assisted.execution is not None
+    object.__setattr__(issuer_assisted.execution, "_issuer", object())
+    assert not _is_issued_pre_action_evidence(issuer_evidence)
+
+    scalar_session, scalar_manual, scalar_residual = _pre_action_session_inputs(
+        tmp_path / "scalar"
+    )
+    scalar_evidence = scalar_session.execute(
+        manual=scalar_manual, residual_providers=scalar_residual
+    )
+    scalar_mechanical = next(
+        item
+        for item in scalar_evidence.records
+        if type(item) is MechanicalPreconditionEvidence
+    )
+    assert scalar_mechanical.result is not None
+    object.__setattr__(scalar_mechanical.result.evaluator, "id", "changed/checker")
+    assert not _is_issued_pre_action_evidence(scalar_evidence)
+
+
+def test_pre_action_missing_residual_and_malformed_manual_fail_before_running(
+    tmp_path: Path,
+) -> None:
+    missing, missing_manual, _ = _pre_action_session_inputs(tmp_path / "missing")
+    with pytest.raises(PreActionEvidenceError, match="exact required keys"):
+        missing.execute(manual=missing_manual, residual_providers={})
+    assert missing.state is PreActionEvidenceSessionState.READY
+
+    cases = (
+        ("missing-conclusion", {"review": "done"}, None),
+        (
+            "wrong-evaluator",
+            {"conclusion": "satisfied"},
+            VersionedReference("wrong/evaluator", 1),
+        ),
+    )
+    for name, evidence, replacement in cases:
+        session, manual, residual = _pre_action_session_inputs(tmp_path / name)
+        key = next(iter(manual))
+        original = manual[key]
+        manual[key] = ManualJudgmentSubmission(
+            key,
+            replacement or original.evaluator,
+            original.input_revision,
+            evidence,
+        )
+        with pytest.raises(PreActionEvidenceError):
+            session.execute(manual=manual, residual_providers=residual)
+        assert session.state is PreActionEvidenceSessionState.READY
+
+
+def test_invalid_evaluator_returns_become_blocked_records(
+    tmp_path: Path,
+) -> None:
+    def invalid_detector(input_data: Mapping[str, JsonValue]) -> DetectorResult:
+        return cast(DetectorResult, object())
+
+    def invalid_checker(input_data: Mapping[str, JsonValue]) -> CheckerResult:
+        sources = cast(tuple[str, ...], input_data["sources"])
+        if any(source.endswith("invalid.yaml") for source in sources):
+            return _checker_result()
+        return cast(CheckerResult, object())
+
+    session, manual, residual = _pre_action_session_inputs(
+        tmp_path,
+        checker_runner=cast(CheckerRunner, invalid_checker),
+        detector_runner=cast(DetectorRunner, invalid_detector),
+    )
+
+    evidence = session.execute(manual=manual, residual_providers=residual)
+
+    assert session.state is PreActionEvidenceSessionState.COMPLETED
+    assert not evidence.cleared
+    assert (
+        sum(record.state is EvaluationState.BLOCKED for record in evidence.records) == 2
+    )
+
+
+def test_pre_action_non_satisfied_sources_prevent_clearance(
+    tmp_path: Path,
+) -> None:
+    false_session, false_manual, false_residual = _pre_action_session_inputs(
+        tmp_path / "observation",
+        observation_provider=cast(
+            ObservationProvider,
+            lambda request: {},
+        ),
+    )
+    false_evidence = false_session.execute(
+        manual=false_manual, residual_providers=false_residual
+    )
+    assert not false_evidence.cleared
+    assert any(
+        type(record) is ObservedPreconditionEvidence
+        and record.state is EvaluationState.VIOLATED
+        for record in false_evidence.records
+    )
+
+    manual_session, manual, residual = _pre_action_session_inputs(tmp_path / "manual")
+    key = next(iter(manual))
+    original = manual[key]
+    manual[key] = ManualJudgmentSubmission(
+        key, original.evaluator, original.input_revision, {"conclusion": "blocked"}
+    )
+    manual_evidence = manual_session.execute(manual=manual, residual_providers=residual)
+    assert not manual_evidence.cleared
+    assert any(
+        type(record) is ManualPreconditionEvidence
+        and record.state is EvaluationState.BLOCKED
+        for record in manual_evidence.records
+    )
+
+    residual_session, residual_manual, residual = _pre_action_session_inputs(
+        tmp_path / "residual"
+    )
+    residual_key = next(iter(residual))
+    residual[residual_key] = cast(
+        ResidualJudgmentProvider,
+        lambda request: ResidualJudgmentSubmission(
+            1,
+            residual_key,
+            request.execution.evaluator,
+            request.execution.input_revision,
+            EvaluationState.VIOLATED,
+            "A violating candidate remains.",
+        ),
+    )
+    residual_evidence = residual_session.execute(
+        manual=residual_manual, residual_providers=residual
+    )
+    assert not residual_evidence.cleared
+
+
+def test_pre_action_total_state_mappings_retain_non_satisfied_results(
+    tmp_path: Path,
+) -> None:
+    unknown_session, unknown_manual, unknown_residual = _pre_action_session_inputs(
+        tmp_path / "unknown",
+        observation_provider=cast(ObservationProvider, lambda request: {}),
+        local_precondition_operator="equals",
+    )
+    unknown = unknown_session.execute(
+        manual=unknown_manual, residual_providers=unknown_residual
+    )
+    unknown_record = next(
+        item for item in unknown.records if type(item) is ObservedPreconditionEvidence
+    )
+    assert unknown_record.state is EvaluationState.BLOCKED
+    assert not unknown.cleared
+
+    violated_session, violated_manual, violated_residual = _pre_action_session_inputs(
+        tmp_path / "manual-violated"
+    )
+    manual_key = next(iter(violated_manual))
+    manual_submission = violated_manual[manual_key]
+    violated_manual[manual_key] = ManualJudgmentSubmission(
+        manual_key,
+        manual_submission.evaluator,
+        manual_submission.input_revision,
+        {"conclusion": "violated"},
+    )
+    violated = violated_session.execute(
+        manual=violated_manual, residual_providers=violated_residual
+    )
+    violated_record = next(
+        item for item in violated.records if type(item) is ManualPreconditionEvidence
+    )
+    assert violated_record.state is EvaluationState.VIOLATED
+    assert not violated.cleared
+
+    blocked_session, blocked_manual, blocked_residual = _pre_action_session_inputs(
+        tmp_path / "residual-blocked"
+    )
+    residual_key = next(iter(blocked_residual))
+    blocked_residual[residual_key] = cast(
+        ResidualJudgmentProvider,
+        lambda request: ResidualJudgmentSubmission(
+            1,
+            residual_key,
+            request.execution.evaluator,
+            request.execution.input_revision,
+            EvaluationState.BLOCKED,
+            "The remaining evidence is inconclusive.",
+        ),
+    )
+    blocked = blocked_session.execute(
+        manual=blocked_manual, residual_providers=blocked_residual
+    )
+    blocked_record = next(
+        item for item in blocked.records if type(item) is AssistedPreconditionEvidence
+    )
+    assert blocked_record.state is EvaluationState.BLOCKED
+    assert blocked_record.diagnostic is None
+    assert not blocked.cleared
+
+    checker_session, checker_manual, checker_residual = _pre_action_session_inputs(
+        tmp_path / "checker-violated",
+        checker_runner=cast(CheckerRunner, lambda input_data: _checker_result()),
+    )
+    checker = checker_session.execute(
+        manual=checker_manual, residual_providers=checker_residual
+    )
+    checker_record = next(
+        item for item in checker.records if type(item) is MechanicalPreconditionEvidence
+    )
+    assert checker_record.state is EvaluationState.VIOLATED
+    assert checker_record.result is not None
+    assert checker_record.diagnostic is None
+    assert not checker.cleared
+
+
+def test_callback_authority_mutation_is_terminal(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path)
+    key = next(iter(residual))
+    original = residual[key]
+
+    def mutate_observation(
+        request: ResidualJudgmentRequest,
+    ) -> ResidualJudgmentSubmission:
+        result = original(request)
+        object.__setattr__(session.observation, "occurrence", 1)
+        return result
+
+    residual[key] = cast(ResidualJudgmentProvider, mutate_observation)
+    with pytest.raises(PreActionEvidenceError, match="observation"):
+        session.execute(manual=manual, residual_providers=residual)
+    assert session.state is PreActionEvidenceSessionState.FAILED_AFTER_EXECUTION
+
+
+def test_submission_mapping_order_does_not_change_canonical_record_order(
+    tmp_path: Path,
+) -> None:
+    session, manual, residual = _pre_action_session_inputs(
+        tmp_path, duplicate_preconditions=True
+    )
+    reversed_manual = dict(reversed(tuple(manual.items())))
+    reversed_residual = dict(reversed(tuple(residual.items())))
+
+    evidence = session.execute(
+        manual=reversed_manual, residual_providers=reversed_residual
+    )
+
+    assert tuple(record.requirement for record in evidence.records) == (
+        session.plan.run.pre_action_requirements
+    )
+    assert evidence.cleared
+
+
+def test_concurrent_factory_calls_claim_one_exact_plan(tmp_path: Path) -> None:
+    plan, observation, _, _ = _pre_action_authorities(tmp_path)
+    barrier = Barrier(3)
+
+    def create() -> object:
+        barrier.wait()
+        try:
+            return create_pre_action_evidence_session(plan, observation)
+        except PreActionEvidenceError as exc:
+            return exc
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = (executor.submit(create), executor.submit(create))
+        barrier.wait()
+        results = tuple(future.result() for future in futures)
+
+    assert sum(type(item) is PreActionEvidenceSession for item in results) == 1
+    assert sum(type(item) is PreActionEvidenceError for item in results) == 1
+
+
+def test_distinct_evaluation_plans_cannot_reexecute_one_run(tmp_path: Path) -> None:
+    first_plan, observation, _, _ = _pre_action_authorities(tmp_path)
+    create_pre_action_evidence_session(first_plan, observation)
+    supplied = _provider_inputs(first_plan.run)
+    second_plan = plan_procedure_precondition_evaluations(
+        first_plan.run,
+        {key: (lambda request, value=value: value) for key, value in supplied.items()},
+    )
+
+    with pytest.raises(PreActionEvidenceError, match="run already owns"):
+        create_pre_action_evidence_session(second_plan, observation)
+
+
+def test_concurrent_execute_calls_claim_one_transaction(tmp_path: Path) -> None:
+    session, manual, residual = _pre_action_session_inputs(tmp_path)
+    entered = Event()
+    release = Event()
+
+    class BlockingManual(dict[ProcedurePredicateKey, ManualJudgmentSubmission]):
+        def items(self):
+            entered.set()
+            assert release.wait(timeout=5)
+            return super().items()
+
+    blocked_manual = BlockingManual(manual)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(
+            session.execute,
+            manual=blocked_manual,
+            residual_providers=residual,
+        )
+        assert entered.wait(timeout=5)
+        second = executor.submit(
+            session.execute,
+            manual=manual,
+            residual_providers=residual,
+        )
+        with pytest.raises(PreActionEvidenceError):
+            second.result()
+        release.set()
+        assert first.result().cleared
+
+
+def test_session_control_is_collectible_but_live_plan_claim_remains(
+    tmp_path: Path,
+) -> None:
+    plan, observation, manual, residual = _pre_action_authorities(tmp_path)
+    abandoned = create_pre_action_evidence_session(plan, observation)
+    abandoned_reference = weakref_ref(abandoned)
+    del abandoned
+    gc.collect()
+    assert abandoned_reference() is None
+    with pytest.raises(PreActionEvidenceError, match="already owns"):
+        create_pre_action_evidence_session(plan, observation)
+
+    terminal_plan, terminal_observation, terminal_manual, terminal_residual = (
+        _pre_action_authorities(tmp_path / "terminal")
+    )
+    terminal = create_pre_action_evidence_session(terminal_plan, terminal_observation)
+    assert terminal.execute(
+        manual=terminal_manual, residual_providers=terminal_residual
+    ).cleared
+    terminal_reference = weakref_ref(terminal)
+    del terminal
+    gc.collect()
+    assert terminal_reference() is None
+    with pytest.raises(PreActionEvidenceError, match="already owns"):
+        create_pre_action_evidence_session(terminal_plan, terminal_observation)
 
 
 def test_precondition_evaluation_plan_rejects_forgery_copying_and_tampering(
