@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Iterable, Mapping, NoReturn, Protocol, TypeAlias, cast
+from typing import Iterable, Mapping, NoReturn, Protocol, SupportsIndex, TypeAlias, cast
 
 from ._runner_support import exception_detail, validate_synchronous_runner
 from .embedded_schema import validate_json_instance
@@ -18,6 +18,8 @@ from .models import (
 )
 from .registry import DeclarationRegistry
 from .source import DocumentPath, format_document_path
+
+_REGISTRY_ISSUER = object()
 
 
 @dataclass(frozen=True)
@@ -54,13 +56,32 @@ class OperationRunnerBinding:
     runner: OperationRunner
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False, eq=False)
 class OperationRunnerRegistry:
-    """An immutable registry of validated operation runner bindings."""
+    """A process-local registry of validated operation runner bindings."""
 
     declarations: DeclarationRegistry
     bindings: Mapping[VersionedReference, OperationRunnerBinding]
     contracts: Mapping[VersionedReference, OperationDeclaration]
+    _issuer: object
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        """Reject construction outside the registry builder."""
+        raise TypeError(
+            "OperationRunnerRegistry instances must be issued by the registry builder"
+        )
+
+    def __copy__(self) -> NoReturn:
+        raise TypeError("OperationRunnerRegistry instances cannot be copied")
+
+    def __deepcopy__(self, _memo: object) -> NoReturn:
+        raise TypeError("OperationRunnerRegistry instances cannot be copied")
+
+    def __reduce__(self) -> NoReturn:
+        raise TypeError("OperationRunnerRegistry instances cannot be serialized")
+
+    def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
+        raise TypeError("OperationRunnerRegistry instances cannot be serialized")
 
 
 def build_operation_runner_registry(
@@ -97,10 +118,19 @@ def build_operation_runner_registry(
         _validate_runner(binding.runner, f"{base}.runner")
         registered[binding.operation] = binding
         contracts[binding.operation] = cast(OperationDeclaration, record.declaration)
-    return OperationRunnerRegistry(
-        declarations=declarations,
-        bindings=MappingProxyType(registered),
-        contracts=MappingProxyType(contracts),
+    registry = object.__new__(OperationRunnerRegistry)
+    object.__setattr__(registry, "declarations", declarations)
+    object.__setattr__(registry, "bindings", MappingProxyType(registered))
+    object.__setattr__(registry, "contracts", MappingProxyType(contracts))
+    object.__setattr__(registry, "_issuer", _REGISTRY_ISSUER)
+    return registry
+
+
+def _is_builder_issued_operation_registry(registry: object) -> bool:
+    """Return whether ``registry`` carries this process's builder authority."""
+    return (
+        isinstance(registry, OperationRunnerRegistry)
+        and getattr(registry, "_issuer", None) is _REGISTRY_ISSUER
     )
 
 
@@ -125,6 +155,11 @@ def execute_operation(
     input_data: Mapping[str, object],
 ) -> OperationResult:
     """Invoke one exact operation and validate its input and returned contract."""
+    if not _is_builder_issued_operation_registry(runners):
+        _raise_execution_error(
+            ("registry",),
+            "operation runner registry was not issued by the registry builder",
+        )
     binding = runners.bindings.get(operation)
     if binding is None:
         _raise_execution_error(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import pickle
 from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
@@ -15,6 +17,7 @@ from eutaxis.declarations import (
     OperationFailure,
     OperationRunner,
     OperationRunnerBinding,
+    OperationRunnerRegistry,
     OperationRunnerRegistryError,
     OperationSuccess,
     VersionedReference,
@@ -77,6 +80,49 @@ def test_successful_outputs_and_inputs_are_immutable() -> None:
     assert result.outputs["record-count"] == 1
     with pytest.raises(TypeError):
         result.outputs["record-count"] = 2  # type: ignore[index]
+
+
+def test_registry_authority_is_private_identity_valued_and_process_local() -> None:
+    first = _registry(
+        lambda input_data: OperationFailure(
+            LOAD_DECLARATION_REGISTRY_OPERATION, "invalid-registry"
+        )
+    )
+    second = _registry(
+        lambda input_data: OperationFailure(
+            LOAD_DECLARATION_REGISTRY_OPERATION, "invalid-registry"
+        )
+    )
+
+    assert first is not second
+    assert first != second
+    with pytest.raises(TypeError, match="issued by the registry builder"):
+        OperationRunnerRegistry()
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.copy(first)
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.deepcopy(first)
+    with pytest.raises(TypeError, match="cannot be serialized"):
+        pickle.dumps(first)
+
+
+def test_unissued_registry_fails_before_mapping_access() -> None:
+    class UnreadableBindings(dict[object, object]):
+        def get(self, key: object, default: object = None) -> object:
+            raise AssertionError("forged bindings were read")
+
+    forged = object.__new__(OperationRunnerRegistry)
+    object.__setattr__(forged, "bindings", UnreadableBindings())
+    object.__setattr__(forged, "_issuer", object())
+
+    with pytest.raises(OperationExecutionError) as captured:
+        execute_operation(
+            forged,
+            LOAD_DECLARATION_REGISTRY_OPERATION,
+            input_data=_valid_input(),
+        )
+
+    assert captured.value.location == "$.registry"
 
 
 def test_registry_rejects_missing_wrong_duplicate_and_invalid_bindings() -> None:

@@ -295,6 +295,12 @@ operation reference when present, frozen bound inputs, relevant before-or-after
 context, obligation key, predicate trace, and truth value. The procedure
 execution contract must first define the observation point for each phase.
 
+`execute_operation` remains a low-level exact-contract runner. The runner accepts only a
+builder-issued, process-local operation registry and validates inputs and
+results, but the runner does not claim to enforce procedure or operation preconditions.
+Only the future procedure executor may consume a prepared procedure run and
+interpret an operation invocation as part of precondition-gated semantics.
+
 The ledger uses one atomic builder:
 `build_completion_ledger(plan, *, manual, assisted, executable, clock)`. The
 builder accepts only a privately issued plan and derives every record from its
