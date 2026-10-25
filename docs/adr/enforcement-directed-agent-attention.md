@@ -317,8 +317,9 @@ that shared context. Consequently, an accepted aggregate cannot combine
 evidence from two snapshots. False and unknown remain evidence values. Neither
 value maps to a completion state or authorizes procedure entry at this boundary.
 
-The remaining execution contract must correlate evaluator-backed preconditions
-before it defines clearance. Then, the contract must define where invariants and
+The evaluator-backed procedure-precondition input boundary is now correlated.
+The remaining execution contract must evaluate those preconditions before it
+defines clearance. Then, the contract must define where invariants and
 postconditions are observed. The contract must separately locate each operation
 precondition before runner invocation. Those later boundaries may extend the
 coordinate and retained action data. However, each boundary must preserve five
@@ -346,6 +347,61 @@ bound input. The plan projects executable and pre-action tuples from the
 authoritative requirements. These projections do not mutate the authoritative
 tuple. Consequently, every postcondition remains available. Preflight stops
 before runner invocation and evidence issuance.
+
+### Evaluator-backed precondition inputs
+
+`plan_procedure_precondition_evaluations` prepares the evaluator-backed
+procedure preconditions at the pre-action boundary. Version 1 fixes the phase to
+`precondition` and the occurrence to `0`. The plan includes each evaluator-backed
+procedure precondition in canonical requirement order. It does not include an
+invariant, a postcondition, or an operation precondition.
+
+A manual precondition retains its complete deliberative entry and requires no
+input provider. Each assisted or mechanical precondition requires exactly one
+provider under its canonical obligation key. Missing, additional, copied, or
+non-canonical key authority is rejected. Provider-map order does not change the
+canonical record order. The provider receives only the procedure
+identifier, boundary coordinate, immutable run parameters, and selected
+predicate. Its result must use the revision and input already admitted by the
+attention invocation. The input is frozen again and validated against the exact
+evaluator-input operation schema. The provider derives an input; it does not run
+the detector or checker.
+
+Procedure preflight materializes detached canonical parameters, predicates,
+invocation inputs, and input schemas. Their carrier identities, scalar fields,
+references, and frozen contents participate in run authority. Provider-facing
+evaluation specifications consume only these detached canonical values. Each
+provider request receives a further detached key and predicate. Consequently, a
+provider cannot mutate the stored canonical input, and a later change to a live
+attention or declaration mapping cannot become the provider input. Live
+requirements, packet entries, registries, and declarations remain correlation
+and diagnostic authorities. The records retain their exact live requirement and
+packet-entry carriers, while repeated validation prevents a plan containing
+stale correlations from being issued.
+
+The run authority also binds the exact attention plan, operation-runner
+registry, procedure and operation declarations, evaluator contracts, authored
+action bindings, requirement partitions, packet entries, and evaluator-input
+operation contracts. Mapping reads occur behind the public planning-error
+boundary. After semantic reads, a callback-free pass rechecks carriers, scalar
+values, transitions, references, and runner identities. A changed authority, or
+a provider side effect that changes retained authority or a validated
+correlation, aborts issuance.
+
+The resulting `ProcedurePreconditionEvaluationPlan` is a process-local
+correlation plan. It retains separate manual, assisted, and mechanical records,
+the detached parameters, and the exact provider mapping. It executes no
+evaluator, makes no predicate judgment, records no completion evidence, and
+grants no clearance. The next design must define one pre-action evidence
+transaction. That transaction must validate manual judgments, execute detectors
+and checkers through their retained authorities exactly once, and pair each
+detector execution with a validated residual judgment. It must also consume the
+issued evaluator-less precondition observation aggregate. Clearance is derived
+from the combined evaluator-less, manual, assisted, and mechanical precondition
+results. The transaction retains all resulting evidence for later completion.
+The mechanical precondition run must either begin or participate in the
+completion-ledger transaction; a later ledger step must not execute the same
+evaluator again.
 
 The ledger uses one atomic builder:
 `build_completion_ledger(plan, *, manual, assisted, executable, clock)`. The

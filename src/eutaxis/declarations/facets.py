@@ -82,6 +82,66 @@ class FacetRegistry:
         return MappingProxyType(validated)
 
 
+@dataclass(frozen=True)
+class ApplicabilityFacetViolation:
+    """Describe one retained applicability value rejected by its facet registry."""
+
+    path: DocumentPath
+    message: str
+
+
+def validate_applicability_expression(
+    predicate: Mapping[str, object], registry: FacetRegistry
+) -> ApplicabilityFacetViolation | None:
+    """Validate one structurally valid applicability tree against ``registry``."""
+    for boolean_operator in ("all", "any"):
+        if boolean_operator in predicate:
+            for index, child in enumerate(
+                cast(tuple[object, ...], predicate[boolean_operator])
+            ):
+                violation = validate_applicability_expression(
+                    cast(Mapping[str, object], child), registry
+                )
+                if violation is not None:
+                    return ApplicabilityFacetViolation(
+                        (boolean_operator, index, *violation.path), violation.message
+                    )
+            return None
+    if "not" in predicate:
+        violation = validate_applicability_expression(
+            cast(Mapping[str, object], predicate["not"]), registry
+        )
+        if violation is None:
+            return None
+        return ApplicabilityFacetViolation(("not", *violation.path), violation.message)
+
+    facet_id = cast(str, predicate["facet"])
+    facet = registry.facets.get(facet_id)
+    if facet is None:
+        return ApplicabilityFacetViolation(
+            ("facet",), f"facet {facet_id!r} is not registered in {registry.id!r}"
+        )
+    operator = predicate["operator"]
+    if operator == "exists":
+        return None
+    values = (
+        (predicate["value"],)
+        if operator == "equals"
+        else cast(tuple[object, ...], predicate["value"])
+    )
+    for index, value in enumerate(values):
+        error = validate_json_instance(facet.value_schema, value)
+        if error is not None:
+            prefix: DocumentPath = (
+                ("value",) if operator == "equals" else ("value", index)
+            )
+            return ApplicabilityFacetViolation(
+                (*prefix, *error.absolute_path),
+                f"value for facet {facet.id!r} is invalid: {error.message}",
+            )
+    return None
+
+
 def facet_registry_path() -> Path:
     """Return the packaged path of the reference context-facet registry."""
     return data_path() / "registries" / FACET_REGISTRY_FILENAME
@@ -236,57 +296,13 @@ def _validate_applicability(
     locations: SourceMap,
 ) -> None:
     """Validate one applicability tree without traversing arbitrary mappings."""
-    for boolean_operator in ("all", "any"):
-        if boolean_operator in predicate:
-            for index, child in enumerate(
-                cast(list[object], predicate[boolean_operator])
-            ):
-                _validate_applicability(
-                    _mapping(child),
-                    registry,
-                    path=path,
-                    parts=parts + (boolean_operator, index),
-                    locations=locations,
-                )
-            return
-    if "not" in predicate:
-        _validate_applicability(
-            _mapping(predicate["not"]),
-            registry,
-            path=path,
-            parts=parts + ("not",),
-            locations=locations,
-        )
-        return
-
-    facet_id = str(predicate["facet"])
-    facet = registry.facets.get(facet_id)
-    if facet is None:
+    violation = validate_applicability_expression(predicate, registry)
+    if violation is not None:
         _raise_declaration_semantic(
             path,
-            parts + ("facet",),
-            f"facet {facet_id!r} is not registered in {registry.id!r}",
+            (*parts, *violation.path),
+            violation.message,
             locations,
-        )
-    operator = predicate["operator"]
-    if operator == "exists":
-        return
-    if operator == "equals":
-        _validate_declared_value(
-            predicate["value"],
-            facet,
-            path=path,
-            parts=parts + ("value",),
-            locations=locations,
-        )
-        return
-    for index, candidate in enumerate(cast(list[object], predicate["value"])):
-        _validate_declared_value(
-            candidate,
-            facet,
-            path=path,
-            parts=parts + ("value", index),
-            locations=locations,
         )
 
 

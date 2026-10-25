@@ -53,9 +53,16 @@ from completion evidence.
 
 When evaluator-less preconditions are present, the procedure observer evaluates
 all of them against one coherent provider snapshot. The resulting aggregate does
-not authorize the executor to enter the procedure. The executor must next
-correlate evaluator-backed preconditions, then observe the remaining execution
-phases, before work starts on the completion ledger.
+not authorize the executor to enter the procedure. Evaluator-backed procedure
+preconditions are now correlated with the exact run through detached canonical
+parameters, predicates, invocation inputs, and schemas. This correlation runs no
+evaluator and grants no clearance. The executor must next validate or execute
+the three enforcement classes in one pre-action evidence transaction. That
+transaction must consume the evaluator-less observation aggregate, pair each
+assisted execution with a validated residual judgment, retain all evidence for
+completion, and derive clearance from the combined precondition results without
+executing the same evaluator again. The remaining execution phases then extend
+the same evidence lifecycle.
 
 ## Decision log and open prerequisites
 
@@ -157,11 +164,12 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Make operation-runner registries process-local authorities and reject unissued registries before any runner mapping is read.
 - [x] Issue immutable procedure-run preflight plans with validated parameters, exact per-action inputs, and canonical executable and pre-action requirement projections.
 - [x] Observe every evaluator-less precondition of a procedure from one minimal, schema-valid provider snapshot without authorizing procedure entry.
-- [ ] Correlate evaluator-backed preconditions before defining when the executor may enter the procedure. Preserve distinct authorities for observing, evaluating, and authorizing.
+- [x] Correlate evaluator-backed procedure preconditions with exact run parameters and detached canonical evaluator inputs without executing evaluators or granting clearance.
+- [ ] Define and implement one pre-action evidence transaction that consumes the evaluator-less observation aggregate, validates manual judgments, pairs each assisted execution with a validated residual judgment, executes mechanical evaluators exactly once, retains all evidence for completion, and derives clearance from the combined results. Decide whether the mechanical run begins or participates in the completion-ledger transaction. Preserve distinct authorities for observing, evaluating, and authorizing.
 - [ ] Observe invariants and postconditions at their defined phases; observe each operation predicate before invoking its runner.
-- [ ] Validate manual submissions and assisted detector-plus-residual submissions against exact retained contracts.
-- [ ] Execute mechanical requirements inside the ledger transaction with repeated assurance-freshness checks.
-- [ ] Issue the complete immutable ledger and require admissible evidence for every effective obligation.
+- [ ] Extend the evidence transaction to validate manual submissions and assisted detector-plus-residual submissions for invariant, postcondition, and operation-precondition occurrences against exact retained contracts.
+- [ ] Extend the evidence transaction with repeated assurance-freshness checks for later mechanical requirements, without rerunning retained pre-action evidence.
+- [ ] Issue the complete immutable ledger from the retained transaction evidence and require admissible evidence for every effective obligation.
 - [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.
 
 **Exit evidence:** clean checker output cannot complete an unmapped obligation. Unchecked, violated, or blocked rule criteria, procedure predicates, or per-action operation preconditions prevent success.

@@ -205,6 +205,15 @@ class ProcedureRunPlanningError(Exception):
         self.detail = message
 
 
+class ProcedureEvaluationPlanningError(Exception):
+    """Report a failed run-scoped evaluator-input planning boundary."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid procedure evaluation plan at {location}: {message}")
+        self.location = location
+        self.detail = message
+
+
 class ObservationProviderRegistryError(Exception):
     """Report an invalid code-owned observation provider binding."""
 

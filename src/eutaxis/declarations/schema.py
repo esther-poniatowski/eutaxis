@@ -86,6 +86,39 @@ def _facet_registry_validator() -> Draft202012Validator:
     return Draft202012Validator(schema)
 
 
+@lru_cache(maxsize=2)
+def _validator_for_definition(name: str) -> Draft202012Validator:
+    """Return one validator for a retained normative declaration fragment."""
+    if name not in {"applicability", "closed-object-schema"}:
+        raise ValueError(f"unsupported declaration definition: {name!r}")
+    root = _declaration_schema()
+    return Draft202012Validator(
+        {
+            "$schema": root["$schema"],
+            "$defs": root["$defs"],
+            "$ref": f"#/$defs/{name}",
+        }
+    )
+
+
+def validate_declaration_definition(
+    name: str, instance: object
+) -> ValidationError | None:
+    """Return the most relevant violation of one retained source contract."""
+    return _actionable_schema_error(
+        _validator_for_definition(name).iter_errors(_plain_instance(instance))
+    )
+
+
+def _plain_instance(value: object) -> object:
+    """Convert one frozen JSON value into containers recognized by jsonschema."""
+    if isinstance(value, Mapping):
+        return {key: _plain_instance(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_plain_instance(item) for item in value]
+    return value
+
+
 def validate_document(
     document: object,
     *,

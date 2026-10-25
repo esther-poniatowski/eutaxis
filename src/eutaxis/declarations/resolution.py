@@ -21,6 +21,8 @@ from .models import (
     ResolutionPolicyDeclaration,
     RuleDeclaration,
     RuleSetDeclaration,
+    freeze_json,
+    json_values_equal,
 )
 from .registry import ConflictPair, DeclarationRegistry, RegisteredDeclaration
 from .source import DocumentPath, nearest_location
@@ -183,6 +185,7 @@ class ResolutionResult:
     registry: DeclarationRegistry = field(compare=False, repr=False)
     unit: ResolvedCompilationUnit
     trace: ResolutionTrace
+    _facet_registry_state: object = field(compare=False, repr=False)
     _issuer: object = field(compare=False, repr=False)
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -208,10 +211,71 @@ class ResolutionResult:
 
 def _is_issued_resolution_result(result: object) -> bool:
     """Return whether ``result`` carries this process's resolver authority."""
+    if (
+        type(result) is not ResolutionResult
+        or getattr(result, "_issuer", None) is not _RESOLUTION_RESULT_ISSUER
+    ):
+        return False
+    try:
+        return _facet_registry_state_matches(
+            result.registry, result._facet_registry_state
+        )
+    except Exception:
+        return False
+
+
+def _capture_facet_registry_state(registry: DeclarationRegistry) -> tuple[object, ...]:
+    facets = registry.facet_registry
+    records: list[object] = []
+    for key, facet in facets.facets.items():
+        records.append(
+            (
+                key,
+                facet,
+                facet.id,
+                facet.value_schema,
+                freeze_json(facet.value_schema),
+            )
+        )
     return (
-        isinstance(result, ResolutionResult)
-        and getattr(result, "_issuer", None) is _RESOLUTION_RESULT_ISSUER
+        facets,
+        facets.schema_version,
+        facets.id,
+        facets.owner,
+        facets.source_revision,
+        facets.facets,
+        tuple(records),
     )
+
+
+def _facet_registry_state_matches(
+    registry: DeclarationRegistry, expected: object
+) -> bool:
+    if type(expected) is not tuple or len(expected) != 7:
+        return False
+    current = _capture_facet_registry_state(registry)
+    if not all(current[index] is expected[index] for index in range(6)):
+        return False
+    current_records = current[6]
+    expected_records = expected[6]
+    if (
+        type(current_records) is not tuple
+        or type(expected_records) is not tuple
+        or len(current_records) != len(expected_records)
+    ):
+        return False
+    for current_record, expected_record in zip(current_records, expected_records):
+        if type(current_record) is not tuple or type(expected_record) is not tuple:
+            return False
+        if len(current_record) != 5 or len(expected_record) != 5:
+            return False
+        if not all(
+            current_record[index] is expected_record[index] for index in range(4)
+        ):
+            return False
+        if not json_values_equal(current_record[4], expected_record[4]):
+            return False
+    return True
 
 
 class ResolutionError(Exception):
@@ -1211,5 +1275,8 @@ def _issue_result(
     object.__setattr__(result, "registry", registry)
     object.__setattr__(result, "unit", unit)
     object.__setattr__(result, "trace", trace)
+    object.__setattr__(
+        result, "_facet_registry_state", _capture_facet_registry_state(registry)
+    )
     object.__setattr__(result, "_issuer", _RESOLUTION_RESULT_ISSUER)
     return result
