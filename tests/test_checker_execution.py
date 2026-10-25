@@ -280,6 +280,21 @@ def test_input_revision_and_payload_fail_before_runner(tmp_path: Path) -> None:
     assert not called
 
 
+def test_checker_rejects_non_object_input(tmp_path: Path) -> None:
+    declarations = _declarations(tmp_path)
+    runners = _runners(declarations, lambda input_data: _result())
+
+    with pytest.raises(CheckerExecutionError) as captured:
+        execute_checker(
+            runners,
+            CHECKER,
+            input_revision="declaration-v1",
+            input_data=cast(Mapping[str, object], []),
+        )
+
+    assert captured.value.location == "$.input"
+    assert "JSON object" in str(captured.value)
+
 class _FlippingInput(Mapping[str, object]):
     """Expose a valid first traversal and an invalid second traversal."""
 

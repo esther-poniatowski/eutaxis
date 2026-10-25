@@ -134,7 +134,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Derive mechanical, assisted, and deliberative classes from evaluator contracts without claiming runner readiness.
 - [x] Issue one process-local known-failure assurance with immutable per-evaluator fixture/result pairs and verified descriptor and resource digests.
 - [x] Atomically restrict version 1 detectors to blocking failure behavior in source and persisted schemas, migrate fixtures and golden artifacts, plant both negative alternatives at both boundaries, and add a builder-issued detector-only runner registry over the shared private binding validator without changing checker behavior.
-- [ ] Execute detector callables through immutable input, identity, revision, and evidence validation before issuing runnable assisted packets.
+- [x] Execute detector callables through immutable input, identity, revision, and evidence validation before issuing runnable assisted packets.
 - [ ] Emit three attention packets and a separate resolution trace.
 - [ ] Require evidence for every effective obligation in the completion ledger.
 - [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.

@@ -166,6 +166,27 @@ class CheckerExecutionError(Exception):
         self.column = column
 
 
+class DetectorExecutionError(Exception):
+    """Report an invalid detector invocation or returned result."""
+
+    def __init__(
+        self,
+        location: str,
+        message: str,
+        *,
+        document_path: tuple[str | int, ...] | None = None,
+        path: Path | None = None,
+    ) -> None:
+        source_path = f" in {path}" if path is not None else ""
+        super().__init__(
+            f"Invalid detector execution{source_path} at {location}: {message}"
+        )
+        self.path = path
+        self.location = location
+        self.document_path = document_path
+        self.detail = message
+
+
 class OperationRunnerRegistryError(Exception):
     """Report an invalid code-owned operation runner binding."""
 

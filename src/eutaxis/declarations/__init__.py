@@ -9,6 +9,7 @@ from .exceptions import (
     DeclarationRegistryError,
     DeclarationSchemaError,
     DeclarationSemanticError,
+    DetectorExecutionError,
     DetectorRunnerRegistryError,
     EvaluatorFixtureError,
     EvaluatorFixtureSchemaError,
@@ -37,10 +38,12 @@ from .composition import (
     plan_cumulative_composition,
 )
 from .execution import (
+    DetectorExecution,
     KnownFailureAssurance,
     KnownFailureEvaluatorAssurance,
     KnownFailureFixtureResult,
     execute_checker,
+    execute_detector,
     execute_known_failure_fixtures,
 )
 from .enforcement import (
@@ -208,6 +211,8 @@ __all__ = [
     "DeclarationKind",
     "DeclarationSchemaError",
     "DeclarationSemanticError",
+    "DetectorExecution",
+    "DetectorExecutionError",
     "DetectorResult",
     "DetectorRunner",
     "DetectorRunnerBinding",
@@ -301,6 +306,7 @@ __all__ = [
     "evaluate_applicability",
     "evaluate_applicability_with_trace",
     "execute_checker",
+    "execute_detector",
     "execute_known_failure_fixtures",
     "execute_operation",
     "evaluator_fixture_schema",

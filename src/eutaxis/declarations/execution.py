@@ -11,7 +11,7 @@ from typing import NoReturn, SupportsIndex, cast
 
 from ._runner_support import exception_detail
 from .embedded_schema import validate_json_instance
-from .exceptions import CheckerExecutionError
+from .exceptions import CheckerExecutionError, DetectorExecutionError
 from .fixtures import (
     EvaluatorFixture,
     EvaluatorFixtureIndex,
@@ -25,11 +25,52 @@ from .models import (
     freeze_json,
 )
 from .registry import DeclarationRegistry, RegisteredDeclaration
-from .results import CheckerResult, EvaluationState
-from .runners import CheckerRunnerRegistry
+from .results import CheckerResult, DetectorResult, EvaluationState
+from .runners import (
+    CheckerRunnerRegistry,
+    DetectorRunnerRegistry,
+    _is_builder_issued_detector_registry,
+)
 from .source import DocumentPath, SourceMap, format_document_path, nearest_location
 
 _ASSURANCE_ISSUER = object()
+_DETECTOR_EXECUTION_ISSUER = object()
+
+
+@dataclass(frozen=True, init=False, eq=False)
+class DetectorExecution:
+    """Process-local proof of one structurally validated detector run."""
+
+    registry: DetectorRunnerRegistry
+    evaluator: VersionedReference
+    input_revision: str
+    input_data: Mapping[str, JsonValue]
+    evidence: Mapping[str, JsonValue]
+    _issuer: object
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        """Reject construction outside detector execution."""
+        raise TypeError("DetectorExecution instances must be issued by execution")
+
+    def __copy__(self) -> NoReturn:
+        raise TypeError("DetectorExecution instances cannot be copied")
+
+    def __deepcopy__(self, _memo: object) -> NoReturn:
+        raise TypeError("DetectorExecution instances cannot be copied")
+
+    def __reduce__(self) -> NoReturn:
+        raise TypeError("DetectorExecution instances cannot be serialized")
+
+    def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
+        raise TypeError("DetectorExecution instances cannot be serialized")
+
+
+def _is_issued_detector_execution(execution: object) -> bool:
+    """Return whether ``execution`` carries this process's executor authority."""
+    return (
+        isinstance(execution, DetectorExecution)
+        and getattr(execution, "_issuer", None) is _DETECTOR_EXECUTION_ISSUER
+    )
 
 
 @dataclass(frozen=True)
@@ -104,6 +145,81 @@ class KnownFailureAssurance(Mapping[str, CheckerResult]):
         raise TypeError("KnownFailureAssurance instances cannot be serialized")
 
 
+def execute_detector(
+    registry: DetectorRunnerRegistry,
+    evaluator: VersionedReference,
+    *,
+    input_revision: str,
+    input_data: Mapping[str, object],
+    path: Path | None = None,
+) -> DetectorExecution:
+    """Invoke one detector and issue its immutable validated execution."""
+    if not _is_builder_issued_detector_registry(registry):
+        _raise_detector_execution_error(
+            (), "detector registry was not issued by its validated builder", path=path
+        )
+    binding = registry.bindings.get(evaluator)
+    if binding is None:
+        _raise_detector_execution_error(
+            ("evaluator",),
+            f"no runner is registered for evaluator {evaluator.id!r}@{evaluator.version}",
+            path=path,
+        )
+    record = registry.evaluator_records[evaluator]
+    contract = cast(EvaluatorDeclaration, record.declaration)
+    if input_revision not in contract.input_revisions:
+        _raise_detector_execution_error(
+            ("input-revision",),
+            f"input revision {input_revision!r} is not admitted by the evaluator",
+            path=path,
+        )
+    immutable_input = _freeze_validate_input(
+        input_data,
+        registry.input_contracts[evaluator],
+        path=path,
+        detector=True,
+    )
+    try:
+        returned = binding.runner(immutable_input)
+    except Exception as exc:
+        _raise_detector_execution_error(
+            ("runner",),
+            f"runner raised {exception_detail(exc)}",
+            path=path,
+            cause=exc,
+        )
+    if not isinstance(returned, DetectorResult):
+        _raise_detector_execution_error(
+            ("result",), "runner did not return DetectorResult", path=path
+        )
+    if returned.evaluator != evaluator:
+        _raise_detector_execution_error(
+            ("result", "evaluator"),
+            "returned evaluator identity differs from the invocation",
+            path=path,
+        )
+    if returned.input_revision != input_revision:
+        _raise_detector_execution_error(
+            ("result", "input-revision"),
+            "returned input revision differs from the invocation",
+            path=path,
+        )
+    evidence = _freeze_validate_evidence(
+        returned.evidence,
+        cast(Mapping[str, object], contract.evidence_schema),
+        path=path,
+        detector=True,
+    )
+    execution = object.__new__(DetectorExecution)
+    object.__setattr__(execution, "registry", registry)
+    object.__setattr__(execution, "evaluator", evaluator)
+    object.__setattr__(execution, "input_revision", input_revision)
+    object.__setattr__(execution, "input_data", immutable_input)
+    object.__setattr__(execution, "evidence", evidence)
+    object.__setattr__(execution, "_issuer", _DETECTOR_EXECUTION_ISSUER)
+    return execution
+
+
 def execute_checker(
     runners: CheckerRunnerRegistry,
     evaluator: VersionedReference,
@@ -129,28 +245,12 @@ def execute_checker(
             f"input revision {input_revision!r} is not admitted by the evaluator",
             path=path,
         )
-    try:
-        frozen_input = freeze_json(input_data)
-    except Exception as exc:
-        _raise_execution_error(
-            ("input",),
-            f"input is not finite JSON: {exception_detail(exc)}",
-            path=path,
-            cause=exc,
-        )
-    if not isinstance(frozen_input, Mapping):
-        _raise_execution_error(("input",), "input must be a JSON object", path=path)
-    immutable_input = cast(Mapping[str, JsonValue], frozen_input)
-    input_error = validate_json_instance(
-        runners.input_contracts[evaluator], immutable_input
+    immutable_input = _freeze_validate_input(
+        input_data,
+        runners.input_contracts[evaluator],
+        path=path,
+        detector=False,
     )
-    if input_error is not None:
-        parts = ("input",) + tuple(input_error.absolute_path)
-        _raise_execution_error(
-            parts,
-            f"input violates the registered operation contract: {input_error.message}",
-            path=path,
-        )
     try:
         returned = binding.runner(immutable_input)
     except Exception as exc:
@@ -400,37 +500,90 @@ def _validate_result(
             f"result state {returned.state.value!r} differs from expected {expected_state.value!r}",
             path=path,
         )
-    if not isinstance(returned.evidence, Mapping):
-        _raise_execution_error(
-            ("result", "evidence"),
-            "result evidence must be a JSON object",
-            path=path,
-        )
-    try:
-        evidence = cast(Mapping[str, JsonValue], freeze_json(returned.evidence))
-    except Exception as exc:
-        _raise_execution_error(
-            ("result", "evidence"),
-            f"result evidence is not finite JSON: {exception_detail(exc)}",
-            path=path,
-            cause=exc,
-        )
-    evidence_error = validate_json_instance(
-        cast(Mapping[str, object], contract.evidence_schema), evidence
+    evidence = _freeze_validate_evidence(
+        returned.evidence,
+        cast(Mapping[str, object], contract.evidence_schema),
+        path=path,
+        detector=False,
     )
-    if evidence_error is not None:
-        parts = ("result", "evidence") + tuple(evidence_error.absolute_path)
-        _raise_execution_error(
-            parts,
-            f"result evidence violates the evaluator contract: {evidence_error.message}",
-            path=path,
-        )
     return CheckerResult(
         evaluator=evaluator,
         input_revision=input_revision,
         state=returned.state,
         evidence=evidence,
     )
+
+
+def _freeze_validate_input(
+    input_data: object,
+    input_schema: Mapping[str, object],
+    *,
+    path: Path | None,
+    detector: bool,
+) -> Mapping[str, JsonValue]:
+    """Freeze one evaluator input and validate its operation contract."""
+    try:
+        frozen_input = freeze_json(input_data)
+    except Exception as exc:
+        _raise_evaluator_execution_error(
+            detector,
+            ("input",),
+            f"input is not finite JSON: {exception_detail(exc)}",
+            path=path,
+            cause=exc,
+        )
+    if not isinstance(frozen_input, Mapping):
+        _raise_evaluator_execution_error(
+            detector, ("input",), "input must be a JSON object", path=path
+        )
+    immutable_input = cast(Mapping[str, JsonValue], frozen_input)
+    input_error = validate_json_instance(input_schema, immutable_input)
+    if input_error is not None:
+        parts = ("input",) + tuple(input_error.absolute_path)
+        _raise_evaluator_execution_error(
+            detector,
+            parts,
+            f"input violates the registered operation contract: {input_error.message}",
+            path=path,
+        )
+    return immutable_input
+
+
+def _freeze_validate_evidence(
+    evidence_data: object,
+    evidence_schema: Mapping[str, object],
+    *,
+    path: Path | None,
+    detector: bool,
+) -> Mapping[str, JsonValue]:
+    """Freeze one evaluator evidence object and validate its contract."""
+    if not isinstance(evidence_data, Mapping):
+        _raise_evaluator_execution_error(
+            detector,
+            ("result", "evidence"),
+            "result evidence must be a JSON object",
+            path=path,
+        )
+    try:
+        evidence = cast(Mapping[str, JsonValue], freeze_json(evidence_data))
+    except Exception as exc:
+        _raise_evaluator_execution_error(
+            detector,
+            ("result", "evidence"),
+            f"result evidence is not finite JSON: {exception_detail(exc)}",
+            path=path,
+            cause=exc,
+        )
+    evidence_error = validate_json_instance(evidence_schema, evidence)
+    if evidence_error is not None:
+        parts = ("result", "evidence") + tuple(evidence_error.absolute_path)
+        _raise_evaluator_execution_error(
+            detector,
+            parts,
+            f"result evidence violates the evaluator contract: {evidence_error.message}",
+            path=path,
+        )
+    return evidence
 
 
 def _raise_record_error(
@@ -485,3 +638,36 @@ def _raise_execution_error(
     if cause is not None:
         raise error from cause
     raise error
+
+
+def _raise_detector_execution_error(
+    parts: DocumentPath,
+    message: str,
+    *,
+    path: Path | None,
+    cause: Exception | None = None,
+) -> NoReturn:
+    """Raise one detector-owned invocation or result diagnostic."""
+    error = DetectorExecutionError(
+        format_document_path(parts),
+        message,
+        document_path=parts,
+        path=path,
+    )
+    if cause is not None:
+        raise error from cause
+    raise error
+
+
+def _raise_evaluator_execution_error(
+    detector: bool,
+    parts: DocumentPath,
+    message: str,
+    *,
+    path: Path | None,
+    cause: Exception | None = None,
+) -> NoReturn:
+    """Dispatch a shared validation defect to its public façade."""
+    if detector:
+        _raise_detector_execution_error(parts, message, path=path, cause=cause)
+    _raise_execution_error(parts, message, path=path, cause=cause)
