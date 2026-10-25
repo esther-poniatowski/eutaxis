@@ -306,10 +306,8 @@ def _procedure_precondition_requirements(
     """Select canonical evaluator-less procedure preconditions from ``run``."""
     return tuple(
         requirement
-        for requirement in run.requirements
+        for requirement in run.procedure_precondition_requirements
         if requirement.evaluator is None
-        and isinstance(requirement.key, ProcedurePredicateKey)
-        and requirement.key.phase is PredicatePhase.PRECONDITION
     )
 
 

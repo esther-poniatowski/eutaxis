@@ -343,10 +343,13 @@ the validated parameter object, and the builder-issued operation registry tied
 to the same declaration registry. The resulting process-local plan retains those
 exact authorities, every procedure-specific completion requirement in canonical
 order, and every authored action with its exact operation contract and frozen
-bound input. The plan projects executable and pre-action tuples from the
-authoritative requirements. These projections do not mutate the authoritative
-tuple. Consequently, every postcondition remains available. Preflight stops
-before runner invocation and evidence issuance.
+bound input. The plan projects executable and broad pre-action tuples, plus
+exact procedure-precondition and evaluator-backed procedure-precondition tuples,
+from the authoritative requirements. The broad pre-action tuple also retains
+invariants and per-action operation preconditions for their later boundaries.
+These projections do not mutate the authoritative tuple. Consequently, every
+postcondition remains available. Preflight stops before runner invocation and
+evidence issuance.
 
 ### Evaluator-backed precondition inputs
 
@@ -406,10 +409,10 @@ combined evaluator-less, manual, assisted, and mechanical results and is true
 only when every precondition is satisfied.
 
 The completed aggregate contains one typed record for every item in
-`run.pre_action_requirements`, in that exact canonical order regardless of
-submission-mapping order. Evaluator-less records retain the exact requirement,
-mapped state, and predicate trace. Manual records retain the exact requirement,
-state derived from `conclusion`, and frozen evidence. Successful assisted
+`run.procedure_precondition_requirements`, in that exact canonical order
+regardless of submission-mapping order. Evaluator-less records retain the exact
+requirement, mapped state, and predicate trace. Manual records retain the exact
+requirement, state derived from `conclusion`, and frozen evidence. Successful assisted
 records retain the exact requirement, residual state, issued
 `DetectorExecution`, and frozen residual judgment. A detector runner or result
 failure instead retains the exact requirement, `blocked` state, and diagnostic,

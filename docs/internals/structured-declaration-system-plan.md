@@ -67,8 +67,8 @@ detectors before requesting residual judgments, and becomes terminal after
 execution starts, including when a later authority check fails. Detector and
 checker runner or result failures map to blocked evidence only after authority
 is revalidated and do not prevent later canonical preconditions from running.
-The completed aggregate retains one typed record per canonical pre-action
-requirement, with the trace, frozen human evidence, issued detector execution
+The completed aggregate retains one typed record per canonical procedure
+precondition, with the trace, frozen human evidence, issued detector execution
 and residual judgment, validated checker result, or blocking diagnostic owned
 by its enforcement class. Separate exact key sets govern manual submissions and
 residual providers. One atomic run-scoped claim prevents a second evaluation

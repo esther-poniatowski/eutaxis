@@ -194,6 +194,10 @@ class ProcedureRunPlan:
     executable_requirements: tuple[CompletionRequirement, ...]
     pre_action_requirements: tuple[CompletionRequirement, ...]
     evaluator_backed_pre_action_requirements: tuple[CompletionRequirement, ...]
+    procedure_precondition_requirements: tuple[CompletionRequirement, ...]
+    evaluator_backed_procedure_precondition_requirements: tuple[
+        CompletionRequirement, ...
+    ]
     actions: tuple[PreparedProcedureAction, ...]
     _parameters_identity: Mapping[str, JsonValue]
     _parameters_value: JsonValue
@@ -203,6 +207,8 @@ class ProcedureRunPlan:
     _executable_identity: tuple[CompletionRequirement, ...]
     _pre_action_identity: tuple[CompletionRequirement, ...]
     _evaluator_backed_identity: tuple[CompletionRequirement, ...]
+    _procedure_precondition_identity: tuple[CompletionRequirement, ...]
+    _evaluator_backed_procedure_precondition_identity: tuple[CompletionRequirement, ...]
     _requirements_identity: tuple[CompletionRequirement, ...]
     _requirement_semantics: tuple[_RequirementAuthorityState, ...]
     _packet_semantics: tuple[_PacketAuthorityState, ...]
@@ -253,6 +259,12 @@ def _is_issued_procedure_run_plan(plan: object) -> bool:
         evaluator_backed = tuple(
             item for item in pre_action if item.evaluator is not None
         )
+        procedure_preconditions = tuple(
+            item for item in plan.requirements if _is_procedure_precondition(item)
+        )
+        evaluator_backed_procedure_preconditions = tuple(
+            item for item in procedure_preconditions if item.evaluator is not None
+        )
         if (
             plan.attention is not plan._attention_identity
             or plan.operation_registry is not plan._operation_registry_state.registry
@@ -267,6 +279,17 @@ def _is_issued_procedure_run_plan(plan: object) -> bool:
             is not plan._evaluator_backed_identity
             or not _same_identity_tuple(
                 plan.evaluator_backed_pre_action_requirements, evaluator_backed
+            )
+            or plan.procedure_precondition_requirements
+            is not plan._procedure_precondition_identity
+            or not _same_identity_tuple(
+                plan.procedure_precondition_requirements, procedure_preconditions
+            )
+            or plan.evaluator_backed_procedure_precondition_requirements
+            is not plan._evaluator_backed_procedure_precondition_identity
+            or not _same_identity_tuple(
+                plan.evaluator_backed_procedure_precondition_requirements,
+                evaluator_backed_procedure_preconditions,
             )
             or not _declaration_authority_is_current(plan._procedure_semantics)
             or plan.parameters is not plan._parameters_identity
@@ -351,6 +374,12 @@ def _prepare_procedure_run(
     executable = tuple(item for item in requirements if item.evaluator is None)
     pre_action = tuple(item for item in requirements if _is_pre_action(item))
     evaluator_backed = tuple(item for item in pre_action if item.evaluator is not None)
+    procedure_preconditions = tuple(
+        item for item in requirements if _is_procedure_precondition(item)
+    )
+    evaluator_backed_procedure_preconditions = tuple(
+        item for item in procedure_preconditions if item.evaluator is not None
+    )
     requirement_semantics = tuple(
         _snapshot_requirement_authority(item, index)
         for index, item in enumerate(requirements)
@@ -373,6 +402,11 @@ def _prepare_procedure_run(
         ("executable_requirements", executable),
         ("pre_action_requirements", pre_action),
         ("evaluator_backed_pre_action_requirements", evaluator_backed),
+        ("procedure_precondition_requirements", procedure_preconditions),
+        (
+            "evaluator_backed_procedure_precondition_requirements",
+            evaluator_backed_procedure_preconditions,
+        ),
         ("actions", actions),
         ("_parameters_identity", frozen_parameters),
         ("_parameters_value", freeze_json(frozen_parameters)),
@@ -385,6 +419,11 @@ def _prepare_procedure_run(
         ("_executable_identity", executable),
         ("_pre_action_identity", pre_action),
         ("_evaluator_backed_identity", evaluator_backed),
+        ("_procedure_precondition_identity", procedure_preconditions),
+        (
+            "_evaluator_backed_procedure_precondition_identity",
+            evaluator_backed_procedure_preconditions,
+        ),
         ("_requirements_identity", requirements),
         ("_requirement_semantics", requirement_semantics),
         ("_packet_semantics", packet_semantics),
@@ -1630,6 +1669,10 @@ def _final_run_identity_check(plan: ProcedureRunPlan) -> bool:
         or plan.pre_action_requirements is not plan._pre_action_identity
         or plan.evaluator_backed_pre_action_requirements
         is not plan._evaluator_backed_identity
+        or plan.procedure_precondition_requirements
+        is not plan._procedure_precondition_identity
+        or plan.evaluator_backed_procedure_precondition_requirements
+        is not plan._evaluator_backed_procedure_precondition_identity
     ):
         return False
     for action, action_state in zip(plan.actions, plan._action_semantics):
@@ -1967,6 +2010,14 @@ def _is_pre_action(item: CompletionRequirement) -> bool:
     return isinstance(key, OperationPredicateKey) or (
         isinstance(key, ProcedurePredicateKey)
         and key.phase in {PredicatePhase.PRECONDITION, PredicatePhase.INVARIANT}
+    )
+
+
+def _is_procedure_precondition(item: CompletionRequirement) -> bool:
+    key = item.key
+    return (
+        isinstance(key, ProcedurePredicateKey)
+        and key.phase is PredicatePhase.PRECONDITION
     )
 
 

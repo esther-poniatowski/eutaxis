@@ -300,6 +300,7 @@ def _prepare_registry(
     ),
     duplicate_preconditions: bool = False,
     local_precondition_operator: str = "exists",
+    later_requirements: bool = False,
 ):
     """Build one registry whose effective obligations match ``mode``."""
     root = tmp_path / "registry"
@@ -435,9 +436,18 @@ def _prepare_registry(
                 "operator": "equals",
                 "value": True,
             }
-        procedure["invariants"] = []
+        if later_requirements:
+            stable = _predicate("stable", "invariant", None)
+            stable["observes"] = ["registry/stable"]
+            procedure["invariants"] = [stable]
+        else:
+            procedure["invariants"] = []
         procedure["postconditions"] = [_predicate("written", "postcondition", None)]
-        operation["preconditions"] = []
+        operation["preconditions"] = (
+            [_predicate("authorized", "authorization", None)]
+            if later_requirements
+            else []
+        )
     else:
         procedure["preconditions"] = []
         procedure["invariants"] = []
@@ -585,6 +595,7 @@ def _precondition_run(
     ),
     duplicate_preconditions: bool = False,
     local_precondition_operator: str = "exists",
+    later_requirements: bool = False,
 ):
     """Build one prepared run with every evaluator enforcement class."""
     root, declarations, resolution, checker_registry, detector_registry = (
@@ -595,6 +606,7 @@ def _precondition_run(
             detector_runner=detector_runner,
             duplicate_preconditions=duplicate_preconditions,
             local_precondition_operator=local_precondition_operator,
+            later_requirements=later_requirements,
         )
     )
     assert checker_registry is not None and detector_registry is not None
@@ -707,6 +719,27 @@ def test_procedure_run_preflight_retains_authorities_inputs_and_requirements(
         item.evaluator is not None
         for item in first.evaluator_backed_pre_action_requirements
     )
+    assert len(first.procedure_precondition_requirements) == 2
+    assert all(
+        actual is expected
+        for actual, expected in zip(
+            first.procedure_precondition_requirements,
+            first.requirements[:2],
+        )
+    )
+    assert len(first.evaluator_backed_procedure_precondition_requirements) == 1
+    assert first.evaluator_backed_procedure_precondition_requirements[0] is (
+        first.requirements[0]
+    )
+    assert any(
+        isinstance(item.key, OperationPredicateKey)
+        for item in first.pre_action_requirements
+    )
+    assert any(
+        isinstance(item.key, ProcedurePredicateKey)
+        and item.key.phase is PredicatePhase.INVARIANT
+        for item in first.pre_action_requirements
+    )
     assert [item.node.id for item in first.actions] == ["write-first", "write-second"]
     assert first.actions[0].contract is first.actions[1].contract
     assert first.actions[0].input_data == {
@@ -735,6 +768,8 @@ def test_procedure_run_preflight_retains_authorities_inputs_and_requirements(
         "executable_requirements",
         "pre_action_requirements",
         "evaluator_backed_pre_action_requirements",
+        "procedure_precondition_requirements",
+        "evaluator_backed_procedure_precondition_requirements",
         "actions",
     ):
         object.__setattr__(reconstructed, field, getattr(first, field))
@@ -1890,7 +1925,14 @@ def test_procedure_run_preflight_contains_incomplete_packet_entry(
 def test_precondition_evaluation_plan_rejects_complete_run_semantic_substitutions(
     tmp_path: Path,
 ) -> None:
-    for mode in ("procedure", "evaluator", "partition", "operation-contract"):
+    for mode in (
+        "procedure",
+        "evaluator",
+        "partition",
+        "procedure-preconditions",
+        "evaluator-backed-procedure-preconditions",
+        "operation-contract",
+    ):
         _, _, _, run = _precondition_run(tmp_path / mode)
         supplied = _provider_inputs(run)
         provider_calls = 0
@@ -1906,6 +1948,16 @@ def test_precondition_evaluation_plan_rejects_complete_run_semantic_substitution
             object.__setattr__(evaluator, "title", "Substituted evaluator")
         elif mode == "partition":
             object.__setattr__(run, "executable_requirements", ())
+        elif mode == "procedure-preconditions":
+            object.__setattr__(
+                run,
+                "procedure_precondition_requirements",
+                tuple(reversed(run.procedure_precondition_requirements)),
+            )
+        elif mode == "evaluator-backed-procedure-preconditions":
+            object.__setattr__(
+                run, "evaluator_backed_procedure_precondition_requirements", ()
+            )
         else:
             object.__setattr__(
                 run.actions[0].contract,
@@ -4337,7 +4389,7 @@ def test_pre_action_evidence_session_issues_complete_canonical_clearance(
     assert evidence.cleared
     assert _is_issued_pre_action_evidence(evidence)
     assert tuple(record.requirement for record in evidence.records) == (
-        evidence.plan.run.pre_action_requirements
+        evidence.plan.run.procedure_precondition_requirements
     )
     assert tuple(type(record) for record in evidence.records) == (
         ManualPreconditionEvidence,
@@ -4348,6 +4400,83 @@ def test_pre_action_evidence_session_issues_complete_canonical_clearance(
     assert all(record.state is EvaluationState.SATISFIED for record in evidence.records)
     with pytest.raises(PreActionEvidenceError, match="completed"):
         session.execute(manual=manual, residual_providers=residual)
+
+
+def test_pre_action_evidence_excludes_later_run_requirements(
+    tmp_path: Path,
+) -> None:
+    _, _, _, run = _precondition_run(
+        tmp_path,
+        later_requirements=True,
+    )
+    supplied = _provider_inputs(run)
+    evaluation_plan = plan_procedure_precondition_evaluations(
+        run,
+        {key: (lambda request, value=value: value) for key, value in supplied.items()},
+    )
+    observation_registry = build_observation_provider_registry(
+        run.attention.resolution.registry,
+        run.attention.resolution.registry.facet_registry,
+        cast(
+            ObservationProvider,
+            lambda request: {facet: True for facet in request.facets},
+        ),
+    )
+    observation = observe_procedure_preconditions(run, observation_registry)
+    manual = {
+        cast(ProcedurePredicateKey, record.requirement.key): ManualJudgmentSubmission(
+            cast(ProcedurePredicateKey, record.requirement.key),
+            VersionedReference(
+                record.entry.evaluator.id,
+                record.entry.evaluator.version,
+            ),
+            record.entry.evaluator.input_revisions[0],
+            {"conclusion": "satisfied"},
+        )
+        for record in evaluation_plan.manual
+    }
+    residual = {
+        cast(ProcedurePredicateKey, record.requirement.key): cast(
+            ResidualJudgmentProvider,
+            lambda request, item=record: ResidualJudgmentSubmission(
+                1,
+                cast(ProcedurePredicateKey, item.requirement.key),
+                item.entry.invocation.evaluator,
+                item.entry.invocation.input_revision,
+                EvaluationState.SATISFIED,
+                "The detector evidence leaves no violating candidate.",
+            ),
+        )
+        for record in evaluation_plan.assisted
+    }
+
+    evidence = create_pre_action_evidence_session(evaluation_plan, observation).execute(
+        manual=manual, residual_providers=residual
+    )
+
+    assert evidence.cleared
+    assert all(
+        record.requirement is requirement
+        for record, requirement in zip(
+            evidence.records, run.procedure_precondition_requirements
+        )
+    )
+    assert len(evidence.records) == 4
+    assert len(run.pre_action_requirements) > len(evidence.records)
+    assert any(
+        isinstance(item.key, OperationPredicateKey)
+        for item in run.pre_action_requirements
+    )
+    assert any(
+        isinstance(item.key, ProcedurePredicateKey)
+        and item.key.phase is PredicatePhase.INVARIANT
+        for item in run.pre_action_requirements
+    )
+    assert any(
+        isinstance(item.key, ProcedurePredicateKey)
+        and item.key.phase is PredicatePhase.POSTCONDITION
+        for item in run.requirements
+    )
 
 
 def test_pre_action_evidence_rejects_key_errors_before_execution(

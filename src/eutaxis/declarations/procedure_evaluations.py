@@ -999,7 +999,15 @@ def _requirements(run: ProcedureRunPlan) -> tuple[CompletionRequirement, ...]:
             and cast(ProcedurePredicateKey, key).phase is PredicatePhase.PRECONDITION
         ):
             selected.append(item)
-    return tuple(selected)
+    expected = tuple(selected)
+    if not _same_identity_projection(
+        run.evaluator_backed_procedure_precondition_requirements, expected
+    ):
+        _fail(
+            ("run", "evaluator-backed-procedure-preconditions"),
+            "run procedure preconditions differ from canonical requirements",
+        )
+    return run.evaluator_backed_procedure_precondition_requirements
 
 
 def _key_belongs_to_procedure(key: object, identifier: str) -> bool:

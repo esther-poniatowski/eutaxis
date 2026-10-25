@@ -450,7 +450,7 @@ def _execute_records(
     residual_providers: Mapping[ProcedurePredicateKey, ResidualJudgmentProvider],
 ) -> tuple[PreActionEvidenceRecord, ...]:
     records: list[PreActionEvidenceRecord] = []
-    for requirement in plan.run.pre_action_requirements:
+    for requirement in plan.run.procedure_precondition_requirements:
         if requirement.evaluator is None:
             item = next(
                 item
@@ -612,7 +612,7 @@ def _issue_evidence(
     observation: ProcedurePreconditionObservation,
     records: tuple[PreActionEvidenceRecord, ...],
 ) -> PreActionEvidence:
-    if len(records) != len(plan.run.pre_action_requirements):
+    if len(records) != len(plan.run.procedure_precondition_requirements):
         _fail(("records",), "evidence tuple is incomplete")
     evidence = object.__new__(PreActionEvidence)
     object.__setattr__(evidence, "plan", plan)
@@ -642,7 +642,7 @@ def _is_issued_pre_action_evidence(evidence: object) -> bool:
             return False
         if evidence.observation.run is not evidence.plan.run:
             return False
-        expected = evidence.plan.run.pre_action_requirements
+        expected = evidence.plan.run.procedure_precondition_requirements
         if type(evidence.records) is not tuple or len(evidence.records) != len(
             expected
         ):
