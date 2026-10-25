@@ -16,4 +16,3 @@ timing: post-artifact
 input-revisions: [declaration-v1]
 evidence-schema: {type: object}
 failure-behavior: block
-known-failure-fixtures: [broken]

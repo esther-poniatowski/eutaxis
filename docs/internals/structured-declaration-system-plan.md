@@ -112,7 +112,7 @@ Separate-directory output requires a contract from identifiers to paths. The sam
 
 ### Catalog, registries, and resolution
 
-This phase has turned the validated registry into a static query boundary and now resolves certified outputs for a supplied context. Its remaining work belongs to enforcement classification and the temporary rendered-Markdown compatibility boundary.
+This phase has turned the validated registry into a static query boundary, resolves certified outputs for a supplied context, and classifies evaluator-backed obligations. Its remaining work is the temporary rendered-Markdown compatibility boundary.
 
 - [x] Consolidate the source boundary and cross-record registry in one `declarations` package.
 - [x] Implement immutable exact lookups and deterministic JSON indexing over the validated registry.
@@ -120,7 +120,7 @@ This phase has turned the validated registry into a static query boundary and no
 - [x] Apply exact static field predicates to live and persisted catalogs, and verify that both produce identical ordered keys.
 - [x] Evaluate each applicability predicate and build its immutable trace through one strong-Kleene implementation.
 - [x] Close the v1 contracts for rule sets, three-valued predicates, policies, projected rules, and issued results.
-- [ ] Derive enforcement classes from evaluator contracts in the enforcement phase, then expose their static filter.
+- [x] Derive declared enforcement classes from evaluator contracts, then expose the live-catalog filter at obligation granularity.
 - [ ] Keep the rendered-Markdown parser behind its current public behavior until migration proves its final disposition.
 - [x] Implement the monotone candidate/excluded/required/effective algorithm and provenance-bearing explanation traces.
 - [x] Move certified-unit issuance from the fixture composer to the resolver, reject rule-set containers as effective components, and add rule projections atomically.
@@ -131,12 +131,12 @@ This phase has turned the validated registry into a static query boundary and no
 
 ### Enforcement and completion
 
-- [ ] Derive mechanical, assisted, and deliberative classes from evaluator contracts.
+- [x] Derive mechanical, assisted, and deliberative classes from evaluator contracts without claiming runner readiness.
 - [ ] Emit three attention packets and a separate resolution trace.
-- [ ] Require evidence for every effective criterion in the completion ledger.
+- [ ] Require evidence for every effective obligation in the completion ledger.
 - [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.
 
-**Exit evidence:** clean checker output cannot complete an unmapped criterion, and unchecked, violated, or blocked criteria prevent success.
+**Exit evidence:** clean checker output cannot complete an unmapped obligation. Unchecked, violated, or blocked rule criteria, procedure predicates, or per-action operation preconditions prevent success.
 
 ### Projections and compatibility
 

@@ -446,10 +446,70 @@ def test_machine_evaluator_contracts_are_admitted(
         document["adjudication"] = adjudication
         if evaluator_kind == "checker":
             document["known-failure-fixtures"] = ["tests/known-failure"]
+        else:
+            document["residual-question"] = "Does the candidate violate the criterion?"
 
     declaration = load_declaration(_write_variant(tmp_path, "evaluator.yaml", mutate))
     assert isinstance(declaration, EvaluatorDeclaration)
     assert declaration.evaluator_kind == evaluator_kind
+    assert declaration.residual_question == (
+        None
+        if evaluator_kind == "checker"
+        else "Does the candidate violate the criterion?"
+    )
+
+
+def test_detector_requires_its_residual_question(tmp_path: Path) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["evaluator-kind"] = "detector"
+        document["coverage"] = "partial"
+        document["adjudication"] = "candidate"
+
+    path = _write_variant(tmp_path, "evaluator.yaml", mutate)
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$"
+    assert "residual-question" in str(captured.value)
+
+
+@pytest.mark.parametrize("evaluator_kind", ["checker", "manual"])
+def test_non_detector_forbids_a_residual_question(
+    tmp_path: Path, evaluator_kind: str
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["residual-question"] = "This question has no detector."
+        if evaluator_kind == "checker":
+            document["evaluator-kind"] = "checker"
+            document["coverage"] = "total"
+            document["adjudication"] = "authoritative"
+            document["known-failure-fixtures"] = ["tests/known-failure"]
+
+    path = _write_variant(tmp_path, "evaluator.yaml", mutate)
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.residual-question"
+    assert "residual-question" in str(captured.value)
+
+
+@pytest.mark.parametrize("evaluator_kind", ["detector", "manual"])
+def test_non_checker_forbids_known_failure_fixtures(
+    tmp_path: Path, evaluator_kind: str
+) -> None:
+    def mutate(document: dict[str, object]) -> None:
+        document["known-failure-fixtures"] = ["tests/known-failure"]
+        if evaluator_kind == "detector":
+            document["evaluator-kind"] = "detector"
+            document["coverage"] = "partial"
+            document["adjudication"] = "candidate"
+            document["residual-question"] = "Does the candidate violate the criterion?"
+
+    path = _write_variant(tmp_path, "evaluator.yaml", mutate)
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.known-failure-fixtures"
 
 
 def test_checker_requires_named_known_failure_fixture(tmp_path: Path) -> None:

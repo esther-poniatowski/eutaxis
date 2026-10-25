@@ -310,13 +310,14 @@ class CompositionManifestDeclaration(Declaration):
 
 @dataclass(frozen=True)
 class EvaluatorDeclaration(Declaration):
-    """A versioned contract for criterion evidence."""
+    """A versioned contract for evaluator-backed obligation evidence."""
 
     version: int
     evaluator_kind: str
     coverage: str
     adjudication: str
     timing: str
+    residual_question: str | None
     input_revisions: tuple[str, ...]
     evidence_schema: Mapping[str, JsonValue]
     failure_behavior: str

@@ -65,6 +65,11 @@ def _contracts(document: dict[str, object]) -> list[dict[str, object]]:
     return cast(list[dict[str, object]], document["contracts"])
 
 
+def _evaluator_query(document: dict[str, object]) -> dict[str, object]:
+    row = next(item for item in _contracts(document) if item["kind"] == "evaluator")
+    return cast(dict[str, object], row["query"])
+
+
 def _sources(document: dict[str, object]) -> list[dict[str, object]]:
     return cast(list[dict[str, object]], document["sources"])
 
@@ -235,6 +240,60 @@ def test_schema_rejects_unknown_query_fields_for_every_kind() -> None:
         cast(dict[str, object], target["query"])["unknown"] = True
         with pytest.raises(DeclarationCatalogError, match="unknown"):
             _load_document(document)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda query: query.update(
+            {
+                "evaluator-kind": "detector",
+                "coverage": "partial",
+                "adjudication": "candidate",
+            }
+        ),
+        lambda query: query.update(
+            {
+                "evaluator-kind": "checker",
+                "coverage": "total",
+                "adjudication": "authoritative",
+                "residual-question": "A checker has no residual question.",
+            }
+        ),
+        lambda query: query.update(
+            {"residual-question": "A manual evaluator owns no detector residual."}
+        ),
+        lambda query: query.update(
+            {
+                "evaluator-kind": "detector",
+                "coverage": "total",
+                "adjudication": "authoritative",
+                "residual-question": "Does the candidate remain?",
+            }
+        ),
+        lambda query: query.update(
+            {
+                "evaluator-kind": "checker",
+                "coverage": "none",
+                "adjudication": "manual",
+            }
+        ),
+        lambda query: query.update(
+            {
+                "coverage": "partial",
+                "adjudication": "candidate",
+            }
+        ),
+    ],
+)
+def test_persisted_evaluator_projection_preserves_class_invariants(
+    mutate: Callable[[dict[str, object]], object],
+) -> None:
+    document = _document()
+    mutate(_evaluator_query(document))
+
+    with pytest.raises(DeclarationCatalogError, match="Invalid catalog index"):
+        _load_document(document)
 
 
 @pytest.mark.parametrize(

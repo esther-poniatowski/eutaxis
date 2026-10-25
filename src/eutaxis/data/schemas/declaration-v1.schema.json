@@ -364,6 +364,7 @@
             "coverage": {"enum": ["total", "partial", "none"]},
             "adjudication": {"enum": ["authoritative", "candidate", "manual"]},
             "timing": {"enum": ["pre-design", "pre-action", "post-action", "post-artifact"]},
+            "residual-question": {"type": "string", "minLength": 1},
             "input-revisions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
             "evidence-schema": {"type": "object"},
             "failure-behavior": {"enum": ["block", "candidate", "record"]},
@@ -378,7 +379,8 @@
                   "adjudication": {"const": "authoritative"}
                 },
                 "required": ["known-failure-fixtures"]
-              }
+              },
+              "else": {"not": {"required": ["known-failure-fixtures"]}}
             },
             {
               "if": {"properties": {"evaluator-kind": {"const": "detector"}}, "required": ["evaluator-kind"]},
@@ -386,8 +388,10 @@
                 "properties": {
                   "coverage": {"const": "partial"},
                   "adjudication": {"const": "candidate"}
-                }
-              }
+                },
+                "required": ["residual-question"]
+              },
+              "else": {"not": {"required": ["residual-question"]}}
             },
             {
               "if": {"properties": {"evaluator-kind": {"const": "manual"}}, "required": ["evaluator-kind"]},

@@ -103,8 +103,40 @@
         "coverage": {"enum": ["total", "partial", "none"]},
         "adjudication": {"enum": ["authoritative", "candidate", "manual"]},
         "timing": {"enum": ["pre-design", "pre-action", "post-action", "post-artifact"]},
+        "residual-question": {"type": "string", "minLength": 1},
         "failure-behavior": {"enum": ["block", "candidate", "record"]}
       },
+      "allOf": [
+        {
+          "if": {"properties": {"evaluator-kind": {"const": "checker"}}, "required": ["evaluator-kind"]},
+          "then": {
+            "properties": {
+              "coverage": {"const": "total"},
+              "adjudication": {"const": "authoritative"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"evaluator-kind": {"const": "detector"}}, "required": ["evaluator-kind"]},
+          "then": {
+            "properties": {
+              "coverage": {"const": "partial"},
+              "adjudication": {"const": "candidate"}
+            },
+            "required": ["residual-question"]
+          },
+          "else": {"not": {"required": ["residual-question"]}}
+        },
+        {
+          "if": {"properties": {"evaluator-kind": {"const": "manual"}}, "required": ["evaluator-kind"]},
+          "then": {
+            "properties": {
+              "coverage": {"const": "none"},
+              "adjudication": {"const": "manual"}
+            }
+          }
+        }
+      ],
       "additionalProperties": false
     },
     "operation-query": {

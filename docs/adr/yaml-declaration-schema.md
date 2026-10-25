@@ -223,13 +223,13 @@ rules:
 
 ## Evaluator and operation registries
 
-An `evaluator` names who assesses a criterion. The evaluator declares when it runs. The contract specifies accepted inputs and produced evidence. The contract also specifies failures. A checker names its known-failure fixtures. Version 1 admits three exact enforcement contracts:
+An `evaluator` names who assesses an obligation. The evaluator declares when it runs. The contract specifies accepted inputs and produced evidence. The contract also specifies failures. A checker names its known-failure fixtures. Version 1 admits three exact enforcement contracts:
 
 - `checker` covers every admitted input and decides the result authoritatively
-- `detector` covers only some admitted inputs and proposes candidate results
+- `detector` covers only some admitted inputs, proposes candidate results, and states the residual judgment question
 - `manual` asks a human reviewer to decide
 
-Each checker names at least one known-failure fixture. During the final registry slice, Eutaxis will register version 1 of `eutaxis/manual-judgment`. Its evidence identifies the reviewer and criterion, then records the observation and conclusion. Therefore, `manual` is not an unregistered escape value.
+Each checker names at least one known-failure fixture. Each detector states a non-empty `residual-question`; checker and manual contracts omit that field. Eutaxis registers version 1 of `eutaxis/manual-judgment`. Its evidence identifies the reviewer and obligation, then records the observation and conclusion. Therefore, `manual` is not an unregistered escape value.
 
 An `operation` declares a versioned action contract. The contract defines:
 

@@ -366,6 +366,11 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
             coverage=str(document["coverage"]),
             adjudication=str(document["adjudication"]),
             timing=str(document["timing"]),
+            residual_question=(
+                str(document["residual-question"])
+                if "residual-question" in document
+                else None
+            ),
             input_revisions=tuple(
                 str(item) for item in cast(list[object], document["input-revisions"])
             ),

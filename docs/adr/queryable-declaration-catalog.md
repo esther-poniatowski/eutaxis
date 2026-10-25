@@ -34,7 +34,7 @@ The static boundary excludes the following work:
 - assigning enforcement work
 - producing query packets or Markdown
 
-The resolver performs the first five items. The projection boundary produces the packets and Markdown.
+The resolver performs the first four items. Enforcement classification assigns the fifth, and the enforcement planner produces query packets. The projection and rendering boundary produces Markdown.
 
 The source schema and the `index-revision` field evolve independently. The JSON arrays use these orders:
 
@@ -97,7 +97,7 @@ The catalog exposes at least these operations:
 
 - retrieve a declaration or one field by stable identifier
 - filter exact indexed fields
-- filter records by a derived enforcement class
+- filter live evaluator-backed obligations by a declared enforcement class
 - resolve exceptions, conflicts, and dependencies for a typed context
 - explain why each declaration was selected, omitted, waived, or overridden
 - group the result into deliberation, assisted inspection, and checker invocations
@@ -105,6 +105,8 @@ The catalog exposes at least these operations:
 - report the source hash, schema version, evaluator version, and generated-index revision used for an answer
 
 Selection cannot guarantee a necessary-and-sufficient rule set from storage alone. Applicability classification and semantic context recognition remain substantive problems. The query contract therefore returns its context assumptions and resolution trace instead of claiming completeness without evidence.
+
+The first enforcement filter is live-catalog only. The persisted index omits obligation-to-evaluator references, so it cannot derive the same result without an index revision. [Enforcement-directed agent attention](enforcement-directed-agent-attention.md) fixes this boundary and keeps the evaluator contract as the sole authority for each declared class. Runner bindings and known-failure assurance separately determine whether a classified obligation is ready for an attention packet.
 
 ## Query packets and target projections
 

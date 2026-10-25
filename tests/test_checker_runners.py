@@ -54,6 +54,7 @@ def _registry(tmp_path: Path):
     detector["evaluator-kind"] = "detector"
     detector["coverage"] = "partial"
     detector["adjudication"] = "candidate"
+    detector["residual-question"] = "Does the candidate violate the obligation?"
     detector.pop("known-failure-fixtures")
     (directory / "detector.yaml").write_text(
         yaml.safe_dump(detector, sort_keys=False), encoding="utf-8"
