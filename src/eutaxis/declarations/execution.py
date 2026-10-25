@@ -29,6 +29,7 @@ from .results import CheckerResult, DetectorResult, EvaluationState
 from .runners import (
     CheckerRunnerRegistry,
     DetectorRunnerRegistry,
+    _is_builder_issued_checker_registry,
     _is_builder_issued_detector_registry,
 )
 from .source import DocumentPath, SourceMap, format_document_path, nearest_location
@@ -145,6 +146,14 @@ class KnownFailureAssurance(Mapping[str, CheckerResult]):
         raise TypeError("KnownFailureAssurance instances cannot be serialized")
 
 
+def _is_issued_known_failure_assurance(assurance: object) -> bool:
+    """Return whether ``assurance`` carries this process's executor authority."""
+    return (
+        isinstance(assurance, KnownFailureAssurance)
+        and getattr(assurance, "_issuer", None) is _ASSURANCE_ISSUER
+    )
+
+
 def execute_detector(
     registry: DetectorRunnerRegistry,
     evaluator: VersionedReference,
@@ -230,6 +239,10 @@ def execute_checker(
     path: Path | None = None,
 ) -> CheckerResult:
     """Invoke one exact checker and validate its complete returned contract."""
+    if not _is_builder_issued_checker_registry(runners):
+        _raise_execution_error(
+            (), "checker registry was not issued by its validated builder", path=path
+        )
     binding = runners.bindings.get(evaluator)
     if binding is None:
         _raise_execution_error(
@@ -276,6 +289,10 @@ def execute_known_failure_fixtures(
     runners: CheckerRunnerRegistry,
 ) -> KnownFailureAssurance:
     """Execute every declared known failure and issue its correlated assurance."""
+    if not _is_builder_issued_checker_registry(runners):
+        raise CheckerExecutionError(
+            "$", "checker registry was not issued by its validated builder"
+        )
     if not _is_loader_issued_fixture_index(fixtures):
         raise CheckerExecutionError(
             "$",

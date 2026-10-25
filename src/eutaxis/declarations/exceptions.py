@@ -187,6 +187,15 @@ class DetectorExecutionError(Exception):
         self.detail = message
 
 
+class AttentionPlanningError(Exception):
+    """Report a failed attention requirement or packet planning boundary."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid attention plan at {location}: {message}")
+        self.location = location
+        self.detail = message
+
+
 class OperationRunnerRegistryError(Exception):
     """Report an invalid code-owned operation runner binding."""
 

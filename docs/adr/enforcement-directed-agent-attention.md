@@ -25,7 +25,7 @@ The catalog derives one enforcement class from each evaluator-backed obligation'
 
 These classes state capabilities, not runtime readiness. After the readiness gate issues a packet, the agent runs mechanical work and reasons further only on a failure, dispute, or checker change. For assisted work, the agent triages every detector candidate and answers the residual question. For deliberative work, the agent judges the obligation from the artifact, its purpose, and the evidence.
 
-The class is not a subjective priority score. It follows from the evaluator's declared capabilities.
+The enforcement class is not a subjective priority score. The evaluator's declared capabilities determine the class.
 
 Each evaluator contract records `kind` (`checker`, `detector`, or `manual`), registry reference, `coverage` (`total`, `partial`, or `none`), `adjudication` (`authoritative`, `candidate`, or `manual`), timing, failure behavior, evidence form, evaluator version, and applicable artifact revision. Version 1 admits exactly three triples: checker/total/authoritative, detector/partial/candidate, and manual/none/manual. Mechanical evaluators also name a known-failure test. A checker cannot claim total authoritative coverage until a planted failure proves that the check can fail and the contract names the class it covers.
 
@@ -33,9 +33,9 @@ Each evaluator contract records `kind` (`checker`, `detector`, or `manual`), reg
 
 Version 1 classifies each evaluator-backed obligation, not its enclosing declaration. One rule may therefore contribute assignments to several enforcement classes. Evaluator-backed predicates of procedures and operations use the same classes, so a manual or detector-backed predicate cannot disappear behind an execution boundary. A predicate without an evaluator reference remains executable predicate logic owned by procedure or operation execution.
 
-`EnforcementClass` is the closed enumeration `mechanical`, `assisted`, and `deliberative`. `derive_enforcement_class(evaluator)` maps only the three admitted evaluator triples to this enumeration. It rejects any other triple instead of guessing from one field. For a checker, the declared contract must also name at least one known-failure fixture, as required by the evaluator schema.
+`EnforcementClass` is the closed enumeration `mechanical`, `assisted`, and `deliberative`. `derive_enforcement_class(evaluator)` maps only the three admitted evaluator triples to this enumeration. The function rejects any other triple instead of guessing from one field. For a checker, the declared contract must also name at least one known-failure fixture, as required by the evaluator schema.
 
-This result is a *declared classification*. It does not prove that an evaluator can run or that its claims have passed their assurance gate. Static filtering alone must not remove an obligation from agent attention or authorize an attention packet.
+The resulting class is a *declared classification*. The class does not prove that an evaluator can run or that its claims have passed their assurance gate. Static filtering alone must not remove an obligation from agent attention or authorize an attention packet.
 
 Three frozen locator types preserve the source distinction:
 
@@ -47,7 +47,7 @@ These locators do not copy criterion statements, predicate expressions, or evalu
 
 `DeclarationCatalog.filter_enforcement(enforcement)` returns all three locator types from live records. Rule and procedure declarations follow identifier order. Rule criteria retain authored order. Procedure predicates follow phase order—preconditions, invariants, then postconditions—and authored order within each phase. Operation contracts follow exact `(identifier, version)` order, and their preconditions retain authored order. Unversioned locators precede operation locators, matching the catalog's existing record traversal. A declaration or operation with obligations in two classes appears in both corresponding results. An obligation without an evaluator reference appears in none. The operation is static: it classifies every authored evaluator-backed obligation without evaluating applicability.
 
-The attention planner intersects rule locators with final projected criteria and procedure locators with final effective procedure components. It expands an operation locator once for each action of an effective procedure that invokes that exact operation. The expanded completion key is `(procedure identifier, action identifier, operation reference, predicate identifier)`. Thus, two actions that invoke one operation contract receive distinct evidence records, even when they share bindings.
+The attention planner intersects rule locators with final projected criteria and procedure locators with final effective procedure components. The planner expands an operation locator once for each action of an effective procedure that invokes that exact operation. The expanded completion key is `(procedure identifier, action identifier, operation reference, predicate identifier)`. Thus, two actions that invoke one operation contract receive distinct evidence records, even when they share bindings.
 
 Detector contracts gain one canonical `residual-question` field. The field states the judgment left after the detector reports its candidates. The schema requires a non-empty residual question for a detector and forbids it for a checker or manual evaluator. The detector owns this question because it describes the limit of that evaluator's coverage; the packet supplies the selected criterion or predicate as the object to which the question applies.
 
@@ -79,11 +79,173 @@ Execution retains its existing diagnostic ownership. Missing or mismatched fixtu
 
 An assisted packet requires an exact detector runner binding and the detector's residual question. A missing detector runner raises a blocking readiness error. Known-failure assurance applies only to total authoritative checkers; it does not convert a partial detector into an authoritative evaluator. The planner never silently emits the packet and never reclassifies the obligation as deliberative.
 
+### Attention planner boundary
+
+Resolution uses one exact registry. The planner must correlate every effective
+obligation with that registry. Three candidate roots fail this criterion:
+
+- a catalog field changes a portable query view into an authorization object
+- a separate planning context duplicates the successful resolution result
+- a public catalog locator lacks issuance authority
+
+`ResolutionResult` consequently retains the exact `DeclarationRegistry` and carries a private
+process-local resolver stamp. The planner checks the stamp before reading the
+result. A private canonical enumerator reads authored obligations through a
+neutral read-only interface. The interface supplies unversioned records and
+exact evaluator or operation lookup. One adapter reads the resolution registry;
+another reads the live catalog mappings. Both the planner and
+`DeclarationCatalog.filter_enforcement` project from this enumerator, so a new
+obligation kind or procedure phase cannot enter only one surface. The enumerator
+supplies no issuance authority. Planner authority comes from the stamped result
+and its registry adapter.
+
+The resolver stamp protects the ordinary public construction boundary. Hostile
+Python code can still inspect private attributes. The planner independently
+checks the structures consumed from the result against the retained registry.
+The checks cover every resolved coordinate and each referenced declaration or
+exact contract.
+The stamp establishes process-local provenance. The structural checks establish
+agreement with the source authority.
+
+Three public obligation-key types identify concrete work:
+
+- `RuleCriterionKey(declaration, criterion)` identifies one effective rule
+  criterion
+- `ProcedurePredicateKey(declaration, phase, predicate)` identifies one
+  predicate of an effective procedure
+- `OperationPredicateKey(procedure, action, operation, predicate)` identifies
+  one operation precondition expanded for one effective procedure action
+
+The keys contain no copied evaluator or enforcement class. A two-stage API
+prevents callers from duplicating the planner's key derivation. First,
+`derive_attention_requirements` returns a privately issued
+`AttentionRequirements`. Each runnable requirement states:
+
+- its canonical key
+- its evaluator and enforcement class
+- its evaluator-input operation
+- the admitted revisions
+- the input schema
+
+The runner binding owns the evaluator-input operation. The evaluator-input
+operation differs from the subject operation named by an expanded operation key.
+The requirements aggregate retains the exact resolution result and each runner
+registry needed by its effective classes.
+
+Second, `plan_attention` accepts the issued requirements and one
+`EvaluatorInput(input_revision, input_data)` for each runnable requirement.
+Missing input leaves runnable work undefined, so missing input blocks
+the plan. Additional input indicates a stale or incorrectly scoped plan.
+Additional input also blocks the plan. The planner freezes each
+supplied JSON object. The admitted revisions must contain the supplied revision.
+The frozen object must satisfy the bound input schema.
+The resulting `EvaluatorInvocation` states four values:
+
+- the exact evaluator
+- the evaluator-input operation
+- the admitted revision
+- the immutable input
+
+One privately issued `AttentionPlan` retains the exact requirements, resolution
+result, and readiness authorities. The resolution trace remains on the
+resolution result. No packet copies the trace. No completion operation accepts
+a resolution event as evidence. The packet entries have distinct
+information boundaries:
+
+- a deliberative entry contains the complete selected obligation and the exact
+  immutable `EvaluatorDeclaration` for its manual evaluator
+- an assisted entry contains the complete selected obligation, a validated
+  detector invocation, and the detector's residual question
+- a mechanical entry contains only the obligation key, a validated checker
+  invocation, and the evaluator's evidence schema
+
+Three normalized snapshots retain declaration values rather than prose
+reconstructed by the planner:
+
+- `RuleObligationSnapshot` retains the rule axis, failure mode, visibility
+  requirement, title, rationale, selected criterion, and referenced effective
+  norms
+- `ProcedureObligationSnapshot` retains the purpose, title, rationale,
+  parameter schema, effects, failures, phase, and selected predicate
+- `OperationObligationSnapshot` retains the procedure purpose, parameter
+  context, action, exact operation input schema, effects, failure outcomes,
+  recovery rule, and selected predicate
+
+One test binds an operation input to a declared procedure parameter. A
+manual-only test uses a non-trivial evidence schema. That test checks every
+evaluator field needed to produce ledger-admissible evidence. The future ledger
+validates manual evidence against this retained evaluator contract.
+
+Packet order follows the resolved component order. Rule criteria keep authored
+order when the final criterion projection selects them. A procedure contributes
+obligations in this order:
+
+1. procedure preconditions in authored order
+2. each action in authored order, followed by that action's operation
+   preconditions in authored order
+3. procedure invariants in authored order
+4. procedure postconditions in authored order
+
+Each obligation enters the packet for its derived class. Its relative place in
+that packet remains unchanged. Empty packets are valid.
+
+Mechanical requirements need an exact checker registry. The checker registry
+uses the same builder-issued boundary as the detector registry: public
+construction, copying, serialization, and reconstruction fail. Checker
+execution validates its private stamp before reading any mapping. Mechanical
+plan issuance additionally needs the exact fixture index and the exact
+`KnownFailureAssurance` issued for that index, the checker registry, and the
+resolution registry. The planner validates the assurance stamp. Each retained
+object must have the required identity. Each checker entry must match its
+current authored fixture sequence. Every fixture digest is rechecked.
+
+Assisted requirements need a builder-issued detector registry whose declaration
+registry is the resolution registry. Every effective assisted evaluator must
+have an exact binding. The final plan retains that registry for comparison with
+later `DetectorExecution` evidence. The completion ledger requires the exact
+assisted entry to match the retained registry identity and invocation values.
+This match covers the evaluator reference, input revision, and immutable input.
+The ledger also associates the execution with that entry's obligation key. One execution cannot discharge another key unless a
+later contract defines an explicit sharing rule.
+
+Future mechanical completion does not accept a caller-supplied `CheckerResult`.
+The completion operation invokes the checker through the exact registry retained
+by the plan, validates the result through `execute_checker`, and records the
+validated value inside the ledger transaction. This route makes a public result
+carrier insufficient as evidence. The plan retains the exact checker registry,
+fixture index, assurance, and detector registry used to issue it. Each authority
+is present only when its corresponding packet is non-empty. Immediately before
+one mechanical invocation or one atomic batch, completion revalidates the
+assurance stamp and every retained identity. Completion also compares the
+authored fixture sequences and rechecks their digests. A stale resource blocks
+completion under the later ledger contract.
+The ledger tests mutate a fixture after plan issuance.
+
+`ResolutionResult`, `AttentionRequirements`, and `AttentionPlan` use private
+process-local issuer stamps. Their public constructors fail. Every ordinary
+reconstruction route also fails, including copying and serialization. Private
+validators check the stamps before reading fields. Authorization compares
+retained aggregates by identity rather than structural equality.
+`ResolutionResult` preserves semantic
+equality over its unit and trace. Its retained registry and issuer stamp do not
+participate in that equality, and authorization never relies on it. These
+cooperative boundaries do not resist hostile access to private Python
+attributes.
+
+An empty effective class requires no authority for that class. Supplying a
+checker registry for an empty mechanical requirement set is an error. Supplying
+a detector registry for an empty assisted set is also an error. Likewise, an
+empty mechanical packet rejects a fixture index or known-failure assurance. A
+resolution with no evaluator-backed obligation still issues one plan containing
+three empty packets. Any mismatch in planning inputs or authorities raises
+`AttentionPlanningError`; no partial aggregate is issued. Tests cover
+no-evaluator, manual-only, mechanical-only, and assisted-only plans.
+
 ### Detector runner boundary
 
 The detector boundary must preserve the semantic distinction between authoritative checking and candidate detection. Three designs were considered. Extending `CheckerRunnerRegistry` would let partial candidate producers enter a registry whose name, result states, and assurance contract promise authoritative decisions. A fully independent detector implementation would preserve that distinction but duplicate exact-reference, operation-contract, ordering, and callable validation. A public generalized evaluator registry would expose combinations that version 1 does not admit. Therefore, version 1 uses separate public checker and detector façades over one private runner-registry validator.
 
-The detector façade consists of `DetectorRunner`, `DetectorRunnerBinding`, `DetectorRunnerRegistry`, and `build_detector_runner_registry`. A binding contains one exact detector reference, one exact operation reference, and one synchronous reviewed callable. The builder sorts bindings by evaluator identifier and version, then operation identifier and version. It rejects duplicate evaluator references, unresolved or wrong-kind contracts, checker and manual evaluators, and unsupported callables with detector-specific located registry errors. The resulting mappings are immutable and retain the exact declaration registry object. Existing checker types, messages, and public behavior remain unchanged while their builder delegates the common structural checks to the same private validator.
+The detector façade consists of `DetectorRunner`, `DetectorRunnerBinding`, `DetectorRunnerRegistry`, and `build_detector_runner_registry`. A binding contains one exact detector reference, one exact operation reference, and one synchronous reviewed callable. The builder sorts bindings by evaluator identifier and version, then operation identifier and version. The builder rejects duplicate evaluator references, unresolved or wrong-kind contracts, checker and manual evaluators, and unsupported callables with detector-specific located registry errors. The resulting mappings are immutable and retain the exact declaration registry object. Checker binding types, builder entrypoint, ordering, validation diagnostics, and valid builder-produced execution behavior remain unchanged while the builder delegates structural checks to the same private validator. Direct construction and reconstruction of the checker aggregate become invalid.
 
 `DetectorRunnerRegistry` is a process-local, builder-issued aggregate. Its public constructor, copying, serialization, and reconstruction fail. A private stamp authenticates the builder, and the later planner validates that stamp and compares the retained declaration registry with `is`. Therefore, an ordinary caller cannot establish detector readiness through the public construction boundary. This cooperative process-local provenance check does not resist hostile Python introspection of private attributes. The stronger ordinary-API boundary is necessary because assisted readiness has no known-failure assurance equivalent.
 

@@ -7,17 +7,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import cast
 
 from .catalog_schema import validate_catalog_index_payload
 from .enforcement import (
     EnforcementClass,
     EnforcementLocator,
-    OperationPredicateEnforcement,
-    PredicatePhase,
-    ProcedurePredicateEnforcement,
-    RuleCriterionEnforcement,
-    derive_enforcement_class,
+    _EnforcementRecordSource,
+    _enumerate_enforcement,
 )
 from .exceptions import DeclarationCatalogError
 from .models import (
@@ -114,71 +110,41 @@ class DeclarationCatalog:
         self, enforcement: EnforcementClass
     ) -> tuple[EnforcementLocator, ...]:
         """Return authored obligations with one declared enforcement class."""
-        locators: list[EnforcementLocator] = []
-        for identifier, record in sorted(self.declarations.items()):
-            declaration = record.declaration
-            if isinstance(declaration, RuleDeclaration):
-                for criterion in declaration.criteria:
-                    derived = self._class_for(criterion.evaluator)
-                    if derived is enforcement:
-                        locators.append(
-                            RuleCriterionEnforcement(
-                                identifier,
-                                criterion.id,
-                                criterion.evaluator,
-                                derived,
-                            )
-                        )
-            elif isinstance(declaration, ProcedureDeclaration):
-                phases = (
-                    (PredicatePhase.PRECONDITION, declaration.preconditions),
-                    (PredicatePhase.INVARIANT, declaration.invariants),
-                    (PredicatePhase.POSTCONDITION, declaration.postconditions),
-                )
-                for phase, predicates in phases:
-                    for predicate in predicates:
-                        if predicate.evaluator is None:
-                            continue
-                        derived = self._class_for(predicate.evaluator)
-                        if derived is enforcement:
-                            locators.append(
-                                ProcedurePredicateEnforcement(
-                                    identifier,
-                                    phase,
-                                    predicate.id,
-                                    predicate.evaluator,
-                                    derived,
-                                )
-                            )
-
-        operation_items = sorted(
-            (
-                (key, record)
-                for key, record in self.contracts.items()
-                if key.kind is DeclarationKind.OPERATION
+        source = _EnforcementRecordSource(
+            declarations=MappingProxyType(
+                {
+                    identifier: record.declaration
+                    for identifier, record in self.declarations.items()
+                }
             ),
-            key=lambda item: (item[0].id, item[0].version),
+            operations=tuple(
+                (
+                    VersionedReference(key.id, key.version),
+                    record.declaration,
+                )
+                for key, record in sorted(
+                    self.contracts.items(),
+                    key=lambda item: (
+                        item[0].kind.value,
+                        item[0].id,
+                        item[0].version,
+                    ),
+                )
+                if key.kind is DeclarationKind.OPERATION
+                and isinstance(record.declaration, OperationDeclaration)
+            ),
+            evaluator=self._evaluator_contract,
         )
-        for key, record in operation_items:
-            operation = cast(OperationDeclaration, record.declaration)
-            operation_reference = VersionedReference(key.id, key.version)
-            for predicate in operation.preconditions:
-                if predicate.evaluator is None:
-                    continue
-                derived = self._class_for(predicate.evaluator)
-                if derived is enforcement:
-                    locators.append(
-                        OperationPredicateEnforcement(
-                            operation_reference,
-                            predicate.id,
-                            predicate.evaluator,
-                            derived,
-                        )
-                    )
-        return tuple(locators)
+        return tuple(
+            locator
+            for locator in _enumerate_enforcement(source)
+            if locator.enforcement is enforcement
+        )
 
-    def _class_for(self, reference: VersionedReference) -> EnforcementClass:
-        """Resolve one exact evaluator and derive its declared class."""
+    def _evaluator_contract(
+        self, reference: VersionedReference
+    ) -> EvaluatorDeclaration:
+        """Resolve one exact evaluator for canonical enumeration."""
         key = ExactContractKey(
             DeclarationKind.EVALUATOR, reference.id, reference.version
         )
@@ -188,7 +154,7 @@ class DeclarationCatalog:
                 "obligation references unknown evaluator "
                 f"{reference.id!r}@{reference.version}"
             )
-        return derive_enforcement_class(record.declaration)
+        return record.declaration
 
 
 def build_declaration_catalog(

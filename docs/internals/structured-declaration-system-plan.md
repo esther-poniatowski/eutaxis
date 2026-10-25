@@ -41,6 +41,15 @@ The resolver contract now distinguishes selectable containers from records admit
 
 The resolution corpus exercises the public resolver and the composer boundary. Its scenarios cover the completed resolution work listed below.
 
+The attention planner now enumerates enforcement from the registry retained by
+that certified result. The live catalog consumes the same canonical enumerator
+independently. The planner expands operation preconditions per procedure action
+and issues separate deliberative, assisted, and mechanical packets. Runnable
+entries retain validated immutable inputs and their exact runner authorities.
+Mechanical planning also requires current known-failure assurance. The
+resolution trace remains separate from completion evidence. The completion
+ledger is the next enforcement dependency.
+
 ## Decision log and open prerequisites
 
 - YAML is canonical; tagged Markdown is only an evidence-triggered fallback.
@@ -135,7 +144,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Issue one process-local known-failure assurance with immutable per-evaluator fixture/result pairs and verified descriptor and resource digests.
 - [x] Atomically restrict version 1 detectors to blocking failure behavior in source and persisted schemas, migrate fixtures and golden artifacts, plant both negative alternatives at both boundaries, and add a builder-issued detector-only runner registry over the shared private binding validator without changing checker behavior.
 - [x] Execute detector callables through immutable input, identity, revision, and evidence validation before issuing runnable assisted packets.
-- [ ] Emit three attention packets and a separate resolution trace.
+- [x] Emit three attention packets and retain the separate resolution trace.
 - [ ] Require evidence for every effective obligation in the completion ledger.
 - [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.
 

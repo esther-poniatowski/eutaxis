@@ -20,6 +20,7 @@ from .models import (
 from .registry import DeclarationRegistry, RegisteredDeclaration
 from .results import CheckerResult, DetectorResult
 
+_CHECKER_REGISTRY_ISSUER = object()
 _DETECTOR_REGISTRY_ISSUER = object()
 
 
@@ -55,14 +56,37 @@ class DetectorRunnerBinding:
     runner: DetectorRunner
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False, eq=False)
 class CheckerRunnerRegistry:
-    """An immutable registry of validated checker runner bindings."""
+    """A process-local checker registry issued by the validated builder."""
 
     declarations: DeclarationRegistry
     bindings: Mapping[VersionedReference, CheckerRunnerBinding]
     input_contracts: EvaluatorInputContracts
     evaluator_records: Mapping[VersionedReference, RegisteredDeclaration]
+    _issuer: object
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        """Reject construction outside checker registry building."""
+        raise TypeError(
+            "CheckerRunnerRegistry instances must be issued by checker registry building"
+        )
+
+    def __copy__(self) -> NoReturn:
+        """Reject reconstruction by shallow copying."""
+        raise TypeError("CheckerRunnerRegistry instances cannot be copied")
+
+    def __deepcopy__(self, _memo: object) -> NoReturn:
+        """Reject reconstruction by deep copying."""
+        raise TypeError("CheckerRunnerRegistry instances cannot be copied")
+
+    def __reduce__(self) -> NoReturn:
+        """Reject serialization and reconstruction."""
+        raise TypeError("CheckerRunnerRegistry instances cannot be serialized")
+
+    def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
+        """Reject protocol-specific serialization and reconstruction."""
+        raise TypeError("CheckerRunnerRegistry instances cannot be serialized")
 
 
 @dataclass(frozen=True, init=False, eq=False)
@@ -127,11 +151,16 @@ def build_checker_runner_registry(
         binding_label="checker",
         error_factory=CheckerRunnerRegistryError,
     )
-    return CheckerRunnerRegistry(
-        declarations=declarations,
-        bindings=MappingProxyType(registered),
-        input_contracts=MappingProxyType(input_contracts),
-        evaluator_records=MappingProxyType(evaluator_records),
+    return cast(
+        CheckerRunnerRegistry,
+        _issue_runner_registry(
+            CheckerRunnerRegistry,
+            declarations=declarations,
+            bindings=registered,
+            input_contracts=input_contracts,
+            evaluator_records=evaluator_records,
+            issuer=_CHECKER_REGISTRY_ISSUER,
+        ),
     )
 
 
@@ -147,15 +176,48 @@ def build_detector_runner_registry(
         binding_label="detector",
         error_factory=DetectorRunnerRegistryError,
     )
-    registry = object.__new__(DetectorRunnerRegistry)
-    object.__setattr__(registry, "declarations", declarations)
-    object.__setattr__(registry, "bindings", MappingProxyType(registered))
-    object.__setattr__(registry, "input_contracts", MappingProxyType(input_contracts))
-    object.__setattr__(
-        registry, "evaluator_records", MappingProxyType(evaluator_records)
+    return cast(
+        DetectorRunnerRegistry,
+        _issue_runner_registry(
+            DetectorRunnerRegistry,
+            declarations=declarations,
+            bindings=registered,
+            input_contracts=input_contracts,
+            evaluator_records=evaluator_records,
+            issuer=_DETECTOR_REGISTRY_ISSUER,
+        ),
     )
-    object.__setattr__(registry, "_issuer", _DETECTOR_REGISTRY_ISSUER)
+
+
+def _issue_runner_registry(
+    registry_type: type[CheckerRunnerRegistry] | type[DetectorRunnerRegistry],
+    *,
+    declarations: DeclarationRegistry,
+    bindings: Mapping[VersionedReference, object],
+    input_contracts: EvaluatorInputContracts,
+    evaluator_records: Mapping[VersionedReference, RegisteredDeclaration],
+    issuer: object,
+) -> CheckerRunnerRegistry | DetectorRunnerRegistry:
+    """Issue one immutable evaluator registry after shared validation."""
+    registry = object.__new__(registry_type)
+    object.__setattr__(registry, "declarations", declarations)
+    object.__setattr__(registry, "bindings", MappingProxyType(dict(bindings)))
+    object.__setattr__(
+        registry, "input_contracts", MappingProxyType(dict(input_contracts))
+    )
+    object.__setattr__(
+        registry, "evaluator_records", MappingProxyType(dict(evaluator_records))
+    )
+    object.__setattr__(registry, "_issuer", issuer)
     return registry
+
+
+def _is_builder_issued_checker_registry(registry: object) -> bool:
+    """Return whether ``registry`` carries this process's builder authority."""
+    return (
+        isinstance(registry, CheckerRunnerRegistry)
+        and getattr(registry, "_issuer", None) is _CHECKER_REGISTRY_ISSUER
+    )
 
 
 def _is_builder_issued_detector_registry(registry: object) -> bool:

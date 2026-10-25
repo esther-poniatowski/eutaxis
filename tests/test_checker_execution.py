@@ -19,6 +19,7 @@ from eutaxis.declarations import (
     CheckerResult,
     CheckerRunner,
     CheckerRunnerBinding,
+    CheckerRunnerRegistry,
     EvaluationState,
     EvaluatorFixtureIndex,
     KnownFailureAssurance,
@@ -249,6 +250,26 @@ def test_valid_result_is_returned_as_immutable_evidence(tmp_path: Path) -> None:
         result.evidence["detail"] = "changed"  # type: ignore[index]
 
 
+def test_unissued_checker_registry_fails_before_mapping_access(tmp_path: Path) -> None:
+    declarations = _declarations(tmp_path)
+    complete = _runners(declarations, lambda input_data: _result())
+    fixtures = _fixture_index(tmp_path, complete.input_contracts)
+    reconstructed = object.__new__(CheckerRunnerRegistry)
+
+    with pytest.raises(CheckerExecutionError, match="not issued") as direct:
+        execute_checker(
+            reconstructed,
+            CHECKER,
+            input_revision="declaration-v1",
+            input_data=_valid_input(),
+        )
+    assert direct.value.location == "$"
+
+    with pytest.raises(CheckerExecutionError, match="not issued") as assurance:
+        execute_known_failure_fixtures(declarations, fixtures, reconstructed)
+    assert assurance.value.location == "$"
+
+
 def test_input_revision_and_payload_fail_before_runner(tmp_path: Path) -> None:
     declarations = _declarations(tmp_path)
     called = False
@@ -294,6 +315,7 @@ def test_checker_rejects_non_object_input(tmp_path: Path) -> None:
 
     assert captured.value.location == "$.input"
     assert "JSON object" in str(captured.value)
+
 
 class _FlippingInput(Mapping[str, object]):
     """Expose a valid first traversal and an invalid second traversal."""

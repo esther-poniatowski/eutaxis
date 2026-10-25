@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import pickle
 import shutil
 from collections.abc import Mapping
 from pathlib import Path
@@ -13,6 +15,7 @@ import yaml
 from eutaxis.declarations import (
     CheckerRunner,
     CheckerRunnerBinding,
+    CheckerRunnerRegistry,
     CheckerRunnerRegistryError,
     VersionedReference,
     build_checker_runner_registry,
@@ -94,6 +97,27 @@ def test_registry_binds_exact_checker_callable_and_operation_input(
         registry.bindings[CHECKER] = _binding()  # type: ignore[index]
     with pytest.raises(TypeError):
         registry.input_contracts[CHECKER] = {}  # type: ignore[index]
+
+
+def test_registry_authority_rejects_public_reconstruction(tmp_path: Path) -> None:
+    declarations = _registry(tmp_path)
+    registry = build_checker_runner_registry(declarations, [_binding()])
+
+    with pytest.raises(TypeError, match="issued by checker registry building"):
+        CheckerRunnerRegistry()
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.copy(registry)
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.deepcopy(registry)
+    with pytest.raises(TypeError, match="cannot be serialized"):
+        pickle.dumps(registry)
+
+    reconstructed = object.__new__(CheckerRunnerRegistry)
+    object.__setattr__(reconstructed, "declarations", registry.declarations)
+    object.__setattr__(reconstructed, "bindings", registry.bindings)
+    object.__setattr__(reconstructed, "input_contracts", registry.input_contracts)
+    object.__setattr__(reconstructed, "evaluator_records", registry.evaluator_records)
+    assert reconstructed is not registry
 
 
 @pytest.mark.parametrize("kind", ["manual", "detector"])

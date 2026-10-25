@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Mapping, NoReturn, cast
+from typing import Mapping, NoReturn, SupportsIndex, cast
 
 from .applicability import (
     ApplicabilityTrace,
@@ -24,6 +24,8 @@ from .models import (
 )
 from .registry import ConflictPair, DeclarationRegistry, RegisteredDeclaration
 from .source import DocumentPath, nearest_location
+
+_RESOLUTION_RESULT_ISSUER = object()
 
 
 @dataclass(frozen=True)
@@ -178,12 +180,38 @@ class ResolvedCompilationUnit:
 class ResolutionResult:
     """One correlated successful compilation unit and explanation trace."""
 
+    registry: DeclarationRegistry = field(compare=False, repr=False)
     unit: ResolvedCompilationUnit
     trace: ResolutionTrace
+    _issuer: object = field(compare=False, repr=False)
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
         """Reject construction outside semantic resolution."""
         raise TypeError("ResolutionResult instances must be issued by resolution")
+
+    def __copy__(self) -> NoReturn:
+        """Reject reconstruction by shallow copying."""
+        raise TypeError("ResolutionResult instances cannot be copied")
+
+    def __deepcopy__(self, _memo: object) -> NoReturn:
+        """Reject reconstruction by deep copying."""
+        raise TypeError("ResolutionResult instances cannot be copied")
+
+    def __reduce__(self) -> NoReturn:
+        """Reject serialization and reconstruction."""
+        raise TypeError("ResolutionResult instances cannot be serialized")
+
+    def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
+        """Reject protocol-specific serialization and reconstruction."""
+        raise TypeError("ResolutionResult instances cannot be serialized")
+
+
+def _is_issued_resolution_result(result: object) -> bool:
+    """Return whether ``result`` carries this process's resolver authority."""
+    return (
+        isinstance(result, ResolutionResult)
+        and getattr(result, "_issuer", None) is _RESOLUTION_RESULT_ISSUER
+    )
 
 
 class ResolutionError(Exception):
@@ -349,7 +377,7 @@ class _Resolver:
         )
         trace = self._trace()
         assert trace.events[unit_event].kind is ResolutionEventKind.UNIT_ISSUED
-        return _issue_result(unit, trace)
+        return _issue_result(self.registry, unit, trace)
 
     def _resolve_manifest(self) -> None:
         record = self.registry.records.get(self.manifest_id)
@@ -1174,10 +1202,14 @@ def _issue_compilation_unit(
 
 
 def _issue_result(
-    unit: ResolvedCompilationUnit, trace: ResolutionTrace
+    registry: DeclarationRegistry,
+    unit: ResolvedCompilationUnit,
+    trace: ResolutionTrace,
 ) -> ResolutionResult:
     """Issue one successful result with its correlated immutable trace."""
     result = object.__new__(ResolutionResult)
+    object.__setattr__(result, "registry", registry)
     object.__setattr__(result, "unit", unit)
     object.__setattr__(result, "trace", trace)
+    object.__setattr__(result, "_issuer", _RESOLUTION_RESULT_ISSUER)
     return result

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import pickle
 import shutil
 from dataclasses import replace
 from pathlib import Path
@@ -80,6 +82,7 @@ def test_resolution_is_deterministic_and_composition_ready() -> None:
         _registry(reverse=True), "resolution/manifest", _context()
     )
 
+    assert first is not second
     assert first == second
     assert tuple(component.declaration for component in first.unit.components) == (
         "resolution/base",
@@ -887,3 +890,11 @@ def test_certified_aggregate_constructors_remain_private() -> None:
 
     with pytest.raises(TypeError, match="issued"):
         replace(_resolve().unit, dependencies=())
+
+    result = _resolve()
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.copy(result)
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.deepcopy(result)
+    with pytest.raises(TypeError, match="cannot be serialized"):
+        pickle.dumps(result)

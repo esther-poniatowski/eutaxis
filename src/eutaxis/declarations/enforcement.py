@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TypeAlias
+from typing import Callable, Mapping, TypeAlias
 
-from .models import EvaluatorDeclaration, VersionedReference
+from .models import (
+    AnyDeclaration,
+    EvaluatorDeclaration,
+    OperationDeclaration,
+    ProcedureDeclaration,
+    RuleDeclaration,
+    VersionedReference,
+)
 
 
 class EnforcementClass(StrEnum):
@@ -67,6 +74,15 @@ class EnforcementClassificationError(ValueError):
     """Report an evaluator contract outside the closed class mapping."""
 
 
+@dataclass(frozen=True)
+class _EnforcementRecordSource:
+    """Read-only declaration values needed by canonical enumeration."""
+
+    declarations: Mapping[str, AnyDeclaration]
+    operations: tuple[tuple[VersionedReference, OperationDeclaration], ...]
+    evaluator: Callable[[VersionedReference], EvaluatorDeclaration]
+
+
 def derive_enforcement_class(
     evaluator: EvaluatorDeclaration,
 ) -> EnforcementClass:
@@ -92,3 +108,63 @@ def derive_enforcement_class(
         f"evaluator {evaluator.id!r}@{evaluator.version} has no admitted "
         "enforcement class"
     )
+
+
+def _enumerate_enforcement(
+    source: _EnforcementRecordSource,
+) -> tuple[EnforcementLocator, ...]:
+    """Enumerate every authored evaluator-backed obligation canonically."""
+    locators: list[EnforcementLocator] = []
+    for identifier, declaration in sorted(source.declarations.items()):
+        if isinstance(declaration, RuleDeclaration):
+            for criterion in declaration.criteria:
+                enforcement = derive_enforcement_class(
+                    source.evaluator(criterion.evaluator)
+                )
+                locators.append(
+                    RuleCriterionEnforcement(
+                        identifier,
+                        criterion.id,
+                        criterion.evaluator,
+                        enforcement,
+                    )
+                )
+        elif isinstance(declaration, ProcedureDeclaration):
+            phases = (
+                (PredicatePhase.PRECONDITION, declaration.preconditions),
+                (PredicatePhase.INVARIANT, declaration.invariants),
+                (PredicatePhase.POSTCONDITION, declaration.postconditions),
+            )
+            for phase, predicates in phases:
+                for predicate in predicates:
+                    if predicate.evaluator is None:
+                        continue
+                    enforcement = derive_enforcement_class(
+                        source.evaluator(predicate.evaluator)
+                    )
+                    locators.append(
+                        ProcedurePredicateEnforcement(
+                            identifier,
+                            phase,
+                            predicate.id,
+                            predicate.evaluator,
+                            enforcement,
+                        )
+                    )
+
+    for operation_reference, operation in source.operations:
+        for predicate in operation.preconditions:
+            if predicate.evaluator is None:
+                continue
+            enforcement = derive_enforcement_class(
+                source.evaluator(predicate.evaluator)
+            )
+            locators.append(
+                OperationPredicateEnforcement(
+                    operation_reference,
+                    predicate.id,
+                    predicate.evaluator,
+                    enforcement,
+                )
+            )
+    return tuple(locators)
