@@ -20,6 +20,7 @@ from eutaxis.declarations import (
     CheckerResult,
     CheckerRunner,
     CheckerRunnerBinding,
+    CompletionRequirement,
     DeliberativeAttentionEntry,
     DetectorResult,
     DetectorRunner,
@@ -39,6 +40,7 @@ from eutaxis.declarations import (
     RuleCriterionEnforcement,
     RuleCriterionKey,
     RuleObligationSnapshot,
+    RunnableAttentionRequirement,
     VersionedReference,
     build_checker_runner_registry,
     build_declaration_catalog,
@@ -281,7 +283,8 @@ def _prepare_registry(tmp_path: Path, mode: Mode):
     operation = _read(root, "operation.yaml")
     if mode == "mixed":
         procedure["preconditions"] = [
-            _predicate("manual-precondition", "assumption", MANUAL)
+            _predicate("manual-precondition", "assumption", MANUAL),
+            _predicate("local-precondition", "assumption", None),
         ]
         detected_invariant = _predicate("detected-invariant", "invariant", DETECTOR)
         detected_invariant["observes"] = ["registry/stable"]
@@ -289,10 +292,18 @@ def _prepare_registry(tmp_path: Path, mode: Mode):
         procedure["postconditions"] = [
             _predicate("checked-postcondition", "postcondition", CHECKER)
         ]
-        action = cast(dict[str, object], cast(list[object], procedure["actions"])[0])
-        action["on-success"] = "checked-postcondition"
+        actions = cast(list[object], procedure["actions"])
+        first_action = cast(dict[str, object], actions[0])
+        first_action["id"] = "write-first"
+        first_action["on-success"] = "write-second"
+        second_action = copy.deepcopy(first_action)
+        second_action["id"] = "write-second"
+        second_action["on-success"] = "checked-postcondition"
+        actions[:] = [first_action, second_action]
+        procedure["entry"] = "write-first"
         operation["preconditions"] = [
-            _predicate("manual-operation", "authorization", MANUAL)
+            _predicate("manual-operation", "authorization", MANUAL),
+            _predicate("local-operation", "authorization", None),
         ]
     else:
         procedure["preconditions"] = []
@@ -426,7 +437,102 @@ def test_mixed_plan_preserves_complete_context_order_and_authority(
     assert plan.detector_registry is requirements.detector_registry
     assert plan.fixture_index is fixtures
     assert plan.assurance is assurance
+    assert all(
+        isinstance(item, CompletionRequirement) for item in requirements.completion
+    )
+    assert tuple(item.key for item in requirements.completion) == (
+        RuleCriterionKey("content/base", "manual-check"),
+        RuleCriterionKey("content/base", "detector-check"),
+        RuleCriterionKey("content/base", "checker-check"),
+        ProcedurePredicateKey(
+            "content/write", PredicatePhase.PRECONDITION, "manual-precondition"
+        ),
+        ProcedurePredicateKey(
+            "content/write", PredicatePhase.PRECONDITION, "local-precondition"
+        ),
+        OperationPredicateKey(
+            "content/write", "write-first", WRITE, "manual-operation"
+        ),
+        OperationPredicateKey("content/write", "write-first", WRITE, "local-operation"),
+        OperationPredicateKey(
+            "content/write", "write-second", WRITE, "manual-operation"
+        ),
+        OperationPredicateKey(
+            "content/write", "write-second", WRITE, "local-operation"
+        ),
+        ProcedurePredicateKey(
+            "content/write", PredicatePhase.INVARIANT, "detected-invariant"
+        ),
+        ProcedurePredicateKey(
+            "content/write", PredicatePhase.POSTCONDITION, "checked-postcondition"
+        ),
+    )
+    evaluator_less = (
+        requirements.completion[4],
+        requirements.completion[6],
+        requirements.completion[8],
+    )
+    assert all(item.evaluator is None for item in evaluator_less)
+    assert all(item.enforcement is None for item in evaluator_less)
+    assert isinstance(evaluator_less[0].obligation, ProcedureObligationSnapshot)
+    assert isinstance(evaluator_less[1].obligation, OperationObligationSnapshot)
+    assert isinstance(evaluator_less[2].obligation, OperationObligationSnapshot)
+    local_procedure = cast(ProcedureObligationSnapshot, evaluator_less[0].obligation)
+    assert local_procedure.phase is PredicatePhase.PRECONDITION
+    assert local_procedure.predicate.id == "local-precondition"
+    assert local_procedure.purpose == "Writes one registry fixture artifact"
+    assert local_procedure.parameters["required"] == ("path",)
+    local_operations = tuple(
+        cast(OperationObligationSnapshot, item.obligation)
+        for item in evaluator_less[1:]
+    )
+    assert tuple(item.action.id for item in local_operations) == (
+        "write-first",
+        "write-second",
+    )
+    assert all(item.predicate.id == "local-operation" for item in local_operations)
+    assert all(
+        item.operation_inputs["required"] == ("path", "content")
+        for item in local_operations
+    )
+    assert all(
+        item.procedure_parameters["required"] == ("path",) for item in local_operations
+    )
+    assert all(
+        item.operation_effects == ("filesystem/artifact",) for item in local_operations
+    )
+    assert all(item.failure_outcomes == ("write-failed",) for item in local_operations)
+    assert all(
+        item.recovery == "Preserve the prior artifact" for item in local_operations
+    )
+    class_keys = {
+        EnforcementClass.DELIBERATIVE: tuple(
+            item.key for item in requirements.deliberative
+        ),
+        EnforcementClass.ASSISTED: tuple(item.key for item in requirements.assisted),
+        EnforcementClass.MECHANICAL: tuple(
+            item.key for item in requirements.mechanical
+        ),
+    }
+    for enforcement, keys in class_keys.items():
+        assert keys == tuple(
+            item.key
+            for item in requirements.completion
+            if item.enforcement is enforcement
+        )
+    completion_by_key = {item.key: item for item in requirements.completion}
+    for projected in (
+        *requirements.deliberative,
+        *requirements.assisted,
+        *requirements.mechanical,
+    ):
+        canonical = completion_by_key[projected.key]
+        assert projected.obligation is canonical.obligation
+        assert projected.evaluator is canonical.evaluator
+        if isinstance(projected, RunnableAttentionRequirement):
+            assert projected.enforcement is canonical.enforcement
     assert tuple(type(item) for item in plan.deliberative.entries) == (
+        DeliberativeAttentionEntry,
         DeliberativeAttentionEntry,
         DeliberativeAttentionEntry,
         DeliberativeAttentionEntry,
@@ -436,7 +542,12 @@ def test_mixed_plan_preserves_complete_context_order_and_authority(
         ProcedurePredicateKey(
             "content/write", PredicatePhase.PRECONDITION, "manual-precondition"
         ),
-        OperationPredicateKey("content/write", "write", WRITE, "manual-operation"),
+        OperationPredicateKey(
+            "content/write", "write-first", WRITE, "manual-operation"
+        ),
+        OperationPredicateKey(
+            "content/write", "write-second", WRITE, "manual-operation"
+        ),
     )
     operation = cast(
         OperationObligationSnapshot, plan.deliberative.entries[2].obligation
@@ -444,6 +555,10 @@ def test_mixed_plan_preserves_complete_context_order_and_authority(
     assert operation.procedure_parameters["required"] == ("path",)
     assert operation.action.bindings["path"].parameter == "path"  # type: ignore[union-attr]
     assert operation.operation_inputs["required"] == ("path", "content")
+    second_operation = cast(
+        OperationObligationSnapshot, plan.deliberative.entries[3].obligation
+    )
+    assert second_operation.action.id == "write-second"
 
     assert tuple(type(item) for item in plan.assisted.entries) == (
         AssistedAttentionEntry,
@@ -504,6 +619,14 @@ def test_single_and_empty_class_boundaries(
         len(requirements.assisted),
         len(requirements.mechanical),
     ) == counts
+    assert len(requirements.completion) == sum(counts) + (1 if mode == "none" else 0)
+    if mode == "none":
+        only = requirements.completion[0]
+        assert only.key == ProcedurePredicateKey(
+            "content/write", PredicatePhase.POSTCONDITION, "written"
+        )
+        assert only.evaluator is None
+        assert only.enforcement is None
 
     fixtures = assurance = None
     if checker_registry is not None:
@@ -538,6 +661,43 @@ def test_single_and_empty_class_boundaries(
         assert entry.evaluator.input_revisions == ("declaration-v1",)
         assert entry.evaluator.evidence_schema["required"] == ("accepted",)
         assert entry.evaluator.failure_behavior == "block"
+
+
+def test_completion_requirement_rejects_inconsistent_public_values(
+    tmp_path: Path,
+) -> None:
+    _, requirements, _, _, _ = _mixed_plan(tmp_path)
+    canonical = requirements.completion[0]
+    unrelated = requirements.completion[1]
+
+    with pytest.raises(ValueError, match="must have enforcement"):
+        CompletionRequirement(
+            canonical.key,
+            canonical.obligation,
+            canonical.evaluator,
+            None,
+        )
+    with pytest.raises(ValueError, match="differs from its snapshot"):
+        CompletionRequirement(
+            RuleCriterionKey("other", "criterion"),
+            canonical.obligation,
+            canonical.evaluator,
+            canonical.enforcement,
+        )
+    with pytest.raises(ValueError, match="snapshot declares an evaluator"):
+        CompletionRequirement(
+            canonical.key,
+            canonical.obligation,
+            None,
+            None,
+        )
+    with pytest.raises(ValueError, match="evaluator differs from its snapshot"):
+        CompletionRequirement(
+            canonical.key,
+            canonical.obligation,
+            unrelated.evaluator,
+            unrelated.enforcement,
+        )
 
 
 def test_requirements_are_the_authoritative_input_discovery_surface(

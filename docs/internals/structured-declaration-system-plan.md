@@ -44,11 +44,13 @@ The resolution corpus exercises the public resolver and the composer boundary. I
 The attention planner now enumerates enforcement from the registry retained by
 that certified result. The live catalog consumes the same canonical enumerator
 independently. The planner expands operation preconditions per procedure action
-and issues separate deliberative, assisted, and mechanical packets. Runnable
-entries retain validated immutable inputs and their exact runner authorities.
-Mechanical planning also requires current known-failure assurance. The
-resolution trace remains separate from completion evidence. The completion
-ledger is the next enforcement dependency.
+and retains one canonical sequence of every effective completion requirement,
+including evaluator-less predicates. Separate deliberative, assisted, and
+mechanical packets project from that sequence. Runnable entries retain validated
+immutable inputs and their exact runner authorities. Mechanical planning also
+requires current known-failure assurance. The resolution trace remains separate
+from completion evidence. The completion ledger is the next enforcement
+dependency.
 
 ## Decision log and open prerequisites
 
@@ -145,7 +147,11 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Atomically restrict version 1 detectors to blocking failure behavior in source and persisted schemas, migrate fixtures and golden artifacts, plant both negative alternatives at both boundaries, and add a builder-issued detector-only runner registry over the shared private binding validator without changing checker behavior.
 - [x] Execute detector callables through immutable input, identity, revision, and evidence validation before issuing runnable assisted packets.
 - [x] Emit three attention packets and retain the separate resolution trace.
-- [ ] Require evidence for every effective obligation in the completion ledger.
+- [x] Retain one canonical completion-requirement sequence, including evaluator-less predicates, and derive all three attention classes from it.
+- [ ] Issue correlated procedure and operation predicate evidence at defined execution phases.
+- [ ] Validate manual submissions and assisted detector-plus-residual submissions against exact retained contracts.
+- [ ] Execute mechanical requirements inside the ledger transaction with repeated assurance-freshness checks.
+- [ ] Issue the complete immutable ledger and require admissible evidence for every effective obligation.
 - [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.
 
 **Exit evidence:** clean checker output cannot complete an unmapped obligation. Unchecked, violated, or blocked rule criteria, procedure predicates, or per-action operation preconditions prevent success.

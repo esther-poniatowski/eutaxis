@@ -17,6 +17,7 @@ from .enforcement import (
     RuleCriterionEnforcement,
     _EnforcementRecordSource,
     _enumerate_enforcement,
+    derive_enforcement_class,
 )
 from .exceptions import AttentionPlanningError, CheckerExecutionError
 from .execution import (
@@ -142,6 +143,41 @@ AttentionObligationSnapshot: TypeAlias = (
 
 
 @dataclass(frozen=True)
+class CompletionRequirement:
+    """Retain one effective obligation in canonical completion order."""
+
+    key: AttentionObligationKey
+    obligation: AttentionObligationSnapshot
+    evaluator: EvaluatorDeclaration | None
+    enforcement: EnforcementClass | None
+
+    def __post_init__(self) -> None:
+        """Require one correlated snapshot and optional evaluator-class pair."""
+        if self.obligation.key != self.key:
+            raise ValueError("completion requirement key differs from its snapshot")
+        declared_evaluator = (
+            self.obligation.criterion.evaluator
+            if isinstance(self.obligation, RuleObligationSnapshot)
+            else self.obligation.predicate.evaluator
+        )
+        if self.evaluator is None:
+            if self.enforcement is not None:
+                raise ValueError("evaluator-less requirement cannot have enforcement")
+            if declared_evaluator is not None:
+                raise ValueError("completion snapshot declares an evaluator")
+            return
+        evaluator_reference = VersionedReference(
+            self.evaluator.id, self.evaluator.version
+        )
+        if evaluator_reference != declared_evaluator:
+            raise ValueError("completion evaluator differs from its snapshot")
+        if self.enforcement is None:
+            raise ValueError("evaluator-backed requirement must have enforcement")
+        if derive_enforcement_class(self.evaluator) is not self.enforcement:
+            raise ValueError("evaluator contract and enforcement class differ")
+
+
+@dataclass(frozen=True)
 class RunnableAttentionRequirement:
     """Describe one canonical machine invocation before its input is supplied."""
 
@@ -168,6 +204,7 @@ class AttentionRequirements:
     """Process-local canonical requirements derived from one resolution result."""
 
     resolution: ResolutionResult
+    completion: tuple[CompletionRequirement, ...]
     deliberative: tuple[DeliberativeAttentionRequirement, ...]
     assisted: tuple[RunnableAttentionRequirement, ...]
     mechanical: tuple[RunnableAttentionRequirement, ...]
@@ -303,15 +340,16 @@ def derive_attention_requirements(
     registry = resolution.registry
     locator_maps = _locator_maps(registry)
     selected = _selected_obligations(resolution, locator_maps)
+    completion = tuple(_completion_requirement(item, registry) for item in selected)
 
     mechanical_selected = tuple(
-        item for item in selected if item[2] is EnforcementClass.MECHANICAL
+        item for item in completion if item.enforcement is EnforcementClass.MECHANICAL
     )
     assisted_selected = tuple(
-        item for item in selected if item[2] is EnforcementClass.ASSISTED
+        item for item in completion if item.enforcement is EnforcementClass.ASSISTED
     )
     deliberative_selected = tuple(
-        item for item in selected if item[2] is EnforcementClass.DELIBERATIVE
+        item for item in completion if item.enforcement is EnforcementClass.DELIBERATIVE
     )
 
     _validate_runner_authority(
@@ -337,14 +375,15 @@ def derive_attention_requirements(
     )
     deliberative = tuple(
         DeliberativeAttentionRequirement(
-            key=key,
-            obligation=obligation,
-            evaluator=_evaluator_contract(registry, evaluator),
+            key=item.key,
+            obligation=item.obligation,
+            evaluator=cast(EvaluatorDeclaration, item.evaluator),
         )
-        for key, obligation, _enforcement, evaluator in deliberative_selected
+        for item in deliberative_selected
     )
     return _issue_requirements(
         resolution,
+        completion,
         deliberative,
         assisted,
         mechanical,
@@ -565,9 +604,25 @@ def _registry_enforcement_source(
 SelectedObligation: TypeAlias = tuple[
     AttentionObligationKey,
     AttentionObligationSnapshot,
-    EnforcementClass,
-    VersionedReference,
+    EnforcementClass | None,
+    VersionedReference | None,
 ]
+
+
+def _completion_requirement(
+    item: SelectedObligation, registry: DeclarationRegistry
+) -> CompletionRequirement:
+    """Resolve one selected obligation into its canonical completion record."""
+    key, obligation, enforcement, reference = item
+    if reference is None:
+        if enforcement is not None:
+            _fail(("requirements",), "evaluator-less obligation has enforcement")
+        evaluator = None
+    else:
+        if enforcement is None:
+            _fail(("requirements",), "evaluator-backed obligation lacks enforcement")
+        evaluator = _evaluator_contract(registry, reference)
+    return CompletionRequirement(key, obligation, evaluator, enforcement)
 
 
 def _selected_obligations(
@@ -703,14 +758,6 @@ def _procedure_obligations(
     for action in procedure.actions:
         operation = _operation_contract(registry, action.operation)
         for predicate in operation.preconditions:
-            if predicate.evaluator is None:
-                continue
-            locator = operation_locators.get((action.operation, predicate.id))
-            if locator is None:
-                _fail(
-                    ("registry",),
-                    f"operation predicate {predicate.id!r} lacks enforcement",
-                )
             key = OperationPredicateKey(
                 procedure.id, action.id, action.operation, predicate.id
             )
@@ -727,6 +774,15 @@ def _procedure_obligations(
                 recovery=operation.recovery,
                 predicate=predicate,
             )
+            if predicate.evaluator is None:
+                selected.append((key, snapshot, None, None))
+                continue
+            locator = operation_locators.get((action.operation, predicate.id))
+            if locator is None:
+                _fail(
+                    ("registry",),
+                    f"operation predicate {predicate.id!r} lacks enforcement",
+                )
             selected.append((key, snapshot, locator.enforcement, locator.evaluator))
     selected.extend(
         _procedure_predicates(
@@ -753,16 +809,9 @@ def _procedure_predicates(
     predicates: tuple[Predicate, ...],
     locators: Mapping[tuple[str, PredicatePhase, str], ProcedurePredicateEnforcement],
 ) -> tuple[SelectedObligation, ...]:
-    """Retain evaluator-backed predicates from one authored procedure phase."""
+    """Retain every predicate from one authored procedure phase."""
     selected: list[SelectedObligation] = []
     for predicate in predicates:
-        if predicate.evaluator is None:
-            continue
-        locator = locators.get((procedure.id, phase, predicate.id))
-        if locator is None:
-            _fail(
-                ("registry",), f"procedure predicate {predicate.id!r} lacks enforcement"
-            )
         key = ProcedurePredicateKey(procedure.id, phase, predicate.id)
         snapshot = ProcedureObligationSnapshot(
             key=key,
@@ -775,6 +824,14 @@ def _procedure_predicates(
             phase=phase,
             predicate=predicate,
         )
+        if predicate.evaluator is None:
+            selected.append((key, snapshot, None, None))
+            continue
+        locator = locators.get((procedure.id, phase, predicate.id))
+        if locator is None:
+            _fail(
+                ("registry",), f"procedure predicate {predicate.id!r} lacks enforcement"
+            )
         selected.append((key, snapshot, locator.enforcement, locator.evaluator))
     return tuple(selected)
 
@@ -809,23 +866,25 @@ def _validate_runner_authority(
 
 
 def _runnable_requirement(
-    item: SelectedObligation,
+    item: CompletionRequirement,
     runners: CheckerRunnerRegistry | DetectorRunnerRegistry,
 ) -> RunnableAttentionRequirement:
     """Bind one selected obligation to its exact evaluator input contract."""
-    key, obligation, enforcement, reference = item
+    if item.evaluator is None or item.enforcement is None:
+        _fail(("requirements",), "runnable obligation lacks evaluator enforcement")
+    evaluator = item.evaluator
+    reference = VersionedReference(evaluator.id, evaluator.version)
     binding = runners.bindings.get(reference)
     if binding is None:
         _fail(
             ("requirements",),
             f"no runner is registered for {_reference_text(reference)}",
         )
-    evaluator = _evaluator_contract(runners.declarations, reference)
     return RunnableAttentionRequirement(
-        key=key,
-        obligation=obligation,
+        key=item.key,
+        obligation=item.obligation,
         evaluator=evaluator,
-        enforcement=enforcement,
+        enforcement=item.enforcement,
         evaluator_input_operation=binding.operation,
         input_revisions=evaluator.input_revisions,
         input_schema=runners.input_contracts[reference],
@@ -958,6 +1017,7 @@ def _operation_contract(
 
 def _issue_requirements(
     resolution: ResolutionResult,
+    completion: tuple[CompletionRequirement, ...],
     deliberative: tuple[DeliberativeAttentionRequirement, ...],
     assisted: tuple[RunnableAttentionRequirement, ...],
     mechanical: tuple[RunnableAttentionRequirement, ...],
@@ -967,6 +1027,7 @@ def _issue_requirements(
     """Issue one immutable requirement aggregate after complete derivation."""
     requirements = object.__new__(AttentionRequirements)
     object.__setattr__(requirements, "resolution", resolution)
+    object.__setattr__(requirements, "completion", completion)
     object.__setattr__(requirements, "deliberative", deliberative)
     object.__setattr__(requirements, "assisted", assisted)
     object.__setattr__(requirements, "mechanical", mechanical)

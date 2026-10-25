@@ -271,6 +271,104 @@ Resolution and completion use separate ledgers. Events such as `declaration-eval
 
 The completion ledger contains one record for every criterion of every effective rule, every predicate of every effective procedure, and every operation precondition expanded per effective procedure action. Evaluator-less predicates receive evidence from procedure or operation execution. Evaluator-backed obligations also record their enforcement class. Ledger states are `satisfied`, `violated`, `blocked`, and `unchecked`, with evaluator identity when present, evidence, and timestamp. `unchecked`, `violated`, or `blocked` prevents successful completion. The only terminal non-blocking exception is an explicit migration baseline that names the finding, owner, expiry condition, and migration it awaits; a baseline cannot be created silently by a run under evaluation.
 
+### Completion ledger boundary
+
+The ledger receives its record universe from the attention planner. The ledger does not
+enumerate the registry again. `AttentionRequirements` retains one canonical
+tuple of `CompletionRequirement` values. Each value contains the obligation key,
+the complete obligation snapshot, and either both an exact evaluator contract
+and its enforcement class or neither field. The latter form identifies an
+evaluator-less predicate. The tuple follows resolved component order and the
+within-component order defined for attention planning. The three class-specific
+requirement tuples and packets are projections of this tuple. Thus, the
+canonical tuple retains evaluator-less predicates and the global interleaving
+that the three packets cannot represent.
+
+The first ledger prerequisite implements only this canonical tuple. Until an
+admissible execution path exists, evaluator-less requirements can produce only
+`unchecked` records. An operation result does not prove an operation
+precondition: the current public result retains neither the procedure action,
+the frozen input, the observed context, nor the evaluated predicate. The future
+procedure executor must issue process-local predicate evidence. That evidence
+must retain the exact declaration registry, procedure, phase or action,
+operation reference when present, frozen bound inputs, relevant before-or-after
+context, obligation key, predicate trace, and truth value. The procedure
+execution contract must first define the observation point for each phase.
+
+The ledger uses one atomic builder:
+`build_completion_ledger(plan, *, manual, assisted, executable, clock)`. The
+builder accepts only a privately issued plan and derives every record from its
+canonical completion tuple. The builder snapshots each submitted mapping once. An
+additional key, malformed carrier, invalid authority, or invalid evidence
+raises `CompletionLedgerError` and prevents issuance. Missing evidence instead
+produces an `unchecked` record. Every issued ledger contains the complete tuple
+in canonical order, including records after a blocked evaluation. The ledger is
+successful exactly when every record is `satisfied`. Migration baselines remain
+outside this first ledger contract.
+
+A `ManualJudgmentSubmission` is an untrusted human assertion. The assertion contains the
+exact obligation key, evaluator reference, admitted input revision, and evidence
+object. Version 1 manual evaluator schemas must require one top-level
+`conclusion` field whose closed values are `satisfied`, `violated`, and
+`blocked`. This invariant applies at the source and persisted-schema boundaries.
+The builder freezes the evidence, validates it against the exact manual
+evaluator schema retained by the plan, and checks the key, evaluator, and
+revision. The ledger derives its state from `conclusion`; the submission carries
+no second state that could contradict the evidence. This validation
+authenticates the shape and correlation of the assertion. Schema validation does not turn the
+public submission into machine evidence. Contract tests plant missing and
+out-of-domain conclusion fields at both schema boundaries.
+
+Assisted completion uses a fixed version 1 residual-judgment contract rather
+than applying the detector's evidence schema to a different object. A
+`ResidualJudgmentSubmission` contains its schema version, exact obligation key,
+detector evaluator reference, admitted input revision, explicit completion
+state, and non-empty rationale. An `AssistedCompletionSubmission` pairs that
+judgment with one issuer-stamped `DetectorExecution`. The builder compares the
+execution registry by identity and requires its evaluator, revision, and frozen
+input to equal the packet invocation. The builder also requires the residual
+judgment to name that obligation and invocation. Detector evidence without a residual
+judgment leaves the record `unchecked`; a residual judgment paired with the
+wrong execution is invalid evidence and prevents issuance.
+
+Mechanical completion accepts no caller-supplied checker result. Version 1
+completion first restricts checker failure behavior to `block` at both source
+and persisted-schema boundaries. The ledger then invokes checkers through the
+registry retained by the plan and in canonical completion order. Before the
+batch, after each invocation, and immediately before issuance, the builder
+revalidates the assurance stamp, retained identities, authored fixture
+sequences, and fixture digests. A stale or unreadable fixture prevents issuance
+and takes precedence over a simultaneous runner or result failure. A validated
+checker result maps its state directly. A registry stamp, retained identity,
+binding, evaluator, revision, invocation input, assurance, fixture sequence, or
+digest defect raises `CompletionLedgerError` and prevents issuance. After those
+checks pass, an exception raised by the reviewed runner or an invalid runner
+return produces a `blocked` record with a separate diagnostic, provided that
+the builder re-establishes freshness. Tests plant both diagnostic classes.
+
+Privately issued executable predicate evidence has a total state mapping.
+`true` maps to `satisfied`, `false` maps to `violated`, and `unknown` maps to
+`blocked`. An `unknown` result records an attempted evaluation that could not
+decide because a required observation was unavailable. An absent execution
+record remains `unchecked`. The procedure executor retains the predicate trace
+that supports every mapped truth value.
+
+The builder calls an injected clock once after all validation and evaluation
+passes. The clock must return a timezone-aware UTC value. The builder normalizes
+that value to one canonical RFC 3339 string ending in `Z`; every record and the
+ledger share that transaction timestamp. Timestamps participate in semantic
+equality. A clock exception, non-UTC value, or normalization failure raises
+`CompletionLedgerError` and prevents issuance. Tests inject a fixed clock, so
+identical inputs remain comparable.
+
+`CompletionLedger` is a privately issued, immutable, process-local aggregate.
+Its public construction, copying, serialization, and reconstruction fail. Each
+`CompletionRecord` contains its key, optional evaluator and enforcement class,
+state, immutable evidence, optional blocking diagnostic, and transaction
+timestamp. Resolution events never satisfy a record. A future projection may
+serialize a reviewed ledger, but the process-local authority itself is not a
+portable evidence token.
+
 Mechanical results are reported compactly after the purpose check; they do not substitute for it. Assisted obligations require both detector evidence and the recorded residual judgment. Deliberative obligations require manual evidence against the criterion or predicate, not a general assertion that the artifact was reviewed.
 
 Failure mode and enforcement class remain orthogonal. A mechanically checked obligation may belong to a rule whose failure mode still requires a resident trip-wire because the check runs only after an irreversible action. Conversely, a visible prose defect can require deliberative enforcement.
