@@ -205,6 +205,26 @@ class ProcedureRunPlanningError(Exception):
         self.detail = message
 
 
+class ObservationProviderRegistryError(Exception):
+    """Report an invalid code-owned observation provider binding."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(
+            f"Invalid observation provider registry at {location}: {message}"
+        )
+        self.location = location
+        self.detail = message
+
+
+class ProcedureObservationError(Exception):
+    """Report a failed procedure-boundary observation."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid procedure observation at {location}: {message}")
+        self.location = location
+        self.detail = message
+
+
 class OperationRunnerRegistryError(Exception):
     """Report an invalid code-owned operation runner binding."""
 

@@ -45,7 +45,9 @@ from .exceptions import (
     FacetRegistrySchemaError,
     FacetRegistrySemanticError,
     OperationExecutionError,
+    ObservationProviderRegistryError,
     OperationRunnerRegistryError,
+    ProcedureObservationError,
     ProcedureRunPlanningError,
 )
 from .catalog import (
@@ -150,6 +152,15 @@ from .operations import (
     OperationSuccess,
     build_operation_runner_registry,
     execute_operation,
+)
+from .observations import (
+    ObservationProvider,
+    ObservationProviderRegistry,
+    ObservationRequest,
+    ProcedurePreconditionObservation,
+    ProcedurePredicateObservation,
+    build_observation_provider_registry,
+    observe_procedure_preconditions,
 )
 from .procedure_runs import (
     PreparedProcedureAction,
@@ -295,6 +306,10 @@ __all__ = [
     "Norm",
     "OperationDeclaration",
     "OperationExecutionError",
+    "ObservationProvider",
+    "ObservationProviderRegistry",
+    "ObservationProviderRegistryError",
+    "ObservationRequest",
     "OperationFailure",
     "OperationObligationSnapshot",
     "OperationPredicateEnforcement",
@@ -317,6 +332,9 @@ __all__ = [
     "ProcedureObligationSnapshot",
     "ProcedureDeclaration",
     "ProcedureNode",
+    "ProcedureObservationError",
+    "ProcedurePreconditionObservation",
+    "ProcedurePredicateObservation",
     "ProcedureRunPlan",
     "ProcedureRunPlanningError",
     "ProcedurePredicateEnforcement",
@@ -353,6 +371,7 @@ __all__ = [
     "build_checker_runner_registry",
     "build_detector_runner_registry",
     "build_operation_runner_registry",
+    "build_observation_provider_registry",
     "catalog_json_bytes",
     "catalog_index_schema",
     "catalog_index_schema_path",
@@ -381,6 +400,7 @@ __all__ = [
     "load_declaration_registry_operation_binding",
     "plan_cumulative_composition",
     "plan_attention",
+    "observe_procedure_preconditions",
     "prepare_procedure_run",
     "resolve_compilation_unit",
     "schema_path",

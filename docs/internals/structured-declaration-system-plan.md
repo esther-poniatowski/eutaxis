@@ -49,8 +49,13 @@ including evaluator-less predicates. Separate deliberative, assisted, and
 mechanical packets project from that sequence. Runnable entries retain validated
 immutable inputs and their exact runner authorities. Mechanical planning also
 requires current known-failure assurance. The resolution trace remains separate
-from completion evidence. The completion ledger is the next enforcement
-dependency.
+from completion evidence.
+
+When evaluator-less preconditions are present, the procedure observer evaluates
+all of them against one coherent provider snapshot. The resulting aggregate does
+not authorize the executor to enter the procedure. The executor must next
+correlate evaluator-backed preconditions, then observe the remaining execution
+phases, before work starts on the completion ledger.
 
 ## Decision log and open prerequisites
 
@@ -151,7 +156,9 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Require the canonical three-state conclusion fragment in every manual evaluator authored under declaration schema version 1 while preserving the persisted catalog as a lossy query index.
 - [x] Make operation-runner registries process-local authorities and reject unissued registries before any runner mapping is read.
 - [x] Issue immutable procedure-run preflight plans with validated parameters, exact per-action inputs, and canonical executable and pre-action requirement projections.
-- [ ] Issue correlated procedure and operation predicate evidence at defined execution phases.
+- [x] Observe every evaluator-less precondition of a procedure from one minimal, schema-valid provider snapshot without authorizing procedure entry.
+- [ ] Correlate evaluator-backed preconditions before defining when the executor may enter the procedure. Preserve distinct authorities for observing, evaluating, and authorizing.
+- [ ] Observe invariants and postconditions at their defined phases; observe each operation predicate before invoking its runner.
 - [ ] Validate manual submissions and assisted detector-plus-residual submissions against exact retained contracts.
 - [ ] Execute mechanical requirements inside the ledger transaction with repeated assurance-freshness checks.
 - [ ] Issue the complete immutable ledger and require admissible evidence for every effective obligation.

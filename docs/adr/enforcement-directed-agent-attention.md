@@ -286,14 +286,49 @@ that the three packets cannot represent.
 
 The first ledger prerequisite implements only this canonical tuple. Until an
 admissible execution path exists, evaluator-less requirements can produce only
-`unchecked` records. An operation result does not prove an operation
-precondition: the current public result retains neither the procedure action,
-the frozen input, the observed context, nor the evaluated predicate. The future
-procedure executor must issue process-local predicate evidence. That evidence
-must retain the exact declaration registry, procedure, phase or action,
-operation reference when present, frozen bound inputs, relevant before-or-after
-context, obligation key, predicate trace, and truth value. The procedure
-execution contract must first define the observation point for each phase.
+`unchecked` records. An operation result does not prove its precondition. The
+result cannot bind an invocation to its procedure action and frozen input.
+Moreover, the public result omits the observed context and evaluated predicate.
+
+The first observation boundary covers evaluator-less procedure preconditions
+at procedure occurrence zero. One builder-issued `ObservationProviderRegistry`
+binds a reviewed synchronous batch provider to the exact declaration and facet
+registries of the prepared run. The observer selects the canonical evaluator-less
+precondition requirements from that run and derives the minimal facet request
+recursively from their predicate expressions. Descriptive `observes` fields do
+not determine the request. An empty requirement tuple issues empty evidence
+without invoking the provider.
+
+The provider request exposes only the boundary coordinate, selected facets, and
+immutable procedure parameters. The request excludes the run plan and every
+authority object. One provider call returns the complete boundary snapshot. The
+observer traverses the result once, freezes its present values, and validates
+them through the exact facet registry. Absent requested facets produce the
+declared strong-Kleene result. Any malformed or additional result aborts issuance.
+Invalid JSON structures and hostile provider behavior belong to this failure
+class.
+
+The privately issued aggregate retains its exact authorities, canonical
+requirement correlations, and predicate results. The aggregate stores no second
+context mapping because each atomic trace already carries its observation. The
+evidence validator reconstructs one transient context across every trace,
+rejects cross-trace disagreements, and replays each canonical predicate against
+that shared context. Consequently, an accepted aggregate cannot combine
+evidence from two snapshots. False and unknown remain evidence values. Neither
+value maps to a completion state or authorizes procedure entry at this boundary.
+
+The remaining execution contract must correlate evaluator-backed preconditions
+before it defines clearance. Then, the contract must define where invariants and
+postconditions are observed. The contract must separately locate each operation
+precondition before runner invocation. Those later boundaries may extend the
+coordinate and retained action data. However, each boundary must preserve five
+separate authorities:
+
+- an observer acquires context
+- an evaluator decides a predicate
+- an authorizer permits a transition
+- an executor performs an action
+- a completion adjudicator closes the run
 
 `execute_operation` remains a low-level exact-contract runner. The runner accepts only a
 builder-issued, process-local operation registry and validates inputs and
@@ -307,10 +342,10 @@ the validated parameter object, and the builder-issued operation registry tied
 to the same declaration registry. The resulting process-local plan retains those
 exact authorities, every procedure-specific completion requirement in canonical
 order, and every authored action with its exact operation contract and frozen
-bound input. Executable and pre-action tuples are overlapping projections of the
-authoritative requirements; neither projection can remove a postcondition from
-the authoritative tuple. Preflight issues no observation, predicate verdict,
-clearance, operation result, transcript, or completion evidence.
+bound input. The plan projects executable and pre-action tuples from the
+authoritative requirements. These projections do not mutate the authoritative
+tuple. Consequently, every postcondition remains available. Preflight stops
+before runner invocation and evidence issuance.
 
 The ledger uses one atomic builder:
 `build_completion_ledger(plan, *, manual, assisted, executable, clock)`. The
