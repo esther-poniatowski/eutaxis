@@ -405,9 +405,33 @@ retained authority and detached evaluator input. Clearance is derived from the
 combined evaluator-less, manual, assisted, and mechanical results and is true
 only when every precondition is satisfied.
 
-The session is single-use. Its state is `ready` before execution and becomes
-terminal when execution starts: either `completed`, with one immutable evidence
-aggregate, or `failed-after-execution`, with no retry permitted. Thus, a stale
+The completed aggregate contains one typed record for every item in
+`run.pre_action_requirements`, in that exact canonical order regardless of
+submission-mapping order. Evaluator-less records retain the exact requirement,
+mapped state, and predicate trace. Manual records retain the exact requirement,
+state derived from `conclusion`, and frozen evidence. Successful assisted
+records retain the exact requirement, residual state, issued
+`DetectorExecution`, and frozen residual judgment. A detector runner or result
+failure instead retains the exact requirement, `blocked` state, and diagnostic,
+with no residual judgment. Successful mechanical records retain the exact
+requirement, checker state, and validated `CheckerResult`; a checker runner or
+result failure retains the exact requirement, `blocked` state, and diagnostic.
+Blocked runner or result records do not abort the batch, so later canonical
+preconditions are still evaluated. Only authority, correlation, or submission
+failures terminate a running session. The transaction derives `cleared` only
+after this complete tuple exists, and sets it exactly when every record is
+`satisfied`.
+
+Manual submissions and residual providers use separate exact key sets derived
+from the correlation plan. A missing or additional key fails before `running`,
+and mapping order has no semantic effect.
+
+The session is single-use. Its state is `ready` during pre-execution validation
+and changes to `running` before the first evaluator invocation or residual
+provider callback. A reentrant execution attempt therefore fails. Every exit
+from `running` is terminal: either `completed`, with one immutable evidence
+aggregate, or `failed-after-execution`, with no retry permitted. A validation
+failure detected before `running` leaves the session `ready`. Thus, a stale
 authority found after a runner call cannot lead the same session to invoke that
 runner twice. A caller that needs a new attempt must prepare a new run and new
 observation and evaluation plans. The completed aggregate retains all
@@ -415,8 +439,8 @@ precondition evidence for later completion. The completion ledger consumes
 these records and never executes a retained precondition evaluator again.
 
 The ledger uses one atomic builder. The builder accepts only a privately issued
-plan and derives every record from its
-canonical completion tuple. For procedure preconditions, it accepts only a
+plan and derives every record from its canonical completion tuple. For
+procedure preconditions, it accepts only a
 completed pre-action evidence aggregate and imports its records. The builder
 snapshots each remaining submitted mapping once. An
 additional key, malformed carrier, invalid authority, or invalid evidence
@@ -467,7 +491,11 @@ obligation, residual question, and issuer-stamped `DetectorExecution` after the
 transaction has executed the detector. The transaction validates the returned
 judgment against that execution and the retained detached invocation. A missing
 or mismatched judgment is invalid evidence and terminates the session; no
-separately executed detector may be submitted.
+separately executed detector may be submitted. A detector error located at its
+runner or returned-result boundary maps to a blocked assisted record after the
+transaction revalidates plan authority, and the residual provider is not called.
+A registry, evaluator, revision, input, or correlation error is an authority
+failure and terminates the session as `failed-after-execution`.
 
 Mechanical completion accepts no caller-supplied checker result. Version 1
 completion first restricts checker failure behavior to `block` at both source
