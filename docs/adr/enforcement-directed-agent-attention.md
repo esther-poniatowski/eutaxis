@@ -208,27 +208,65 @@ This match covers the evaluator reference, input revision, and immutable input.
 The ledger also associates the execution with that entry's obligation key. One execution cannot discharge another key unless a
 later contract defines an explicit sharing rule.
 
-Future mechanical completion does not accept a caller-supplied `CheckerResult`.
-The completion operation invokes the checker through the exact registry retained
-by the plan, validates the result through `execute_checker`, and records the
-validated value inside the ledger transaction. This route makes a public result
-carrier insufficient as evidence. The plan retains the exact checker registry,
-fixture index, assurance, and detector registry used to issue it. Each authority
-is present only when its corresponding packet is non-empty. Immediately before
-one mechanical invocation or one atomic batch, completion revalidates the
-assurance stamp and every retained identity. Completion also compares the
-authored fixture sequences and rechecks their digests. A stale resource blocks
-completion under the later ledger contract.
-The ledger tests mutate a fixture after plan issuance.
+Mechanical evidence does not accept a caller-supplied `CheckerResult`. A
+procedure evidence transaction or rule evidence transaction invokes the checker
+through the exact registry retained by the plan, validates the result through
+`execute_checker`, and records the validated value before ledger construction.
+This route makes a public result carrier insufficient as evidence. The plan
+retains the exact checker registry, fixture index, assurance, and detector
+registry used to issue it. Each authority is present only when its corresponding
+packet is non-empty. Immediately before and after a mechanical invocation, the
+evidence transaction revalidates the assurance stamp and every retained identity.
+It also compares the authored fixture sequences and rechecks their digests. A
+stale resource prevents evidence issuance. The ledger imports only authenticated
+evidence and never invokes an evaluator. Tests mutate a fixture after plan
+issuance and prove that no stale evidence reaches the ledger.
 
 `ResolutionResult`, `AttentionRequirements`, and `AttentionPlan` use private
 process-local issuer stamps. Their public constructors fail. Every ordinary
-reconstruction route also fails, including copying and serialization. Private
-validators check the stamps before reading fields. Authorization compares
-retained aggregates by identity rather than structural equality.
-`ResolutionResult` preserves semantic
-equality over its unit and trace. Its retained registry and issuer stamp do not
-participate in that equality, and authorization never relies on it. These
+reconstruction route also fails, including copying and serialization.
+All three aggregates additionally use module-owned weak identity records with
+opaque tokens and complete issuance snapshots. Their validators compare the
+external token and state with the current graph before any consumer reads it;
+rewriting an embedded state cannot attest a mutation.
+
+The weak authority store is identity-indexed and never hashes or compares an
+aggregate. It maps `id(aggregate)` to the aggregate's weak reference, opaque
+token, and issuance state under one module lock. Validation requires both the
+integer key and `stored_reference() is aggregate`. The weak-reference callback
+removes the entry only when the stored reference is the callback's own reference,
+so delayed collection cannot delete a later object that reuses the integer
+identity. This representation preserves `ResolutionResult` semantic equality,
+admits traces containing unhashable JSON values, and gives distinct but
+semantically equal results independent issuance records. The same store shape is
+used for requirements and plans to keep the authority mechanism uniform.
+
+The resolution snapshot covers the `ResolutionResult` carrier and issuer;
+registry origin and facet-registry issuance state; resolved-unit carrier and
+manifest; ordered component tuple and every component carrier, declaration,
+version, and declaration kind recovered from the exact registry; dependency and
+rule-projection tuple carriers, member carriers, and semantic values; trace
+carrier; and ordered event tuple, event carriers, and event values. Equal-value
+replacement of the unit, component tuple, one component, dependency, rule
+projection, trace, event tuple, or one event invalidates the result. Adding,
+removing, reordering, or replacing an effective procedure—including one with no
+obligation—therefore invalidates every downstream attention authority.
+
+The requirements snapshot covers the exact resolution authority; canonical
+completion tuple; every requirement, key, obligation snapshot, evaluator, and
+enforcement value; every class-specific projection and its correlation to the
+canonical tuple; mapping and tuple carrier identities; canonical order; and
+frozen semantic values. The plan snapshot adds each packet carrier and entry;
+evaluator invocation; input and evidence schema; residual question; checker and
+detector registry origin, issuer, binding, runner identity, and contract state;
+fixture-index authority; and known-failure-assurance authority. Executable
+callables contribute identity but not mutable internal state. Equal-value
+replacement of any top-level projection or nested authority invalidates the
+aggregate.
+
+`ResolutionResult` preserves semantic equality over its unit and trace. Its
+retained registry, issuer stamp, token, and authority state do not participate in
+that equality, and authorization never relies on semantic equality. These
 cooperative boundaries do not resist hostile access to private Python
 attributes.
 
@@ -271,6 +309,84 @@ Resolution and completion use separate ledgers. Events such as `declaration-eval
 
 The completion ledger contains one record for every criterion of every effective rule, every predicate of every effective procedure, and every operation precondition expanded per effective procedure action. Evaluator-less predicates receive evidence from procedure or operation execution. Evaluator-backed obligations also record their enforcement class. Ledger completion states are `satisfied`, `violated`, `blocked`, `unchecked`, and `inapplicable`. This ledger enumeration is distinct from `EvaluationState`: an evaluator may return only `satisfied`, `violated`, or `blocked`. A ledger record becomes `inapplicable` only after a declared procedure terminal closes the realized path and excludes that requirement. `unchecked`, `violated`, or `blocked` prevents successful completion. The only other terminal non-blocking exception is an explicit migration baseline that names the finding, owner, expiry condition, and migration it awaits; a baseline cannot be created silently by a run under evaluation.
 
+### Rule evidence boundary
+
+Rule criteria require an authenticated evidence transaction before completion
+reconciliation. The rejected alternative makes the completion-ledger builder
+execute evaluators. That route combines evidence acquisition, retry semantics,
+authority revalidation, reconciliation, timestamping, and issuance in one
+transaction. The accepted route adds a single-use `RuleEvidenceSession` and
+keeps the ledger builder free of evaluator callbacks.
+
+`create_rule_evidence_session(plan)` accepts one exact issued `AttentionPlan`.
+The session selects only `RuleCriterionKey` requirements, in their relative
+order within `plan.requirements.completion`, and correlates them with the exact
+packet entries and evaluator authorities retained by that plan. A module-owned
+weak claim permits one session for that plan without retaining an otherwise
+unreachable plan. The session state is `ready`, `running`, `completed`, or
+`failed-after-execution`. It enters `running` before the first detector, checker,
+or residual-provider call. Every later exit is terminal and non-retryable.
+
+`execute` accepts
+`manual: Mapping[RuleCriterionKey, RuleManualJudgmentSubmission]` and
+`residual_providers: Mapping[RuleCriterionKey, RuleResidualJudgmentProvider]`.
+It atomically claims the session and enters `running` before traversing either
+caller mapping or inspecting a provider signature. It snapshots each mapping
+once. Their required keys are respectively the deliberative and assisted
+rule-criterion keys. Missing, additional, copied-equal, or wrong-kind keys fail
+the session; mutable mappings are never traversed again. Mechanical criteria
+require no caller-supplied result. An empty rule set issues empty rule evidence
+without invoking a callback.
+
+`RuleManualJudgmentSubmission` contains an exact `RuleCriterionKey`, evaluator
+reference, admitted input revision, and evidence object. The session freezes the
+evidence and validates it against the retained manual evaluator before deriving
+the state from the canonical conclusion field. `RuleResidualJudgmentRequest` is
+privately issued with the exact `CompletionRequirement`, residual question, and
+issued `DetectorExecution`. `RuleResidualJudgmentSubmission` contains schema
+version 1, that exact request object, an `EvaluationState`, and a non-empty
+rationale. `RuleResidualJudgmentProvider` accepts the request and returns that
+submission.
+
+`RuleEvidenceRecord` is the closed union of `RuleManualEvidence`,
+`RuleAssistedEvidence`, and `RuleMechanicalEvidence`. Every variant retains the
+exact source requirement and state. The manual variant retains the validated
+submission. The assisted variant retains either its issued detector execution
+and residual judgment or a blocking diagnostic. The mechanical variant retains
+either its validated `CheckerResult` or a blocking diagnostic. No variant admits
+a caller-supplied state independent of its evidence.
+
+A deliberative rule record validates one `RuleManualJudgmentSubmission` against
+the exact manual evaluator and its canonical conclusion schema. An assisted
+record executes the retained detector invocation, then requests one residual
+judgment correlated with that exact issued execution. A mechanical record
+executes the retained checker invocation through the plan's checker authority.
+Detector or checker runner and result failures produce blocked records only
+after authority revalidation. Mechanical execution additionally revalidates the
+known-failure assurance and fixture digests before and after each invocation;
+fixture staleness takes precedence over a simultaneous checker failure. The
+transaction continues after a valid blocked record and produces one record for
+every effective rule criterion.
+
+Residual-provider signatures are validated from the captured callable objects.
+The session revalidates plan authority and captured mapping authority after each
+signature inspection, provider call, detector call, and checker call. On any
+provider, detector, or checker `BaseException`, it performs guarded structural
+authority revalidation and, for a mechanical occurrence, fixture-freshness
+revalidation. It then publishes `failed-after-execution` with no `RuleEvidence`
+and re-raises. Structural authority or fixture staleness takes precedence over a
+simultaneous ordinary or interrupting checker failure. No callback runs after a
+terminal failure.
+
+`RuleEvidence` is a privately issued, immutable, process-local aggregate. It
+retains the exact plan and a typed record for every rule criterion. Its external
+weak issuance record covers the plan, canonical requirement and packet-entry
+correlations, source record carriers, result values, diagnostics, and callable
+identities without traversing callable internals. Public construction, copying,
+serialization, token replacement, embedded-state replacement, and equal-value
+carrier substitution cannot establish authority. The completion ledger imports
+these records without re-executing or revalidating their judgments.
+
 ### Completion ledger boundary
 
 The ledger receives its record universe from the attention planner. The ledger does not
@@ -283,6 +399,30 @@ within-component order defined for attention planning. The three class-specific
 requirement tuples and packets are projections of this tuple. Thus, the
 canonical tuple retains evaluator-less predicates and the global interleaving
 that the three packets cannot represent.
+
+`build_completion_ledger` receives the exact issued plan, an optional exact
+`RuleEvidence`, a mapping from effective procedure identifier to procedure
+outcome, and a clock. The builder snapshots the procedure mapping exactly once.
+Its admitted value union contains an authentic terminal
+`ProcedureExecutionTranscript` or authentic, complete, uncleared
+`PreActionEvidence`. An uncleared pre-action aggregate preserves actual violated
+or blocked entry evidence when lifecycle execution cannot begin. A cleared
+pre-action aggregate without its terminal transcript is invalid because it
+would permit a caller to stop before lifecycle execution. Every supplied
+outcome must originate from the exact attention plan and must name its mapping
+key. Additional, duplicate, copied-equal, malformed, or cross-plan outcomes
+raise `CompletionLedgerError`.
+
+The outcome mapping is sparse. An omitted effective procedure produces
+unchecked records and an incomplete procedure outcome, including when that
+procedure declares no obligation. A transcript imports its exact retained entry
+evidence, lifecycle boundary evidence, applicability, graph disposition, and
+adjudication disposition. An uncleared pre-action outcome imports its exact
+precondition records and leaves every later lifecycle requirement unchecked.
+No outcome may be supplied for a declaration that is not an effective procedure.
+The builder discovers effective procedure identifiers from the plan's issued
+resolution authority, not from the supplied mapping and not only from the
+requirement tuple.
 
 The first ledger prerequisite implements only this canonical tuple. Until an
 admissible execution path exists, evaluator-less requirements can produce only
@@ -645,32 +785,40 @@ terminal.
 
 Every invariant occurrence remains in the transcript. The invariant's canonical
 ledger record aggregates those occurrences as `violated` when any occurrence is
-violated, otherwise `blocked` when any occurrence is blocked or an expected
-record is missing from an already emitted boundary that selected the invariant,
-and otherwise `satisfied`. A boundary never emitted after an abort creates no
-expected occurrence; its later requirements remain `unchecked`. A reached
-operation precondition and the selected postcondition use their retained
-occurrence state.
+violated, otherwise `blocked` when an actual retained occurrence is blocked,
+otherwise `unchecked` when an emitted boundary selected the invariant but its
+partial evidence prefix contains no record, and otherwise `satisfied`. Thus, the
+precedence is `violated`, `blocked`, `unchecked`, then `satisfied`. A missing
+record never asserts blocked evidence. A boundary never emitted after an abort
+creates no expected occurrence; its later requirements remain `unchecked`. The
+same missing-record rule applies to a reached operation precondition and the
+selected postcondition. Their states otherwise come from their retained
+occurrence records.
 The terminal graph and adjudication dispositions remain separate ledger
 authorities: obligation records alone cannot convert a declared failure or an
 aborted run into successful completion.
 
-The ledger uses one atomic builder. The builder accepts only a privately issued
-plan and derives every record from its canonical completion tuple. For every
-procedure-owned record, it accepts only the exact terminal lifecycle transcript.
-That transcript retains the completed pre-action aggregate, later boundary
-evidence, partial prefixes, path applicability, and both terminal dispositions.
-The ledger imports these records without rerunning or replacing their evidence.
-Separately submitted mappings are restricted to non-procedure obligations such
-as rule criteria, and the builder snapshots each such mapping once. An
-additional key, malformed carrier, invalid authority, or invalid evidence
-raises `CompletionLedgerError` and prevents issuance. Missing evidence instead
-produces an `unchecked` record. Every issued ledger contains the complete tuple
-in canonical order, including records after a blocked evaluation. The ledger is
-successful exactly when the procedure lifecycle reports `success-terminal` and
-`accepted`, every applicable record is `satisfied`, and every remaining record
-is an admitted `inapplicable` record. Migration baselines remain outside this
-first ledger contract.
+The ledger uses one atomic reconciliation builder. It accepts only a privately
+issued plan, optional exact rule evidence, and the once-snapshotted procedure
+outcomes. It derives every record from the plan's canonical completion tuple and
+imports retained evidence without executing an observation, evaluator, residual
+provider, checker fixture, or operation. An additional key, malformed carrier,
+invalid authority, invalid evidence correlation, or copied-equal authority
+raises `CompletionLedgerError` and prevents issuance. An omitted rule aggregate,
+an omitted procedure outcome, or an absent record in a valid partial prefix
+instead produces `unchecked` at the affected canonical records. Every issued
+ledger contains the complete tuple in canonical order.
+
+Ledger success requires an authentic terminal transcript for every effective
+procedure, with `success-terminal` graph disposition and `accepted` adjudication,
+and requires every canonical record to be `satisfied` or validly
+`inapplicable`. Every `inapplicable` record must be justified by the reached
+authored terminal of its procedure. A plan with no effective procedure applies
+only the record condition. Therefore, a satisfied rule-only plan succeeds, and
+an empty plan succeeds after valid issuance. An uncleared pre-action outcome, a
+missing outcome even for a zero-obligation procedure, a failure-terminal or
+aborted transcript, or any unchecked, violated, or blocked record prevents
+success. Migration baselines remain outside this first ledger contract.
 
 A `ManualJudgmentSubmission` is an untrusted human assertion. The assertion contains the
 exact obligation key, evaluator reference, admitted input revision, and evidence
@@ -721,21 +869,19 @@ transaction revalidates plan authority, and the residual provider is not called.
 A registry, evaluator, revision, input, or correlation error is an authority
 failure and terminates the session as `failed-after-execution`.
 
-Mechanical completion accepts no caller-supplied checker result. Version 1
-completion first restricts checker failure behavior to `block` at both source
-and persisted-schema boundaries. The pre-action transaction invokes
-precondition checkers through the registry retained by the plan and in canonical
-order. Before the batch, after each invocation, and immediately before issuance,
-the transaction
-revalidates the assurance stamp, retained identities, authored fixture
-sequences, and fixture digests. A stale or unreadable fixture prevents issuance
-and takes precedence over a simultaneous runner or result failure. A validated
-checker result maps its state directly. A registry stamp, retained identity,
-binding, evaluator, revision, invocation input, assurance, fixture sequence, or
-digest defect terminates the session as `failed-after-execution` and prevents
-issuance. After those checks pass, an error located at the runner or returned
-result boundary produces a `blocked` record with a separate diagnostic,
-provided that the transaction re-establishes freshness. Registry, correlation,
+Mechanical evidence accepts no caller-supplied checker result. Version 1 first
+restricts checker failure behavior to `block` at both source and persisted-schema
+boundaries. The procedure pre-action, procedure lifecycle, and rule-evidence
+transactions invoke their respective checkers through the registry retained by
+the plan and in canonical order. Before and after each invocation, the owning
+transaction revalidates the assurance stamp, retained identities, authored
+fixture sequences, and fixture digests. A stale or unreadable fixture prevents
+evidence issuance and takes precedence over a simultaneous runner or result
+failure. A validated checker result maps its state directly. A registry stamp,
+retained identity, binding, evaluator, revision, invocation input, assurance,
+fixture sequence, or digest defect terminates the evidence transaction. After
+those checks pass, an error located at the runner or returned-result boundary
+produces a `blocked` record with a separate diagnostic. Registry, correlation,
 input, assurance, and fixture errors are authority failures, never blocked
 evidence. Tests plant both diagnostic classes.
 
@@ -746,21 +892,38 @@ decide because a required observation was unavailable. An absent execution
 record remains `unchecked`. The procedure executor retains the predicate trace
 that supports every mapped truth value.
 
-The builder calls an injected clock once after all validation and evaluation
-passes. The clock must return a timezone-aware UTC value. The builder normalizes
-that value to one canonical RFC 3339 string ending in `Z`; every record and the
-ledger share that transaction timestamp. Timestamps participate in semantic
-equality. A clock exception, non-UTC value, or normalization failure raises
-`CompletionLedgerError` and prevents issuance. Tests inject a fixed clock, so
-identical inputs remain comparable.
+The builder captures the exact injected clock callable before inspecting and
+invoking it. It requires an exact synchronous zero-argument callable and
+revalidates every source authority after signature inspection. The builder then
+calls the captured clock once after evidence reconciliation. The clock must
+return an exact aware `datetime` whose UTC offset is zero. The builder normalizes
+that value to one canonical RFC 3339 string ending in `Z`, then revalidates the
+plan, rule evidence, procedure mapping, and every procedure outcome before
+issuance. Every record and the ledger share that transaction timestamp, which
+participates in semantic equality. A clock exception, invalid carrier, naive
+value, nonzero offset, authority mutation during the callback, or normalization
+failure raises `CompletionLedgerError` and prevents issuance. A `BaseException`
+propagates with no ledger issued. Tests inject a fixed clock, so identical inputs
+remain comparable.
 
 `CompletionLedger` is a privately issued, immutable, process-local aggregate.
 Its public construction, copying, serialization, and reconstruction fail. Each
 `CompletionRecord` contains its key, optional evaluator and enforcement class,
-state, immutable evidence, optional blocking diagnostic, and transaction
-timestamp. Resolution events never satisfy a record. A future projection may
-serialize a reviewed ledger, but the process-local authority itself is not a
-portable evidence token.
+state, a typed tuple of exact source evidence records, a diagnostic tuple, and
+the transaction timestamp. Repeated invariants retain every occurrence record
+and every occurrence diagnostic. Unchecked and inapplicable records have empty
+source and diagnostic tuples. Detached lifecycle requirements are correlated to
+canonical completion requirements by validated semantic keys only after the
+transcript authority passes; detached object identity is not expected to match.
+
+The ledger retains the exact plan, optional rule evidence, procedure-mapping
+origin, each procedure outcome, canonical records, per-procedure outcome status,
+timestamp, and derived success. A module-owned weak issuance record stores an
+opaque token and the complete issuance snapshot. Authenticity revalidates each
+retained source authority and rejects later mutation, equal-value replacement,
+token replacement, and embedded-state self-attestation. Resolution events never
+satisfy a record. A future projection may serialize a reviewed ledger, but the
+process-local authority itself is not a portable evidence token.
 
 Mechanical results are reported compactly after the purpose check; they do not substitute for it. Assisted obligations require both detector evidence and the recorded residual judgment. Deliberative obligations require manual evidence against the criterion or predicate, not a general assertion that the artifact was reviewed.
 
