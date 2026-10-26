@@ -332,11 +332,15 @@ or residual-provider call. Every later exit is terminal and non-retryable.
 `residual_providers: Mapping[RuleCriterionKey, RuleResidualJudgmentProvider]`.
 It atomically claims the session and enters `running` before traversing either
 caller mapping or inspecting a provider signature. It snapshots each mapping
-once. Their required keys are respectively the deliberative and assisted
+once, retaining the mapping-origin identity only as provenance of that capture.
+Their required keys are respectively the deliberative and assisted
 rule-criterion keys. Missing, additional, copied-equal, or wrong-kind keys fail
-the session; mutable mappings are never traversed again. Mechanical criteria
-require no caller-supplied result. An empty rule set issues empty rule evidence
-without invoking a callback.
+the session; mutable mappings are never traversed again. After the snapshot,
+changes to the caller's containers are irrelevant and neither change execution
+nor invalidate completed evidence. Session authority covers only the immutable
+captured key identities, submission carriers until canonicalization, and
+provider callable identities. Mechanical criteria require no caller-supplied
+result. An empty rule set issues empty rule evidence without invoking a callback.
 
 `RuleManualJudgmentSubmission` contains an exact `RuleCriterionKey`, evaluator
 reference, admitted input revision, and evidence object. The session freezes the
@@ -356,6 +360,23 @@ and residual judgment or a blocking diagnostic. The mechanical variant retains
 either its validated `CheckerResult` or a blocking diagnostic. No variant admits
 a caller-supplied state independent of its evidence.
 
+Each successful record owns canonical carriers. `RuleManualEvidence` retains a
+new submission with a copied key and evaluator reference and frozen evidence,
+not the caller's submission object. A residual judgment is reconstructed after
+validation with schema version 1, its exact privately issued request, the
+validated state, and rationale. `RuleAssistedEvidence` retains that canonical
+judgment together with the exact issued `DetectorExecution`; copying the
+execution would destroy its authority. `RuleMechanicalEvidence` retains a new
+`CheckerResult` with a copied evaluator reference and frozen evidence, not the
+runner-returned result object.
+
+The record variants exclude contradictory states. A successful assisted record
+has an execution and judgment and no diagnostic; its blocking form has blocked
+state, no execution, no judgment, and a non-empty diagnostic. A successful
+mechanical record has a result and no diagnostic; its blocking form has blocked
+state, no result, and a non-empty diagnostic. A manual record always has its
+canonical submission and no diagnostic.
+
 A deliberative rule record validates one `RuleManualJudgmentSubmission` against
 the exact manual evaluator and its canonical conclusion schema. An assisted
 record executes the retained detector invocation, then requests one residual
@@ -369,23 +390,36 @@ transaction continues after a valid blocked record and produces one record for
 every effective rule criterion.
 
 Residual-provider signatures are validated from the captured callable objects.
-The session revalidates plan authority and captured mapping authority after each
-signature inspection, provider call, detector call, and checker call. On any
-provider, detector, or checker `BaseException`, it performs guarded structural
-authority revalidation and, for a mechanical occurrence, fixture-freshness
-revalidation. It then publishes `failed-after-execution` with no `RuleEvidence`
-and re-raises. Structural authority or fixture staleness takes precedence over a
-simultaneous ordinary or interrupting checker failure. No callback runs after a
-terminal failure.
+After every ordinary or interrupting mapping traversal, signature inspection,
+detector call, or residual-provider call, the session revalidates structural
+plan and captured mapping authority before classifying the callback outcome. A
+structural defect takes precedence over the callback's evidence failure. After a
+checker call, the session revalidates both structural authority and fixture
+freshness; either authority defect takes precedence over the checker outcome.
+
+Every exception after the session enters `running` publishes
+`failed-after-execution` with no `RuleEvidence`, and no later callback runs. An
+ordinary exception is exposed as `RuleEvidenceError` after publication. A
+`BaseException` outside `Exception`, including `KeyboardInterrupt`, publishes the
+same terminal state and is re-raised unchanged. Replacing a provider, submission,
+or key inside the private session snapshot is an authority failure even when the
+replacement is equal or would return the same result. Replacing an entry in the
+original caller mapping after its one traversal is not an authority change.
+When initial traversal raises or interrupts, no complete mapping snapshot exists;
+the session revalidates structural plan authority, publishes the terminal state,
+then applies the same ordinary-exception or `BaseException` rule.
 
 `RuleEvidence` is a privately issued, immutable, process-local aggregate. It
 retains the exact plan and a typed record for every rule criterion. Its external
 weak issuance record covers the plan, canonical requirement and packet-entry
-correlations, source record carriers, result values, diagnostics, and callable
-identities without traversing callable internals. Public construction, copying,
+correlations, canonical source record carriers, result values, and diagnostics.
+Caller mapping origins, submission carriers, provider carriers, and provider
+callable identities are session-only authorities and are not retained after
+successful issuance. Therefore, later mutation of a provider or caller mapping
+does not invalidate completed evidence. Public construction, copying,
 serialization, token replacement, embedded-state replacement, and equal-value
-carrier substitution cannot establish authority. The completion ledger imports
-these records without re-executing or revalidating their judgments.
+record-carrier substitution cannot establish authority. The completion ledger
+imports these records without re-executing or revalidating their judgments.
 
 ### Completion ledger boundary
 
