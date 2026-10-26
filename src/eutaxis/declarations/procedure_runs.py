@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import NoReturn, SupportsIndex, cast
+from dataclasses import dataclass, fields, is_dataclass
+from enum import Enum
+from types import MappingProxyType
+from typing import NoReturn, SupportsIndex, TypeAlias, cast
 
 from ._runner_support import exception_detail
 from .attention import (
     AssistedAttentionEntry,
+    AttentionObligationKey,
     AttentionPlan,
     CompletionRequirement,
     DeliberativeAttentionEntry,
@@ -21,7 +24,7 @@ from .attention import (
     _is_issued_attention_plan,
 )
 from .embedded_schema import validate_json_instance
-from .enforcement import PredicatePhase
+from .enforcement import EnforcementClass, PredicatePhase
 from .exceptions import ProcedureRunPlanningError
 from .models import (
     EvaluatorDeclaration,
@@ -40,6 +43,11 @@ from .operations import (
     OperationRunnerBinding,
     OperationRunnerRegistry,
     _is_builder_issued_operation_registry,
+)
+from .runners import (
+    DetectorRunnerBinding,
+    DetectorRunnerRegistry,
+    _is_builder_issued_detector_registry,
 )
 from .source import format_document_path
 
@@ -98,11 +106,11 @@ class _ActionAuthorityState:
 
 @dataclass(frozen=True)
 class _PacketAuthorityState:
-    """Retain one procedure-precondition packet entry and invocation contract."""
+    """Retain one procedure-owned packet entry and invocation contract."""
 
     entry: object
-    key: ProcedurePredicateKey
-    obligation: ProcedureObligationSnapshot | None
+    key: ProcedurePredicateKey | OperationPredicateKey
+    obligation: ProcedureObligationSnapshot | OperationObligationSnapshot | None
     evaluator: EvaluatorDeclaration | None
     invocation: EvaluatorInvocation | None
     evaluator_reference: VersionedReference | None
@@ -141,6 +149,18 @@ class _OperationRegistryAuthorityState:
 
 
 @dataclass(frozen=True)
+class _DetectorRegistryAuthorityState:
+    """Retain the live detector-registry origin used by one procedure run."""
+
+    registry: DetectorRunnerRegistry
+    declarations: object
+    bindings: Mapping[VersionedReference, DetectorRunnerBinding]
+    input_contracts: Mapping[VersionedReference, Mapping[str, object]]
+    evaluator_records: Mapping[VersionedReference, object]
+    records: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
 class PreparedProcedureEvaluationInput:
     """Retain detached canonical inputs for one precondition evaluation."""
 
@@ -149,6 +169,69 @@ class PreparedProcedureEvaluationInput:
     predicate: Predicate
     invocation_input: Mapping[str, JsonValue] | None
     input_schema: Mapping[str, JsonValue] | None
+
+
+@dataclass(frozen=True)
+class PreparedManualLifecycleEvaluation:
+    """Retain detached manual authority for one later lifecycle requirement."""
+
+    ordinal: int
+    source_key: AttentionObligationKey
+    source_requirement: CompletionRequirement
+    source_entry: DeliberativeAttentionEntry
+    requirement: CompletionRequirement
+    evaluator: EvaluatorDeclaration
+    enforcement: EnforcementClass
+
+
+@dataclass(frozen=True)
+class PreparedAssistedLifecycleEvaluation:
+    """Retain detached detector authority for one later lifecycle requirement."""
+
+    ordinal: int
+    source_key: AttentionObligationKey
+    source_requirement: CompletionRequirement
+    source_entry: AssistedAttentionEntry
+    requirement: CompletionRequirement
+    evaluator: EvaluatorDeclaration
+    enforcement: EnforcementClass
+    invocation: EvaluatorInvocation
+    input_schema: Mapping[str, JsonValue]
+    residual_question: str
+
+
+@dataclass(frozen=True)
+class PreparedMechanicalLifecycleEvaluation:
+    """Retain detached checker authority for one later lifecycle requirement."""
+
+    ordinal: int
+    source_key: AttentionObligationKey
+    source_requirement: CompletionRequirement
+    source_entry: MechanicalAttentionEntry
+    requirement: CompletionRequirement
+    evaluator: EvaluatorDeclaration
+    enforcement: EnforcementClass
+    invocation: EvaluatorInvocation
+    input_schema: Mapping[str, JsonValue]
+    evidence_schema: Mapping[str, JsonValue]
+
+
+PreparedLifecycleEvaluation: TypeAlias = (
+    PreparedManualLifecycleEvaluation
+    | PreparedAssistedLifecycleEvaluation
+    | PreparedMechanicalLifecycleEvaluation
+)
+
+
+@dataclass(frozen=True)
+class _LifecycleEvaluationAuthorityState:
+    """Bind one detached lifecycle specification to its exact live origins."""
+
+    item: PreparedLifecycleEvaluation
+    source_key: AttentionObligationKey
+    source_requirement: CompletionRequirement
+    source_entry: object
+    detached_state: object
 
 
 @dataclass(frozen=True)
@@ -199,6 +282,7 @@ class ProcedureRunPlan:
         CompletionRequirement, ...
     ]
     actions: tuple[PreparedProcedureAction, ...]
+    lifecycle_evaluations: tuple[PreparedLifecycleEvaluation, ...]
     _parameters_identity: Mapping[str, JsonValue]
     _parameters_value: JsonValue
     _actions_identity: tuple[PreparedProcedureAction, ...]
@@ -214,8 +298,11 @@ class ProcedureRunPlan:
     _packet_semantics: tuple[_PacketAuthorityState, ...]
     _attention_identity: AttentionPlan
     _operation_registry_state: _OperationRegistryAuthorityState
+    _detector_registry_state: _DetectorRegistryAuthorityState | None
     _evaluation_inputs: tuple[PreparedProcedureEvaluationInput, ...]
     _evaluation_input_state: tuple[_EvaluationInputAuthorityState, ...]
+    _lifecycle_evaluations_identity: tuple[PreparedLifecycleEvaluation, ...]
+    _lifecycle_evaluation_state: tuple[_LifecycleEvaluationAuthorityState, ...]
     _issuer: object
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -304,6 +391,11 @@ def _is_issued_procedure_run_plan(plan: object) -> bool:
             )
             or not _packet_authority_is_current(plan)
             or not _evaluation_inputs_are_current(plan)
+            or plan.lifecycle_evaluations is not plan._lifecycle_evaluations_identity
+            or not _lifecycle_evaluations_are_current(plan)
+            or not _detector_registry_authority_is_current(
+                plan.attention.detector_registry, plan._detector_registry_state
+            )
         ):
             return False
         return _final_run_identity_check(plan)
@@ -392,6 +484,12 @@ def _prepare_procedure_run(
     evaluation_inputs = _prepare_evaluation_inputs(
         procedure_id, requirement_semantics, packet_semantics
     )
+    lifecycle_evaluations = _prepare_lifecycle_evaluations(
+        requirement_semantics, packet_semantics
+    )
+    detector_registry_state = _snapshot_detector_registry_authority(
+        attention.detector_registry
+    )
     plan = object.__new__(ProcedureRunPlan)
     for name, value in (
         ("attention", attention),
@@ -408,6 +506,7 @@ def _prepare_procedure_run(
             evaluator_backed_procedure_preconditions,
         ),
         ("actions", actions),
+        ("lifecycle_evaluations", lifecycle_evaluations),
         ("_parameters_identity", frozen_parameters),
         ("_parameters_value", freeze_json(frozen_parameters)),
         ("_actions_identity", actions),
@@ -432,10 +531,18 @@ def _prepare_procedure_run(
             "_operation_registry_state",
             _snapshot_operation_registry_authority(operation_registry),
         ),
+        ("_detector_registry_state", detector_registry_state),
         ("_evaluation_inputs", evaluation_inputs),
         (
             "_evaluation_input_state",
             tuple(_snapshot_evaluation_input(item) for item in evaluation_inputs),
+        ),
+        ("_lifecycle_evaluations_identity", lifecycle_evaluations),
+        (
+            "_lifecycle_evaluation_state",
+            tuple(
+                _snapshot_lifecycle_evaluation(item) for item in lifecycle_evaluations
+            ),
         ),
         ("_issuer", _PLAN_ISSUER),
     ):
@@ -592,6 +699,252 @@ def _prepare_evaluation_inputs(
             )
         )
     return tuple(result)
+
+
+def _prepare_lifecycle_evaluations(
+    requirements: tuple[_RequirementAuthorityState, ...],
+    packets: tuple[_PacketAuthorityState, ...],
+) -> tuple[PreparedLifecycleEvaluation, ...]:
+    """Detach every evaluator-backed requirement realized after entry."""
+    result: list[PreparedLifecycleEvaluation] = []
+    for ordinal, state in enumerate(requirements):
+        if state.evaluator is None or not _is_lifecycle_key(state.key):
+            continue
+        packet = next((item for item in packets if item.key is state.key), None)
+        if packet is None:
+            _fail(("requirements", ordinal), "lifecycle packet entry is absent")
+        requirement = cast(CompletionRequirement, _detach_value(state.requirement))
+        evaluator = requirement.evaluator
+        if type(evaluator) is not EvaluatorDeclaration:
+            _fail(("requirements", ordinal, "evaluator"), "evaluator is absent")
+        enforcement = state.enforcement
+        if type(enforcement) is not EnforcementClass:
+            _fail(("requirements", ordinal), "lifecycle enforcement class is invalid")
+        common = (
+            ordinal,
+            cast(AttentionObligationKey, state.key),
+            state.requirement,
+            requirement,
+            evaluator,
+            enforcement,
+        )
+        if enforcement is EnforcementClass.DELIBERATIVE:
+            if type(packet.entry) is not DeliberativeAttentionEntry:
+                _fail(("requirements", ordinal), "manual packet entry kind differs")
+            result.append(
+                PreparedManualLifecycleEvaluation(
+                    common[0],
+                    common[1],
+                    common[2],
+                    cast(DeliberativeAttentionEntry, packet.entry),
+                    common[3],
+                    common[4],
+                    common[5],
+                )
+            )
+            continue
+        invocation, input_schema = _detach_lifecycle_invocation(packet, ordinal)
+        if enforcement is EnforcementClass.ASSISTED:
+            if type(packet.entry) is not AssistedAttentionEntry:
+                _fail(("requirements", ordinal), "assisted packet entry kind differs")
+            residual = cast(AssistedAttentionEntry, packet.entry).residual_question
+            result.append(
+                PreparedAssistedLifecycleEvaluation(
+                    common[0],
+                    common[1],
+                    common[2],
+                    cast(AssistedAttentionEntry, packet.entry),
+                    common[3],
+                    common[4],
+                    common[5],
+                    invocation,
+                    input_schema,
+                    residual,
+                )
+            )
+            continue
+        if enforcement is not EnforcementClass.MECHANICAL:
+            _fail(("requirements", ordinal), "lifecycle enforcement class is invalid")
+        if type(packet.entry) is not MechanicalAttentionEntry:
+            _fail(("requirements", ordinal), "mechanical packet entry kind differs")
+        evidence = packet.evidence_value
+        if not isinstance(evidence, Mapping):
+            _fail(("requirements", ordinal, "evidence-schema"), "schema is absent")
+        result.append(
+            PreparedMechanicalLifecycleEvaluation(
+                common[0],
+                common[1],
+                common[2],
+                cast(MechanicalAttentionEntry, packet.entry),
+                common[3],
+                common[4],
+                common[5],
+                invocation,
+                input_schema,
+                cast(Mapping[str, JsonValue], freeze_json(evidence)),
+            )
+        )
+    return tuple(result)
+
+
+def _detach_lifecycle_invocation(
+    packet: _PacketAuthorityState, ordinal: int
+) -> tuple[EvaluatorInvocation, Mapping[str, JsonValue]]:
+    """Detach one canonical invocation and its input-operation schema."""
+    if packet.invocation is None or packet.input_contract_value is None:
+        _fail(("requirements", ordinal, "invocation"), "invocation is absent")
+    if not isinstance(packet.input_contract_value, Mapping):
+        _fail(("requirements", ordinal, "invocation", "contract"), "schema is invalid")
+    invocation = cast(EvaluatorInvocation, _detach_value(packet.invocation))
+    schema = cast(Mapping[str, JsonValue], freeze_json(packet.input_contract_value))
+    return invocation, schema
+
+
+def _snapshot_lifecycle_evaluation(
+    item: PreparedLifecycleEvaluation,
+) -> _LifecycleEvaluationAuthorityState:
+    """Capture live identities and detached semantics for one specification."""
+    return _LifecycleEvaluationAuthorityState(
+        item,
+        item.source_key,
+        item.source_requirement,
+        item.source_entry,
+        _identity_semantic_state(item),
+    )
+
+
+def _lifecycle_evaluations_are_current(plan: ProcedureRunPlan) -> bool:
+    """Validate every lifecycle specification against its issuance snapshot."""
+    items = plan.lifecycle_evaluations
+    states = plan._lifecycle_evaluation_state
+    if (
+        type(items) is not tuple
+        or type(states) is not tuple
+        or len(items) != len(states)
+    ):
+        return False
+    expected = tuple(
+        state.requirement
+        for state in plan._requirement_semantics
+        if state.evaluator is not None and _is_lifecycle_key(state.key)
+    )
+    if len(expected) != len(items):
+        return False
+    return all(
+        item is state.item
+        and item.source_key is state.source_key
+        and item.source_requirement is state.source_requirement
+        and item.source_requirement is requirement
+        and item.source_entry is state.source_entry
+        and item.requirement.evaluator is item.evaluator
+        and _identity_semantic_state(item) == state.detached_state
+        for item, state, requirement in zip(items, states, expected)
+    )
+
+
+def _is_lifecycle_key(
+    key: ProcedurePredicateKey | OperationPredicateKey,
+) -> bool:
+    if type(key) is OperationPredicateKey:
+        return True
+    return type(key) is ProcedurePredicateKey and key.phase in {
+        PredicatePhase.INVARIANT,
+        PredicatePhase.POSTCONDITION,
+    }
+
+
+def _detach_value(value: object) -> object:
+    """Copy one authority graph into immutable value carriers."""
+    if (
+        isinstance(value, Enum)
+        or value is None
+        or type(value)
+        in {
+            str,
+            int,
+            float,
+            bool,
+        }
+    ):
+        return value
+    if isinstance(value, Mapping):
+        return MappingProxyType(
+            {_detach_value(key): _detach_value(item) for key, item in value.items()}
+        )
+    if type(value) in {tuple, list}:
+        sequence = cast(tuple[object, ...] | list[object], value)
+        return tuple(_detach_value(item) for item in sequence)
+    if is_dataclass(value):
+        return type(value)(  # type: ignore[misc]
+            **{
+                field.name: _detach_value(getattr(value, field.name))
+                for field in fields(value)
+            }
+        )
+    return value
+
+
+def _semantic_state(value: object) -> object:
+    """Return an alias-free semantic state for detached run material."""
+    if isinstance(value, Enum):
+        return (type(value), value.value)
+    if value is None or type(value) in {str, int, float, bool}:
+        return value
+    if isinstance(value, Mapping):
+        return tuple(
+            (_semantic_state(key), _semantic_state(item)) for key, item in value.items()
+        )
+    if type(value) is tuple:
+        return tuple(_semantic_state(item) for item in value)
+    if is_dataclass(value):
+        return (
+            type(value),
+            tuple(
+                (field.name, _semantic_state(getattr(value, field.name)))
+                for field in fields(value)
+            ),
+        )
+    return ("identity", type(value), id(value))
+
+
+def _identity_semantic_state(value: object) -> object:
+    """Capture nested carrier identity together with detached semantics."""
+    if isinstance(value, Enum):
+        return (type(value), value.value)
+    if isinstance(value, type):
+        return ("type", value)
+    if value is None or type(value) in {str, int, float, bool}:
+        return value
+    if isinstance(value, Mapping):
+        return (
+            "mapping",
+            type(value),
+            id(value),
+            tuple(
+                (
+                    _identity_semantic_state(key),
+                    _identity_semantic_state(item),
+                )
+                for key, item in value.items()
+            ),
+        )
+    if type(value) is tuple:
+        return (
+            "tuple",
+            id(value),
+            tuple(_identity_semantic_state(item) for item in value),
+        )
+    if is_dataclass(value):
+        return (
+            "dataclass",
+            type(value),
+            id(value),
+            tuple(
+                (field.name, _identity_semantic_state(getattr(value, field.name)))
+                for field in fields(value)
+            ),
+        )
+    return ("identity", type(value), id(value))
 
 
 def _procedure_evaluation_material(
@@ -850,7 +1203,7 @@ def _binding_authority_is_current(
 def _snapshot_packet_authority(
     attention: AttentionPlan, procedure_id: str
 ) -> tuple[_PacketAuthorityState, ...]:
-    """Capture the packet entries consumed by precondition-input planning."""
+    """Capture every procedure-owned packet entry used by run planning."""
     states: list[_PacketAuthorityState] = []
     try:
         packets = (
@@ -899,9 +1252,13 @@ def _snapshot_packet_entry(
     location = ("attention", "packets", packet_index, entry_index)
     if type(entry) is DeliberativeAttentionEntry:
         key = entry.obligation.key
-        obligation: ProcedureObligationSnapshot | None = (
-            entry.obligation
-            if type(entry.obligation) is ProcedureObligationSnapshot
+        obligation: ProcedureObligationSnapshot | OperationObligationSnapshot | None = (
+            cast(
+                ProcedureObligationSnapshot | OperationObligationSnapshot,
+                entry.obligation,
+            )
+            if type(entry.obligation)
+            in {ProcedureObligationSnapshot, OperationObligationSnapshot}
             else None
         )
         evaluator = entry.evaluator
@@ -911,8 +1268,12 @@ def _snapshot_packet_entry(
     elif type(entry) is AssistedAttentionEntry:
         key = entry.obligation.key
         obligation = (
-            entry.obligation
-            if type(entry.obligation) is ProcedureObligationSnapshot
+            cast(
+                ProcedureObligationSnapshot | OperationObligationSnapshot,
+                entry.obligation,
+            )
+            if type(entry.obligation)
+            in {ProcedureObligationSnapshot, OperationObligationSnapshot}
             else None
         )
         evaluator = None
@@ -928,16 +1289,13 @@ def _snapshot_packet_entry(
         entry_state = ()
     else:
         _fail(location, "attention packet entry is invalid")
-    if (
-        type(key) is not ProcedurePredicateKey
-        or key.declaration != procedure_id
-        or key.phase is not PredicatePhase.PRECONDITION
-    ):
+    if not _key_belongs_to_procedure(key, procedure_id):
         return None
+    procedure_key = cast(ProcedurePredicateKey | OperationPredicateKey, key)
     if invocation is None:
         return _PacketAuthorityState(
             entry=entry,
-            key=key,
+            key=procedure_key,
             obligation=obligation,
             evaluator=evaluator,
             invocation=None,
@@ -961,7 +1319,7 @@ def _snapshot_packet_entry(
     )
     return _PacketAuthorityState(
         entry=entry,
-        key=key,
+        key=procedure_key,
         obligation=obligation,
         evaluator=evaluator,
         invocation=invocation,
@@ -997,7 +1355,7 @@ def _snapshot_packet_entry(
 
 
 def _packet_authority_is_current(plan: ProcedureRunPlan) -> bool:
-    """Check every retained precondition packet entry and input contract."""
+    """Check every retained procedure-owned packet entry and input contract."""
     current_entries: list[object] = []
     for entries in (
         plan.attention.deliberative.entries,
@@ -1015,17 +1373,20 @@ def _packet_authority_is_current(plan: ProcedureRunPlan) -> bool:
                 key = entry.key
             else:
                 return False
-            if (
-                type(key) is ProcedurePredicateKey
-                and key.declaration == plan.procedure.id
-                and key.phase is PredicatePhase.PRECONDITION
-            ):
+            if _key_belongs_to_procedure(key, plan.procedure.id):
                 current_entries.append(entry)
     if len(current_entries) != len(plan._packet_semantics):
         return False
     return all(
         _packet_entry_authority_is_current(plan.attention, entry, state)
         for entry, state in zip(current_entries, plan._packet_semantics)
+    )
+
+
+def _key_belongs_to_procedure(key: object, procedure_id: str) -> bool:
+    """Return whether one packet key belongs to the exact prepared procedure."""
+    return (type(key) is ProcedurePredicateKey and key.declaration == procedure_id) or (
+        type(key) is OperationPredicateKey and key.procedure == procedure_id
     )
 
 
@@ -1643,6 +2004,96 @@ def _operation_registry_authority_is_current(
     )
 
 
+def _snapshot_detector_registry_authority(
+    registry: DetectorRunnerRegistry | None,
+) -> _DetectorRegistryAuthorityState | None:
+    """Capture identities and contracts from the live detector-registry origin."""
+    if registry is None:
+        return None
+    if not _is_builder_issued_detector_registry(registry):
+        _fail(("detector-registry",), "registry was not issued by its builder")
+    records: list[tuple[object, ...]] = []
+    for reference, binding in registry.bindings.items():
+        if type(binding) is not DetectorRunnerBinding:
+            _fail(("detector-registry", "bindings"), "runner binding is invalid")
+        contract = registry.input_contracts.get(reference)
+        registered = registry.evaluator_records.get(reference)
+        if not isinstance(contract, Mapping) or registered is None:
+            _fail(("detector-registry", "contracts"), "registry contract is absent")
+        declaration = registered.declaration
+        if type(declaration) is not EvaluatorDeclaration:
+            _fail(("detector-registry", "records"), "evaluator record is invalid")
+        records.append(
+            (
+                reference,
+                reference.id,
+                reference.version,
+                binding,
+                binding.evaluator,
+                binding.evaluator.id,
+                binding.evaluator.version,
+                binding.operation,
+                binding.operation.id,
+                binding.operation.version,
+                binding.runner,
+                contract,
+                freeze_json(contract),
+                registered,
+                declaration,
+                _evaluator_contract_state(declaration),
+            )
+        )
+    return _DetectorRegistryAuthorityState(
+        registry,
+        registry.declarations,
+        registry.bindings,
+        registry.input_contracts,
+        registry.evaluator_records,
+        tuple(records),
+    )
+
+
+def _detector_registry_authority_is_current(
+    current_registry: DetectorRunnerRegistry | None,
+    state: _DetectorRegistryAuthorityState | None,
+) -> bool:
+    """Check the detector origin without accepting equal-value replacement."""
+    if state is None:
+        return current_registry is None
+    if current_registry is not state.registry:
+        return False
+    registry = state.registry
+    if (
+        not _is_builder_issued_detector_registry(registry)
+        or registry.declarations is not state.declarations
+        or registry.bindings is not state.bindings
+        or registry.input_contracts is not state.input_contracts
+        or registry.evaluator_records is not state.evaluator_records
+    ):
+        return False
+    current = _snapshot_detector_registry_authority(registry)
+    if current is None or len(current.records) != len(state.records):
+        return False
+    for actual, retained in zip(current.records, state.records):
+        if (
+            actual[0] is not retained[0]
+            or actual[3] is not retained[3]
+            or actual[4] is not retained[4]
+            or actual[7] is not retained[7]
+            or actual[10] is not retained[10]
+            or actual[11] is not retained[11]
+            or actual[13] is not retained[13]
+            or actual[14] is not retained[14]
+            or not _exact_state_equal(actual[1:3], retained[1:3])
+            or not _exact_state_equal(actual[5:7], retained[5:7])
+            or not _exact_state_equal(actual[8:10], retained[8:10])
+            or not json_values_equal(actual[12], retained[12])
+            or not _exact_state_equal(actual[15], retained[15])
+        ):
+            return False
+    return True
+
+
 def _final_run_identity_check(plan: ProcedureRunPlan) -> bool:
     """Recheck callback-free carrier identities after every semantic traversal."""
     if not _final_run_mapping_check(plan):
@@ -1657,6 +2108,9 @@ def _final_run_identity_check(plan: ProcedureRunPlan) -> bool:
         or plan.operation_registry.contracts
         is not plan._operation_registry_state.contracts
         or not _final_operation_registry_record_check(plan._operation_registry_state)
+        or not _detector_registry_authority_is_current(
+            plan.attention.detector_registry, plan._detector_registry_state
+        )
         or plan.procedure is not plan._procedure_semantics.declaration
         or not _exact_state_equal(
             _declaration_scalar_state(plan.procedure),
@@ -1673,6 +2127,7 @@ def _final_run_identity_check(plan: ProcedureRunPlan) -> bool:
         is not plan._procedure_precondition_identity
         or plan.evaluator_backed_procedure_precondition_requirements
         is not plan._evaluator_backed_procedure_precondition_identity
+        or plan.lifecycle_evaluations is not plan._lifecycle_evaluations_identity
     ):
         return False
     for action, action_state in zip(plan.actions, plan._action_semantics):
@@ -1819,6 +2274,18 @@ def _final_run_identity_check(plan: ProcedureRunPlan) -> bool:
             )
             or item.invocation_input is not input_state.invocation_input
             or item.input_schema is not input_state.input_schema
+        ):
+            return False
+    for lifecycle_item, state in zip(
+        plan.lifecycle_evaluations, plan._lifecycle_evaluation_state
+    ):
+        if (
+            lifecycle_item is not state.item
+            or lifecycle_item.source_key is not state.source_key
+            or lifecycle_item.source_requirement is not state.source_requirement
+            or lifecycle_item.source_entry is not state.source_entry
+            or lifecycle_item.requirement.evaluator is not lifecycle_item.evaluator
+            or _identity_semantic_state(lifecycle_item) != state.detached_state
         ):
             return False
     return True

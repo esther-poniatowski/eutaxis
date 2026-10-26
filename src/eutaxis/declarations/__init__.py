@@ -168,6 +168,10 @@ from .observations import (
     observe_procedure_preconditions,
 )
 from .procedure_runs import (
+    PreparedAssistedLifecycleEvaluation,
+    PreparedLifecycleEvaluation,
+    PreparedManualLifecycleEvaluation,
+    PreparedMechanicalLifecycleEvaluation,
     PreparedProcedureAction,
     ProcedureRunPlan,
     prepare_procedure_run,
@@ -383,6 +387,10 @@ __all__ = [
     "PlannedComponent",
     "Predicate",
     "PredicatePhase",
+    "PreparedAssistedLifecycleEvaluation",
+    "PreparedLifecycleEvaluation",
+    "PreparedManualLifecycleEvaluation",
+    "PreparedMechanicalLifecycleEvaluation",
     "PreparedProcedureAction",
     "PreActionEvidence",
     "PreActionEvidenceError",

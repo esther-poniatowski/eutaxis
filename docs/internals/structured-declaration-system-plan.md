@@ -88,6 +88,12 @@ terminal transcript separates graph disposition from adjudication, retains
 partial failure evidence, and distinguishes path-inapplicable obligations from
 abort-unchecked obligations. Runs with evaluator-backed lifecycle requirements
 remain rejected before a claim until the next extension supplies their evidence.
+Procedure preflight now retains one canonical detached lifecycle-evaluation
+union for every evaluator-backed invariant, postcondition, and expanded
+operation precondition. Each variant binds its exact live source identities to
+detached evaluator, invocation, and schema carriers. The run also retains the
+detector-registry origin, including runner identities and frozen contracts; the
+execution factory will use that authority to detach the executable registry.
 
 ## Decision log and open prerequisites
 
@@ -194,6 +200,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Define and implement one single-use pre-action evidence transaction that requires the issued evaluator-less observation aggregate, validates exact manual-judgment keys, enters a non-reentrant running state before callbacks or evaluators, executes each detector before requesting and validating its residual judgment, executes each mechanical evaluator exactly once, retains all evidence for completion, and derives clearance from the combined results. Map runner and result failures to blocked evidence only after authority revalidation; make every other post-start failure terminal; and preserve distinct authorities for observing, evaluating, and authorizing.
 - [x] Define and adversarially review the exact-once procedure lifecycle contract, including action and terminal boundaries, shared snapshots, graph and adjudication dispositions, partial failure transcripts, repeated invariant aggregation, and path applicability.
 - [x] Implement the evaluator-less `ProcedureExecutionSession` skeleton: consume exact cleared entry evidence; claim the run once; own boundary observation, authorization, operation invocation, graph transition, partial transcripts, and terminal publication; and fail closed when a lifecycle requirement is evaluator-backed.
+- [x] Retain one canonical detached lifecycle-evaluation union at procedure preflight, including exact source-key, requirement, and packet-entry authority; class-specific evaluator, invocation, and schema contracts; evaluator timing; and detector-registry origin authority for every evaluator-backed invariant, postcondition, and expanded operation precondition.
 - [ ] Extend the lifecycle session to request and validate manual and assisted detector-plus-residual evidence at exact realized invariant, postcondition, and operation-precondition boundaries.
 - [ ] Extend the lifecycle session with assurance-freshness checks for every realized mechanical occurrence, without rerunning retained entry evidence.
 - [ ] Issue the complete immutable ledger from the exact terminal lifecycle transcript and require admissible evidence for every effective obligation.

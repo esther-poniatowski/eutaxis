@@ -502,6 +502,98 @@ same invariant provider may therefore be invoked once at each realized
 occurrence. Mechanical assurance freshness is rechecked at each mechanical
 occurrence; retained procedure-entry evidence is never rerun.
 
+Evaluator timing states the earliest boundary at which an evaluator may run,
+ordered as `pre-design`, `pre-action`, `post-action`, and `post-artifact`.
+An action boundary admits `pre-design` and `pre-action`; a terminal boundary
+also admits `post-action`. `post-artifact` is outside procedure lifecycle
+execution. This cumulative interpretation lets one invariant evaluator serve
+both its action and terminal occurrences without weakening its earliest-run
+constraint. The lifecycle factory validates the timing of every selected
+evaluator before it installs the run claim.
+
+Procedure preflight retains entry-evaluation authority and lifecycle-evaluation
+authority as separate projections. The lifecycle projection covers every
+evaluator-backed procedure invariant, procedure postcondition, and operation
+precondition expanded to an action. One canonical tuple contains a closed union
+of manual, assisted, and mechanical specifications; class-specific subsets are
+derived instead of retained as competing sources. Every variant retains its
+canonical requirement ordinal, the live source-key, requirement, and packet-entry
+identities, a detached requirement and evaluator contract, and its enforcement
+class. An assisted variant additionally retains a detached invocation, input
+schema, and residual question. A mechanical variant retains a detached
+invocation, input schema, and evidence schema. The source packet entry serves
+only as issuance authority. The execution session consumes the detached
+requirement, evaluator, invocation, and schemas, so it does not reconstruct
+evaluator authority from the live attention plan after execution begins.
+
+Preflight also captures the detector-registry origin: the registry and
+declaration identities, binding-map and contract-map identities, evaluator and
+operation references, binding and runner identities, and frozen contract
+contents. The session factory revalidates that state and then constructs its
+detached executable detector registry. This division matches operation-runner
+ownership: preflight establishes the live origin, while the execution factory
+selects and freezes the runners that the transcript authorizes.
+
+The session accepts one exact binding map over the supported evaluator-backed
+lifecycle keys. A manual binding supplies one manual-judgment provider. An
+assisted binding supplies one evaluator-input provider and one residual-judgment
+provider. The map is traversed once while the session owns its execution claim,
+then validated by exact source-key identity and enforcement class. `None` is
+admitted only when the required key set is empty. A later mechanical binding
+extends this same map rather than adding a parallel argument. For this manual
+and assisted slice, a mechanical lifecycle requirement still fails at the
+factory before the run claim is installed.
+
+Every provider request is privately issued after its boundary is realized. A
+manual request carries the exact coordinate, detached requirement, and detached
+evaluator contract. Its submission retains that exact request, the input
+revision, and the evidence object. An assisted input request carries the exact
+coordinate and detached requirement. Version 1 treats the invocation recorded
+by attention planning as canonical: the returned `EvaluatorInput` must have the
+same revision and JSON value and must satisfy the detached input-operation
+schema. After detector execution, the residual request carries the coordinate,
+requirement, residual question, and exact issued execution. Its submission
+retains that exact request, schema version, state, and rationale. Exact request
+identity prevents a submission for one invariant occurrence from being replayed
+at another occurrence. Boundary-varying evaluator input requires a later
+attention-contract revision.
+
+Boundary evidence contains one record for every selected requirement in
+canonical run order. Its record union distinguishes evaluator-less observation,
+manual evidence, and assisted evidence. Each record retains the detached
+requirement and the resulting `EvaluationState`. An assisted detector runner or
+result failure produces a blocked record with a diagnostic and no residual
+judgment; the session then continues the remaining requirements at that
+boundary. Every other invalid evaluator input, manual submission, residual
+submission, or authority correlation terminates the evidence transaction. A
+`complete` flag distinguishes a fully evaluated boundary from the canonical
+record prefix published after a later callback fails. Authorization and terminal
+acceptance require a complete boundary whose records are all satisfied.
+
+The factory snapshot also retains the exact detector-registry origin and a
+detached detector registry containing its runner identities and invocation
+contracts. Detector calls use only the detached registry. Live authority is
+revalidated after every provider callback, callable-signature inspection, and
+detector call. Thus, a lasting mutation aborts the run, while a transient
+binding substitution cannot select another runner. The transcript separately
+retains the execution-time binding-map origin, canonical keys, binding carriers,
+and callable identities, and its authenticity snapshot covers these authorities
+and every nested boundary-evidence carrier.
+
+Failure classification distinguishes untrusted evidence from retained authority.
+An evaluator-input callback has its own `evaluator-input` stage. A provider that
+raises an ordinary exception, returns an invalid carrier, returns the wrong
+request, supplies an inadmissible revision or mismatched input, violates an
+evidence schema, supplies an invalid conclusion or state, leaves a blank
+rationale, or replays an earlier occurrence produces `evidence-aborted`. A
+retained run, packet, registry, evaluator, input contract, provider snapshot, or
+detached specification that changed or no longer matches its issuance authority
+produces `authority-aborted`. A detector runner or result failure becomes a
+blocked record only after authority revalidation; any other detector-execution
+error is an authority failure. A `BaseException` at any callback stage is
+re-raised only after terminal publication of the completed record prefix, and
+no callback runs after an abort.
+
 Every terminal publication atomically couples the lifecycle state with an
 immutable transcript. The transcript retains the completed boundary and action
 prefix, the exact current coordinate, all retained authorities, and a failure

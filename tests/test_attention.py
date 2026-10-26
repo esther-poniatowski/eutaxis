@@ -10,7 +10,7 @@ import shutil
 import sys
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Barrier, Event
 from types import MappingProxyType
@@ -56,6 +56,9 @@ from eutaxis.declarations import (
     OperationRunnerBinding,
     OperationRunnerRegistry,
     PredicatePhase,
+    PreparedAssistedLifecycleEvaluation,
+    PreparedManualLifecycleEvaluation,
+    PreparedMechanicalLifecycleEvaluation,
     PreparedProcedureAction,
     ProcedureEvaluationPlanningError,
     ProcedureEvaluatorInputProvider,
@@ -771,6 +774,39 @@ def test_procedure_run_preflight_retains_authorities_inputs_and_requirements(
         for item in first.pre_action_requirements
     )
     assert [item.node.id for item in first.actions] == ["write-first", "write-second"]
+    lifecycle_requirements = tuple(
+        (index, item)
+        for index, item in enumerate(first.requirements)
+        if item.evaluator is not None
+        and (
+            isinstance(item.key, OperationPredicateKey)
+            or (
+                isinstance(item.key, ProcedurePredicateKey)
+                and item.key.phase
+                in {PredicatePhase.INVARIANT, PredicatePhase.POSTCONDITION}
+            )
+        )
+    )
+    assert tuple(type(item) for item in first.lifecycle_evaluations) == (
+        PreparedManualLifecycleEvaluation,
+        PreparedManualLifecycleEvaluation,
+        PreparedAssistedLifecycleEvaluation,
+        PreparedMechanicalLifecycleEvaluation,
+    )
+    assert tuple(item.ordinal for item in first.lifecycle_evaluations) == tuple(
+        index for index, _ in lifecycle_requirements
+    )
+    assert all(
+        item.source_requirement is requirement
+        and item.source_key is requirement.key
+        and item.requirement is not requirement
+        and item.requirement.key == requirement.key
+        and item.evaluator is not requirement.evaluator
+        and item.requirement.evaluator is item.evaluator
+        for item, (_, requirement) in zip(
+            first.lifecycle_evaluations, lifecycle_requirements
+        )
+    )
     assert first.actions[0].contract is first.actions[1].contract
     assert first.actions[0].input_data == {
         "path": "artifact.txt",
@@ -801,9 +837,98 @@ def test_procedure_run_preflight_retains_authorities_inputs_and_requirements(
         "procedure_precondition_requirements",
         "evaluator_backed_procedure_precondition_requirements",
         "actions",
+        "lifecycle_evaluations",
     ):
         object.__setattr__(reconstructed, field, getattr(first, field))
     assert not _is_issued_procedure_run_plan(reconstructed)
+
+
+def test_procedure_run_lifecycle_authority_rejects_origin_and_snapshot_mutation(
+    tmp_path: Path,
+) -> None:
+    _, _, _, _, packet_attention = _mixed_plan(tmp_path / "packet")
+    packet_run = _procedure_run(packet_attention)
+    assisted = next(
+        item
+        for item in packet_run.lifecycle_evaluations
+        if type(item) is PreparedAssistedLifecycleEvaluation
+    )
+    object.__setattr__(assisted.source_entry, "residual_question", "changed")
+    assert not _is_issued_procedure_run_plan(packet_run)
+
+    _, _, _, _, detached_attention = _mixed_plan(tmp_path / "detached")
+    detached_run = _procedure_run(detached_attention)
+    detached = detached_run.lifecycle_evaluations[0]
+    object.__setattr__(detached.evaluator, "timing", "pre-design")
+    assert not _is_issued_procedure_run_plan(detached_run)
+
+    _, _, _, _, registry_attention = _mixed_plan(tmp_path / "registry")
+    registry_run = _procedure_run(registry_attention)
+    detector_registry = registry_attention.detector_registry
+    assert detector_registry is not None
+    object.__setattr__(
+        detector_registry,
+        "bindings",
+        MappingProxyType(dict(detector_registry.bindings)),
+    )
+    assert not _is_issued_procedure_run_plan(registry_run)
+
+    _, _, _, _, missing_attention = _mixed_plan(tmp_path / "missing-registry")
+    missing_run = _procedure_run(missing_attention)
+    object.__setattr__(missing_attention, "detector_registry", None)
+    assert not _is_issued_procedure_run_plan(missing_run)
+
+    _, _, _, _, equal_attention = _mixed_plan(tmp_path / "equal-registry")
+    equal_run = _procedure_run(equal_attention)
+    equal_origin = equal_attention.detector_registry
+    assert equal_origin is not None
+    equal_registry = build_detector_runner_registry(
+        equal_origin.declarations, equal_origin.bindings.values()
+    )
+    object.__setattr__(equal_attention, "detector_registry", equal_registry)
+    assert not _is_issued_procedure_run_plan(equal_run)
+
+    _, _, _, _, foreign_attention = _mixed_plan(tmp_path / "foreign-registry")
+    foreign_run = _procedure_run(foreign_attention)
+    _, _, _, _, other_attention = _mixed_plan(tmp_path / "other-registry")
+    object.__setattr__(
+        foreign_attention, "detector_registry", other_attention.detector_registry
+    )
+    assert not _is_issued_procedure_run_plan(foreign_run)
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "requirement",
+        "evaluator",
+        "invocation",
+        "input_schema",
+        "evidence_schema",
+        "lifecycle_evaluations",
+    ),
+)
+def test_procedure_run_lifecycle_authority_rejects_equal_value_replacement(
+    tmp_path: Path, field: str
+) -> None:
+    _, _, _, _, attention = _mixed_plan(tmp_path / field)
+    run = _procedure_run(attention)
+    if field == "lifecycle_evaluations":
+        object.__setattr__(run, field, tuple(list(run.lifecycle_evaluations)))
+    else:
+        item = next(
+            candidate
+            for candidate in run.lifecycle_evaluations
+            if hasattr(candidate, field)
+        )
+        value = getattr(item, field)
+        replacement = (
+            MappingProxyType(dict(value))
+            if isinstance(value, Mapping)
+            else replace(value)
+        )
+        object.__setattr__(item, field, replacement)
+    assert not _is_issued_procedure_run_plan(run)
 
 
 def test_procedure_run_preflight_retains_evaluatorless_postconditions(
@@ -2635,7 +2760,7 @@ def test_precondition_evaluation_plan_requires_exact_runner_registries(
         "checker_registry",
         foreign_run.attention.checker_registry,
     )
-    with pytest.raises(ProcedureEvaluationPlanningError, match="identity differs"):
+    with pytest.raises(ProcedureEvaluationPlanningError, match="issued by preflight"):
         plan_procedure_precondition_evaluations(cross_run, providers_for(cross_run))
 
     _, _, _, detector_run = _precondition_run(tmp_path / "detector")
@@ -2650,7 +2775,7 @@ def test_precondition_evaluation_plan_requires_exact_runner_registries(
         ],
     )
     object.__setattr__(detector_run.attention, "detector_registry", detector_registry)
-    with pytest.raises(ProcedureEvaluationPlanningError, match="identity differs"):
+    with pytest.raises(ProcedureEvaluationPlanningError, match="issued by preflight"):
         plan_procedure_precondition_evaluations(
             detector_run, providers_for(detector_run)
         )
