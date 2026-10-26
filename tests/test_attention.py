@@ -304,7 +304,9 @@ def _prepare_registry(
     duplicate_preconditions: bool = False,
     local_precondition_operator: str = "exists",
     later_requirements: bool = False,
-    evaluator_backed_lifecycle: bool = False,
+    evaluator_backed_lifecycle: bool | str = False,
+    lifecycle_location: str = "invariant",
+    lifecycle_timing: str | None = None,
     two_actions: bool = False,
 ):
     """Build one registry whose effective obligations match ``mode``."""
@@ -350,6 +352,17 @@ def _prepare_registry(
         }
     )
     _write(root, "detector.yaml", detector)
+    lifecycle_reference = None
+    if lifecycle_timing is not None and evaluator_backed_lifecycle:
+        lifecycle_document = copy.deepcopy(
+            manual if evaluator_backed_lifecycle == "manual" else detector
+        )
+        lifecycle_reference = VersionedReference(
+            f"registry/lifecycle-{evaluator_backed_lifecycle}", 1
+        )
+        lifecycle_document["id"] = lifecycle_reference.id
+        lifecycle_document["timing"] = lifecycle_timing
+        _write(root, "lifecycle-evaluator.yaml", lifecycle_document)
 
     checker_operation = _read(root, "operation.yaml")
     checker_operation.update(
@@ -419,6 +432,7 @@ def _prepare_registry(
             _predicate("local-operation", "authorization", None),
         ]
     elif mode == "preconditions":
+        lifecycle_evaluator = None
         procedure["preconditions"] = [
             _predicate("manual-precondition", "assumption", MANUAL),
             _predicate("detected-precondition", "assumption", DETECTOR),
@@ -442,18 +456,44 @@ def _prepare_registry(
                 "value": True,
             }
         if later_requirements:
+            lifecycle_evaluator = (
+                MANUAL
+                if evaluator_backed_lifecycle == "manual"
+                else (
+                    CHECKER
+                    if evaluator_backed_lifecycle == "mechanical"
+                    else (DETECTOR if evaluator_backed_lifecycle else None)
+                )
+            )
+            lifecycle_evaluator = lifecycle_reference or lifecycle_evaluator
             stable = _predicate(
                 "stable",
                 "invariant",
-                DETECTOR if evaluator_backed_lifecycle else None,
+                lifecycle_evaluator if lifecycle_location == "invariant" else None,
             )
             stable["observes"] = ["registry/stable"]
             procedure["invariants"] = [stable]
         else:
             procedure["invariants"] = []
-        procedure["postconditions"] = [_predicate("written", "postcondition", None)]
+        procedure["postconditions"] = [
+            _predicate(
+                "written",
+                "postcondition",
+                lifecycle_evaluator if lifecycle_location == "postcondition" else None,
+            )
+        ]
         operation["preconditions"] = (
-            [_predicate("authorized", "authorization", None)]
+            [
+                _predicate(
+                    "authorized",
+                    "authorization",
+                    (
+                        lifecycle_evaluator
+                        if lifecycle_location == "operation-precondition"
+                        else None
+                    ),
+                )
+            ]
             if later_requirements
             else []
         )
@@ -508,15 +548,24 @@ def _prepare_registry(
         )
     detector_registry = None
     if mode in {"mixed", "assisted", "preconditions"}:
-        detector_registry = build_detector_runner_registry(
-            declarations,
-            [
+        detector_bindings = [
+            DetectorRunnerBinding(
+                DETECTOR,
+                WRITE,
+                detector_runner,
+            )
+        ]
+        if lifecycle_reference is not None and evaluator_backed_lifecycle is True:
+            detector_bindings.append(
                 DetectorRunnerBinding(
-                    DETECTOR,
+                    lifecycle_reference,
                     WRITE,
                     detector_runner,
                 )
-            ],
+            )
+        detector_registry = build_detector_runner_registry(
+            declarations,
+            detector_bindings,
         )
     return root, declarations, resolution, checker_registry, detector_registry
 
@@ -622,7 +671,9 @@ def _precondition_run(
     duplicate_preconditions: bool = False,
     local_precondition_operator: str = "exists",
     later_requirements: bool = False,
-    evaluator_backed_lifecycle: bool = False,
+    evaluator_backed_lifecycle: bool | str = False,
+    lifecycle_location: str = "invariant",
+    lifecycle_timing: str | None = None,
     two_actions: bool = False,
     operation_runner: OperationRunner = cast(
         OperationRunner, lambda input_data: OperationFailure(WRITE, "write-failed")
@@ -639,6 +690,8 @@ def _precondition_run(
             local_precondition_operator=local_precondition_operator,
             later_requirements=later_requirements,
             evaluator_backed_lifecycle=evaluator_backed_lifecycle,
+            lifecycle_location=lifecycle_location,
+            lifecycle_timing=lifecycle_timing,
             two_actions=two_actions,
         )
     )
@@ -4460,7 +4513,9 @@ def _pre_action_authorities(
     duplicate_preconditions: bool = False,
     local_precondition_operator: str = "exists",
     later_requirements: bool = False,
-    evaluator_backed_lifecycle: bool = False,
+    evaluator_backed_lifecycle: bool | str = False,
+    lifecycle_location: str = "invariant",
+    lifecycle_timing: str | None = None,
     two_actions: bool = False,
     operation_runner: OperationRunner = cast(
         OperationRunner, lambda input_data: OperationFailure(WRITE, "write-failed")
@@ -4475,6 +4530,8 @@ def _pre_action_authorities(
         local_precondition_operator=local_precondition_operator,
         later_requirements=later_requirements,
         evaluator_backed_lifecycle=evaluator_backed_lifecycle,
+        lifecycle_location=lifecycle_location,
+        lifecycle_timing=lifecycle_timing,
         two_actions=two_actions,
         operation_runner=operation_runner,
     )

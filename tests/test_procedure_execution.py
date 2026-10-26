@@ -5,8 +5,10 @@ from __future__ import annotations
 import gc
 import importlib
 import pickle
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, replace
+from inspect import signature
 from threading import Barrier
 from typing import cast
 from weakref import ref
@@ -15,6 +17,8 @@ from weakref import WeakKeyDictionary
 import pytest
 
 from eutaxis.declarations import (
+    EvaluationState,
+    EvaluatorInput,
     ObservationProvider,
     OperationFailure,
     OperationRunner,
@@ -23,8 +27,15 @@ from eutaxis.declarations import (
     PreparedProcedureAction,
     ProcedureAdjudicationDisposition,
     ProcedureBoundaryKind,
+    ProcedureAssistedBoundaryEvidence,
+    ProcedureAssistedLifecycleBinding,
     ProcedureExecutionSessionState,
+    ProcedureFailureStage,
     ProcedureGraphDisposition,
+    ProcedureLifecycleManualJudgmentSubmission,
+    ProcedureLifecycleResidualJudgmentSubmission,
+    ProcedureManualBoundaryEvidence,
+    ProcedureManualLifecycleBinding,
     ProcedureRequirementApplicabilityState,
     create_pre_action_evidence_session,
     create_procedure_execution_session,
@@ -34,7 +45,7 @@ from eutaxis.declarations.procedure_execution import (
     _is_issued_procedure_execution_transcript,
 )
 
-from tests.test_attention import WRITE, _pre_action_authorities
+from tests.test_attention import WRITE, _detector_result, _pre_action_authorities
 
 
 def _entry_evidence(
@@ -42,8 +53,11 @@ def _entry_evidence(
     provider,
     *,
     operation_runner=None,
+    detector_runner=None,
     later_requirements=True,
     evaluator_backed_lifecycle=False,
+    lifecycle_location="invariant",
+    lifecycle_timing=None,
     two_actions=False,
 ):
     plan, observation, manual, residual = _pre_action_authorities(
@@ -51,11 +65,22 @@ def _entry_evidence(
         observation_provider=cast(ObservationProvider, provider),
         later_requirements=later_requirements,
         evaluator_backed_lifecycle=evaluator_backed_lifecycle,
+        lifecycle_location=lifecycle_location,
+        lifecycle_timing=lifecycle_timing,
         two_actions=two_actions,
         **(
-            {}
-            if operation_runner is None
-            else {"operation_runner": cast(OperationRunner, operation_runner)}
+            {
+                **(
+                    {}
+                    if operation_runner is None
+                    else {"operation_runner": cast(OperationRunner, operation_runner)}
+                ),
+                **(
+                    {}
+                    if detector_runner is None
+                    else {"detector_runner": detector_runner}
+                ),
+            }
         ),
     )
     evidence = create_pre_action_evidence_session(plan, observation).execute(
@@ -203,7 +228,9 @@ def test_provider_replacement_aborts_authority_with_transcript(tmp_path) -> None
         transcript.adjudication_disposition
         is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
     )
-    assert transcript.boundaries[0].evidence is None
+    assert transcript.boundaries[0].evidence is not None
+    assert not transcript.boundaries[0].evidence.complete
+    assert transcript.boundaries[0].evidence.records == ()
     assert transcript.authority.lifecycle_observation_provider_origin is provider
     assert (
         transcript.authority.lifecycle_observation_registry_origin is lifecycle_registry
@@ -495,7 +522,7 @@ def test_run_claim_releases_when_complete_authority_graph_is_unreachable(
     assert run_reference() is None
 
 
-def test_evaluator_backed_lifecycle_rejection_precedes_claim_installation(
+def test_assisted_lifecycle_runs_at_each_realized_invariant_boundary(
     tmp_path,
 ) -> None:
     entry, registry = _entry_evidence(
@@ -504,9 +531,929 @@ def test_evaluator_backed_lifecycle_rejection_precedes_claim_installation(
         evaluator_backed_lifecycle=True,
     )
 
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    input_requests = []
+    residual_requests = []
+
+    def input_provider(request):
+        input_requests.append(request)
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    def residual_provider(request):
+        residual_requests.append(request)
+        return ProcedureLifecycleResidualJudgmentSubmission(
+            1,
+            request,
+            EvaluationState.SATISFIED,
+            "The detector candidate satisfies the invariant.",
+        )
+
+    session = create_procedure_execution_session(entry, registry)
+    with pytest.raises(ProcedureExecutionError, match="bindings are absent"):
+        session.execute()
+    assert session.state is ProcedureExecutionSessionState.READY
+
+    transcript = session.execute(
+        evidence_bindings={
+            specification.source_key: ProcedureAssistedLifecycleBinding(
+                input_provider, residual_provider
+            )
+        }
+    )
+
+    assert session.state is ProcedureExecutionSessionState.TERMINAL
+    assert len(input_requests) == 2
+    assert len(residual_requests) == 2
+    assert input_requests[0].coordinate.occurrence == 0
+    assert input_requests[1].coordinate.occurrence == 1
+    assert residual_requests[0] is not residual_requests[1]
+    assert all(
+        boundary.evidence is not None and boundary.evidence.complete
+        for boundary in transcript.boundaries
+    )
+    assert (
+        sum(
+            isinstance(record, ProcedureAssistedBoundaryEvidence)
+            for boundary in transcript.boundaries
+            if boundary.evidence is not None
+            for record in boundary.evidence.records
+        )
+        == 2
+    )
+
+
+def test_manual_lifecycle_derives_each_occurrence_from_its_exact_request(
+    tmp_path,
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    requests = []
+
+    def provider(request):
+        requests.append(request)
+        return ProcedureLifecycleManualJudgmentSubmission(
+            request,
+            specification.evaluator.input_revisions[0],
+            {"conclusion": "satisfied"},
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureManualLifecycleBinding(provider)
+        }
+    )
+
+    assert len(requests) == 2
+    assert requests[0] is not requests[1]
+    assert tuple(request.coordinate.occurrence for request in requests) == (0, 1)
+    assert (
+        sum(
+            isinstance(record, ProcedureManualBoundaryEvidence)
+            for boundary in transcript.boundaries
+            if boundary.evidence is not None
+            for record in boundary.evidence.records
+        )
+        == 2
+    )
+
+
+def test_mechanical_lifecycle_rejection_precedes_claim_installation(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+    )
+
     for _ in range(2):
-        with pytest.raises(ProcedureExecutionError, match="evaluator-backed"):
+        with pytest.raises(ProcedureExecutionError, match="mechanical lifecycle"):
             create_procedure_execution_session(entry, registry)
+
+
+@pytest.mark.parametrize("conclusion", ["violated", "blocked"])
+def test_manual_lifecycle_denial_prevents_operation(tmp_path, conclusion) -> None:
+    operation_calls = 0
+
+    def operation_runner(input_data):
+        nonlocal operation_calls
+        operation_calls += 1
+        return OperationSuccess(WRITE, {"written": True})
+
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+        operation_runner=operation_runner,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def provider(request):
+        return ProcedureLifecycleManualJudgmentSubmission(
+            request,
+            specification.evaluator.input_revisions[0],
+            {"conclusion": conclusion},
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureManualLifecycleBinding(provider)
+        }
+    )
+
+    assert operation_calls == 0
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORIZATION_ABORTED
+    )
+    evidence = transcript.boundaries[0].evidence
+    assert evidence is not None and evidence.complete
+    manual = next(
+        record
+        for record in evidence.records
+        if isinstance(record, ProcedureManualBoundaryEvidence)
+    )
+    assert manual.state is EvaluationState(conclusion)
+
+
+def test_manual_lifecycle_replay_publishes_incomplete_terminal_prefix(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    retained = None
+
+    def provider(request):
+        nonlocal retained
+        if retained is None:
+            retained = ProcedureLifecycleManualJudgmentSubmission(
+                request,
+                specification.evaluator.input_revisions[0],
+                {"conclusion": "satisfied"},
+            )
+        return retained
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureManualLifecycleBinding(provider)
+        }
+    )
+
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.EVIDENCE_ABORTED
+    )
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.MANUAL
+    terminal = transcript.boundaries[-1].evidence
+    assert terminal is not None and not terminal.complete
+    assert terminal.records == ()
+
+
+def test_assisted_detector_failure_blocks_without_residual_or_operation(
+    tmp_path,
+) -> None:
+    detector_calls = 0
+    residual_calls = 0
+    operation_calls = 0
+
+    def detector_runner(input_data):
+        nonlocal detector_calls
+        detector_calls += 1
+        if detector_calls > 1:
+            raise RuntimeError("detector failed")
+        return _detector_result()
+
+    def operation_runner(input_data):
+        nonlocal operation_calls
+        operation_calls += 1
+        return OperationSuccess(WRITE, {"written": True})
+
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle=True,
+        detector_runner=detector_runner,
+        operation_runner=operation_runner,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    def residual_provider(request):
+        nonlocal residual_calls
+        residual_calls += 1
+        return ProcedureLifecycleResidualJudgmentSubmission(
+            1, request, EvaluationState.SATISFIED, "Satisfied."
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureAssistedLifecycleBinding(
+                input_provider, residual_provider
+            )
+        }
+    )
+
+    assert detector_calls == 2
+    assert residual_calls == 0
+    assert operation_calls == 0
+    evidence = transcript.boundaries[0].evidence
+    assert evidence is not None and evidence.complete
+    assisted = next(
+        record
+        for record in evidence.records
+        if isinstance(record, ProcedureAssistedBoundaryEvidence)
+    )
+    assert assisted.state is EvaluationState.BLOCKED
+    assert assisted.execution is None and assisted.judgment is None
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORIZATION_ABORTED
+    )
+
+
+def test_lifecycle_binding_requires_exact_source_key_identity(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    copied_key = replace(specification.source_key)
+    session = create_procedure_execution_session(entry, registry)
+
+    with pytest.raises(ProcedureExecutionError, match="exact required key"):
+        session.execute(
+            evidence_bindings={
+                copied_key: ProcedureManualLifecycleBinding(lambda request: None)
+            }
+        )
+
+    assert session.state is ProcedureExecutionSessionState.READY
+
+
+def test_manual_operation_precondition_runs_at_its_action_boundary(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+        lifecycle_location="operation-precondition",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    requests = []
+
+    def provider(request):
+        requests.append(request)
+        return ProcedureLifecycleManualJudgmentSubmission(
+            request,
+            specification.evaluator.input_revisions[0],
+            {"conclusion": "satisfied"},
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureManualLifecycleBinding(provider)
+        }
+    )
+
+    assert len(requests) == 1
+    assert requests[0].coordinate.kind is ProcedureBoundaryKind.ACTION
+    action_evidence = transcript.boundaries[0].evidence
+    assert action_evidence is not None
+    assert any(
+        isinstance(record, ProcedureManualBoundaryEvidence)
+        for record in action_evidence.records
+    )
+
+
+@pytest.mark.parametrize("operation_succeeds,expected_calls", [(True, 1), (False, 0)])
+def test_assisted_postcondition_runs_only_at_its_reached_success_terminal(
+    tmp_path, operation_succeeds, expected_calls
+) -> None:
+    result = (
+        OperationSuccess(WRITE, {"written": True})
+        if operation_succeeds
+        else OperationFailure(WRITE, "write-failed")
+    )
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle=True,
+        lifecycle_location="postcondition",
+        operation_runner=lambda input_data: result,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    requests = []
+
+    def input_provider(request):
+        requests.append(request)
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    def residual_provider(request):
+        return ProcedureLifecycleResidualJudgmentSubmission(
+            1, request, EvaluationState.SATISFIED, "Satisfied."
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureAssistedLifecycleBinding(
+                input_provider, residual_provider
+            )
+        }
+    )
+
+    assert len(requests) == expected_calls
+    if requests:
+        assert requests[0].coordinate.kind is ProcedureBoundaryKind.TERMINAL
+        assert requests[0].coordinate.terminal == "written"
+    postcondition = next(
+        item
+        for item in transcript.applicability
+        if item.requirement.evaluator is not None
+    )
+    assert postcondition.state is (
+        ProcedureRequirementApplicabilityState.APPLICABLE
+        if operation_succeeds
+        else ProcedureRequirementApplicabilityState.INAPPLICABLE
+    )
+
+
+def test_post_action_timing_is_accepted_for_a_reached_postcondition(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+        lifecycle_location="postcondition",
+        lifecycle_timing="post-action",
+        operation_runner=lambda input_data: OperationSuccess(WRITE, {"written": True}),
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def provider(request):
+        return ProcedureLifecycleManualJudgmentSubmission(
+            request,
+            specification.evaluator.input_revisions[0],
+            {"conclusion": "satisfied"},
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureManualLifecycleBinding(provider)
+        }
+    )
+
+    assert transcript.successful
+
+
+@pytest.mark.parametrize("location", ["invariant", "operation-precondition"])
+def test_post_action_timing_is_rejected_before_claim_for_action_boundaries(
+    tmp_path, location
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+        lifecycle_location=location,
+        lifecycle_timing="post-action",
+    )
+
+    for _ in range(2):
+        with pytest.raises(ProcedureExecutionError, match="timing is later"):
+            create_procedure_execution_session(entry, registry)
+
+
+def test_assisted_input_must_equal_the_retained_invocation(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle=True,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            {**specification.invocation.input_data, "content": "different"},
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureAssistedLifecycleBinding(
+                input_provider, lambda request: None
+            )
+        }
+    )
+
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.EVALUATOR_INPUT
+
+
+def test_assisted_residual_replay_cannot_authorize_a_later_occurrence(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle=True,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    retained = None
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    def residual_provider(request):
+        nonlocal retained
+        if retained is None:
+            retained = ProcedureLifecycleResidualJudgmentSubmission(
+                1, request, EvaluationState.SATISFIED, "Satisfied."
+            )
+        return retained
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureAssistedLifecycleBinding(
+                input_provider, residual_provider
+            )
+        }
+    )
+
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.RESIDUAL
+
+
+def test_manual_binding_rejects_provider_swap_during_signature_inspection(
+    tmp_path,
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    class SwappingProvider:
+        binding = None
+
+        @property
+        def __signature__(self):
+            assert self.binding is not None
+            object.__setattr__(self.binding, "provider", lambda request: None)
+            return signature(lambda request: None)
+
+        def __call__(self, request):
+            raise AssertionError("mutated provider must never run")
+
+    provider = SwappingProvider()
+    binding = ProcedureManualLifecycleBinding(provider)
+    provider.binding = binding
+    session = create_procedure_execution_session(entry, registry)
+
+    with pytest.raises(ProcedureExecutionError, match="manual provider changed"):
+        session.execute(evidence_bindings={specification.source_key: binding})
+
+    assert session.state is ProcedureExecutionSessionState.READY
+
+
+def test_assisted_binding_rejects_cross_swap_during_signature_inspection(
+    tmp_path,
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle=True,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    class SwappingProvider:
+        binding = None
+
+        @property
+        def __signature__(self):
+            assert self.binding is not None
+            original_input = self.binding.input_provider
+            object.__setattr__(
+                self.binding, "input_provider", self.binding.residual_provider
+            )
+            object.__setattr__(self.binding, "residual_provider", original_input)
+            return signature(lambda request: None)
+
+        def __call__(self, request):
+            raise AssertionError("mutated provider must never run")
+
+    input_provider = SwappingProvider()
+    residual_provider = lambda request: None
+    binding = ProcedureAssistedLifecycleBinding(input_provider, residual_provider)
+    input_provider.binding = binding
+    session = create_procedure_execution_session(entry, registry)
+
+    with pytest.raises(ProcedureExecutionError, match="assisted provider changed"):
+        session.execute(evidence_bindings={specification.source_key: binding})
+
+    assert session.state is ProcedureExecutionSessionState.READY
+
+
+def test_manual_provider_mutation_of_live_evaluator_aborts_authority(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def provider(request):
+        object.__setattr__(specification.evaluator, "input_revisions", ("changed",))
+        return ProcedureLifecycleManualJudgmentSubmission(
+            request, "changed", {"conclusion": "satisfied"}
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureManualLifecycleBinding(provider)
+        }
+    )
+
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+    )
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.AUTHORITY
+
+
+def test_manual_evidence_traversal_mutation_of_detached_schema_aborts_authority(
+    tmp_path,
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    class MutatingEvidence(Mapping):
+        def __init__(self, evaluator):
+            self.evaluator = evaluator
+
+        def __getitem__(self, key):
+            if key == "conclusion":
+                return "satisfied"
+            raise KeyError(key)
+
+        def __iter__(self):
+            return iter(("conclusion",))
+
+        def __len__(self):
+            return 1
+
+        def items(self):
+            object.__setattr__(self.evaluator, "evidence_schema", {})
+            return (("conclusion", "satisfied"),)
+
+    def provider(request):
+        return ProcedureLifecycleManualJudgmentSubmission(
+            request,
+            request.evaluator.input_revisions[0],
+            MutatingEvidence(request.evaluator),
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureManualLifecycleBinding(provider)
+        }
+    )
+
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+    )
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.AUTHORITY
+
+
+@pytest.mark.parametrize("raised", [RuntimeError, KeyboardInterrupt])
+def test_failing_manual_evidence_traversal_preserves_authority_precedence(
+    tmp_path, raised
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    class MutatingEvidence(Mapping):
+        def __init__(self, evaluator):
+            self.evaluator = evaluator
+
+        def __getitem__(self, key):
+            raise KeyError(key)
+
+        def __iter__(self):
+            return iter(("conclusion",))
+
+        def __len__(self):
+            return 1
+
+        def items(self):
+            object.__setattr__(self.evaluator, "evidence_schema", {})
+            raise raised("mapping traversal failed")
+
+    def provider(request):
+        return ProcedureLifecycleManualJudgmentSubmission(
+            request,
+            request.evaluator.input_revisions[0],
+            MutatingEvidence(request.evaluator),
+        )
+
+    session = create_procedure_execution_session(entry, registry)
+    execute = lambda: session.execute(
+        evidence_bindings={
+            specification.source_key: ProcedureManualLifecycleBinding(provider)
+        }
+    )
+    if raised is KeyboardInterrupt:
+        with pytest.raises(KeyboardInterrupt):
+            execute()
+        transcript = session.transcript
+        assert transcript is not None
+    else:
+        transcript = execute()
+
+    assert session.state is ProcedureExecutionSessionState.TERMINAL
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+    )
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.AUTHORITY
+    evidence = transcript.boundaries[0].evidence
+    assert evidence is not None and not evidence.complete
+    assert len(evidence.records) == 1
+
+
+def test_manual_revision_requires_exact_string_type(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    class Revision(str):
+        pass
+
+    def provider(request):
+        return ProcedureLifecycleManualJudgmentSubmission(
+            request,
+            Revision(specification.evaluator.input_revisions[0]),
+            {"conclusion": "satisfied"},
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureManualLifecycleBinding(provider)
+        }
+    )
+
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.MANUAL
+
+
+def test_residual_schema_version_rejects_boolean(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle=True,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    def residual_provider(request):
+        return ProcedureLifecycleResidualJudgmentSubmission(
+            True, request, EvaluationState.SATISFIED, "Satisfied."
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureAssistedLifecycleBinding(
+                input_provider, residual_provider
+            )
+        }
+    )
+
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.RESIDUAL
+
+
+def test_malformed_binding_mapping_item_is_a_located_pre_run_error(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+
+    class MalformedMapping(Mapping):
+        def __getitem__(self, key):
+            raise KeyError(key)
+
+        def __iter__(self):
+            return iter(())
+
+        def __len__(self):
+            return 1
+
+        def items(self):
+            return ((object(),),)
+
+    session = create_procedure_execution_session(entry, registry)
+
+    with pytest.raises(ProcedureExecutionError) as captured:
+        session.execute(evidence_bindings=cast(Mapping, MalformedMapping()))
+
+    assert captured.value.location == "$.evidence-bindings[0]"
+    assert session.state is ProcedureExecutionSessionState.READY
+
+
+def test_authority_revalidation_base_exception_publishes_authority_stage(
+    tmp_path, monkeypatch
+) -> None:
+    module = importlib.import_module("eutaxis.declarations.procedure_execution")
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def interrupted(_control):
+        raise KeyboardInterrupt
+
+    def provider(request):
+        monkeypatch.setattr(module, "_require_control_authority", interrupted)
+        return ProcedureLifecycleManualJudgmentSubmission(
+            request,
+            specification.evaluator.input_revisions[0],
+            {"conclusion": "satisfied"},
+        )
+
+    session = create_procedure_execution_session(entry, registry)
+    with pytest.raises(KeyboardInterrupt):
+        session.execute(
+            evidence_bindings={
+                specification.source_key: ProcedureManualLifecycleBinding(provider)
+            }
+        )
+
+    transcript = session.transcript
+    assert transcript is not None
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.AUTHORITY
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+    )
+
+
+def test_stateful_dataclass_callables_do_not_invalidate_execution_authority(
+    tmp_path,
+) -> None:
+    @dataclass
+    class StatefulDetector:
+        calls: int = 0
+
+        def __call__(self, input_data):
+            self.calls += 1
+            return _detector_result()
+
+    @dataclass
+    class StatefulOperation:
+        calls: int = 0
+
+        def __call__(self, input_data):
+            self.calls += 1
+            return OperationSuccess(WRITE, {"written": True})
+
+    detector = StatefulDetector()
+    operation = StatefulOperation()
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle=True,
+        detector_runner=detector,
+        operation_runner=operation,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    @dataclass
+    class StatefulInputProvider:
+        calls: int = 0
+
+        def __call__(self, request):
+            self.calls += 1
+            return EvaluatorInput(
+                specification.invocation.input_revision,
+                specification.invocation.input_data,
+            )
+
+    @dataclass
+    class StatefulResidualProvider:
+        calls: int = 0
+
+        def __call__(self, request):
+            self.calls += 1
+            return ProcedureLifecycleResidualJudgmentSubmission(
+                1, request, EvaluationState.SATISFIED, "Satisfied."
+            )
+
+    input_provider = StatefulInputProvider()
+    residual_provider = StatefulResidualProvider()
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureAssistedLifecycleBinding(
+                input_provider, residual_provider
+            )
+        }
+    )
+
+    assert transcript.successful
+    assert detector.calls == 3  # one entry check and two lifecycle boundaries
+    assert input_provider.calls == residual_provider.calls == 2
+    assert operation.calls == 1
+    assert _is_issued_procedure_execution_transcript(transcript)
+    detector.calls += 1
+    assert _is_issued_procedure_execution_transcript(transcript)
+    execution = next(
+        record.execution
+        for boundary in transcript.boundaries
+        if boundary.evidence is not None
+        for record in boundary.evidence.records
+        if isinstance(record, ProcedureAssistedBoundaryEvidence)
+        and record.execution is not None
+    )
+    detector_binding = next(iter(execution.registry.bindings.values()))
+    object.__setattr__(
+        detector_binding, "runner", lambda input_data: _detector_result()
+    )
+    assert not _is_issued_procedure_execution_transcript(transcript)
+
+
+def test_stateful_manual_provider_and_binding_mutation_have_distinct_authority(
+    tmp_path,
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="manual",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    @dataclass
+    class StatefulProvider:
+        calls: int = 0
+
+        def __call__(self, request):
+            self.calls += 1
+            return ProcedureLifecycleManualJudgmentSubmission(
+                request,
+                specification.evaluator.input_revisions[0],
+                {"conclusion": "satisfied"},
+            )
+
+    provider = StatefulProvider()
+    binding = ProcedureManualLifecycleBinding(provider)
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={specification.source_key: binding}
+    )
+
+    assert (
+        transcript.adjudication_disposition is ProcedureAdjudicationDisposition.ACCEPTED
+    )
+    assert provider.calls == 2
+    assert _is_issued_procedure_execution_transcript(transcript)
+    object.__setattr__(binding, "provider", lambda request: None)
+    assert not _is_issued_procedure_execution_transcript(transcript)
 
 
 @pytest.mark.parametrize("first_success", [True, False])

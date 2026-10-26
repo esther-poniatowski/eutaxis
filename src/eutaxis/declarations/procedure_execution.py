@@ -1,4 +1,4 @@
-"""Execute evaluator-less procedure lifecycles behind one exact-once boundary."""
+"""Execute procedure lifecycles behind one exact-once evidence boundary."""
 
 from __future__ import annotations
 
@@ -8,19 +8,38 @@ from enum import Enum, StrEnum
 from _thread import LockType
 from threading import Lock
 from types import MappingProxyType
-from typing import NoReturn, SupportsIndex, cast
+from typing import NoReturn, Protocol, SupportsIndex, TypeAlias, cast
 from weakref import ReferenceType, WeakKeyDictionary, ref
 
-from ._runner_support import exception_detail
+from ._runner_support import exception_detail, validate_synchronous_runner
+from .applicability import ApplicabilityTrace
 from .attention import (
+    AttentionObligationKey,
     CompletionRequirement,
+    EvaluatorInput,
     OperationPredicateKey,
     ProcedureObligationSnapshot,
     ProcedurePredicateKey,
 )
-from .enforcement import PredicatePhase
-from .exceptions import OperationExecutionError, ProcedureExecutionError
-from .models import JsonValue, VersionedReference, freeze_json
+from .embedded_schema import validate_json_instance
+from .enforcement import EnforcementClass, PredicatePhase
+from .exceptions import (
+    DetectorExecutionError,
+    OperationExecutionError,
+    ProcedureExecutionError,
+)
+from .execution import (
+    DetectorExecution,
+    _is_issued_detector_execution,
+    execute_detector,
+)
+from .models import (
+    EvaluatorDeclaration,
+    JsonValue,
+    VersionedReference,
+    freeze_json,
+    json_values_equal,
+)
 from .observations import (
     ObservationProviderRegistry,
     ProcedureBoundaryKind,
@@ -41,12 +60,20 @@ from .operations import (
 )
 from .pre_action_evidence import PreActionEvidence, _is_issued_pre_action_evidence
 from .procedure_runs import PreparedProcedureAction, ProcedureRunPlan
+from .procedure_runs import (
+    PreparedAssistedLifecycleEvaluation,
+    PreparedLifecycleEvaluation,
+    PreparedManualLifecycleEvaluation,
+    PreparedMechanicalLifecycleEvaluation,
+)
 from .results import EvaluationState
+from .runners import DetectorRunnerBinding, DetectorRunnerRegistry
 from .source import format_document_path
 
 _SESSION_ISSUER = object()
 _TRANSCRIPT_ISSUER = object()
 _COORDINATE_ISSUER = object()
+_REQUEST_ISSUER = object()
 _CLAIM_LOCK = Lock()
 
 
@@ -74,6 +101,7 @@ class ProcedureAdjudicationDisposition(StrEnum):
 class ProcedureFailureStage(StrEnum):
     OBSERVATION = "observation"
     MANUAL = "manual"
+    EVALUATOR_INPUT = "evaluator-input"
     DETECTOR = "detector"
     RESIDUAL = "residual"
     CHECKER = "checker"
@@ -107,10 +135,122 @@ class ProcedureBoundaryCoordinate:
         raise TypeError("procedure boundary coordinates must be issued by execution")
 
 
+@dataclass(frozen=True, init=False)
+class ProcedureLifecycleManualJudgmentRequest:
+    coordinate: ProcedureBoundaryCoordinate
+    requirement: CompletionRequirement
+    evaluator: EvaluatorDeclaration
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        raise TypeError("manual lifecycle requests must be issued by execution")
+
+
+@dataclass(frozen=True)
+class ProcedureLifecycleManualJudgmentSubmission:
+    request: ProcedureLifecycleManualJudgmentRequest
+    input_revision: str
+    evidence: Mapping[str, object]
+
+
+class ProcedureLifecycleManualProvider(Protocol):
+    def __call__(
+        self, request: ProcedureLifecycleManualJudgmentRequest, /
+    ) -> ProcedureLifecycleManualJudgmentSubmission: ...
+
+
+@dataclass(frozen=True, init=False)
+class ProcedureLifecycleEvaluatorInputRequest:
+    coordinate: ProcedureBoundaryCoordinate
+    requirement: CompletionRequirement
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        raise TypeError(
+            "lifecycle evaluator input requests must be issued by execution"
+        )
+
+
+class ProcedureLifecycleEvaluatorInputProvider(Protocol):
+    def __call__(
+        self, request: ProcedureLifecycleEvaluatorInputRequest, /
+    ) -> EvaluatorInput: ...
+
+
+@dataclass(frozen=True, init=False)
+class ProcedureLifecycleResidualJudgmentRequest:
+    coordinate: ProcedureBoundaryCoordinate
+    requirement: CompletionRequirement
+    residual_question: str
+    execution: DetectorExecution
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        raise TypeError("residual lifecycle requests must be issued by execution")
+
+
+@dataclass(frozen=True)
+class ProcedureLifecycleResidualJudgmentSubmission:
+    schema_version: int
+    request: ProcedureLifecycleResidualJudgmentRequest
+    state: EvaluationState
+    rationale: str
+
+
+class ProcedureLifecycleResidualProvider(Protocol):
+    def __call__(
+        self, request: ProcedureLifecycleResidualJudgmentRequest, /
+    ) -> ProcedureLifecycleResidualJudgmentSubmission: ...
+
+
+@dataclass(frozen=True)
+class ProcedureManualLifecycleBinding:
+    provider: ProcedureLifecycleManualProvider
+
+
+@dataclass(frozen=True)
+class ProcedureAssistedLifecycleBinding:
+    input_provider: ProcedureLifecycleEvaluatorInputProvider
+    residual_provider: ProcedureLifecycleResidualProvider
+
+
+ProcedureLifecycleBinding: TypeAlias = (
+    ProcedureManualLifecycleBinding | ProcedureAssistedLifecycleBinding
+)
+
+
+@dataclass(frozen=True)
+class ProcedureObservedBoundaryEvidence:
+    requirement: CompletionRequirement
+    state: EvaluationState
+    trace: ApplicabilityTrace
+
+
+@dataclass(frozen=True)
+class ProcedureManualBoundaryEvidence:
+    requirement: CompletionRequirement
+    state: EvaluationState
+    judgment: ProcedureLifecycleManualJudgmentSubmission
+
+
+@dataclass(frozen=True)
+class ProcedureAssistedBoundaryEvidence:
+    requirement: CompletionRequirement
+    state: EvaluationState
+    execution: DetectorExecution | None
+    judgment: ProcedureLifecycleResidualJudgmentSubmission | None
+    diagnostic: str | None
+
+
+ProcedureBoundaryRecord: TypeAlias = (
+    ProcedureObservedBoundaryEvidence
+    | ProcedureManualBoundaryEvidence
+    | ProcedureAssistedBoundaryEvidence
+)
+
+
 @dataclass(frozen=True)
 class ProcedureBoundaryEvidence:
     coordinate: ProcedureBoundaryCoordinate
-    records: tuple[ProcedurePredicateObservation, ...]
+    records: tuple[ProcedureBoundaryRecord, ...]
+    complete: bool
 
 
 @dataclass(frozen=True)
@@ -143,6 +283,16 @@ class ProcedureRequirementApplicability:
 
 
 @dataclass(frozen=True)
+class ProcedureLifecycleProviderAuthoritySnapshot:
+    """Retain one validated execution-time provider map without rereading it."""
+
+    mapping_origin: object | None
+    keys: tuple[AttentionObligationKey, ...]
+    bindings: tuple[ProcedureLifecycleBinding, ...]
+    callbacks: tuple[tuple[object, ...], ...]
+
+
+@dataclass(frozen=True)
 class ProcedureExecutionAuthoritySnapshot:
     """Retain factory-time semantics separately from their live origin identities."""
 
@@ -154,6 +304,10 @@ class ProcedureExecutionAuthoritySnapshot:
     lifecycle_observation_provider_origin: object
     operation_registry_origin: OperationRunnerRegistry
     operation_registry: OperationRunnerRegistry
+    lifecycle_evaluation_origins: tuple[PreparedLifecycleEvaluation, ...]
+    lifecycle_evaluations: tuple[PreparedLifecycleEvaluation, ...]
+    detector_registry_origin: DetectorRunnerRegistry | None
+    detector_registry: DetectorRunnerRegistry | None
     lifecycle: tuple[CompletionRequirement, ...]
     actions: tuple[PreparedProcedureAction, ...]
     procedure_id: str
@@ -166,6 +320,7 @@ class ProcedureExecutionAuthoritySnapshot:
 @dataclass(frozen=True, init=False, eq=False)
 class ProcedureExecutionTranscript:
     authority: ProcedureExecutionAuthoritySnapshot
+    provider_authority: ProcedureLifecycleProviderAuthoritySnapshot
     boundaries: tuple[ProcedureBoundaryAttempt, ...]
     actions: tuple[ProcedureActionExecution, ...]
     applicability: tuple[ProcedureRequirementApplicability, ...]
@@ -200,8 +355,11 @@ class _SessionControl:
     registry: ObservationProviderRegistry
     provider: object
     operation_registry: OperationRunnerRegistry
+    detector_registry: DetectorRunnerRegistry | None
     authority: ProcedureExecutionAuthoritySnapshot
     lifecycle: tuple[CompletionRequirement, ...]
+    lifecycle_evaluations: tuple[PreparedLifecycleEvaluation, ...]
+    lifecycle_evaluation_origins: tuple[PreparedLifecycleEvaluation, ...]
     actions: tuple[PreparedProcedureAction, ...]
     procedure_id: str
     entry_action: str
@@ -213,6 +371,8 @@ class _SessionControl:
         ProcedureExecutionSessionState, ProcedureExecutionTranscript | None
     ]
     active: bool
+    active_stage: ProcedureFailureStage
+    provider_authority: ProcedureLifecycleProviderAuthoritySnapshot | None
     lock: LockType
     session: ReferenceType[ProcedureExecutionSession] | None
 
@@ -250,7 +410,13 @@ class ProcedureExecutionSession:
     def transcript(self) -> ProcedureExecutionTranscript | None:
         return _require_session(self).publication[1]
 
-    def execute(self) -> ProcedureExecutionTranscript:
+    def execute(
+        self,
+        *,
+        evidence_bindings: (
+            Mapping[AttentionObligationKey, ProcedureLifecycleBinding] | None
+        ) = None,
+    ) -> ProcedureExecutionTranscript:
         control = _require_session(self)
         claimed = False
         try:
@@ -263,11 +429,10 @@ class ProcedureExecutionSession:
                 claimed = True
                 control.active = True
             _require_control_authority(control)
-            if any(item.evaluator is not None for item in control.lifecycle):
-                _fail(
-                    ("requirements",),
-                    "evaluator-backed lifecycle requirements are not supported",
-                )
+            provider_authority = _prepare_provider_authority(control, evidence_bindings)
+            _require_control_authority(control)
+            _require_provider_authority(provider_authority)
+            control.provider_authority = provider_authority
             with control.lock:
                 control.publication = (ProcedureExecutionSessionState.RUNNING, None)
         except BaseException as exc:
@@ -301,7 +466,6 @@ class ProcedureExecutionSession:
         selected: set[int] = set()
         current: ProcedureBoundaryCoordinate | None = None
         graph = ProcedureGraphDisposition.NO_TERMINAL
-        active_stage = ProcedureFailureStage.OBSERVATION
         try:
             action_by_id = {item.node.id: item for item in control.actions}
             next_id = control.entry_action
@@ -311,12 +475,19 @@ class ProcedureExecutionSession:
                 current = _coordinate(
                     ProcedureBoundaryKind.ACTION, occurrence, action, None
                 )
-                active_stage = ProcedureFailureStage.OBSERVATION
+                control.active_stage = ProcedureFailureStage.OBSERVATION
                 requirements = _action_requirements(control.lifecycle, action)
                 selected.update(id(item) for item in requirements)
-                boundaries.append(ProcedureBoundaryAttempt(current, requirements, None))
-                attempt, failure = _observe(control, current, requirements)
-                boundaries[-1] = attempt
+                boundaries.append(
+                    ProcedureBoundaryAttempt(
+                        current,
+                        requirements,
+                        ProcedureBoundaryEvidence(current, (), False),
+                    )
+                )
+                attempt, failure = _evaluate_boundary(
+                    control, current, requirements, boundaries
+                )
                 if failure is not None:
                     return _publish(
                         control,
@@ -327,10 +498,12 @@ class ProcedureExecutionSession:
                         _failure_disposition(failure),
                         failure,
                     )
+                control.active_stage = ProcedureFailureStage.AUTHORITY
                 _require_control_authority(control)
+                control.active_stage = ProcedureFailureStage.AUTHORIZATION
                 assert attempt.evidence is not None
-                if any(
-                    _state(item) is not EvaluationState.SATISFIED
+                if not attempt.evidence.complete or any(
+                    item.state is not EvaluationState.SATISFIED
                     for item in attempt.evidence.records
                 ):
                     failure = ProcedureExecutionFailure(
@@ -356,7 +529,7 @@ class ProcedureExecutionSession:
                         None,
                     )
                 )
-                active_stage = ProcedureFailureStage.OPERATION_RUNNER
+                control.active_stage = ProcedureFailureStage.OPERATION_RUNNER
                 try:
                     result = execute_operation(
                         control.operation_registry,
@@ -387,7 +560,7 @@ class ProcedureExecutionSession:
                         failure,
                     )
                 detached = _copy_result(result)
-                active_stage = ProcedureFailureStage.AUTHORITY
+                control.active_stage = ProcedureFailureStage.AUTHORITY
                 actions[-1] = ProcedureActionExecution(
                     current,
                     action,
@@ -429,11 +602,18 @@ class ProcedureExecutionSession:
                 final_action.transition,
             )
             requirements = _terminal_requirements(control.lifecycle, next_id, graph)
-            active_stage = ProcedureFailureStage.OBSERVATION
+            control.active_stage = ProcedureFailureStage.OBSERVATION
             selected.update(id(item) for item in requirements)
-            boundaries.append(ProcedureBoundaryAttempt(current, requirements, None))
-            attempt, failure = _observe(control, current, requirements)
-            boundaries[-1] = attempt
+            boundaries.append(
+                ProcedureBoundaryAttempt(
+                    current,
+                    requirements,
+                    ProcedureBoundaryEvidence(current, (), False),
+                )
+            )
+            attempt, failure = _evaluate_boundary(
+                control, current, requirements, boundaries
+            )
             if failure is not None:
                 return _publish(
                     control,
@@ -444,14 +624,17 @@ class ProcedureExecutionSession:
                     _failure_disposition(failure),
                     failure,
                 )
+            control.active_stage = ProcedureFailureStage.AUTHORITY
             _require_control_authority(control)
+            control.active_stage = ProcedureFailureStage.AUTHORIZATION
             assert attempt.evidence is not None
             adjudication = (
                 ProcedureAdjudicationDisposition.ACCEPTED
                 if all(
-                    _state(item) is EvaluationState.SATISFIED
+                    item.state is EvaluationState.SATISFIED
                     for item in attempt.evidence.records
                 )
+                and attempt.evidence.complete
                 else ProcedureAdjudicationDisposition.TERMINAL_EVIDENCE_REJECTED
             )
             return _publish(
@@ -474,11 +657,15 @@ class ProcedureExecutionSession:
                 failure,
             )
         except BaseException as exc:
+            if control.publication[0] is ProcedureExecutionSessionState.TERMINAL:
+                raise
             coordinate = current or _coordinate(
                 ProcedureBoundaryKind.ACTION, 0, control.actions[0], None
             )
-            failure = ProcedureExecutionFailure(
-                coordinate, active_stage, _safe_detail(exc)
+            interrupted_stage = control.active_stage
+            authority_failure = _guarded_authority_failure(control, coordinate)
+            failure = authority_failure or ProcedureExecutionFailure(
+                coordinate, interrupted_stage, _safe_detail(exc)
             )
             _publish(
                 control,
@@ -488,14 +675,14 @@ class ProcedureExecutionSession:
                 graph,
                 (
                     ProcedureAdjudicationDisposition.EXECUTION_ABORTED
-                    if active_stage
+                    if failure.stage
                     in {
                         ProcedureFailureStage.OPERATION_RUNNER,
                         ProcedureFailureStage.OPERATION_RESULT,
                     }
                     else (
                         ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
-                        if active_stage is ProcedureFailureStage.AUTHORITY
+                        if failure.stage is ProcedureFailureStage.AUTHORITY
                         else ProcedureAdjudicationDisposition.EVIDENCE_ABORTED
                     )
                 ),
@@ -510,16 +697,33 @@ def create_procedure_execution_session(
     _require_authority(entry_evidence, observation_registry)
     if entry_evidence.cleared is not True:
         _fail(("entry-evidence", "cleared"), "procedure entry was not cleared")
-    lifecycle = _lifecycle_requirements(entry_evidence.plan.run)
-    if any(item.evaluator is not None for item in lifecycle):
+    run = entry_evidence.plan.run
+    lifecycle = _lifecycle_requirements(run)
+    lifecycle_origins = run.lifecycle_evaluations
+    if any(
+        type(item) is PreparedMechanicalLifecycleEvaluation
+        for item in lifecycle_origins
+    ):
         _fail(
             ("requirements",),
-            "evaluator-backed lifecycle requirements are not supported",
+            "mechanical lifecycle requirements are not supported",
         )
-    run = entry_evidence.plan.run
-    detached_lifecycle = cast(
-        tuple[CompletionRequirement, ...],
-        tuple(_detach(item) for item in lifecycle),
+    _validate_lifecycle_timing(lifecycle_origins)
+    detached_evaluations = cast(
+        tuple[PreparedLifecycleEvaluation, ...],
+        tuple(_detach(item) for item in lifecycle_origins),
+    )
+    detached_by_origin = {
+        id(origin.source_requirement): detached
+        for origin, detached in zip(lifecycle_origins, detached_evaluations)
+    }
+    detached_lifecycle = tuple(
+        (
+            detached_by_origin[id(item)].requirement
+            if id(item) in detached_by_origin
+            else cast(CompletionRequirement, _detach(item))
+        )
+        for item in lifecycle
     )
     detached_actions = cast(
         tuple[PreparedProcedureAction, ...],
@@ -533,6 +737,7 @@ def create_procedure_execution_session(
         ),
         contracts=run._operation_registry_state.contracts,
     )
+    detached_detector_registry = _detach_detector_registry(run)
     parameters = cast(Mapping[str, JsonValue], _detach(run.parameters))
     procedure_id = run.procedure.id
     entry_action = run.procedure.entry
@@ -550,6 +755,10 @@ def create_procedure_execution_session(
         lifecycle_observation_provider_origin=observation_registry.provider,
         operation_registry_origin=run.operation_registry,
         operation_registry=detached_operation_registry,
+        lifecycle_evaluation_origins=lifecycle_origins,
+        lifecycle_evaluations=detached_evaluations,
+        detector_registry_origin=run.attention.detector_registry,
+        detector_registry=detached_detector_registry,
         lifecycle=detached_lifecycle,
         actions=detached_actions,
         procedure_id=procedure_id,
@@ -579,24 +788,29 @@ def create_procedure_execution_session(
         object.__setattr__(session, "_token", token)
         object.__setattr__(session, "_issuer", _SESSION_ISSUER)
         control = _SessionControl(
-            token,
-            entry_evidence,
-            observation_registry,
-            observation_registry.provider,
-            detached_operation_registry,
-            authority,
-            detached_lifecycle,
-            detached_actions,
-            procedure_id,
-            entry_action,
-            success_terminals,
-            failure_terminals,
-            parameters,
-            authority_state,
-            (ProcedureExecutionSessionState.READY, None),
-            False,
-            Lock(),
-            None,
+            token=token,
+            entry=entry_evidence,
+            registry=observation_registry,
+            provider=observation_registry.provider,
+            operation_registry=detached_operation_registry,
+            detector_registry=detached_detector_registry,
+            authority=authority,
+            lifecycle=detached_lifecycle,
+            lifecycle_evaluations=detached_evaluations,
+            lifecycle_evaluation_origins=lifecycle_origins,
+            actions=detached_actions,
+            procedure_id=procedure_id,
+            entry_action=entry_action,
+            success_terminals=success_terminals,
+            failure_terminals=failure_terminals,
+            parameters=parameters,
+            authority_state=authority_state,
+            publication=(ProcedureExecutionSessionState.READY, None),
+            active=False,
+            active_stage=ProcedureFailureStage.AUTHORITY,
+            provider_authority=None,
+            lock=Lock(),
+            session=None,
         )
         control.session = ref(session)
         _RUN_CLAIMS[run] = token
@@ -649,11 +863,24 @@ def _require_control_authority(control: _SessionControl) -> None:
     """Require live execution authorities to match their factory-time snapshot."""
     _require_authority(control.entry, control.registry, control.provider)
     run = control.entry.plan.run
-    if control.authority_state != _factory_authority_state(
-        control.entry,
-        control.registry,
-        _lifecycle_requirements(run),
-        run.actions,
+    authority = control.authority
+    if (
+        control.operation_registry is not authority.operation_registry
+        or control.detector_registry is not authority.detector_registry
+        or control.lifecycle is not authority.lifecycle
+        or control.lifecycle_evaluations is not authority.lifecycle_evaluations
+        or control.lifecycle_evaluation_origins
+        is not authority.lifecycle_evaluation_origins
+        or control.actions is not authority.actions
+        or control.parameters is not authority.parameters
+        or control.authority_state
+        != _factory_authority_state(
+            control.entry,
+            control.registry,
+            _lifecycle_requirements(run),
+            run.actions,
+        )
+        or not _snapshot_matches_live(authority, run)
     ):
         _fail(("run",), "procedure authority changed after session issuance")
 
@@ -757,18 +984,221 @@ def _coordinate(
     return value
 
 
-def _observe(
+def _prepare_provider_authority(
+    control: _SessionControl,
+    supplied: Mapping[AttentionObligationKey, ProcedureLifecycleBinding] | None,
+) -> ProcedureLifecycleProviderAuthoritySnapshot:
+    expected = tuple(
+        item
+        for item in control.lifecycle_evaluation_origins
+        if type(item)
+        in {PreparedManualLifecycleEvaluation, PreparedAssistedLifecycleEvaluation}
+    )
+    if supplied is None:
+        if expected:
+            _fail(("evidence-bindings",), "required lifecycle bindings are absent")
+        return ProcedureLifecycleProviderAuthoritySnapshot(None, (), (), ())
+    if not isinstance(supplied, Mapping):
+        _fail(("evidence-bindings",), "value must be a mapping")
+    try:
+        supplied_items = tuple(supplied.items())
+    except Exception as exc:
+        _fail(
+            ("evidence-bindings",),
+            f"mapping could not be read: {exception_detail(exc)}",
+        )
+    normalized: list[tuple[object, object]] = []
+    for index, item in enumerate(supplied_items):
+        try:
+            supplied_key, supplied_binding = item
+        except Exception as exc:
+            _fail(
+                ("evidence-bindings", index),
+                f"item is not a key-value pair: {exception_detail(exc)}",
+            )
+        normalized.append((supplied_key, supplied_binding))
+    pairs = tuple(normalized)
+    if len(pairs) != len(expected):
+        _fail(("evidence-bindings",), "mapping does not contain the exact keys")
+    keys: list[AttentionObligationKey] = []
+    bindings: list[ProcedureLifecycleBinding] = []
+    callbacks: list[tuple[object, ...]] = []
+    for index, specification in enumerate(expected):
+        captured: tuple[object, ...]
+        pair = next(
+            (pair for pair in pairs if pair[0] is specification.source_key), None
+        )
+        if pair is None or any(pair[0] is key for key in keys):
+            _fail(
+                ("evidence-bindings", index, "key"),
+                "key is not one exact required key",
+            )
+        key, binding = pair
+        if type(specification) is PreparedManualLifecycleEvaluation:
+            if type(binding) is not ProcedureManualLifecycleBinding:
+                _fail(("evidence-bindings", index), "manual binding kind differs")
+            typed_manual = cast(ProcedureManualLifecycleBinding, binding)
+            manual_provider = typed_manual.provider
+            captured = (manual_provider,)
+            _validate_callback(manual_provider, ("evidence-bindings", index))
+            _require_control_authority(control)
+            if typed_manual.provider is not manual_provider:
+                _fail(("evidence-bindings", index), "manual provider changed")
+        else:
+            if type(binding) is not ProcedureAssistedLifecycleBinding:
+                _fail(("evidence-bindings", index), "assisted binding kind differs")
+            typed_assisted = cast(ProcedureAssistedLifecycleBinding, binding)
+            input_provider = typed_assisted.input_provider
+            residual_provider = typed_assisted.residual_provider
+            captured = (input_provider, residual_provider)
+            _validate_callback(
+                input_provider,
+                ("evidence-bindings", index, "input-provider"),
+            )
+            _require_control_authority(control)
+            if (
+                typed_assisted.input_provider is not input_provider
+                or typed_assisted.residual_provider is not residual_provider
+            ):
+                _fail(("evidence-bindings", index), "assisted provider changed")
+            _validate_callback(
+                residual_provider,
+                ("evidence-bindings", index, "residual-provider"),
+            )
+        _require_control_authority(control)
+        if type(binding) is ProcedureManualLifecycleBinding:
+            if binding.provider is not captured[0]:
+                _fail(("evidence-bindings", index), "manual provider changed")
+        else:
+            assisted_binding = cast(ProcedureAssistedLifecycleBinding, binding)
+            if (
+                assisted_binding.input_provider is not captured[0]
+                or assisted_binding.residual_provider is not captured[1]
+            ):
+                _fail(("evidence-bindings", index), "assisted provider changed")
+        keys.append(cast(AttentionObligationKey, key))
+        bindings.append(cast(ProcedureLifecycleBinding, binding))
+        callbacks.append(captured)
+    authority = ProcedureLifecycleProviderAuthoritySnapshot(
+        supplied, tuple(keys), tuple(bindings), tuple(callbacks)
+    )
+    _require_provider_authority(authority)
+    return authority
+
+
+def _validate_callback(callback: object, location: tuple[str | int, ...]) -> None:
+    validate_synchronous_runner(
+        callback,
+        lambda message: ProcedureExecutionError(
+            format_document_path(location), message
+        ),
+    )
+
+
+def _require_provider_authority(
+    authority: ProcedureLifecycleProviderAuthoritySnapshot,
+) -> None:
+    if not (
+        type(authority.keys) is tuple
+        and type(authority.bindings) is tuple
+        and type(authority.callbacks) is tuple
+        and len(authority.keys) == len(authority.bindings) == len(authority.callbacks)
+    ):
+        _fail(("evidence-bindings",), "provider snapshot is invalid")
+    for index, (binding, callbacks) in enumerate(
+        zip(authority.bindings, authority.callbacks)
+    ):
+        if type(binding) is ProcedureManualLifecycleBinding:
+            if len(callbacks) != 1 or binding.provider is not callbacks[0]:
+                _fail(("evidence-bindings", index), "manual provider changed")
+        elif type(binding) is ProcedureAssistedLifecycleBinding:
+            if (
+                len(callbacks) != 2
+                or binding.input_provider is not callbacks[0]
+                or binding.residual_provider is not callbacks[1]
+            ):
+                _fail(("evidence-bindings", index), "assisted provider changed")
+        else:
+            _fail(("evidence-bindings", index), "binding carrier changed")
+
+
+def _evaluate_boundary(
     control: _SessionControl,
     coordinate: ProcedureBoundaryCoordinate,
     requirements: tuple[CompletionRequirement, ...],
+    boundaries: list[ProcedureBoundaryAttempt],
 ) -> tuple[ProcedureBoundaryAttempt, ProcedureExecutionFailure | None]:
-    if not requirements:
-        return (
-            ProcedureBoundaryAttempt(
-                coordinate, requirements, ProcedureBoundaryEvidence(coordinate, ())
+    observed_requirements = tuple(
+        item for item in requirements if item.evaluator is None
+    )
+    observations: tuple[ProcedurePredicateObservation, ...] = ()
+    if observed_requirements:
+        control.active_stage = ProcedureFailureStage.OBSERVATION
+        observations, failure = _observe_requirements(
+            control, coordinate, observed_requirements
+        )
+        if failure is not None:
+            return boundaries[-1], failure
+    records: list[ProcedureBoundaryRecord] = []
+    for requirement in requirements:
+        if requirement.evaluator is None:
+            observation = next(
+                item for item in observations if item.requirement is requirement
+            )
+            records.append(
+                ProcedureObservedBoundaryEvidence(
+                    requirement, _observation_state(observation), observation.trace
+                )
+            )
+            _replace_boundary_prefix(boundaries, coordinate, requirements, records)
+            continue
+        specification = next(
+            (
+                item
+                for item in control.lifecycle_evaluations
+                if item.requirement is requirement
             ),
             None,
         )
+        if specification is None:
+            return boundaries[-1], ProcedureExecutionFailure(
+                coordinate, ProcedureFailureStage.AUTHORITY, "specification is absent"
+            )
+        if type(specification) is PreparedManualLifecycleEvaluation:
+            manual_record, failure = _evaluate_manual(
+                control, coordinate, specification
+            )
+            record: ProcedureBoundaryRecord | None = manual_record
+        elif type(specification) is PreparedAssistedLifecycleEvaluation:
+            assisted_record, failure = _evaluate_assisted(
+                control, coordinate, specification
+            )
+            record = assisted_record
+        else:
+            return boundaries[-1], ProcedureExecutionFailure(
+                coordinate,
+                ProcedureFailureStage.AUTHORITY,
+                "mechanical lifecycle evaluation reached execution",
+            )
+        if failure is not None:
+            return boundaries[-1], failure
+        assert record is not None
+        records.append(record)
+        _replace_boundary_prefix(boundaries, coordinate, requirements, records)
+    attempt = ProcedureBoundaryAttempt(
+        coordinate,
+        requirements,
+        ProcedureBoundaryEvidence(coordinate, tuple(records), True),
+    )
+    boundaries[-1] = attempt
+    return attempt, None
+
+
+def _observe_requirements(
+    control: _SessionControl,
+    coordinate: ProcedureBoundaryCoordinate,
+    requirements: tuple[CompletionRequirement, ...],
+) -> tuple[tuple[ProcedurePredicateObservation, ...], ProcedureExecutionFailure | None]:
     facets = _requested_facets(requirements)
     request = object.__new__(ProcedureLifecycleObservationRequest)
     for name, value in (
@@ -786,27 +1216,359 @@ def _observe(
         returned = control.provider(request)  # type: ignore[operator]
         context = _snapshot_observation(returned, facets, control.registry.facets)
     except Exception as exc:
-        failure = ProcedureExecutionFailure(
+        return (), ProcedureExecutionFailure(
             coordinate, ProcedureFailureStage.OBSERVATION, _safe_detail(exc)
         )
-        return ProcedureBoundaryAttempt(coordinate, requirements, None), failure
     try:
+        previous_stage = control.active_stage
+        control.active_stage = ProcedureFailureStage.AUTHORITY
         _require_control_authority(control)
     except ProcedureExecutionError as exc:
-        failure = ProcedureExecutionFailure(
+        return (), ProcedureExecutionFailure(
             coordinate, ProcedureFailureStage.AUTHORITY, exc.detail
         )
-        return ProcedureBoundaryAttempt(coordinate, requirements, None), failure
+    control.active_stage = previous_stage
     records = tuple(_evaluate_requirement(item, context) for item in requirements)
+    return records, None
+
+
+def _replace_boundary_prefix(
+    boundaries: list[ProcedureBoundaryAttempt],
+    coordinate: ProcedureBoundaryCoordinate,
+    requirements: tuple[CompletionRequirement, ...],
+    records: list[ProcedureBoundaryRecord],
+) -> None:
+    boundaries[-1] = ProcedureBoundaryAttempt(
+        coordinate,
+        requirements,
+        ProcedureBoundaryEvidence(coordinate, tuple(records), False),
+    )
+
+
+def _callbacks_for_specification(
+    control: _SessionControl, specification: PreparedLifecycleEvaluation
+) -> tuple[object, ...]:
+    authority = control.provider_authority
+    if authority is None:
+        _fail(("evidence-bindings",), "provider authority is absent")
+    index = next(
+        (
+            index
+            for index, item in enumerate(control.lifecycle_evaluations)
+            if item is specification
+        ),
+        None,
+    )
+    if index is None:
+        _fail(("requirements",), "lifecycle specification is not retained")
+    origin = control.lifecycle_evaluation_origins[index]
+    provider_index = next(
+        (
+            provider_index
+            for provider_index, key in enumerate(authority.keys)
+            if key is origin.source_key
+        ),
+        None,
+    )
+    if provider_index is None:
+        _fail(("evidence-bindings",), "provider binding is absent")
+    return authority.callbacks[provider_index]
+
+
+def _evaluate_manual(
+    control: _SessionControl,
+    coordinate: ProcedureBoundaryCoordinate,
+    specification: PreparedManualLifecycleEvaluation,
+) -> tuple[ProcedureManualBoundaryEvidence | None, ProcedureExecutionFailure | None]:
+    control.active_stage = ProcedureFailureStage.MANUAL
+    request = object.__new__(ProcedureLifecycleManualJudgmentRequest)
+    for name, value in (
+        ("coordinate", coordinate),
+        ("requirement", specification.requirement),
+        ("evaluator", specification.evaluator),
+        ("_issuer", _REQUEST_ISSUER),
+    ):
+        object.__setattr__(request, name, value)
+    provider = cast(
+        ProcedureLifecycleManualProvider,
+        _callbacks_for_specification(control, specification)[0],
+    )
+    try:
+        returned = provider(request)
+    except Exception as exc:
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.MANUAL, _safe_detail(exc)
+        )
+    authority_failure = _post_callback_authority_failure(control, coordinate)
+    if authority_failure is not None:
+        return None, authority_failure
+    try:
+        judgment, state = _validate_manual_judgment(specification, request, returned)
+    except _EvidenceValidationError as exc:
+        authority_failure = _post_callback_authority_failure(control, coordinate)
+        if authority_failure is not None:
+            return None, authority_failure
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.MANUAL, exc.detail
+        )
+    authority_failure = _post_callback_authority_failure(control, coordinate)
+    if authority_failure is not None:
+        return None, authority_failure
     return (
-        ProcedureBoundaryAttempt(
-            coordinate, requirements, ProcedureBoundaryEvidence(coordinate, records)
+        ProcedureManualBoundaryEvidence(specification.requirement, state, judgment),
+        None,
+    )
+
+
+def _evaluate_assisted(
+    control: _SessionControl,
+    coordinate: ProcedureBoundaryCoordinate,
+    specification: PreparedAssistedLifecycleEvaluation,
+) -> tuple[ProcedureAssistedBoundaryEvidence | None, ProcedureExecutionFailure | None]:
+    callbacks = _callbacks_for_specification(control, specification)
+    control.active_stage = ProcedureFailureStage.EVALUATOR_INPUT
+    input_request = object.__new__(ProcedureLifecycleEvaluatorInputRequest)
+    object.__setattr__(input_request, "coordinate", coordinate)
+    object.__setattr__(input_request, "requirement", specification.requirement)
+    object.__setattr__(input_request, "_issuer", _REQUEST_ISSUER)
+    provider = cast(ProcedureLifecycleEvaluatorInputProvider, callbacks[0])
+    try:
+        returned_input = provider(input_request)
+    except Exception as exc:
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.EVALUATOR_INPUT, _safe_detail(exc)
+        )
+    authority_failure = _post_callback_authority_failure(control, coordinate)
+    if authority_failure is not None:
+        return None, authority_failure
+    try:
+        evaluator_input = _validate_lifecycle_input(specification, returned_input)
+    except _EvidenceValidationError as exc:
+        authority_failure = _post_callback_authority_failure(control, coordinate)
+        if authority_failure is not None:
+            return None, authority_failure
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.EVALUATOR_INPUT, exc.detail
+        )
+    authority_failure = _post_callback_authority_failure(control, coordinate)
+    if authority_failure is not None:
+        return None, authority_failure
+    registry = control.detector_registry
+    if registry is None:
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.AUTHORITY, "detector registry is absent"
+        )
+    control.active_stage = ProcedureFailureStage.DETECTOR
+    try:
+        execution = execute_detector(
+            registry,
+            specification.invocation.evaluator,
+            input_revision=evaluator_input.input_revision,
+            input_data=evaluator_input.input_data,
+        )
+    except DetectorExecutionError as exc:
+        authority_failure = _post_callback_authority_failure(control, coordinate)
+        if authority_failure is not None:
+            return None, authority_failure
+        if exc.document_path and exc.document_path[0] in {"runner", "result"}:
+            return (
+                ProcedureAssistedBoundaryEvidence(
+                    specification.requirement,
+                    EvaluationState.BLOCKED,
+                    None,
+                    None,
+                    exc.detail,
+                ),
+                None,
+            )
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.AUTHORITY, exc.detail
+        )
+    authority_failure = _post_callback_authority_failure(control, coordinate)
+    if authority_failure is not None:
+        return None, authority_failure
+    if not _is_issued_detector_execution(execution):
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.AUTHORITY, "detector execution is invalid"
+        )
+    control.active_stage = ProcedureFailureStage.RESIDUAL
+    residual_request = object.__new__(ProcedureLifecycleResidualJudgmentRequest)
+    for name, value in (
+        ("coordinate", coordinate),
+        ("requirement", specification.requirement),
+        ("residual_question", specification.residual_question),
+        ("execution", execution),
+        ("_issuer", _REQUEST_ISSUER),
+    ):
+        object.__setattr__(residual_request, name, value)
+    residual_provider = cast(ProcedureLifecycleResidualProvider, callbacks[1])
+    try:
+        returned_judgment = residual_provider(residual_request)
+    except Exception as exc:
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.RESIDUAL, _safe_detail(exc)
+        )
+    authority_failure = _post_callback_authority_failure(control, coordinate)
+    if authority_failure is not None:
+        return None, authority_failure
+    try:
+        judgment = _validate_residual_judgment(residual_request, returned_judgment)
+    except _EvidenceValidationError as exc:
+        authority_failure = _post_callback_authority_failure(control, coordinate)
+        if authority_failure is not None:
+            return None, authority_failure
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.RESIDUAL, exc.detail
+        )
+    authority_failure = _post_callback_authority_failure(control, coordinate)
+    if authority_failure is not None:
+        return None, authority_failure
+    return (
+        ProcedureAssistedBoundaryEvidence(
+            specification.requirement,
+            judgment.state,
+            execution,
+            judgment,
+            None,
         ),
         None,
     )
 
 
-def _state(record: ProcedurePredicateObservation) -> EvaluationState:
+@dataclass(frozen=True)
+class _EvidenceValidationError(Exception):
+    detail: str
+
+
+def _validate_manual_judgment(
+    specification: PreparedManualLifecycleEvaluation,
+    request: ProcedureLifecycleManualJudgmentRequest,
+    returned: object,
+) -> tuple[ProcedureLifecycleManualJudgmentSubmission, EvaluationState]:
+    if type(returned) is not ProcedureLifecycleManualJudgmentSubmission:
+        raise _EvidenceValidationError("manual provider returned an invalid carrier")
+    submission = cast(ProcedureLifecycleManualJudgmentSubmission, returned)
+    if submission.request is not request:
+        raise _EvidenceValidationError("manual judgment request differs")
+    if (
+        type(submission.input_revision) is not str
+        or submission.input_revision not in specification.evaluator.input_revisions
+    ):
+        raise _EvidenceValidationError("manual judgment revision is not admitted")
+    try:
+        frozen = freeze_json(submission.evidence)
+    except Exception as exc:
+        raise _EvidenceValidationError(
+            f"manual evidence is not finite JSON: {exception_detail(exc)}"
+        ) from exc
+    if type(frozen) is not MappingProxyType:
+        raise _EvidenceValidationError("manual evidence must be an object")
+    evidence = cast(Mapping[str, JsonValue], frozen)
+    error = validate_json_instance(
+        cast(Mapping[str, object], specification.evaluator.evidence_schema), evidence
+    )
+    if error is not None:
+        raise _EvidenceValidationError(f"manual evidence is invalid: {error.message}")
+    try:
+        state = EvaluationState(cast(str, evidence.get("conclusion")))
+    except (TypeError, ValueError) as exc:
+        raise _EvidenceValidationError("manual conclusion is invalid") from exc
+    return (
+        ProcedureLifecycleManualJudgmentSubmission(
+            request, submission.input_revision, evidence
+        ),
+        state,
+    )
+
+
+def _validate_lifecycle_input(
+    specification: PreparedAssistedLifecycleEvaluation, returned: object
+) -> EvaluatorInput:
+    if type(returned) is not EvaluatorInput:
+        raise _EvidenceValidationError("input provider returned an invalid carrier")
+    value = cast(EvaluatorInput, returned)
+    invocation = specification.invocation
+    if (
+        type(value.input_revision) is not str
+        or value.input_revision != invocation.input_revision
+    ):
+        raise _EvidenceValidationError("evaluator input revision differs")
+    try:
+        frozen = freeze_json(value.input_data)
+    except Exception as exc:
+        raise _EvidenceValidationError(
+            f"evaluator input is not finite JSON: {exception_detail(exc)}"
+        ) from exc
+    if type(frozen) is not MappingProxyType:
+        raise _EvidenceValidationError("evaluator input must be an object")
+    input_data = cast(Mapping[str, JsonValue], frozen)
+    error = validate_json_instance(
+        cast(Mapping[str, object], specification.input_schema), input_data
+    )
+    if error is not None:
+        raise _EvidenceValidationError(f"evaluator input is invalid: {error.message}")
+    if not json_values_equal(input_data, invocation.input_data):
+        raise _EvidenceValidationError("evaluator input differs from the plan")
+    return EvaluatorInput(value.input_revision, input_data)
+
+
+def _validate_residual_judgment(
+    request: ProcedureLifecycleResidualJudgmentRequest, returned: object
+) -> ProcedureLifecycleResidualJudgmentSubmission:
+    if type(returned) is not ProcedureLifecycleResidualJudgmentSubmission:
+        raise _EvidenceValidationError("residual provider returned an invalid carrier")
+    judgment = cast(ProcedureLifecycleResidualJudgmentSubmission, returned)
+    if judgment.request is not request:
+        raise _EvidenceValidationError("residual judgment request differs")
+    if type(judgment.schema_version) is not int or judgment.schema_version != 1:
+        raise _EvidenceValidationError("residual schema version must be 1")
+    if type(judgment.state) is not EvaluationState:
+        raise _EvidenceValidationError("residual state is invalid")
+    if type(judgment.rationale) is not str or not judgment.rationale.strip():
+        raise _EvidenceValidationError("residual rationale must be non-empty")
+    return ProcedureLifecycleResidualJudgmentSubmission(
+        1, request, judgment.state, judgment.rationale
+    )
+
+
+def _post_callback_authority_failure(
+    control: _SessionControl, coordinate: ProcedureBoundaryCoordinate
+) -> ProcedureExecutionFailure | None:
+    previous_stage = control.active_stage
+    control.active_stage = ProcedureFailureStage.AUTHORITY
+    try:
+        _require_control_authority(control)
+        if control.provider_authority is None:
+            _fail(("evidence-bindings",), "provider authority is absent")
+        _require_provider_authority(control.provider_authority)
+    except ProcedureExecutionError as exc:
+        return ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.AUTHORITY, exc.detail
+        )
+    control.active_stage = previous_stage
+    return None
+
+
+def _guarded_authority_failure(
+    control: _SessionControl, coordinate: ProcedureBoundaryCoordinate
+) -> ProcedureExecutionFailure | None:
+    """Check authority while converting a failing check into a terminal diagnosis."""
+    previous_stage = control.active_stage
+    control.active_stage = ProcedureFailureStage.AUTHORITY
+    try:
+        _require_control_authority(control)
+        if control.provider_authority is None:
+            _fail(("evidence-bindings",), "provider authority is absent")
+        _require_provider_authority(control.provider_authority)
+    except BaseException as exc:
+        return ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.AUTHORITY, _safe_detail(exc)
+        )
+    control.active_stage = previous_stage
+    return None
+
+
+def _observation_state(record: ProcedurePredicateObservation) -> EvaluationState:
     if record.truth.value == "true":
         return EvaluationState.SATISFIED
     if record.truth.value == "false":
@@ -857,6 +1619,57 @@ def _detach_operation_registry(
     return snapshot
 
 
+def _validate_lifecycle_timing(
+    specifications: tuple[PreparedLifecycleEvaluation, ...],
+) -> None:
+    """Require each evaluator to be available by its earliest realized boundary."""
+    for index, item in enumerate(specifications):
+        key = item.source_key
+        admitted = {"pre-design", "pre-action"}
+        if (
+            type(key) is ProcedurePredicateKey
+            and key.phase is PredicatePhase.POSTCONDITION
+        ):
+            admitted.add("post-action")
+        if item.evaluator.timing not in admitted:
+            _fail(
+                ("requirements", index, "evaluator", "timing"),
+                "evaluator timing is later than its lifecycle boundary",
+            )
+
+
+def _detach_detector_registry(run: ProcedureRunPlan) -> DetectorRunnerRegistry | None:
+    """Detach captured detector runners and contracts for lifecycle execution."""
+    if not any(
+        type(item) is PreparedAssistedLifecycleEvaluation
+        for item in run.lifecycle_evaluations
+    ):
+        return None
+    state = run._detector_registry_state
+    if state is None or run.attention.detector_registry is not state.registry:
+        _fail(("detector-registry",), "detector registry authority is absent")
+    bindings: dict[VersionedReference, DetectorRunnerBinding] = {}
+    contracts: dict[VersionedReference, Mapping[str, object]] = {}
+    records: dict[VersionedReference, object] = {}
+    for record in state.records:
+        reference = VersionedReference(cast(str, record[1]), cast(int, record[2]))
+        operation = VersionedReference(cast(str, record[8]), cast(int, record[9]))
+        bindings[reference] = DetectorRunnerBinding(
+            reference, operation, cast(object, record[10])  # type: ignore[arg-type]
+        )
+        contracts[reference] = cast(
+            Mapping[str, object], freeze_json(cast(Mapping[str, object], record[11]))
+        )
+        records[reference] = _detach(record[13])
+    snapshot = object.__new__(DetectorRunnerRegistry)
+    object.__setattr__(snapshot, "declarations", state.declarations)
+    object.__setattr__(snapshot, "bindings", MappingProxyType(bindings))
+    object.__setattr__(snapshot, "input_contracts", MappingProxyType(contracts))
+    object.__setattr__(snapshot, "evaluator_records", MappingProxyType(records))
+    object.__setattr__(snapshot, "_issuer", getattr(state.registry, "_issuer"))
+    return snapshot
+
+
 def _publish(
     control: _SessionControl,
     boundaries: list[ProcedureBoundaryAttempt],
@@ -866,8 +1679,41 @@ def _publish(
     adjudication: ProcedureAdjudicationDisposition,
     failure: ProcedureExecutionFailure | None,
 ) -> ProcedureExecutionTranscript:
+    authority_interruption: BaseException | None = None
+    if adjudication is not ProcedureAdjudicationDisposition.AUTHORITY_ABORTED:
+        coordinate = (
+            failure.coordinate
+            if failure is not None
+            else (
+                boundaries[-1].coordinate
+                if boundaries
+                else _coordinate(
+                    ProcedureBoundaryKind.ACTION, 0, control.actions[0], None
+                )
+            )
+        )
+        previous_stage = control.active_stage
+        control.active_stage = ProcedureFailureStage.AUTHORITY
+        try:
+            _require_control_authority(control)
+            if control.provider_authority is None:
+                _fail(("evidence-bindings",), "provider authority is absent")
+            _require_provider_authority(control.provider_authority)
+        except ProcedureExecutionError as exc:
+            adjudication = ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+            failure = ProcedureExecutionFailure(
+                coordinate, ProcedureFailureStage.AUTHORITY, exc.detail
+            )
+        except BaseException as exc:
+            adjudication = ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+            failure = ProcedureExecutionFailure(
+                coordinate, ProcedureFailureStage.AUTHORITY, _safe_detail(exc)
+            )
+            authority_interruption = exc
+        else:
+            control.active_stage = previous_stage
     try:
-        return _publish_once(
+        transcript = _publish_once(
             control, boundaries, actions, selected, graph, adjudication, failure
         )
     except BaseException:
@@ -876,6 +1722,9 @@ def _publish(
             control, boundaries, actions, selected, graph, adjudication, failure
         )
         raise
+    if authority_interruption is not None:
+        raise authority_interruption
+    return transcript
 
 
 def _publish_once(
@@ -922,10 +1771,13 @@ def _prepare_transcript(
     failure: ProcedureExecutionFailure | None,
 ) -> ProcedureExecutionTranscript:
     """Build one complete transcript before exposing any part of it."""
+    if control.provider_authority is None:
+        _fail(("evidence-bindings",), "provider authority is absent")
     transcript = object.__new__(ProcedureExecutionTranscript)
     transcript_token = object()
     for name, value in (
         ("authority", control.authority),
+        ("provider_authority", control.provider_authority),
         ("boundaries", tuple(boundaries)),
         ("actions", tuple(actions)),
         ("applicability", applicability),
@@ -971,6 +1823,7 @@ def _capture_transcript_state(
     """Capture every public transcript carrier and scalar without live-run reads."""
     return (
         _authority_transcript_state(transcript.authority),
+        _provider_authority_transcript_state(transcript.provider_authority),
         _identity_semantic_state(transcript.boundaries),
         _identity_semantic_state(transcript.actions),
         _identity_semantic_state(transcript.applicability),
@@ -978,6 +1831,127 @@ def _capture_transcript_state(
         _semantic_state(transcript.graph_disposition),
         _semantic_state(transcript.adjudication_disposition),
         transcript.successful,
+    )
+
+
+def _provider_authority_transcript_state(
+    authority: ProcedureLifecycleProviderAuthoritySnapshot,
+) -> tuple[object, ...]:
+    """Capture provider authority without traversing the caller's mapping again."""
+    binding_state = tuple(
+        (
+            type(binding),
+            id(binding),
+            (
+                (id(binding.provider),)
+                if type(binding) is ProcedureManualLifecycleBinding
+                else (
+                    id(cast(ProcedureAssistedLifecycleBinding, binding).input_provider),
+                    id(
+                        cast(
+                            ProcedureAssistedLifecycleBinding, binding
+                        ).residual_provider
+                    ),
+                )
+            ),
+        )
+        for binding in authority.bindings
+    )
+    return (
+        id(authority),
+        id(authority.mapping_origin),
+        tuple(id(key) for key in authority.keys),
+        binding_state,
+        tuple(tuple(id(callback) for callback in item) for item in authority.callbacks),
+    )
+
+
+def _operation_registry_state(registry: OperationRunnerRegistry) -> tuple[object, ...]:
+    """Capture operation authority while treating executable runners as identities."""
+    return (
+        id(registry),
+        id(registry.declarations),
+        id(registry.bindings),
+        tuple(
+            (
+                id(reference),
+                reference.id,
+                reference.version,
+                id(binding),
+                id(binding.operation),
+                binding.operation.id,
+                binding.operation.version,
+                id(binding.runner),
+            )
+            for reference, binding in registry.bindings.items()
+        ),
+        id(registry.contracts),
+        _identity_semantic_state(registry.contracts),
+    )
+
+
+def _detector_registry_state(
+    registry: DetectorRunnerRegistry | None,
+) -> tuple[object, ...] | None:
+    """Capture detector authority without traversing executable runner state."""
+    if registry is None:
+        return None
+    return (
+        id(registry),
+        id(registry.declarations),
+        id(registry.bindings),
+        tuple(
+            (
+                id(reference),
+                reference.id,
+                reference.version,
+                id(binding),
+                id(binding.evaluator),
+                binding.evaluator.id,
+                binding.evaluator.version,
+                id(binding.operation),
+                binding.operation.id,
+                binding.operation.version,
+                id(binding.runner),
+            )
+            for reference, binding in registry.bindings.items()
+        ),
+        id(registry.input_contracts),
+        _identity_semantic_state(registry.input_contracts),
+        id(registry.evaluator_records),
+        _identity_semantic_state(registry.evaluator_records),
+    )
+
+
+def _operation_runner_correlations(
+    registry: OperationRunnerRegistry,
+) -> tuple[object, ...]:
+    return tuple(
+        (
+            reference.id,
+            reference.version,
+            binding.operation.id,
+            binding.operation.version,
+            id(binding.runner),
+        )
+        for reference, binding in registry.bindings.items()
+    )
+
+
+def _detector_runner_correlations(
+    registry: DetectorRunnerRegistry,
+) -> tuple[object, ...]:
+    return tuple(
+        (
+            reference.id,
+            reference.version,
+            binding.evaluator.id,
+            binding.evaluator.version,
+            binding.operation.id,
+            binding.operation.version,
+            id(binding.runner),
+        )
+        for reference, binding in registry.bindings.items()
     )
 
 
@@ -1104,6 +2078,18 @@ def _identity_semantic_state(value: object) -> object:
             id(value),
             tuple(_identity_semantic_state(item) for item in value),
         )
+    if type(value) is DetectorExecution:
+        execution = cast(DetectorExecution, value)
+        return (
+            "detector-execution",
+            id(execution),
+            _detector_registry_state(execution.registry),
+            _identity_semantic_state(execution.evaluator),
+            execution.input_revision,
+            _identity_semantic_state(execution.input_data),
+            _identity_semantic_state(execution.evidence),
+            id(execution._issuer),
+        )
     if is_dataclass(value):
         return (
             "dataclass",
@@ -1130,7 +2116,11 @@ def _authority_transcript_state(
         id(authority.lifecycle_observation_registry_origin),
         id(authority.lifecycle_observation_provider_origin),
         id(authority.operation_registry_origin),
-        _identity_semantic_state(authority.operation_registry),
+        _operation_registry_state(authority.operation_registry),
+        _identity_semantic_state(authority.lifecycle_evaluation_origins),
+        _identity_semantic_state(authority.lifecycle_evaluations),
+        id(authority.detector_registry_origin),
+        _detector_registry_state(authority.detector_registry),
         _identity_semantic_state(authority.lifecycle),
         _identity_semantic_state(authority.actions),
         authority.procedure_id,
@@ -1145,13 +2135,28 @@ def _entry_evidence_state(entry: PreActionEvidence) -> tuple[object, ...]:
     """Detach the factory-time state carried by one exact entry aggregate."""
     return (
         entry.cleared,
-        _semantic_state(entry.records),
-        _semantic_state(entry._record_state),
+        id(entry.records),
+        tuple(id(record) for record in entry.records),
+        _entry_record_state(entry._record_state),
         _semantic_state(entry.observation.requirements),
         _semantic_state(entry.observation.observations),
         _semantic_state(entry.observation.phase),
         entry.observation.occurrence,
     )
+
+
+def _entry_record_state(snapshot: tuple[object, ...]) -> tuple[object, ...]:
+    """Retain issued entry evidence without traversing executable authorities."""
+    state: list[object] = []
+    for item in snapshot:
+        identities, values = cast(tuple[tuple[object, ...], tuple[object, ...]], item)
+        state.append(
+            (
+                tuple(id(value) for value in identities),
+                _semantic_state(values),
+            )
+        )
+    return tuple(state)
 
 
 def _snapshot_matches_live(
@@ -1163,10 +2168,30 @@ def _snapshot_matches_live(
         == _semantic_state(_lifecycle_requirements(run))
         and _semantic_state(authority.actions) == _semantic_state(run.actions)
         and _semantic_state(authority.parameters) == _semantic_state(run.parameters)
-        and _semantic_state(authority.operation_registry.bindings)
-        == _semantic_state(run.operation_registry.bindings)
+        and _operation_runner_correlations(authority.operation_registry)
+        == _operation_runner_correlations(run.operation_registry)
+        and authority.operation_registry.declarations
+        is run.operation_registry.declarations
         and _semantic_state(authority.operation_registry.contracts)
         == _semantic_state(run.operation_registry.contracts)
+        and authority.lifecycle_evaluation_origins is run.lifecycle_evaluations
+        and _semantic_state(authority.lifecycle_evaluations)
+        == _semantic_state(run.lifecycle_evaluations)
+        and authority.detector_registry_origin is run.attention.detector_registry
+        and (
+            authority.detector_registry is None
+            or (
+                run.attention.detector_registry is not None
+                and _detector_runner_correlations(authority.detector_registry)
+                == _detector_runner_correlations(run.attention.detector_registry)
+                and _semantic_state(authority.detector_registry.input_contracts)
+                == _semantic_state(run.attention.detector_registry.input_contracts)
+                and _semantic_state(authority.detector_registry.evaluator_records)
+                == _semantic_state(run.attention.detector_registry.evaluator_records)
+                and authority.detector_registry.declarations
+                is run.attention.detector_registry.declarations
+            )
+        )
         and authority.procedure_id == run.procedure.id
         and authority.entry_action == run.procedure.entry
         and authority.success_terminals
@@ -1195,8 +2220,20 @@ def _factory_authority_state(
         registry.provider,
         run.operation_registry,
         run.operation_registry.declarations,
-        _semantic_state(run.operation_registry.bindings),
+        _operation_registry_state(run.operation_registry),
         _semantic_state(run.operation_registry.contracts),
+        _identity_semantic_state(run.lifecycle_evaluations),
+        id(run.attention.detector_registry),
+        (
+            _detector_registry_state(run.attention.detector_registry)
+            if run.attention.detector_registry is not None
+            else None
+        ),
+        (
+            _identity_semantic_state(run.attention.detector_registry.input_contracts)
+            if run.attention.detector_registry is not None
+            else None
+        ),
         _semantic_state(lifecycle),
         _semantic_state(actions),
         run.procedure.id,
