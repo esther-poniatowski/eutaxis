@@ -129,6 +129,16 @@ detector boundaries reject malformed or equality-spoofing result correlation
 fields before they create canonical evidence. Completion reconciliation can now
 consume authenticated rule evidence without invoking an evaluator.
 
+The completion ledger now reconciles the canonical requirement sequence with
+optional authenticated rule evidence and one sparse, once-snapshotted procedure
+outcome mapping. Terminal transcripts contribute retained historical entry and
+lifecycle evidence; complete uncleared pre-action aggregates contribute their
+entry evidence and leave later requirements unchecked. The ledger derives every
+record without evaluator callbacks, preserves every repeated occurrence, and
+requires successful graph and adjudication outcomes for every effective
+procedure. External issuance snapshots reject mapping re-entry, live-origin
+substitution, callback-time state forgery, and later ledger mutation.
+
 ## Decision log and open prerequisites
 
 - YAML is canonical; tagged Markdown is only an evidence-triggered fallback.
@@ -239,7 +249,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Extend the lifecycle session with detached checker execution and assurance-freshness checks for every realized mechanical occurrence, without rerunning known-failure fixtures or retained entry evidence; preserve authority precedence across provider and checker failures and interruptions.
 - [x] Harden `ResolutionResult`, `AttentionRequirements`, and `AttentionPlan` with external issuance snapshots that cover the complete resolved unit and trace, canonical requirement projections, packet entries, evaluator invocations, runner registries, fixture authority, and assurance authority before any later evidence transaction trusts the plan.
 - [x] Issue one authenticated single-use rule-evidence transaction that evaluates every effective rule criterion in canonical order and retains deliberative, assisted, and mechanical records without making the completion ledger execute evaluators.
-- [ ] Issue the complete immutable ledger from optional authenticated rule evidence and a once-snapshotted mapping of every effective procedure to an exact terminal transcript or complete uncleared pre-action evidence; require admissible evidence for every effective obligation and a successful transcript for every effective procedure.
+- [x] Issue the complete immutable ledger from optional authenticated rule evidence and a once-snapshotted mapping of every effective procedure to an exact terminal transcript or complete uncleared pre-action evidence; require admissible evidence for every effective obligation and a successful transcript for every effective procedure.
 - [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.
 
 **Exit evidence:** clean checker output cannot complete an unmapped obligation. Unchecked, violated, or blocked rule criteria, procedure predicates, or per-action operation preconditions prevent success; only obligations excluded by a completed authored path may be inapplicable.

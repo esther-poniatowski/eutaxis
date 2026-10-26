@@ -11,6 +11,7 @@ from types import MappingProxyType
 from typing import NoReturn, Protocol, SupportsIndex, cast
 from weakref import ReferenceType, WeakKeyDictionary, ref
 
+from ._authority import IdentityAuthorityStore
 from ._runner_support import exception_detail, validate_synchronous_runner
 from .applicability import ApplicabilityTrace, TruthValue
 from .attention import (
@@ -48,6 +49,9 @@ from .source import format_document_path
 _EVIDENCE_ISSUER = object()
 _REQUEST_ISSUER = object()
 _SESSION_ISSUER = object()
+_EVIDENCE_AUTHORITIES: IdentityAuthorityStore[PreActionEvidence] = (
+    IdentityAuthorityStore()
+)
 
 
 class PreActionEvidenceSessionState(StrEnum):
@@ -151,6 +155,8 @@ class PreActionEvidence:
     records: tuple[PreActionEvidenceRecord, ...]
     cleared: bool
     _record_state: tuple[object, ...]
+    _token: object
+    _state: tuple[object, ...]
     _issuer: object
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -167,6 +173,15 @@ class PreActionEvidence:
 
     def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
         raise TypeError("PreActionEvidence instances cannot be serialized")
+
+
+@dataclass(frozen=True, eq=False)
+class _PreActionEvidenceAuthoritySnapshot:
+    plan: ProcedurePreconditionEvaluationPlan
+    observation: ProcedurePreconditionObservation
+    records: tuple[PreActionEvidenceRecord, ...]
+    cleared: bool
+    evidence_state: tuple[object, ...]
 
 
 @dataclass
@@ -649,52 +664,120 @@ def _issue_evidence(
     )
     object.__setattr__(evidence, "_record_state", _capture_record_state(records))
     object.__setattr__(evidence, "_issuer", _EVIDENCE_ISSUER)
+    state = _capture_evidence_state(evidence)
+    snapshot = _PreActionEvidenceAuthoritySnapshot(
+        plan,
+        observation,
+        records,
+        evidence.cleared,
+        state,
+    )
+    token = _EVIDENCE_AUTHORITIES.issue(
+        evidence,
+        (snapshot, _capture_authority_snapshot_state(snapshot)),
+    )
+    object.__setattr__(evidence, "_token", token)
+    object.__setattr__(evidence, "_state", state)
     return evidence
 
 
 def _is_issued_pre_action_evidence(evidence: object) -> bool:
     """Return whether one aggregate retains its complete issued authority."""
+    return _issued_pre_action_evidence_snapshot(evidence) is not None
+
+
+def _issued_pre_action_evidence_snapshot(
+    evidence: object,
+) -> _PreActionEvidenceAuthoritySnapshot | None:
+    """Return issuer-owned carriers for one unchanged evidence aggregate."""
     if (
         type(evidence) is not PreActionEvidence
         or getattr(evidence, "_issuer", None) is not _EVIDENCE_ISSUER
+        or type(getattr(evidence, "_state", None)) is not tuple
     ):
-        return False
+        return None
     try:
+        issued = _EVIDENCE_AUTHORITIES.lookup(evidence)
+        if issued is None or evidence._token is not issued[0]:
+            return None
+        authority = issued[1]
+        if (
+            len(authority) != 2
+            or type(authority[0]) is not _PreActionEvidenceAuthoritySnapshot
+            or type(authority[1]) is not tuple
+        ):
+            return None
+        snapshot = cast(_PreActionEvidenceAuthoritySnapshot, authority[0])
+        if (
+            authority[1] != _capture_authority_snapshot_state(snapshot)
+            or evidence.plan is not snapshot.plan
+            or evidence.observation is not snapshot.observation
+            or evidence.records is not snapshot.records
+            or evidence.cleared is not snapshot.cleared
+            or evidence._state != snapshot.evidence_state
+            or evidence._state != _capture_evidence_state(evidence)
+        ):
+            return None
         if not _is_issued_procedure_precondition_evaluation_plan(evidence.plan):
-            return False
+            return None
         if not _is_issued_procedure_precondition_observation(evidence.observation):
-            return False
+            return None
         if evidence.observation.run is not evidence.plan.run:
-            return False
+            return None
         expected = evidence.plan.run.procedure_precondition_requirements
         if type(evidence.records) is not tuple or len(evidence.records) != len(
             expected
         ):
-            return False
+            return None
         if any(
             record.requirement is not requirement
             for record, requirement in zip(evidence.records, expected)
         ):
-            return False
+            return None
         if any(
             not _record_matches_canonical(
                 evidence.plan, evidence.observation, record, requirement
             )
             for record, requirement in zip(evidence.records, expected)
         ):
-            return False
+            return None
         if type(evidence._record_state) is not tuple or not _record_state_matches(
             evidence.records, evidence._record_state
         ):
-            return False
+            return None
         cleared = all(
             record.state is EvaluationState.SATISFIED for record in evidence.records
         )
         if type(evidence.cleared) is not bool or evidence.cleared is not cleared:
-            return False
+            return None
     except Exception:
-        return False
-    return True
+        return None
+    return snapshot
+
+
+def _capture_authority_snapshot_state(
+    snapshot: _PreActionEvidenceAuthoritySnapshot,
+) -> tuple[object, ...]:
+    return (
+        id(snapshot.plan),
+        id(snapshot.observation),
+        id(snapshot.records),
+        _capture_record_state(snapshot.records),
+        snapshot.cleared,
+        id(snapshot.evidence_state),
+        snapshot.evidence_state,
+    )
+
+
+def _capture_evidence_state(evidence: PreActionEvidence) -> tuple[object, ...]:
+    return (
+        id(evidence.plan),
+        id(evidence.observation),
+        id(evidence.records),
+        _capture_record_state(evidence.records),
+        evidence.cleared,
+        id(evidence._issuer),
+    )
 
 
 def _record_matches_canonical(

@@ -15,6 +15,7 @@ from ._runner_support import exception_detail, validate_synchronous_runner
 from .applicability import ApplicabilityTrace
 from .attention import (
     AttentionObligationKey,
+    AttentionPlan,
     CompletionRequirement,
     EvaluatorInput,
     OperationPredicateKey,
@@ -64,7 +65,12 @@ from .operations import (
     OperationSuccess,
     execute_operation,
 )
-from .pre_action_evidence import PreActionEvidence, _is_issued_pre_action_evidence
+from .pre_action_evidence import (
+    PreActionEvidence,
+    PreActionEvidenceRecord,
+    _PreActionEvidenceAuthoritySnapshot,
+    _issued_pre_action_evidence_snapshot,
+)
 from .procedure_runs import PreparedProcedureAction, ProcedureRunPlan
 from .procedure_runs import (
     PreparedAssistedLifecycleEvaluation,
@@ -325,6 +331,8 @@ class ProcedureExecutionAuthoritySnapshot:
 
     entry_evidence_origin: PreActionEvidence
     entry_evidence_state: tuple[object, ...]
+    entry_evidence_records: tuple[PreActionEvidenceRecord, ...]
+    entry_attention_plan_origin: AttentionPlan
     entry_observation_registry_origin: ObservationProviderRegistry
     entry_observation_provider_origin: object
     lifecycle_observation_registry_origin: ObservationProviderRegistry
@@ -728,10 +736,10 @@ class ProcedureExecutionSession:
 def create_procedure_execution_session(
     entry_evidence: PreActionEvidence, observation_registry: ObservationProviderRegistry
 ) -> ProcedureExecutionSession:
-    _require_authority(entry_evidence, observation_registry)
-    if entry_evidence.cleared is not True:
+    entry_authority = _require_authority(entry_evidence, observation_registry)
+    if entry_authority.cleared is not True:
         _fail(("entry-evidence", "cleared"), "procedure entry was not cleared")
-    run = entry_evidence.plan.run
+    run = entry_authority.plan.run
     lifecycle = _lifecycle_requirements(run)
     lifecycle_origins = run.lifecycle_evaluations
     _validate_lifecycle_timing(lifecycle_origins)
@@ -775,9 +783,11 @@ def create_procedure_execution_session(
     )
     authority = ProcedureExecutionAuthoritySnapshot(
         entry_evidence_origin=entry_evidence,
-        entry_evidence_state=_entry_evidence_state(entry_evidence),
-        entry_observation_registry_origin=entry_evidence.observation.registry,
-        entry_observation_provider_origin=entry_evidence.observation.registry.provider,
+        entry_evidence_state=_entry_authority_state(entry_authority),
+        entry_evidence_records=entry_authority.records,
+        entry_attention_plan_origin=run.attention,
+        entry_observation_registry_origin=entry_authority.observation.registry,
+        entry_observation_provider_origin=entry_authority.observation.registry.provider,
         lifecycle_observation_registry_origin=observation_registry,
         lifecycle_observation_provider_origin=observation_registry.provider,
         operation_registry_origin=run.operation_registry,
@@ -878,12 +888,13 @@ def _require_authority(
     entry: PreActionEvidence,
     registry: ObservationProviderRegistry,
     provider: object | None = None,
-) -> None:
-    if not _is_issued_pre_action_evidence(entry):
+) -> _PreActionEvidenceAuthoritySnapshot:
+    entry_authority = _issued_pre_action_evidence_snapshot(entry)
+    if entry_authority is None:
         _fail(("entry-evidence",), "entry evidence is not authoritative")
     if not _is_builder_issued_observation_registry(registry):
         _fail(("observation-registry",), "registry was not issued")
-    declarations = entry.plan.run.attention.resolution.registry
+    declarations = entry_authority.plan.run.attention.resolution.registry
     if (
         registry.declarations is not declarations
         or registry.facets is not declarations.facet_registry
@@ -891,6 +902,7 @@ def _require_authority(
         _fail(("observation-registry",), "registry authority differs from the run")
     if provider is not None and registry.provider is not provider:
         _fail(("observation-registry", "provider"), "provider authority changed")
+    return entry_authority
 
 
 def _require_control_authority(control: _SessionControl) -> None:
@@ -2418,6 +2430,8 @@ def _authority_transcript_state(
         id(authority),
         id(authority.entry_evidence_origin),
         _identity_semantic_state(authority.entry_evidence_state),
+        _identity_semantic_state(authority.entry_evidence_records),
+        id(authority.entry_attention_plan_origin),
         id(authority.entry_observation_registry_origin),
         id(authority.entry_observation_provider_origin),
         id(authority.lifecycle_observation_registry_origin),
@@ -2458,6 +2472,23 @@ def _entry_evidence_state(entry: PreActionEvidence) -> tuple[object, ...]:
         _semantic_state(entry.observation.observations),
         _semantic_state(entry.observation.phase),
         entry.observation.occurrence,
+    )
+
+
+def _entry_authority_state(
+    authority: _PreActionEvidenceAuthoritySnapshot,
+) -> tuple[object, ...]:
+    """Detach entry state only from one issuer-owned aggregate snapshot."""
+    record_state = cast(tuple[object, ...], authority.evidence_state[3])
+    return (
+        authority.cleared,
+        id(authority.records),
+        tuple(id(record) for record in authority.records),
+        _entry_record_state(record_state),
+        _semantic_state(authority.observation.requirements),
+        _semantic_state(authority.observation.observations),
+        _semantic_state(authority.observation.phase),
+        authority.observation.occurrence,
     )
 
 

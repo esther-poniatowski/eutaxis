@@ -316,21 +316,74 @@ def test_canonical_authority_snapshot_survives_live_origin_mutation(tmp_path) ->
     )
     transcript = create_procedure_execution_session(entry, registry).execute()
     retained_entry_state = transcript.authority.entry_evidence_state
+    retained_records = transcript.authority.entry_evidence_records
     retained_provider = transcript.authority.lifecycle_observation_provider_origin
 
     object.__setattr__(entry, "cleared", False)
+    object.__setattr__(entry, "records", tuple([*entry.records]))
     object.__setattr__(
         registry, "provider", cast(ObservationProvider, lambda request: {})
     )
 
     assert transcript.authority.entry_evidence_origin is entry
     assert transcript.authority.entry_evidence_state is retained_entry_state
+    assert transcript.authority.entry_evidence_records is retained_records
     assert transcript.authority.entry_evidence_state[0] is True
     assert transcript.authority.lifecycle_observation_registry_origin is registry
     assert (
         transcript.authority.lifecycle_observation_provider_origin is retained_provider
     )
     assert _is_issued_procedure_execution_transcript(transcript)
+
+
+def test_transcript_rejects_equal_value_retained_entry_tuple_replacement(
+    tmp_path,
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path, lambda request: {facet: True for facet in request.facets}
+    )
+    transcript = create_procedure_execution_session(entry, registry).execute()
+
+    object.__setattr__(
+        transcript.authority,
+        "entry_evidence_records",
+        tuple([*transcript.authority.entry_evidence_records]),
+    )
+
+    assert not _is_issued_procedure_execution_transcript(transcript)
+
+
+def test_transcript_rejects_retained_entry_record_mutation(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path, lambda request: {facet: True for facet in request.facets}
+    )
+    transcript = create_procedure_execution_session(entry, registry).execute()
+
+    object.__setattr__(
+        transcript.authority.entry_evidence_records[0],
+        "state",
+        EvaluationState.BLOCKED,
+    )
+
+    assert not _is_issued_procedure_execution_transcript(transcript)
+
+
+def test_transcript_rejects_retained_attention_plan_replacement(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path / "first", lambda request: {facet: True for facet in request.facets}
+    )
+    other_entry, _ = _entry_evidence(
+        tmp_path / "second", lambda request: {facet: True for facet in request.facets}
+    )
+    transcript = create_procedure_execution_session(entry, registry).execute()
+
+    object.__setattr__(
+        transcript.authority,
+        "entry_attention_plan_origin",
+        other_entry.plan.run.attention,
+    )
+
+    assert not _is_issued_procedure_execution_transcript(transcript)
 
 
 @pytest.mark.parametrize(

@@ -447,6 +447,14 @@ outcome must originate from the exact attention plan and must name its mapping
 key. Additional, duplicate, copied-equal, malformed, or cross-plan outcomes
 raise `CompletionLedgerError`.
 
+A terminal transcript retains the exact entry-evidence record tuple and
+attention-plan identity captured by its execution authority. The ledger imports
+that retained tuple and does not reread the live pre-action aggregate. Therefore,
+a later mutation of the live aggregate cannot rewrite or invalidate the
+historical transcript, whereas mutation or replacement of a retained record,
+the retained tuple, or the retained plan identity invalidates transcript
+authority.
+
 The outcome mapping is sparse. An omitted effective procedure produces
 unchecked records and an incomplete procedure outcome, including when that
 procedure declares no obligation. A transcript imports its exact retained entry
