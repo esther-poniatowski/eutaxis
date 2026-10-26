@@ -862,6 +862,255 @@ missing outcome even for a zero-obligation procedure, a failure-terminal or
 aborted transcript, or any unchecked, violated, or blocked record prevents
 success. Migration baselines remain outside this first ledger contract.
 
+### Migration baseline boundary
+
+A migration baseline keeps one known rule-criterion finding visible while
+allowing that finding, and only that finding, to stop blocking ledger success
+during a bounded migration. It is not evidence and does not change a completion
+state. Version 1 admits no procedure predicate or operation precondition: either
+finding already prevents an accepted successful transcript, and procedure
+outcomes remain unwaivable.
+
+Version 1 stores baselines in canonical YAML auxiliary sources, separate from
+declarations and from a run under evaluation. One source defines one baseline
+with these required fields: `schema-version`, stable `id`, `owner`, stable
+`manifest`, `migration`, exact UTC `expires-at`, and `finding`. The `id`,
+`owner`, `manifest`, and `migration` values are non-empty text without
+whitespace. `migration` is an opaque accountability label in version 1; it has
+no referential authority until the migration-accountability registry exists.
+`expires-at` uses exactly the ledger grammar
+`YYYY-MM-DDTHH:MM:SS.ffffffZ`. The complete source shape is:
+
+```yaml
+schema-version: 1
+id: BASELINE_ID
+owner: OWNER_ID
+manifest: MANIFEST_ID
+migration: MIGRATION_LABEL
+expires-at: YYYY-MM-DDTHH:MM:SS.ffffffZ
+finding:
+  key:
+    kind: rule-criterion
+    declaration: RULE_ID
+    criterion: CRITERION_ID
+  state: violated | unchecked
+  digest: sha256:LOWERCASE_HEXADECIMAL
+```
+
+Uppercase values are metavariables, and the two state tokens denote an enum
+rather than a YAML scalar containing `|`. The root, `finding`, and `key` mappings
+are closed: every displayed property is required, and no additional property is
+admitted. No description or free-form exception field is admitted.
+
+The finding digest hashes one closed JSON payload. In the templates below,
+uppercase quoted strings are text metavariables, `EVALUATOR_VERSION` is the
+positive integer from the reference, `JSON_OBJECT` is the corresponding finite
+frozen JSON object inserted as an object, `TEXT_OR_NULL` is either the retained
+string or literal null, and null is literal. Every displayed object is closed
+and every displayed property is required. An evaluator object always has exactly
+`id` and `version`. A key object always has exactly `kind`, `declaration`, and
+`criterion`. Every payload contains this exact projection of the retained
+`RuleObligationSnapshot`:
+
+```text
+{
+  "key": {"kind": "rule-criterion", "declaration": "RULE_ID", "criterion": "CRITERION_ID"},
+  "axis": "RULE_AXIS",
+  "failure-mode": "FAILURE_MODE",
+  "required-visibility": TEXT_OR_NULL,
+  "title": TEXT_OR_NULL,
+  "rationale": TEXT_OR_NULL,
+  "criterion": {
+    "id": "CRITERION_ID",
+    "norms": ["NORM_ID"],
+    "evaluator": {"id": "EVALUATOR_ID", "version": EVALUATOR_VERSION},
+    "statement": "CRITERION_STATEMENT"
+  },
+  "norms": [
+    {
+      "id": "NORM_ID",
+      "modality": "MODALITY",
+      "subject": "SUBJECT",
+      "action": {"verb": "VERB", "object": "OBJECT", "timing": TEXT_OR_NULL},
+      "applicability": JSON_OBJECT,
+      "guidance": TEXT_OR_NULL,
+      "rationale": TEXT_OR_NULL,
+      "decision-criterion": TEXT_OR_NULL
+    }
+  ]
+}
+```
+
+The `criterion.norms` and top-level `norms` arrays preserve their retained tuple
+order and may be empty. Each norm uses the displayed closed shape. This
+projection contains every field of the snapshot and therefore changes when the
+resolved norm projection changes under the same identifiers.
+
+An unchecked record has empty source and diagnostic tuples and uses:
+
+```text
+{
+  "schema-version": 1,
+  "key": {"kind": "rule-criterion", "declaration": "RULE_ID", "criterion": "CRITERION_ID"},
+  "obligation": OBLIGATION_OBJECT,
+  "evaluator": {"id": "EVALUATOR_ID", "version": EVALUATOR_VERSION},
+  "enforcement": "ENFORCEMENT_CLASS",
+  "state": "unchecked",
+  "source": null
+}
+```
+
+`evaluator` and `enforcement` may instead be literal null only when the canonical
+completion requirement carries neither field. A violated record has exactly one
+source, an empty diagnostic tuple, and one of the following exhaustive payloads.
+
+Manual evidence uses:
+
+```text
+{
+  "schema-version": 1,
+  "key": {"kind": "rule-criterion", "declaration": "RULE_ID", "criterion": "CRITERION_ID"},
+  "obligation": OBLIGATION_OBJECT,
+  "evaluator": {"id": "EVALUATOR_ID", "version": EVALUATOR_VERSION},
+  "enforcement": "deliberative",
+  "state": "violated",
+  "source": {
+    "kind": "manual",
+    "evaluator": {"id": "EVALUATOR_ID", "version": EVALUATOR_VERSION},
+    "input-revision": "INPUT_REVISION",
+    "evidence": JSON_OBJECT,
+    "state": "violated"
+  }
+}
+```
+
+Assisted evidence uses:
+
+```text
+{
+  "schema-version": 1,
+  "key": {"kind": "rule-criterion", "declaration": "RULE_ID", "criterion": "CRITERION_ID"},
+  "obligation": OBLIGATION_OBJECT,
+  "evaluator": {"id": "EVALUATOR_ID", "version": EVALUATOR_VERSION},
+  "enforcement": "assisted",
+  "state": "violated",
+  "source": {
+    "kind": "assisted",
+    "evaluator": {"id": "EVALUATOR_ID", "version": EVALUATOR_VERSION},
+    "input-revision": "INPUT_REVISION",
+    "input": JSON_OBJECT,
+    "evidence": JSON_OBJECT,
+    "residual": {
+      "schema-version": 1,
+      "question": "RESIDUAL_QUESTION",
+      "state": "violated",
+      "rationale": "RATIONALE"
+    },
+    "state": "violated"
+  }
+}
+```
+
+Mechanical evidence uses:
+
+```text
+{
+  "schema-version": 1,
+  "key": {"kind": "rule-criterion", "declaration": "RULE_ID", "criterion": "CRITERION_ID"},
+  "obligation": OBLIGATION_OBJECT,
+  "evaluator": {"id": "EVALUATOR_ID", "version": EVALUATOR_VERSION},
+  "enforcement": "mechanical",
+  "state": "violated",
+  "source": {
+    "kind": "mechanical",
+    "evaluator": {"id": "EVALUATOR_ID", "version": EVALUATOR_VERSION},
+    "input-revision": "INPUT_REVISION",
+    "evidence": JSON_OBJECT,
+    "state": "violated"
+  }
+}
+```
+
+`OBLIGATION_OBJECT` is the exact object defined above. The manual fields map
+exhaustively to `RuleManualEvidence.submission`; the
+assisted fields map exhaustively to its issued detector execution and residual
+request and judgment, including the residual question; the mechanical fields map
+exhaustively to its checker result. The common fields map exhaustively to the
+completion record and canonical completion requirement. No other public carrier
+field contributes to the payload.
+
+The encoder applies RFC 8785 JSON Canonicalization Scheme (JCS) and hashes its
+UTF-8 output without a byte-order mark or trailing newline. Baseline eligibility
+therefore requires every JSON value in the payload to satisfy the I-JSON domain:
+strings contain Unicode scalar values without lone surrogates; numbers are
+finite IEEE 754 binary64 values; and integers lie in the exactly interoperable
+range from `-(2^53)+1` through `(2^53)-1`. JCS supplies ECMAScript number
+rendering, normalizes negative zero, escapes strings, and sorts object keys by
+UTF-16 code units without Unicode normalization. An otherwise valid completion
+record outside this domain remains blocking but is not baseline-eligible.
+SHA-256 over the exact JCS bytes yields
+`sha256:<lowercase hexadecimal>`, which the ledger exposes on every eligible
+record. Thus, changed evidence or state requires another reviewed baseline.
+`blocked` remains ineligible until evaluator failures expose a closed stable
+diagnostic code with canonical parameters; rendered exception text and resource
+paths are not stable digest inputs.
+
+The source loader validates and freezes baseline documents, rejects duplicate
+identifiers, and issues one immutable process-local registry. Each registry
+entry retains the loader-normalized POSIX source path and the SHA-256 of the
+exact source bytes. A separate selection operation receives that registry and
+an exact tuple of identifiers, snapshots the tuple once, rejects duplicates and
+unknown identifiers, and issues an immutable `MigrationBaselineSelection`. The
+completion builder accepts only that issued selection through an optional
+keyword argument. It never discovers, creates, extends, or refreshes a baseline
+from the current run. Omitting the argument selects no baseline.
+
+A selected baseline matches exactly one canonical rule-criterion record by key,
+expected state, and finding digest. Its `manifest` must equal
+`resolution.unit.manifest`, and its owner must equal the owner of that exact
+composition-manifest declaration in the resolved registry. The baseline cannot
+confer authority on its own `owner` string. The targeted rule owner remains
+derived provenance but grants no local migration authority. A baseline for
+another manifest, an unmatched selection, several selections for one record, or
+one selection matching several records raises `CompletionLedgerError` and
+prevents issuance.
+
+The builder evaluates expiry against the same exact clock value used for the
+ledger timestamp. A baseline applies only when the timestamp is strictly before
+`expires-at`. An expired selected baseline raises `CompletionLedgerError`; it is
+not ignored and cannot be renewed by changing an in-memory carrier. Source,
+registry, selection, and applied-baseline identities participate in external
+issuance snapshots, so copying, reconstruction, equal-value replacement,
+callback mutation, or embedded-state rewriting cannot establish authority.
+
+An applied baseline is retained on its `CompletionRecord` beside the unchanged
+`violated` or `unchecked` state and finding digest. Record success admits
+`satisfied`, justified `inapplicable`, or an eligible rule-criterion state with
+one valid applied baseline. Overall success still requires every effective
+procedure outcome to be successful. The ledger retains the exact registry and
+selection authorities. The applied record points to the exact registry entry
+and exposes its source path and source SHA-256, so a reviewer can recover the
+reviewed authorization. Ledger authority re-derives the digest, manifest,
+owner, match, expiry, applied baseline, provenance, record disposition, and
+overall success.
+
+Contract tests plant an invalid source field, key tag, identifier, migration
+label, manifest, timestamp form, duplicate identifier, unknown or duplicate
+selection, copied registry and selection, wrong manifest, manifest owner, key,
+state, digest, source path, or source hash, blocked, satisfied, inapplicable,
+procedure, or operation target, one baseline matching no record, several
+baselines matching one record, expiry equality, expiry before the clock,
+clock-time source mutation, changed obligation or selected norms, changed
+evidence after authoring, attempted
+procedure-outcome waiver, and post-issuance ledger mutation. Digest tests use
+fixed expected bytes and hashes for every source variant, negative zero,
+exponent-form numbers, non-BMP keys, control characters, and the admitted
+integer limits; lone surrogates and out-of-range integers must be ineligible.
+Each case must fail at its owning boundary. One valid violated and one valid
+unchecked rule-criterion case must retain the blocking state, expose the applied
+baseline and its provenance, and permit success only when every procedure
+outcome independently succeeds.
+
 A `ManualJudgmentSubmission` is an untrusted human assertion. The assertion contains the
 exact obligation key, evaluator reference, admitted input revision, and evidence
 object. The revision identifies the manual evidence protocol used to construct

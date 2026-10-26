@@ -250,9 +250,9 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Harden `ResolutionResult`, `AttentionRequirements`, and `AttentionPlan` with external issuance snapshots that cover the complete resolved unit and trace, canonical requirement projections, packet entries, evaluator invocations, runner registries, fixture authority, and assurance authority before any later evidence transaction trusts the plan.
 - [x] Issue one authenticated single-use rule-evidence transaction that evaluates every effective rule criterion in canonical order and retains deliberative, assisted, and mechanical records without making the completion ledger execute evaluators.
 - [x] Issue the complete immutable ledger from optional authenticated rule evidence and a once-snapshotted mapping of every effective procedure to an exact terminal transcript or complete uncleared pre-action evidence; require admissible evidence for every effective obligation and a successful transcript for every effective procedure.
-- [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.
+- [ ] Implement the reviewed migration-baseline boundary: permit only explicitly selected, manifest-scoped, manifest-owner-authorized, expiring baselines for exact violated or unchecked rule-criterion findings; keep procedure, operation, and blocked findings unwaivable.
 
-**Exit evidence:** clean checker output cannot complete an unmapped obligation. Unchecked, violated, or blocked rule criteria, procedure predicates, or per-action operation preconditions prevent success; only obligations excluded by a completed authored path may be inapplicable.
+**Exit evidence:** clean checker output cannot complete an unmapped obligation. Unbaselined unchecked or violated rule criteria, every blocked rule criterion, and every unchecked, violated, or blocked procedure predicate or per-action operation precondition prevent success; only obligations excluded by a completed authored path may be inapplicable.
 
 ### Projections and compatibility
 
