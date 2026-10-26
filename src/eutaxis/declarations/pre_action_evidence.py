@@ -13,7 +13,11 @@ from weakref import ReferenceType, WeakKeyDictionary, ref
 
 from ._runner_support import exception_detail, validate_synchronous_runner
 from .applicability import ApplicabilityTrace, TruthValue
-from .attention import CompletionRequirement, ProcedurePredicateKey
+from .attention import (
+    CompletionRequirement,
+    ProcedurePredicateKey,
+    _validate_assurance,
+)
 from .embedded_schema import validate_json_instance
 from .exceptions import (
     CheckerExecutionError,
@@ -539,6 +543,7 @@ def _execute_mechanical(
     if registry is None:
         _fail(("mechanical",), "checker registry is absent")
     invocation = record.entry.invocation
+    _revalidate_mechanical_assurance(plan)
     try:
         result = execute_checker(
             registry,
@@ -547,12 +552,17 @@ def _execute_mechanical(
             input_data=record.evaluator_input.input_data,
         )
     except CheckerExecutionError as exc:
+        _revalidate_mechanical_assurance(plan)
         _require_authority(plan, observation)
         if _is_runner_or_result_error(exc.document_path):
             return MechanicalPreconditionEvidence(
                 record.requirement, EvaluationState.BLOCKED, None, exc.detail
             )
         raise PreActionEvidenceError(exc.location, exc.detail) from exc
+    except BaseException:
+        _revalidate_mechanical_assurance(plan)
+        raise
+    _revalidate_mechanical_assurance(plan)
     _require_authority(plan, observation)
     retained = CheckerResult(
         VersionedReference(result.evaluator.id, result.evaluator.version),
@@ -563,6 +573,20 @@ def _execute_mechanical(
     return MechanicalPreconditionEvidence(
         record.requirement, retained.state, retained, None
     )
+
+
+def _revalidate_mechanical_assurance(
+    plan: ProcedurePreconditionEvaluationPlan,
+) -> None:
+    attention = plan.run.attention
+    if attention.fixture_index is None or attention.assurance is None:
+        _fail(("assurance",), "mechanical preconditions require checker assurance")
+    try:
+        _validate_assurance(
+            attention.requirements, attention.fixture_index, attention.assurance
+        )
+    except Exception as exc:
+        _fail(("assurance",), exception_detail(exc), cause=exc)
 
 
 def _validate_residual_judgment(

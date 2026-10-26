@@ -34,7 +34,7 @@ from .attention import (
 from .embedded_schema import validate_json_instance
 from .enforcement import EnforcementClass, PredicatePhase, derive_enforcement_class
 from .exceptions import AttentionPlanningError, ProcedureEvaluationPlanningError
-from .execution import KnownFailureAssurance
+from .execution import KnownFailureAssurance, _is_issued_known_failure_assurance
 from .facets import validate_applicability_expression
 from .models import (
     Criterion,
@@ -2099,7 +2099,9 @@ def _is_issued_procedure_precondition_evaluation_plan(plan: object) -> bool:
         ):
             return False
         if plan.mechanical:
-            _revalidate_assurance(run.attention)
+            assurance = run.attention.assurance
+            if assurance is None or not _is_issued_known_failure_assurance(assurance):
+                return False
         _require_run_graph(run, plan._run_graph, ("run",))
     except Exception:
         return False

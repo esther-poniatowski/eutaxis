@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass
+from enum import Enum
 from pathlib import Path
+from threading import Lock
 from types import MappingProxyType
 from typing import NoReturn, SupportsIndex, cast
+from weakref import WeakKeyDictionary
 
 from ._runner_support import exception_detail
 from .embedded_schema import validate_json_instance
@@ -36,6 +39,10 @@ from .source import DocumentPath, SourceMap, format_document_path, nearest_locat
 
 _ASSURANCE_ISSUER = object()
 _DETECTOR_EXECUTION_ISSUER = object()
+_ASSURANCE_LOCK = Lock()
+_ASSURANCE_STATES: WeakKeyDictionary[
+    KnownFailureAssurance, tuple[object, tuple[object, ...]]
+] = WeakKeyDictionary()
 
 
 @dataclass(frozen=True, init=False, eq=False)
@@ -99,6 +106,8 @@ class KnownFailureAssurance(Mapping[str, CheckerResult]):
     runners: CheckerRunnerRegistry
     evaluators: Mapping[VersionedReference, KnownFailureEvaluatorAssurance]
     _results: Mapping[str, CheckerResult]
+    _token: object
+    _state: tuple[object, ...]
     _issuer: object
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -147,11 +156,24 @@ class KnownFailureAssurance(Mapping[str, CheckerResult]):
 
 
 def _is_issued_known_failure_assurance(assurance: object) -> bool:
-    """Return whether ``assurance`` carries this process's executor authority."""
-    return (
-        isinstance(assurance, KnownFailureAssurance)
-        and getattr(assurance, "_issuer", None) is _ASSURANCE_ISSUER
-    )
+    """Return whether ``assurance`` retains its complete issuance authority."""
+    if (
+        type(assurance) is not KnownFailureAssurance
+        or getattr(assurance, "_issuer", None) is not _ASSURANCE_ISSUER
+        or type(getattr(assurance, "_state", None)) is not tuple
+    ):
+        return False
+    try:
+        with _ASSURANCE_LOCK:
+            issued = _ASSURANCE_STATES.get(assurance)
+        return (
+            issued is not None
+            and assurance._token is issued[0]
+            and assurance._state == issued[1]
+            and assurance._state == _capture_assurance_state(assurance)
+        )
+    except Exception:
+        return False
 
 
 def execute_detector(
@@ -430,7 +452,179 @@ def _issue_known_failure_assurance(
     object.__setattr__(assurance, "evaluators", MappingProxyType(dict(evaluators)))
     object.__setattr__(assurance, "_results", MappingProxyType(dict(results)))
     object.__setattr__(assurance, "_issuer", _ASSURANCE_ISSUER)
+    token = object()
+    state = _capture_assurance_state(assurance)
+    object.__setattr__(assurance, "_token", token)
+    object.__setattr__(assurance, "_state", state)
+    with _ASSURANCE_LOCK:
+        _ASSURANCE_STATES[assurance] = (token, state)
     return assurance
+
+
+def _capture_assurance_state(
+    assurance: KnownFailureAssurance,
+) -> tuple[object, ...]:
+    """Capture assurance carriers and values without traversing runner state."""
+    runners = assurance.runners
+    runner_state = (
+        id(runners),
+        id(runners._issuer),
+        id(runners.declarations),
+        id(runners.bindings),
+        tuple(
+            (
+                id(reference),
+                reference.id,
+                reference.version,
+                id(binding),
+                id(binding.evaluator),
+                binding.evaluator.id,
+                binding.evaluator.version,
+                id(binding.operation),
+                binding.operation.id,
+                binding.operation.version,
+                id(binding.runner),
+            )
+            for reference, binding in runners.bindings.items()
+        ),
+        id(runners.input_contracts),
+        _identity_value_state(runners.input_contracts),
+        id(runners.evaluator_records),
+        _identity_value_state(runners.evaluator_records),
+    )
+    fixtures = assurance.fixtures
+    fixture_state = (
+        id(fixtures),
+        str(fixtures.root),
+        id(fixtures.paths),
+        tuple(str(path) for path in fixtures.paths),
+        id(fixtures.fixtures),
+        tuple(
+            _fixture_authority_state(key, value)
+            for key, value in fixtures.fixtures.items()
+        ),
+        id(fixtures._issuer),
+    )
+    evaluator_state = (
+        id(assurance.evaluators),
+        tuple(
+            (
+                id(reference),
+                reference.id,
+                reference.version,
+                id(value),
+                id(value.evaluator),
+                value.evaluator.id,
+                value.evaluator.version,
+                id(value.fixtures),
+                tuple(
+                    (
+                        id(item),
+                        item.fixture_id,
+                        id(item.result),
+                        _checker_result_state(item.result),
+                    )
+                    for item in value.fixtures
+                ),
+            )
+            for reference, value in assurance.evaluators.items()
+        ),
+    )
+    result_state = (
+        id(assurance._results),
+        tuple(
+            (key, id(value), _checker_result_state(value))
+            for key, value in assurance._results.items()
+        ),
+    )
+    return (
+        id(assurance.declarations),
+        fixture_state,
+        runner_state,
+        evaluator_state,
+        result_state,
+    )
+
+
+def _fixture_authority_state(key: str, fixture: EvaluatorFixture) -> tuple[object, ...]:
+    return (
+        key,
+        id(fixture),
+        str(fixture.path),
+        fixture.schema_version,
+        fixture.id,
+        id(fixture.evaluator),
+        fixture.evaluator.id,
+        fixture.evaluator.version,
+        fixture.input_revision,
+        id(fixture.input),
+        freeze_json(fixture.input),
+        fixture.expected_state,
+        id(fixture.sources),
+        tuple(str(path) for path in fixture.sources),
+        str(fixture.facet_registry),
+        id(fixture.digests),
+        tuple(
+            (
+                id(digest),
+                str(digest.path),
+                digest.sha256,
+                digest.fixture_id,
+                digest.role,
+                id(digest.document_path),
+                tuple(digest.document_path),
+            )
+            for digest in fixture.digests
+        ),
+        id(fixture.locations),
+        _identity_value_state(fixture.locations),
+    )
+
+
+def _checker_result_state(result: CheckerResult) -> tuple[object, ...]:
+    return (
+        id(result.evaluator),
+        result.evaluator.id,
+        result.evaluator.version,
+        result.input_revision,
+        type(result.state),
+        result.state.value,
+        id(result.evidence),
+        freeze_json(result.evidence),
+    )
+
+
+def _identity_value_state(value: object) -> object:
+    """Capture nested value semantics and carrier identity for immutable authority."""
+    if isinstance(value, Enum):
+        return (type(value), value.value)
+    if value is None or type(value) in {str, int, float, bool}:
+        return value
+    if isinstance(value, Mapping):
+        return (
+            type(value),
+            id(value),
+            tuple(
+                (_identity_value_state(key), _identity_value_state(item))
+                for key, item in value.items()
+            ),
+        )
+    if type(value) is tuple:
+        return (
+            tuple,
+            id(value),
+            tuple(_identity_value_state(item) for item in value),
+        )
+    if is_dataclass(value):
+        return (
+            type(value),
+            id(value),
+            tuple(
+                (field.name, _identity_value_state(getattr(value, field.name)))
+                for field in fields(value)
+            ),
+        )
+    return (type(value), id(value))
 
 
 def _verify_fixture_digests(fixture: EvaluatorFixture) -> None:

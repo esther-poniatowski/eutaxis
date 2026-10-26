@@ -17,6 +17,7 @@ from weakref import WeakKeyDictionary
 import pytest
 
 from eutaxis.declarations import (
+    CheckerResult,
     EvaluationState,
     EvaluatorInput,
     ObservationProvider,
@@ -36,16 +37,26 @@ from eutaxis.declarations import (
     ProcedureLifecycleResidualJudgmentSubmission,
     ProcedureManualBoundaryEvidence,
     ProcedureManualLifecycleBinding,
+    ProcedureMechanicalBoundaryEvidence,
+    ProcedureMechanicalLifecycleBinding,
     ProcedureRequirementApplicabilityState,
     create_pre_action_evidence_session,
     create_procedure_execution_session,
 )
-from eutaxis.declarations.exceptions import ProcedureExecutionError
+from eutaxis.declarations.exceptions import (
+    PreActionEvidenceError,
+    ProcedureExecutionError,
+)
 from eutaxis.declarations.procedure_execution import (
     _is_issued_procedure_execution_transcript,
 )
 
-from tests.test_attention import WRITE, _detector_result, _pre_action_authorities
+from tests.test_attention import (
+    CHECKER,
+    WRITE,
+    _detector_result,
+    _pre_action_authorities,
+)
 
 
 def _entry_evidence(
@@ -54,6 +65,7 @@ def _entry_evidence(
     *,
     operation_runner=None,
     detector_runner=None,
+    checker_runner=None,
     later_requirements=True,
     evaluator_backed_lifecycle=False,
     lifecycle_location="invariant",
@@ -79,6 +91,9 @@ def _entry_evidence(
                     {}
                     if detector_runner is None
                     else {"detector_runner": detector_runner}
+                ),
+                **(
+                    {} if checker_runner is None else {"checker_runner": checker_runner}
                 ),
             }
         ),
@@ -585,6 +600,627 @@ def test_assisted_lifecycle_runs_at_each_realized_invariant_boundary(
     )
 
 
+def test_mechanical_operation_precondition_runs_at_its_action_boundary(
+    tmp_path,
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+        lifecycle_location="operation-precondition",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    requests = []
+
+    def input_provider(request):
+        requests.append(request)
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+
+    assert len(requests) == 1
+    assert requests[0].coordinate.kind is ProcedureBoundaryKind.ACTION
+    evidence = transcript.boundaries[0].evidence
+    assert evidence is not None
+    assert any(
+        isinstance(record, ProcedureMechanicalBoundaryEvidence)
+        for record in evidence.records
+    )
+
+
+@pytest.mark.parametrize("operation_succeeds,expected_calls", [(True, 1), (False, 0)])
+def test_mechanical_postcondition_runs_only_when_its_terminal_is_reached(
+    tmp_path, operation_succeeds, expected_calls
+) -> None:
+    result = (
+        OperationSuccess(WRITE, {"written": True})
+        if operation_succeeds
+        else OperationFailure(WRITE, "write-failed")
+    )
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+        lifecycle_location="postcondition",
+        operation_runner=lambda input_data: result,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    calls = 0
+
+    def input_provider(request):
+        nonlocal calls
+        calls += 1
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+
+    assert calls == expected_calls
+    applicability = next(
+        item.state
+        for item in transcript.applicability
+        if item.requirement.evaluator is not None
+    )
+    assert applicability is (
+        ProcedureRequirementApplicabilityState.APPLICABLE
+        if operation_succeeds
+        else ProcedureRequirementApplicabilityState.INAPPLICABLE
+    )
+
+
+@pytest.mark.parametrize(
+    "state",
+    [EvaluationState.SATISFIED, EvaluationState.VIOLATED, EvaluationState.BLOCKED],
+)
+def test_mechanical_lifecycle_uses_each_valid_checker_state(tmp_path, state) -> None:
+    calls = 0
+
+    def checker(input_data):
+        nonlocal calls
+        calls += 1
+        selected = (
+            EvaluationState.VIOLATED
+            if calls == 1
+            else (EvaluationState.SATISFIED if calls == 2 else state)
+        )
+        return CheckerResult(CHECKER, "declaration-v1", selected, {"accepted": True})
+
+    operation_calls = 0
+
+    def operation(input_data):
+        nonlocal operation_calls
+        operation_calls += 1
+        return OperationSuccess(WRITE, {"written": True})
+
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+        checker_runner=checker,
+        operation_runner=operation,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+
+    evidence = transcript.boundaries[0].evidence
+    assert evidence is not None
+    record = next(
+        record
+        for record in evidence.records
+        if isinstance(record, ProcedureMechanicalBoundaryEvidence)
+    )
+    assert record.state is state
+    assert operation_calls == (1 if state is EvaluationState.SATISFIED else 0)
+
+
+@pytest.mark.parametrize("reached", [True, False])
+def test_mechanical_fixture_freshness_is_checked_only_for_reached_requirements(
+    tmp_path, reached
+) -> None:
+    operation_result = (
+        OperationSuccess(WRITE, {"written": True})
+        if reached
+        else OperationFailure(WRITE, "write-failed")
+    )
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+        lifecycle_location="postcondition",
+        operation_runner=lambda input_data: operation_result,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    fixture_index = entry.plan.run.attention.fixture_index
+    assert fixture_index is not None
+    fixture = next(iter(fixture_index.fixtures.values()))
+    source = next(digest.path for digest in fixture.digests if digest.role == "source")
+    source.write_text("changed: true\n", encoding="utf-8")
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+
+    if reached:
+        assert (
+            transcript.adjudication_disposition
+            is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+        )
+        assert transcript.failure is not None
+        assert transcript.failure.stage is ProcedureFailureStage.AUTHORITY
+    else:
+        assert (
+            transcript.adjudication_disposition
+            is ProcedureAdjudicationDisposition.ACCEPTED
+        )
+        assert (
+            transcript.graph_disposition is ProcedureGraphDisposition.FAILURE_TERMINAL
+        )
+
+
+def test_mechanical_input_mismatch_aborts_before_checker(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            {**specification.invocation.input_data, "sources": ["different.yaml"]},
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.EVALUATOR_INPUT
+
+
+def test_mechanical_checker_runner_failure_becomes_blocked_evidence(tmp_path) -> None:
+    calls = 0
+
+    def checker(input_data):
+        nonlocal calls
+        calls += 1
+        if calls >= 3:
+            raise RuntimeError("checker failed")
+        return CheckerResult(
+            CHECKER,
+            "declaration-v1",
+            (EvaluationState.VIOLATED if calls == 1 else EvaluationState.SATISFIED),
+            {"accepted": True},
+        )
+
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+        checker_runner=checker,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+
+    evidence = transcript.boundaries[0].evidence
+    assert evidence is not None and evidence.complete
+    record = next(
+        record
+        for record in evidence.records
+        if isinstance(record, ProcedureMechanicalBoundaryEvidence)
+    )
+    assert record.state is EvaluationState.BLOCKED
+    assert record.result is None and record.diagnostic is not None
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORIZATION_ABORTED
+    )
+
+
+@pytest.mark.parametrize("mutation_stage", ["input", "checker"])
+def test_mechanical_fixture_staleness_has_authority_precedence(
+    tmp_path, mutation_stage
+) -> None:
+    calls = 0
+    source = None
+
+    def checker(input_data):
+        nonlocal calls
+        calls += 1
+        if mutation_stage == "checker" and calls >= 3:
+            assert source is not None
+            source.write_text("changed: true\n", encoding="utf-8")
+        return CheckerResult(
+            CHECKER,
+            "declaration-v1",
+            (EvaluationState.VIOLATED if calls == 1 else EvaluationState.SATISFIED),
+            {"accepted": True},
+        )
+
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+        checker_runner=checker,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    fixture_index = entry.plan.run.attention.fixture_index
+    assert fixture_index is not None
+    fixture = next(iter(fixture_index.fixtures.values()))
+    source = next(digest.path for digest in fixture.digests if digest.role == "source")
+
+    def input_provider(request):
+        if mutation_stage == "input":
+            assert source is not None
+            source.write_text("changed: true\n", encoding="utf-8")
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+    )
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.AUTHORITY
+
+
+def test_mechanical_fixture_staleness_precedes_input_provider_failure(
+    tmp_path,
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    fixture_index = entry.plan.run.attention.fixture_index
+    assert fixture_index is not None
+    fixture = next(iter(fixture_index.fixtures.values()))
+    source = next(digest.path for digest in fixture.digests if digest.role == "source")
+
+    def input_provider(request):
+        source.write_text("changed: true\n", encoding="utf-8")
+        raise RuntimeError("provider failed after invalidating authority")
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+    )
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.AUTHORITY
+    assert transcript.failure.diagnostic is not None
+    assert "source file changed" in transcript.failure.diagnostic
+
+
+def test_mechanical_fixture_staleness_precedes_input_provider_interruption(
+    tmp_path,
+) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    fixture_index = entry.plan.run.attention.fixture_index
+    assert fixture_index is not None
+    fixture = next(iter(fixture_index.fixtures.values()))
+    source = next(digest.path for digest in fixture.digests if digest.role == "source")
+    session = create_procedure_execution_session(entry, registry)
+
+    def input_provider(request):
+        source.write_text("changed: true\n", encoding="utf-8")
+        raise KeyboardInterrupt("provider interrupted after invalidating authority")
+
+    with pytest.raises(KeyboardInterrupt):
+        session.execute(
+            evidence_bindings={
+                specification.source_key: ProcedureMechanicalLifecycleBinding(
+                    input_provider
+                )
+            }
+        )
+
+    transcript = session.transcript
+    assert transcript is not None
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+    )
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.AUTHORITY
+
+
+def test_pre_action_mechanical_evidence_rechecks_fixture_freshness(
+    tmp_path,
+) -> None:
+    calls = 0
+
+    def checker(input_data):
+        nonlocal calls
+        calls += 1
+        return CheckerResult(
+            CHECKER,
+            "declaration-v1",
+            EvaluationState.VIOLATED,
+            {"accepted": True},
+        )
+
+    plan, observation, manual, residual = _pre_action_authorities(
+        tmp_path,
+        checker_runner=checker,
+    )
+    calls_after_assurance = calls
+    fixture_index = plan.run.attention.fixture_index
+    assert fixture_index is not None
+    fixture = next(iter(fixture_index.fixtures.values()))
+    source = next(digest.path for digest in fixture.digests if digest.role == "source")
+    source.write_text("changed: true\n", encoding="utf-8")
+
+    with pytest.raises(PreActionEvidenceError, match="source file changed"):
+        create_pre_action_evidence_session(plan, observation).execute(
+            manual=manual,
+            residual_providers=residual,
+        )
+
+    assert calls == calls_after_assurance
+
+
+def test_pre_action_mechanical_checker_failure_rechecks_fixture_freshness(
+    tmp_path,
+) -> None:
+    calls = 0
+    source = None
+
+    def checker(input_data):
+        nonlocal calls
+        calls += 1
+        if calls >= 2:
+            assert source is not None
+            source.write_text("changed: true\n", encoding="utf-8")
+            raise RuntimeError("checker failed after invalidating authority")
+        return CheckerResult(
+            CHECKER,
+            "declaration-v1",
+            EvaluationState.VIOLATED,
+            {"accepted": True},
+        )
+
+    plan, observation, manual, residual = _pre_action_authorities(
+        tmp_path,
+        checker_runner=checker,
+    )
+    fixture_index = plan.run.attention.fixture_index
+    assert fixture_index is not None
+    fixture = next(iter(fixture_index.fixtures.values()))
+    source = next(digest.path for digest in fixture.digests if digest.role == "source")
+
+    with pytest.raises(PreActionEvidenceError, match="source file changed"):
+        create_pre_action_evidence_session(plan, observation).execute(
+            manual=manual,
+            residual_providers=residual,
+        )
+
+
+def test_mechanical_checker_interruption_rechecks_fixture_freshness(tmp_path) -> None:
+    calls = 0
+    source = None
+
+    def checker(input_data):
+        nonlocal calls
+        calls += 1
+        if calls >= 3:
+            assert source is not None
+            source.write_text("changed: true\n", encoding="utf-8")
+            raise KeyboardInterrupt("checker interrupted after invalidating authority")
+        return CheckerResult(
+            CHECKER,
+            "declaration-v1",
+            (EvaluationState.VIOLATED if calls == 1 else EvaluationState.SATISFIED),
+            {"accepted": True},
+        )
+
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+        checker_runner=checker,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    fixture_index = entry.plan.run.attention.fixture_index
+    assert fixture_index is not None
+    fixture = next(iter(fixture_index.fixtures.values()))
+    source = next(digest.path for digest in fixture.digests if digest.role == "source")
+    session = create_procedure_execution_session(entry, registry)
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    with pytest.raises(KeyboardInterrupt):
+        session.execute(
+            evidence_bindings={
+                specification.source_key: ProcedureMechanicalLifecycleBinding(
+                    input_provider
+                )
+            }
+        )
+
+    transcript = session.transcript
+    assert transcript is not None
+    assert (
+        transcript.adjudication_disposition
+        is ProcedureAdjudicationDisposition.AUTHORITY_ABORTED
+    )
+    assert transcript.failure is not None
+    assert transcript.failure.stage is ProcedureFailureStage.AUTHORITY
+
+
+def test_stateful_checker_state_is_not_transcript_authority(tmp_path) -> None:
+    @dataclass
+    class StatefulChecker:
+        calls: int = 0
+
+        def __call__(self, input_data):
+            self.calls += 1
+            return CheckerResult(
+                CHECKER,
+                "declaration-v1",
+                (
+                    EvaluationState.VIOLATED
+                    if self.calls == 1
+                    else EvaluationState.SATISFIED
+                ),
+                {"accepted": True},
+            )
+
+    checker = StatefulChecker()
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+        checker_runner=checker,
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    @dataclass
+    class StatefulProvider:
+        calls: int = 0
+
+        def __call__(self, request):
+            self.calls += 1
+            return EvaluatorInput(
+                specification.invocation.input_revision,
+                specification.invocation.input_data,
+            )
+
+    provider = StatefulProvider()
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(provider)
+        }
+    )
+
+    assert (
+        transcript.adjudication_disposition is ProcedureAdjudicationDisposition.ACCEPTED
+    )
+    assert _is_issued_procedure_execution_transcript(transcript)
+    checker.calls += 1
+    assert _is_issued_procedure_execution_transcript(transcript)
+    detached_registry = transcript.authority.checker_registry
+    assert detached_registry is not None
+    binding = next(iter(detached_registry.bindings.values()))
+    object.__setattr__(binding, "runner", lambda input_data: None)
+    assert not _is_issued_procedure_execution_transcript(transcript)
+
+
+def test_checker_registry_issuer_is_transcript_authority(tmp_path) -> None:
+    entry, registry = _entry_evidence(
+        tmp_path,
+        lambda request: {facet: True for facet in request.facets},
+        evaluator_backed_lifecycle="mechanical",
+        operation_runner=lambda input_data: OperationSuccess(WRITE, {"written": True}),
+    )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+
+    def input_provider(request):
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+    detached_registry = transcript.authority.checker_registry
+    assert detached_registry is not None
+
+    object.__setattr__(detached_registry, "_issuer", object())
+
+    assert not _is_issued_procedure_execution_transcript(transcript)
+
+
 def test_manual_lifecycle_derives_each_occurrence_from_its_exact_request(
     tmp_path,
 ) -> None:
@@ -624,16 +1260,42 @@ def test_manual_lifecycle_derives_each_occurrence_from_its_exact_request(
     )
 
 
-def test_mechanical_lifecycle_rejection_precedes_claim_installation(tmp_path) -> None:
+def test_mechanical_lifecycle_runs_at_each_realized_invariant_boundary(
+    tmp_path,
+) -> None:
     entry, registry = _entry_evidence(
         tmp_path,
         lambda request: {facet: True for facet in request.facets},
         evaluator_backed_lifecycle="mechanical",
     )
+    specification = entry.plan.run.lifecycle_evaluations[0]
+    requests = []
 
-    for _ in range(2):
-        with pytest.raises(ProcedureExecutionError, match="mechanical lifecycle"):
-            create_procedure_execution_session(entry, registry)
+    def input_provider(request):
+        requests.append(request)
+        return EvaluatorInput(
+            specification.invocation.input_revision,
+            specification.invocation.input_data,
+        )
+
+    transcript = create_procedure_execution_session(entry, registry).execute(
+        evidence_bindings={
+            specification.source_key: ProcedureMechanicalLifecycleBinding(
+                input_provider
+            )
+        }
+    )
+
+    assert tuple(request.coordinate.occurrence for request in requests) == (0, 1)
+    assert (
+        sum(
+            isinstance(record, ProcedureMechanicalBoundaryEvidence)
+            for boundary in transcript.boundaries
+            if boundary.evidence is not None
+            for record in boundary.evidence.records
+        )
+        == 2
+    )
 
 
 @pytest.mark.parametrize("conclusion", ["violated", "blocked"])

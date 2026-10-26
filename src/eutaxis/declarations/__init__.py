@@ -229,6 +229,8 @@ from .procedure_execution import (
     ProcedureLifecycleResidualProvider,
     ProcedureManualBoundaryEvidence,
     ProcedureManualLifecycleBinding,
+    ProcedureMechanicalBoundaryEvidence,
+    ProcedureMechanicalLifecycleBinding,
     ProcedureObservedBoundaryEvidence,
     ProcedureRequirementApplicability,
     ProcedureRequirementApplicabilityState,

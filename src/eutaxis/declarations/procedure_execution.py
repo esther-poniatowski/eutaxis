@@ -20,19 +20,25 @@ from .attention import (
     OperationPredicateKey,
     ProcedureObligationSnapshot,
     ProcedurePredicateKey,
+    _validate_assurance,
 )
 from .embedded_schema import validate_json_instance
 from .enforcement import EnforcementClass, PredicatePhase
 from .exceptions import (
+    CheckerExecutionError,
     DetectorExecutionError,
     OperationExecutionError,
     ProcedureExecutionError,
 )
 from .execution import (
+    KnownFailureAssurance,
     DetectorExecution,
+    _capture_assurance_state,
     _is_issued_detector_execution,
+    execute_checker,
     execute_detector,
 )
+from .fixtures import EvaluatorFixtureIndex
 from .models import (
     EvaluatorDeclaration,
     JsonValue,
@@ -66,8 +72,13 @@ from .procedure_runs import (
     PreparedManualLifecycleEvaluation,
     PreparedMechanicalLifecycleEvaluation,
 )
-from .results import EvaluationState
-from .runners import DetectorRunnerBinding, DetectorRunnerRegistry
+from .results import CheckerResult, EvaluationState
+from .runners import (
+    CheckerRunnerBinding,
+    CheckerRunnerRegistry,
+    DetectorRunnerBinding,
+    DetectorRunnerRegistry,
+)
 from .source import format_document_path
 
 _SESSION_ISSUER = object()
@@ -211,8 +222,15 @@ class ProcedureAssistedLifecycleBinding:
     residual_provider: ProcedureLifecycleResidualProvider
 
 
+@dataclass(frozen=True)
+class ProcedureMechanicalLifecycleBinding:
+    input_provider: ProcedureLifecycleEvaluatorInputProvider
+
+
 ProcedureLifecycleBinding: TypeAlias = (
-    ProcedureManualLifecycleBinding | ProcedureAssistedLifecycleBinding
+    ProcedureManualLifecycleBinding
+    | ProcedureAssistedLifecycleBinding
+    | ProcedureMechanicalLifecycleBinding
 )
 
 
@@ -239,10 +257,19 @@ class ProcedureAssistedBoundaryEvidence:
     diagnostic: str | None
 
 
+@dataclass(frozen=True)
+class ProcedureMechanicalBoundaryEvidence:
+    requirement: CompletionRequirement
+    state: EvaluationState
+    result: CheckerResult | None
+    diagnostic: str | None
+
+
 ProcedureBoundaryRecord: TypeAlias = (
     ProcedureObservedBoundaryEvidence
     | ProcedureManualBoundaryEvidence
     | ProcedureAssistedBoundaryEvidence
+    | ProcedureMechanicalBoundaryEvidence
 )
 
 
@@ -308,6 +335,10 @@ class ProcedureExecutionAuthoritySnapshot:
     lifecycle_evaluations: tuple[PreparedLifecycleEvaluation, ...]
     detector_registry_origin: DetectorRunnerRegistry | None
     detector_registry: DetectorRunnerRegistry | None
+    checker_registry_origin: CheckerRunnerRegistry | None
+    checker_registry: CheckerRunnerRegistry | None
+    fixture_index_origin: EvaluatorFixtureIndex | None
+    assurance_origin: KnownFailureAssurance | None
     lifecycle: tuple[CompletionRequirement, ...]
     actions: tuple[PreparedProcedureAction, ...]
     procedure_id: str
@@ -356,6 +387,9 @@ class _SessionControl:
     provider: object
     operation_registry: OperationRunnerRegistry
     detector_registry: DetectorRunnerRegistry | None
+    checker_registry: CheckerRunnerRegistry | None
+    fixture_index: EvaluatorFixtureIndex | None
+    assurance: KnownFailureAssurance | None
     authority: ProcedureExecutionAuthoritySnapshot
     lifecycle: tuple[CompletionRequirement, ...]
     lifecycle_evaluations: tuple[PreparedLifecycleEvaluation, ...]
@@ -700,14 +734,6 @@ def create_procedure_execution_session(
     run = entry_evidence.plan.run
     lifecycle = _lifecycle_requirements(run)
     lifecycle_origins = run.lifecycle_evaluations
-    if any(
-        type(item) is PreparedMechanicalLifecycleEvaluation
-        for item in lifecycle_origins
-    ):
-        _fail(
-            ("requirements",),
-            "mechanical lifecycle requirements are not supported",
-        )
     _validate_lifecycle_timing(lifecycle_origins)
     detached_evaluations = cast(
         tuple[PreparedLifecycleEvaluation, ...],
@@ -738,6 +764,7 @@ def create_procedure_execution_session(
         contracts=run._operation_registry_state.contracts,
     )
     detached_detector_registry = _detach_detector_registry(run)
+    detached_checker_registry = _detach_checker_registry(run)
     parameters = cast(Mapping[str, JsonValue], _detach(run.parameters))
     procedure_id = run.procedure.id
     entry_action = run.procedure.entry
@@ -759,6 +786,10 @@ def create_procedure_execution_session(
         lifecycle_evaluations=detached_evaluations,
         detector_registry_origin=run.attention.detector_registry,
         detector_registry=detached_detector_registry,
+        checker_registry_origin=run.attention.checker_registry,
+        checker_registry=detached_checker_registry,
+        fixture_index_origin=run.attention.fixture_index,
+        assurance_origin=run.attention.assurance,
         lifecycle=detached_lifecycle,
         actions=detached_actions,
         procedure_id=procedure_id,
@@ -794,6 +825,9 @@ def create_procedure_execution_session(
             provider=observation_registry.provider,
             operation_registry=detached_operation_registry,
             detector_registry=detached_detector_registry,
+            checker_registry=detached_checker_registry,
+            fixture_index=run.attention.fixture_index,
+            assurance=run.attention.assurance,
             authority=authority,
             lifecycle=detached_lifecycle,
             lifecycle_evaluations=detached_evaluations,
@@ -867,6 +901,9 @@ def _require_control_authority(control: _SessionControl) -> None:
     if (
         control.operation_registry is not authority.operation_registry
         or control.detector_registry is not authority.detector_registry
+        or control.checker_registry is not authority.checker_registry
+        or control.fixture_index is not authority.fixture_index_origin
+        or control.assurance is not authority.assurance_origin
         or control.lifecycle is not authority.lifecycle
         or control.lifecycle_evaluations is not authority.lifecycle_evaluations
         or control.lifecycle_evaluation_origins
@@ -992,7 +1029,11 @@ def _prepare_provider_authority(
         item
         for item in control.lifecycle_evaluation_origins
         if type(item)
-        in {PreparedManualLifecycleEvaluation, PreparedAssistedLifecycleEvaluation}
+        in {
+            PreparedManualLifecycleEvaluation,
+            PreparedAssistedLifecycleEvaluation,
+            PreparedMechanicalLifecycleEvaluation,
+        }
     )
     if supplied is None:
         if expected:
@@ -1044,7 +1085,7 @@ def _prepare_provider_authority(
             _require_control_authority(control)
             if typed_manual.provider is not manual_provider:
                 _fail(("evidence-bindings", index), "manual provider changed")
-        else:
+        elif type(specification) is PreparedAssistedLifecycleEvaluation:
             if type(binding) is not ProcedureAssistedLifecycleBinding:
                 _fail(("evidence-bindings", index), "assisted binding kind differs")
             typed_assisted = cast(ProcedureAssistedLifecycleBinding, binding)
@@ -1065,17 +1106,35 @@ def _prepare_provider_authority(
                 residual_provider,
                 ("evidence-bindings", index, "residual-provider"),
             )
+        else:
+            if type(binding) is not ProcedureMechanicalLifecycleBinding:
+                _fail(("evidence-bindings", index), "mechanical binding kind differs")
+            typed_mechanical = cast(ProcedureMechanicalLifecycleBinding, binding)
+            input_provider = typed_mechanical.input_provider
+            captured = (input_provider,)
+            _validate_callback(
+                input_provider,
+                ("evidence-bindings", index, "input-provider"),
+            )
+            _require_control_authority(control)
+            if typed_mechanical.input_provider is not input_provider:
+                _fail(("evidence-bindings", index), "mechanical provider changed")
         _require_control_authority(control)
         if type(binding) is ProcedureManualLifecycleBinding:
             if binding.provider is not captured[0]:
                 _fail(("evidence-bindings", index), "manual provider changed")
-        else:
+        elif type(binding) is ProcedureAssistedLifecycleBinding:
             assisted_binding = cast(ProcedureAssistedLifecycleBinding, binding)
+            assisted_callbacks = cast(tuple[object, object], captured)
             if (
-                assisted_binding.input_provider is not captured[0]
-                or assisted_binding.residual_provider is not captured[1]
+                assisted_binding.input_provider is not assisted_callbacks[0]
+                or assisted_binding.residual_provider is not assisted_callbacks[1]
             ):
                 _fail(("evidence-bindings", index), "assisted provider changed")
+        else:
+            mechanical_binding = cast(ProcedureMechanicalLifecycleBinding, binding)
+            if mechanical_binding.input_provider is not captured[0]:
+                _fail(("evidence-bindings", index), "mechanical provider changed")
         keys.append(cast(AttentionObligationKey, key))
         bindings.append(cast(ProcedureLifecycleBinding, binding))
         callbacks.append(captured)
@@ -1118,6 +1177,9 @@ def _require_provider_authority(
                 or binding.residual_provider is not callbacks[1]
             ):
                 _fail(("evidence-bindings", index), "assisted provider changed")
+        elif type(binding) is ProcedureMechanicalLifecycleBinding:
+            if len(callbacks) != 1 or binding.input_provider is not callbacks[0]:
+                _fail(("evidence-bindings", index), "mechanical provider changed")
         else:
             _fail(("evidence-bindings", index), "binding carrier changed")
 
@@ -1175,11 +1237,12 @@ def _evaluate_boundary(
             )
             record = assisted_record
         else:
-            return boundaries[-1], ProcedureExecutionFailure(
+            mechanical_record, failure = _evaluate_mechanical(
+                control,
                 coordinate,
-                ProcedureFailureStage.AUTHORITY,
-                "mechanical lifecycle evaluation reached execution",
+                cast(PreparedMechanicalLifecycleEvaluation, specification),
             )
+            record = mechanical_record
         if failure is not None:
             return boundaries[-1], failure
         assert record is not None
@@ -1335,9 +1398,15 @@ def _evaluate_assisted(
     try:
         returned_input = provider(input_request)
     except Exception as exc:
+        freshness_failure = _mechanical_authority_failure(control, coordinate)
+        if freshness_failure is not None:
+            return None, freshness_failure
         return None, ProcedureExecutionFailure(
             coordinate, ProcedureFailureStage.EVALUATOR_INPUT, _safe_detail(exc)
         )
+    except BaseException:
+        _mechanical_authority_failure(control, coordinate)
+        raise
     authority_failure = _post_callback_authority_failure(control, coordinate)
     if authority_failure is not None:
         return None, authority_failure
@@ -1350,6 +1419,9 @@ def _evaluate_assisted(
         return None, ProcedureExecutionFailure(
             coordinate, ProcedureFailureStage.EVALUATOR_INPUT, exc.detail
         )
+    except BaseException:
+        _mechanical_authority_failure(control, coordinate)
+        raise
     authority_failure = _post_callback_authority_failure(control, coordinate)
     if authority_failure is not None:
         return None, authority_failure
@@ -1435,6 +1507,133 @@ def _evaluate_assisted(
     )
 
 
+def _evaluate_mechanical(
+    control: _SessionControl,
+    coordinate: ProcedureBoundaryCoordinate,
+    specification: PreparedMechanicalLifecycleEvaluation,
+) -> tuple[
+    ProcedureMechanicalBoundaryEvidence | None, ProcedureExecutionFailure | None
+]:
+    freshness_failure = _mechanical_authority_failure(control, coordinate)
+    if freshness_failure is not None:
+        return None, freshness_failure
+    control.active_stage = ProcedureFailureStage.EVALUATOR_INPUT
+    input_request = object.__new__(ProcedureLifecycleEvaluatorInputRequest)
+    object.__setattr__(input_request, "coordinate", coordinate)
+    object.__setattr__(input_request, "requirement", specification.requirement)
+    object.__setattr__(input_request, "_issuer", _REQUEST_ISSUER)
+    provider = cast(
+        ProcedureLifecycleEvaluatorInputProvider,
+        _callbacks_for_specification(control, specification)[0],
+    )
+    try:
+        returned_input = provider(input_request)
+    except Exception as exc:
+        freshness_failure = _mechanical_authority_failure(control, coordinate)
+        if freshness_failure is not None:
+            return None, freshness_failure
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.EVALUATOR_INPUT, _safe_detail(exc)
+        )
+    except BaseException:
+        _mechanical_authority_failure(control, coordinate)
+        raise
+    freshness_failure = _mechanical_authority_failure(control, coordinate)
+    if freshness_failure is not None:
+        return None, freshness_failure
+    try:
+        evaluator_input = _validate_lifecycle_input(specification, returned_input)
+    except _EvidenceValidationError as exc:
+        freshness_failure = _mechanical_authority_failure(control, coordinate)
+        if freshness_failure is not None:
+            return None, freshness_failure
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.EVALUATOR_INPUT, exc.detail
+        )
+    freshness_failure = _mechanical_authority_failure(control, coordinate)
+    if freshness_failure is not None:
+        return None, freshness_failure
+    registry = control.checker_registry
+    if registry is None:
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.AUTHORITY, "checker registry is absent"
+        )
+    control.active_stage = ProcedureFailureStage.CHECKER
+    try:
+        result = execute_checker(
+            registry,
+            specification.invocation.evaluator,
+            input_revision=evaluator_input.input_revision,
+            input_data=evaluator_input.input_data,
+        )
+    except CheckerExecutionError as exc:
+        freshness_failure = _mechanical_authority_failure(control, coordinate)
+        if freshness_failure is not None:
+            return None, freshness_failure
+        if exc.document_path and exc.document_path[0] in {"runner", "result"}:
+            return (
+                ProcedureMechanicalBoundaryEvidence(
+                    specification.requirement,
+                    EvaluationState.BLOCKED,
+                    None,
+                    exc.detail,
+                ),
+                None,
+            )
+        return None, ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.AUTHORITY, exc.detail
+        )
+    except BaseException:
+        _mechanical_authority_failure(control, coordinate)
+        raise
+    freshness_failure = _mechanical_authority_failure(control, coordinate)
+    if freshness_failure is not None:
+        return None, freshness_failure
+    retained = CheckerResult(
+        VersionedReference(result.evaluator.id, result.evaluator.version),
+        result.input_revision,
+        result.state,
+        cast(Mapping[str, JsonValue], freeze_json(result.evidence)),
+    )
+    return (
+        ProcedureMechanicalBoundaryEvidence(
+            specification.requirement, retained.state, retained, None
+        ),
+        None,
+    )
+
+
+def _mechanical_authority_failure(
+    control: _SessionControl, coordinate: ProcedureBoundaryCoordinate
+) -> ProcedureExecutionFailure | None:
+    authority_failure = _post_callback_authority_failure(control, coordinate)
+    if authority_failure is not None:
+        return authority_failure
+    previous_stage = control.active_stage
+    control.active_stage = ProcedureFailureStage.AUTHORITY
+    if control.fixture_index is None or control.assurance is None:
+        return ProcedureExecutionFailure(
+            coordinate,
+            ProcedureFailureStage.AUTHORITY,
+            "mechanical assurance authority is absent",
+        )
+    try:
+        _validate_assurance(
+            control.entry.plan.run.attention.requirements,
+            control.fixture_index,
+            control.assurance,
+        )
+    except Exception as exc:
+        return ProcedureExecutionFailure(
+            coordinate, ProcedureFailureStage.AUTHORITY, _safe_detail(exc)
+        )
+    authority_failure = _post_callback_authority_failure(control, coordinate)
+    if authority_failure is not None:
+        return authority_failure
+    control.active_stage = previous_stage
+    return None
+
+
 @dataclass(frozen=True)
 class _EvidenceValidationError(Exception):
     detail: str
@@ -1482,7 +1681,10 @@ def _validate_manual_judgment(
 
 
 def _validate_lifecycle_input(
-    specification: PreparedAssistedLifecycleEvaluation, returned: object
+    specification: (
+        PreparedAssistedLifecycleEvaluation | PreparedMechanicalLifecycleEvaluation
+    ),
+    returned: object,
 ) -> EvaluatorInput:
     if type(returned) is not EvaluatorInput:
         raise _EvidenceValidationError("input provider returned an invalid carrier")
@@ -1670,6 +1872,45 @@ def _detach_detector_registry(run: ProcedureRunPlan) -> DetectorRunnerRegistry |
     return snapshot
 
 
+def _detach_checker_registry(run: ProcedureRunPlan) -> CheckerRunnerRegistry | None:
+    """Detach captured checker runners and contracts for lifecycle execution."""
+    if not any(
+        type(item) is PreparedMechanicalLifecycleEvaluation
+        for item in run.lifecycle_evaluations
+    ):
+        return None
+    registry = run.attention.checker_registry
+    fixtures = run.attention.fixture_index
+    assurance = run.attention.assurance
+    if registry is None or fixtures is None or assurance is None:
+        _fail(("checker-registry",), "mechanical lifecycle authority is absent")
+    bindings = {
+        VersionedReference(reference.id, reference.version): CheckerRunnerBinding(
+            VersionedReference(binding.evaluator.id, binding.evaluator.version),
+            VersionedReference(binding.operation.id, binding.operation.version),
+            binding.runner,
+        )
+        for reference, binding in registry.bindings.items()
+    }
+    contracts = {
+        VersionedReference(reference.id, reference.version): cast(
+            Mapping[str, object], freeze_json(contract)
+        )
+        for reference, contract in registry.input_contracts.items()
+    }
+    records = {
+        VersionedReference(reference.id, reference.version): _detach(record)
+        for reference, record in registry.evaluator_records.items()
+    }
+    snapshot = object.__new__(CheckerRunnerRegistry)
+    object.__setattr__(snapshot, "declarations", registry.declarations)
+    object.__setattr__(snapshot, "bindings", MappingProxyType(bindings))
+    object.__setattr__(snapshot, "input_contracts", MappingProxyType(contracts))
+    object.__setattr__(snapshot, "evaluator_records", MappingProxyType(records))
+    object.__setattr__(snapshot, "_issuer", getattr(registry, "_issuer"))
+    return snapshot
+
+
 def _publish(
     control: _SessionControl,
     boundaries: list[ProcedureBoundaryAttempt],
@@ -1846,12 +2087,26 @@ def _provider_authority_transcript_state(
                 (id(binding.provider),)
                 if type(binding) is ProcedureManualLifecycleBinding
                 else (
-                    id(cast(ProcedureAssistedLifecycleBinding, binding).input_provider),
-                    id(
-                        cast(
-                            ProcedureAssistedLifecycleBinding, binding
-                        ).residual_provider
-                    ),
+                    (
+                        id(
+                            cast(
+                                ProcedureAssistedLifecycleBinding, binding
+                            ).input_provider
+                        ),
+                        id(
+                            cast(
+                                ProcedureAssistedLifecycleBinding, binding
+                            ).residual_provider
+                        ),
+                    )
+                    if type(binding) is ProcedureAssistedLifecycleBinding
+                    else (
+                        id(
+                            cast(
+                                ProcedureMechanicalLifecycleBinding, binding
+                            ).input_provider
+                        ),
+                    )
                 )
             ),
         )
@@ -1870,6 +2125,7 @@ def _operation_registry_state(registry: OperationRunnerRegistry) -> tuple[object
     """Capture operation authority while treating executable runners as identities."""
     return (
         id(registry),
+        id(registry._issuer),
         id(registry.declarations),
         id(registry.bindings),
         tuple(
@@ -1923,6 +2179,40 @@ def _detector_registry_state(
     )
 
 
+def _checker_registry_state(
+    registry: CheckerRunnerRegistry | None,
+) -> tuple[object, ...] | None:
+    """Capture checker authority without traversing executable runner state."""
+    if registry is None:
+        return None
+    return (
+        id(registry),
+        id(registry._issuer),
+        id(registry.declarations),
+        id(registry.bindings),
+        tuple(
+            (
+                id(reference),
+                reference.id,
+                reference.version,
+                id(binding),
+                id(binding.evaluator),
+                binding.evaluator.id,
+                binding.evaluator.version,
+                id(binding.operation),
+                binding.operation.id,
+                binding.operation.version,
+                id(binding.runner),
+            )
+            for reference, binding in registry.bindings.items()
+        ),
+        id(registry.input_contracts),
+        _identity_semantic_state(registry.input_contracts),
+        id(registry.evaluator_records),
+        _identity_semantic_state(registry.evaluator_records),
+    )
+
+
 def _operation_runner_correlations(
     registry: OperationRunnerRegistry,
 ) -> tuple[object, ...]:
@@ -1940,6 +2230,23 @@ def _operation_runner_correlations(
 
 def _detector_runner_correlations(
     registry: DetectorRunnerRegistry,
+) -> tuple[object, ...]:
+    return tuple(
+        (
+            reference.id,
+            reference.version,
+            binding.evaluator.id,
+            binding.evaluator.version,
+            binding.operation.id,
+            binding.operation.version,
+            id(binding.runner),
+        )
+        for reference, binding in registry.bindings.items()
+    )
+
+
+def _checker_runner_correlations(
+    registry: CheckerRunnerRegistry,
 ) -> tuple[object, ...]:
     return tuple(
         (
@@ -2121,6 +2428,15 @@ def _authority_transcript_state(
         _identity_semantic_state(authority.lifecycle_evaluations),
         id(authority.detector_registry_origin),
         _detector_registry_state(authority.detector_registry),
+        id(authority.checker_registry_origin),
+        _checker_registry_state(authority.checker_registry),
+        id(authority.fixture_index_origin),
+        id(authority.assurance_origin),
+        (
+            _capture_assurance_state(authority.assurance_origin)
+            if authority.assurance_origin is not None
+            else None
+        ),
         _identity_semantic_state(authority.lifecycle),
         _identity_semantic_state(authority.actions),
         authority.procedure_id,
@@ -2192,6 +2508,23 @@ def _snapshot_matches_live(
                 is run.attention.detector_registry.declarations
             )
         )
+        and authority.checker_registry_origin is run.attention.checker_registry
+        and authority.fixture_index_origin is run.attention.fixture_index
+        and authority.assurance_origin is run.attention.assurance
+        and (
+            authority.checker_registry is None
+            or (
+                run.attention.checker_registry is not None
+                and _checker_runner_correlations(authority.checker_registry)
+                == _checker_runner_correlations(run.attention.checker_registry)
+                and _semantic_state(authority.checker_registry.input_contracts)
+                == _semantic_state(run.attention.checker_registry.input_contracts)
+                and _semantic_state(authority.checker_registry.evaluator_records)
+                == _semantic_state(run.attention.checker_registry.evaluator_records)
+                and authority.checker_registry.declarations
+                is run.attention.checker_registry.declarations
+            )
+        )
         and authority.procedure_id == run.procedure.id
         and authority.entry_action == run.procedure.entry
         and authority.success_terminals
@@ -2232,6 +2565,15 @@ def _factory_authority_state(
         (
             _identity_semantic_state(run.attention.detector_registry.input_contracts)
             if run.attention.detector_registry is not None
+            else None
+        ),
+        id(run.attention.checker_registry),
+        _checker_registry_state(run.attention.checker_registry),
+        id(run.attention.fixture_index),
+        id(run.attention.assurance),
+        (
+            _capture_assurance_state(run.attention.assurance)
+            if run.attention.assurance is not None
             else None
         ),
         _semantic_state(lifecycle),

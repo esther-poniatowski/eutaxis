@@ -537,12 +537,11 @@ selects and freezes the runners that the transcript authorizes.
 The session accepts one exact binding map over the supported evaluator-backed
 lifecycle keys. A manual binding supplies one manual-judgment provider. An
 assisted binding supplies one evaluator-input provider and one residual-judgment
-provider. The map is traversed once while the session owns its execution claim,
-then validated by exact source-key identity and enforcement class. `None` is
-admitted only when the required key set is empty. A later mechanical binding
-extends this same map rather than adding a parallel argument. For this manual
-and assisted slice, a mechanical lifecycle requirement still fails at the
-factory before the run claim is installed.
+provider. A mechanical binding supplies one evaluator-input provider; the
+checker result comes only from the retained checker authority. The map is
+traversed once while the session owns its execution claim, then validated by
+exact source-key identity and enforcement class. `None` is admitted only when
+the required key set is empty.
 
 Every provider request is privately issued after its boundary is realized. A
 manual request carries the exact coordinate, detached requirement, and detached
@@ -560,15 +559,18 @@ attention-contract revision.
 
 Boundary evidence contains one record for every selected requirement in
 canonical run order. Its record union distinguishes evaluator-less observation,
-manual evidence, and assisted evidence. Each record retains the detached
-requirement and the resulting `EvaluationState`. An assisted detector runner or
-result failure produces a blocked record with a diagnostic and no residual
-judgment; the session then continues the remaining requirements at that
-boundary. Every other invalid evaluator input, manual submission, residual
-submission, or authority correlation terminates the evidence transaction. A
-`complete` flag distinguishes a fully evaluated boundary from the canonical
-record prefix published after a later callback fails. Authorization and terminal
-acceptance require a complete boundary whose records are all satisfied.
+manual evidence, assisted evidence, and mechanical evidence. Each record retains
+the detached requirement and the resulting `EvaluationState`. An assisted
+detector runner or result failure produces a blocked record with a diagnostic
+and no residual judgment. A mechanical checker runner or result failure likewise
+produces a blocked record with a diagnostic and no result, but only after the
+session revalidates structural authority and fixture freshness. The session then
+continues the remaining requirements at that boundary. Every other invalid
+evaluator input, manual submission, residual submission, or authority correlation
+terminates the evidence transaction. A `complete` flag distinguishes a fully
+evaluated boundary from the canonical record prefix published after a later
+callback fails. Authorization and terminal acceptance require a complete
+boundary whose records are all satisfied.
 
 The factory snapshot also retains the exact detector-registry origin and a
 detached detector registry containing its runner identities and invocation
@@ -580,6 +582,24 @@ retains the execution-time binding-map origin, canonical keys, binding carriers,
 and callable identities, and its authenticity snapshot covers these authorities
 and every nested boundary-evidence carrier.
 
+When the lifecycle contains a mechanical requirement, the factory also retains
+the live checker registry, fixture index, and known-failure assurance as origins,
+then constructs a detached checker registry for execution. Known-failure
+assurance issuance is recorded in a module-owned identity ledger. Rewriting the
+assurance's embedded state therefore cannot attest a mutated assurance. The
+authority projection covers the checker-registry issuer, bindings, runner
+identities, contracts, evaluator records, fixture carriers, and assurance
+results. Mutable fields inside a runner remain outside semantic authority.
+
+Fixture freshness is occurrence-scoped. The factory does not read fixture files,
+and an unreachable mechanical postcondition does not inspect them. At each
+realized mechanical occurrence, the session validates assurance authority and
+re-reads the declared fixture digests before input provision, after input
+provision, before checker execution, and after checker success, failure, or
+interruption. These checks never rerun a known-failure fixture and never rerun
+retained procedure-entry evidence. If fixture staleness coincides with a provider
+or checker failure, the authority failure takes precedence.
+
 Failure classification distinguishes untrusted evidence from retained authority.
 An evaluator-input callback has its own `evaluator-input` stage. A provider that
 raises an ordinary exception, returns an invalid carrier, returns the wrong
@@ -589,10 +609,11 @@ rationale, or replays an earlier occurrence produces `evidence-aborted`. A
 retained run, packet, registry, evaluator, input contract, provider snapshot, or
 detached specification that changed or no longer matches its issuance authority
 produces `authority-aborted`. A detector runner or result failure becomes a
-blocked record only after authority revalidation; any other detector-execution
-error is an authority failure. A `BaseException` at any callback stage is
-re-raised only after terminal publication of the completed record prefix, and
-no callback runs after an abort.
+blocked record only after authority revalidation; a checker runner or result
+failure becomes blocked only after both authority and fixture-freshness
+revalidation. Any other evaluator-execution error is an authority failure. A
+`BaseException` at any callback stage is re-raised only after terminal
+publication of the completed record prefix, and no callback runs after an abort.
 
 Every terminal publication atomically couples the lifecycle state with an
 immutable transcript. The transcript retains the completed boundary and action

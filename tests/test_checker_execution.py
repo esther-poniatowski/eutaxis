@@ -9,6 +9,7 @@ from collections import UserDict
 from collections.abc import ItemsView, Iterator, Mapping
 from dataclasses import replace
 from pathlib import Path
+from types import MappingProxyType
 from typing import cast
 
 import pytest
@@ -32,6 +33,10 @@ from eutaxis.declarations import (
     load_facet_registry,
 )
 from eutaxis.declarations.models import JsonValue
+from eutaxis.declarations.execution import (
+    _capture_assurance_state,
+    _is_issued_known_failure_assurance,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REGISTRY_FIXTURES = FIXTURES / "registry" / "valid"
@@ -530,6 +535,77 @@ def test_known_failure_assurance_is_private_identity_valued_and_process_local(
         copy.deepcopy(assurance)
     with pytest.raises(TypeError, match="cannot be serialized"):
         pickle.dumps(assurance)
+
+
+def test_known_failure_assurance_detects_equal_value_carrier_replacement(
+    tmp_path: Path,
+) -> None:
+    declarations = _declarations(tmp_path)
+    runners = _runners(declarations, lambda input_data: _result())
+    fixtures = _fixture_index(tmp_path, runners.input_contracts)
+    assurance = execute_known_failure_fixtures(declarations, fixtures, runners)
+
+    assert _is_issued_known_failure_assurance(assurance)
+    evaluator, value = next(iter(assurance.evaluators.items()))
+    object.__setattr__(
+        assurance,
+        "evaluators",
+        MappingProxyType({evaluator: replace(value)}),
+    )
+    assert not _is_issued_known_failure_assurance(assurance)
+
+
+def test_known_failure_assurance_cannot_self_attest_after_mutation(
+    tmp_path: Path,
+) -> None:
+    declarations = _declarations(tmp_path)
+    runners = _runners(declarations, lambda input_data: _result())
+    fixtures = _fixture_index(tmp_path, runners.input_contracts)
+    assurance = execute_known_failure_fixtures(declarations, fixtures, runners)
+
+    evaluator, value = next(iter(assurance.evaluators.items()))
+    object.__setattr__(
+        assurance,
+        "evaluators",
+        MappingProxyType({evaluator: replace(value)}),
+    )
+    object.__setattr__(assurance, "_state", _capture_assurance_state(assurance))
+
+    assert not _is_issued_known_failure_assurance(assurance)
+
+
+def test_known_failure_assurance_covers_runner_registry_issuer(tmp_path: Path) -> None:
+    declarations = _declarations(tmp_path)
+    runners = _runners(declarations, lambda input_data: _result())
+    fixtures = _fixture_index(tmp_path, runners.input_contracts)
+    assurance = execute_known_failure_fixtures(declarations, fixtures, runners)
+
+    object.__setattr__(runners, "_issuer", object())
+
+    assert not _is_issued_known_failure_assurance(assurance)
+
+
+def test_known_failure_assurance_ignores_runner_internal_state(tmp_path: Path) -> None:
+    class StatefulRunner:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def __call__(self, input_data):
+            self.calls += 1
+            return _result()
+
+    runner = StatefulRunner()
+    declarations = _declarations(tmp_path)
+    runners = _runners(declarations, runner)
+    fixtures = _fixture_index(tmp_path, runners.input_contracts)
+    assurance = execute_known_failure_fixtures(declarations, fixtures, runners)
+
+    assert _is_issued_known_failure_assurance(assurance)
+    runner.calls += 1
+    assert _is_issued_known_failure_assurance(assurance)
+    binding = next(iter(runners.bindings.values()))
+    object.__setattr__(binding, "runner", lambda input_data: _result())
+    assert not _is_issued_known_failure_assurance(assurance)
 
 
 @pytest.mark.parametrize(
