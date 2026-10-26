@@ -214,6 +214,29 @@ class CompletionLedgerError(Exception):
         self.detail = message
 
 
+class MigrationBaselineError(Exception):
+    """Report a malformed baseline source, registry, or selection."""
+
+    def __init__(
+        self,
+        path: Path,
+        location: str,
+        message: str,
+        *,
+        line: int | None = None,
+        column: int | None = None,
+    ) -> None:
+        source = f" (line {line}, column {column})" if line and column else ""
+        super().__init__(
+            f"Invalid migration baseline in {path} at {location}{source}: {message}"
+        )
+        self.path = path
+        self.location = location
+        self.detail = message
+        self.line = line
+        self.column = column
+
+
 class ProcedureRunPlanningError(Exception):
     """Report a failed procedure-run preflight boundary."""
 

@@ -283,6 +283,55 @@ def test_clock_cannot_forge_unchecked_requirement_state(tmp_path: Path) -> None:
         build_completion_ledger(plan, None, {}, clock=clock)
 
 
+def test_clock_cannot_equality_spoof_procedure_identifier(tmp_path: Path) -> None:
+    plan, rules, transcript = _procedure_bundle(tmp_path)
+
+    class Spoof(str):
+        def __eq__(self, _other: object) -> bool:
+            return True
+
+        __hash__ = str.__hash__
+
+    def clock() -> datetime:
+        frame = inspect.currentframe()
+        assert frame is not None and frame.f_back is not None
+        reconciliation = frame.f_back.f_locals["reconciliation"]
+        object.__setattr__(
+            reconciliation.completions[0], "procedure", Spoof("evil/procedure")
+        )
+        return NOW
+
+    with pytest.raises(
+        CompletionLedgerError, match="captured mapping authority changed"
+    ):
+        build_completion_ledger(plan, rules, {"content/write": transcript}, clock=clock)
+
+
+def test_clock_cannot_equality_spoof_evaluator_identifier(tmp_path: Path) -> None:
+    plan = rule_plan(tmp_path, "manual")
+    evidence = _rule_evidence(plan)
+
+    class Spoof(str):
+        def __eq__(self, _other: object) -> bool:
+            return True
+
+        __hash__ = str.__hash__
+
+    def clock() -> datetime:
+        frame = inspect.currentframe()
+        assert frame is not None and frame.f_back is not None
+        reconciliation = frame.f_back.f_locals["reconciliation"]
+        evaluator = reconciliation.records[0].evaluator
+        assert evaluator is not None
+        object.__setattr__(evaluator, "id", Spoof("evil/evaluator"))
+        return NOW
+
+    with pytest.raises(
+        CompletionLedgerError, match="captured reconciliation authority changed"
+    ):
+        build_completion_ledger(plan, evidence, {}, clock=clock)
+
+
 def test_cross_plan_and_additional_outcomes_are_rejected(tmp_path: Path) -> None:
     first_plan, first_rules, transcript = _procedure_bundle(tmp_path / "first")
     second_plan, second_rules, _ = _procedure_bundle(tmp_path / "second")

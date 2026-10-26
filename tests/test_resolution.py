@@ -5,8 +5,10 @@ from __future__ import annotations
 import copy
 import pickle
 import shutil
+from collections.abc import Mapping
 from dataclasses import fields, replace
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 import yaml
@@ -156,6 +158,55 @@ def test_resolution_authority_cannot_self_attest_after_mutation() -> None:
     object.__setattr__(result, "_state", _capture_resolution_authority_state(result))
 
     assert not _is_issued_resolution_result(result)
+
+
+def test_resolution_authority_binds_manifest_owner() -> None:
+    result = _resolve()
+    manifest = result.registry.records[result.unit.manifest].declaration
+
+    object.__setattr__(manifest, "owner", "forged")
+
+    assert not _is_issued_resolution_result(result)
+
+
+def test_resolution_authority_binds_manifest_record_identity() -> None:
+    result = _resolve()
+    records = dict(result.registry.records)
+    manifest_id = result.unit.manifest
+    records[manifest_id] = replace(records[manifest_id])
+
+    object.__setattr__(result.registry, "records", MappingProxyType(records))
+
+    assert not _is_issued_resolution_result(result)
+
+
+def test_resolution_rejects_preissuance_manifest_mapping_equivocation() -> None:
+    registry = _registry()
+    manifest_id = "resolution/manifest"
+    original_records = registry.records
+    original = original_records[manifest_id]
+    forged = replace(
+        original,
+        declaration=replace(original.declaration, owner="forged"),
+    )
+
+    class EquivocatingRecords(Mapping):
+        def __getitem__(self, key):
+            return forged if key == manifest_id else original_records[key]
+
+        def __iter__(self):
+            return iter(original_records)
+
+        def __len__(self):
+            return len(original_records)
+
+        def get(self, key, default=None):
+            return original_records.get(key, default)
+
+    object.__setattr__(registry, "records", EquivocatingRecords())
+
+    with pytest.raises(ValueError, match="manifest record changed"):
+        resolve_compilation_unit(registry, manifest_id, _context())
 
 
 def test_rule_set_is_expanded_but_never_becomes_effective() -> None:

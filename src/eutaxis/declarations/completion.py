@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from typing import Callable, NoReturn, SupportsIndex, TypeAlias, cast
 
@@ -23,6 +23,13 @@ from .attention import (
 from .enforcement import EnforcementClass
 from .exceptions import CompletionLedgerError
 from .models import ProcedureDeclaration, VersionedReference
+from .migration_baselines import (
+    AppliedMigrationBaseline,
+    MigrationBaselineSelection,
+    _is_issued_migration_baseline_selection,
+    baseline_expiry,
+    eligible_finding_digest,
+)
 from .pre_action_evidence import (
     AssistedPreconditionEvidence,
     MechanicalPreconditionEvidence,
@@ -114,6 +121,8 @@ class CompletionRecord:
     state: CompletionState
     sources: tuple[CompletionEvidenceSource, ...]
     diagnostics: tuple[str, ...]
+    finding_digest: str | None
+    baseline: AppliedMigrationBaseline | None
     timestamp: str
 
 
@@ -132,6 +141,7 @@ class CompletionLedger:
 
     plan: AttentionPlan
     rule_evidence: RuleEvidence | None
+    baseline_selection: MigrationBaselineSelection | None
     procedure_mapping_origin: object
     procedure_outcomes: tuple[ProcedureCompletion, ...]
     records: tuple[CompletionRecord, ...]
@@ -165,21 +175,25 @@ def build_completion_ledger(
     procedure_outcomes: Mapping[str, ProcedureOutcome],
     *,
     clock: CompletionClock,
+    baselines: MigrationBaselineSelection | None = None,
 ) -> CompletionLedger:
     """Reconcile every canonical obligation without executing an evaluator."""
     _require_plan_and_rule_evidence(plan, rule_evidence)
+    _require_baseline_selection(baselines)
     procedure_ids = _effective_procedure_ids(plan)
     try:
         supplied, outcome_snapshot = _snapshot_outcomes(
             plan, procedure_ids, procedure_outcomes
         )
     except BaseException as exc:
-        _raise_after_authority(exc, plan, rule_evidence)
+        _raise_after_authority(exc, plan, rule_evidence, baselines=baselines)
     completions = tuple(
         _procedure_completion(identifier, supplied.get(identifier))
         for identifier in procedure_ids
     )
-    _require_transaction_sources(plan, rule_evidence, completions, outcome_snapshot)
+    _require_transaction_sources(
+        plan, rule_evidence, completions, outcome_snapshot, baselines=baselines
+    )
     provisional = tuple(
         _reconcile_requirement(requirement, rule_evidence, completions)
         for requirement in plan.requirements.completion
@@ -191,6 +205,7 @@ def build_completion_ledger(
         completions,
         outcome_snapshot,
         reconciliation,
+        baselines,
     )
     try:
         _require_clock(clock)
@@ -202,9 +217,15 @@ def build_completion_ledger(
             completions,
             outcome_snapshot,
             reconciliation,
+            baselines,
         )
     _require_transaction_sources(
-        plan, rule_evidence, completions, outcome_snapshot, reconciliation
+        plan,
+        rule_evidence,
+        completions,
+        outcome_snapshot,
+        reconciliation,
+        baselines,
     )
     try:
         observed = clock()
@@ -216,10 +237,16 @@ def build_completion_ledger(
             completions,
             outcome_snapshot,
             reconciliation,
+            baselines,
             clock_failure=True,
         )
     _require_transaction_sources(
-        plan, rule_evidence, completions, outcome_snapshot, reconciliation
+        plan,
+        rule_evidence,
+        completions,
+        outcome_snapshot,
+        reconciliation,
+        baselines,
     )
     try:
         timestamp = _canonical_timestamp(observed)
@@ -231,31 +258,35 @@ def build_completion_ledger(
             completions,
             outcome_snapshot,
             reconciliation,
+            baselines,
         )
     _require_transaction_sources(
-        plan, rule_evidence, completions, outcome_snapshot, reconciliation
+        plan,
+        rule_evidence,
+        completions,
+        outcome_snapshot,
+        reconciliation,
+        baselines,
     )
-    records = tuple(
-        CompletionRecord(
-            item.key,
-            item.evaluator,
-            item.enforcement,
-            item.state,
-            item.sources,
-            item.diagnostics,
-            timestamp,
-        )
-        for item in reconciliation.records
+    records = _apply_baselines(
+        plan,
+        _materialize_records(reconciliation.records, timestamp),
+        baselines,
+        datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(
+            tzinfo=timezone.utc
+        ),
     )
     successful = all(
         item.state is ProcedureOutcomeState.SUCCESSFUL for item in completions
     ) and all(
         item.state in {CompletionState.SATISFIED, CompletionState.INAPPLICABLE}
+        or item.baseline is not None
         for item in records
     )
     ledger = object.__new__(CompletionLedger)
     object.__setattr__(ledger, "plan", plan)
     object.__setattr__(ledger, "rule_evidence", rule_evidence)
+    object.__setattr__(ledger, "baseline_selection", baselines)
     object.__setattr__(ledger, "procedure_mapping_origin", procedure_outcomes)
     object.__setattr__(ledger, "procedure_outcomes", completions)
     object.__setattr__(ledger, "records", records)
@@ -281,6 +312,7 @@ class _ProvisionalRecord:
     state: CompletionState
     sources: tuple[CompletionEvidenceSource, ...]
     diagnostics: tuple[str, ...]
+    finding_digest: str | None
 
 
 def _effective_procedure_ids(plan: AttentionPlan) -> tuple[str, ...]:
@@ -337,13 +369,19 @@ def _require_outcome(
     outcome: object,
     path: tuple[str | int, ...],
 ) -> None:
+    if type(procedure) is not str:
+        _fail(path, "procedure correlation is not exact text")
     if type(outcome) is PreActionEvidence:
         evidence = cast(PreActionEvidence, outcome)
         authority = _issued_pre_action_evidence_snapshot(evidence)
         if authority is None:
             _fail(path, "pre-action evidence is not authoritative")
         run = authority.plan.run
-        if run.attention is not plan or run.procedure.id != procedure:
+        if (
+            run.attention is not plan
+            or type(run.procedure.id) is not str
+            or run.procedure.id != procedure
+        ):
             _fail(path, "pre-action evidence correlation differs")
         if authority.cleared:
             _fail(path, "cleared pre-action evidence requires a terminal transcript")
@@ -354,6 +392,7 @@ def _require_outcome(
             _fail(path, "procedure transcript is not authoritative")
         if (
             transcript.authority.entry_attention_plan_origin is not plan
+            or type(transcript.authority.procedure_id) is not str
             or transcript.authority.procedure_id != procedure
         ):
             _fail(path, "procedure transcript correlation differs")
@@ -408,7 +447,11 @@ def _reconcile_requirement(
         if type(requirement.key) is ProcedurePredicateKey
         else cast(OperationPredicateKey, requirement.key).procedure
     )
-    completion = next(item for item in completions if item.procedure == procedure)
+    completion = next(
+        item
+        for item in completions
+        if type(item.procedure) is str and item.procedure == procedure
+    )
     if completion.outcome is None:
         return _provisional(requirement, evaluator, CompletionState.UNCHECKED)
     if type(completion.outcome) is PreActionEvidence:
@@ -497,6 +540,12 @@ def _provisional(
     sources: tuple[CompletionEvidenceSource, ...] = (),
     diagnostics: tuple[str, ...] = (),
 ) -> _ProvisionalRecord:
+    digest = eligible_finding_digest(
+        requirement,
+        state.value,
+        cast(tuple[object, ...], sources),
+        diagnostics,
+    )
     return _ProvisionalRecord(
         requirement.key,
         evaluator,
@@ -504,7 +553,81 @@ def _provisional(
         state,
         sources,
         diagnostics,
+        digest,
     )
+
+
+def _materialize_records(
+    provisional: tuple[_ProvisionalRecord, ...], timestamp: str
+) -> tuple[CompletionRecord, ...]:
+    return tuple(
+        CompletionRecord(
+            item.key,
+            item.evaluator,
+            item.enforcement,
+            item.state,
+            item.sources,
+            item.diagnostics,
+            item.finding_digest,
+            None,
+            timestamp,
+        )
+        for item in provisional
+    )
+
+
+def _apply_baselines(
+    plan: AttentionPlan,
+    records: tuple[CompletionRecord, ...],
+    selection: MigrationBaselineSelection | None,
+    observed: datetime,
+) -> tuple[CompletionRecord, ...]:
+    if selection is None:
+        return records
+    _require_baseline_selection(selection)
+    manifest = plan.resolution.unit.manifest
+    registered = plan.resolution.manifest_record
+    owner = registered.declaration.owner
+    if type(manifest) is not str or type(owner) is not str:
+        _fail(("baselines", "manifest"), "resolved manifest identity is not exact text")
+    applied = list(records)
+    claimed: set[int] = set()
+    for baseline_index, baseline in enumerate(selection.baselines):
+        path = ("baselines", baseline_index)
+        if baseline.manifest != manifest:
+            _fail(path + ("manifest",), "baseline targets another manifest")
+        if baseline.owner != owner:
+            _fail(path + ("owner",), "baseline owner differs from manifest owner")
+        if observed >= baseline_expiry(baseline.expires_at):
+            _fail(path + ("expires-at",), "baseline has expired")
+        matches = tuple(
+            index
+            for index, record in enumerate(applied)
+            if type(record.key) is RuleCriterionKey
+            and _key_signature(record.key) == _key_signature(baseline.finding.key)
+            and record.state.value == baseline.finding.state
+            and record.finding_digest == baseline.finding.digest
+        )
+        if len(matches) != 1:
+            _fail(path + ("finding",), "baseline does not match exactly one record")
+        record_index = matches[0]
+        if record_index in claimed:
+            _fail(path + ("finding",), "record already has a selected baseline")
+        claimed.add(record_index)
+        applied_baseline = AppliedMigrationBaseline(
+            baseline, baseline.source_path, baseline.source_sha256
+        )
+        applied[record_index] = replace(
+            applied[record_index], baseline=applied_baseline
+        )
+    return tuple(applied)
+
+
+def _require_baseline_selection(
+    selection: MigrationBaselineSelection | None,
+) -> None:
+    if selection is not None and not _is_issued_migration_baseline_selection(selection):
+        _fail(("baselines",), "baseline selection is not authoritative")
 
 
 def _record_with_key(
@@ -675,7 +798,9 @@ def _require_transaction_sources(
     completions: tuple[ProcedureCompletion, ...],
     mapping_snapshot: _ProcedureOutcomeSnapshot,
     reconciliation: _ReconciliationSnapshot | None = None,
+    baselines: MigrationBaselineSelection | None = None,
 ) -> None:
+    _require_baseline_selection(baselines)
     if not _is_issued_mapping_snapshot(
         mapping_snapshot
     ) or not _snapshot_matches_completions(mapping_snapshot, completions):
@@ -692,6 +817,8 @@ def _snapshot_matches_completions(
     snapshot: _ProcedureOutcomeSnapshot,
     completions: tuple[ProcedureCompletion, ...],
 ) -> bool:
+    if any(type(completion.procedure) is not str for completion in completions):
+        return False
     if any(
         completion.state is not _expected_procedure_state(completion.outcome)
         for completion in completions
@@ -702,7 +829,9 @@ def _snapshot_matches_completions(
         return False
     return all(
         any(
-            key == completion.procedure and outcome is completion.outcome
+            type(key) is str
+            and key == completion.procedure
+            and outcome is completion.outcome
             for key, outcome in snapshot.pairs
         )
         for completion in supplied
@@ -753,26 +882,24 @@ def _capture_reconciliation_snapshot_state(
 def _completion_authority_state(item: ProcedureCompletion) -> tuple[object, ...]:
     return (
         id(item),
-        item.procedure,
+        identity_value_state(item.procedure),
         item.state.value,
         id(item.outcome),
     )
 
 
 def _provisional_authority_state(item: _ProvisionalRecord) -> tuple[object, ...]:
-    evaluator = (
-        None if item.evaluator is None else (item.evaluator.id, item.evaluator.version)
-    )
     return (
         id(item),
         _key_signature(item.key),
-        evaluator,
+        identity_value_state(item.evaluator),
         None if item.enforcement is None else item.enforcement.value,
         item.state.value,
         id(item.sources),
         tuple(id(source) for source in item.sources),
         id(item.diagnostics),
         item.diagnostics,
+        identity_value_state(item.finding_digest),
     )
 
 
@@ -800,12 +927,14 @@ def _raise_after_authority(
     completions: tuple[ProcedureCompletion, ...] = (),
     mapping_snapshot: _ProcedureOutcomeSnapshot | None = None,
     reconciliation: _ReconciliationSnapshot | None = None,
+    baselines: MigrationBaselineSelection | None = None,
     *,
     clock_failure: bool = False,
 ) -> NoReturn:
     try:
         if mapping_snapshot is None:
             _require_plan_and_rule_evidence(plan, rule_evidence)
+            _require_baseline_selection(baselines)
         else:
             _require_transaction_sources(
                 plan,
@@ -813,6 +942,7 @@ def _raise_after_authority(
                 completions,
                 mapping_snapshot,
                 reconciliation,
+                baselines,
             )
     except CompletionLedgerError as authority:
         raise authority from exc
@@ -828,20 +958,27 @@ def _raise_after_authority(
     raise exc
 
 
-def _records_match_reconciliation(
+def _records_match_expected(
     records: tuple[CompletionRecord, ...],
-    expected: tuple[_ProvisionalRecord, ...],
-    timestamp: str,
+    expected: tuple[CompletionRecord, ...],
 ) -> bool:
     if len(records) != len(expected):
         return False
     for record, source in zip(records, expected):
         if (
+            type(record.timestamp) is not str
+            or type(source.timestamp) is not str
+            or record.timestamp != source.timestamp
+            or not _optional_exact_text_matches(
+                record.finding_digest, source.finding_digest
+            )
+        ):
+            return False
+        if (
             record.key is not source.key
             or record.enforcement is not source.enforcement
             or record.state is not source.state
             or record.diagnostics != source.diagnostics
-            or record.timestamp != timestamp
             or len(record.sources) != len(source.sources)
             or any(
                 actual is not canonical
@@ -849,11 +986,27 @@ def _records_match_reconciliation(
             )
         ):
             return False
+        if record.baseline is None or source.baseline is None:
+            if record.baseline is not source.baseline:
+                return False
+        elif (
+            record.baseline.baseline is not source.baseline.baseline
+            or type(record.baseline.source_path) is not str
+            or type(record.baseline.source_sha256) is not str
+            or record.baseline.source_path != source.baseline.source_path
+            or record.baseline.source_sha256 != source.baseline.source_sha256
+        ):
+            return False
         if record.evaluator is None or source.evaluator is None:
             if record.evaluator is not source.evaluator:
                 return False
         elif (
             type(record.evaluator) is not VersionedReference
+            or type(source.evaluator) is not VersionedReference
+            or type(record.evaluator.id) is not str
+            or type(source.evaluator.id) is not str
+            or type(record.evaluator.version) is not int
+            or type(source.evaluator.version) is not int
             or record.evaluator.id != source.evaluator.id
             or record.evaluator.version != source.evaluator.version
         ):
@@ -861,10 +1014,17 @@ def _records_match_reconciliation(
     return True
 
 
+def _optional_exact_text_matches(left: str | None, right: str | None) -> bool:
+    if left is None or right is None:
+        return left is right
+    return type(left) is str and type(right) is str and left == right
+
+
 def _capture_ledger_state(ledger: CompletionLedger) -> tuple[object, ...]:
     return (
         id(ledger.plan),
         id(ledger.rule_evidence),
+        id(ledger.baseline_selection),
         id(ledger.procedure_mapping_origin),
         id(ledger._procedure_mapping_snapshot),
         _capture_mapping_snapshot_state(ledger._procedure_mapping_snapshot),
@@ -874,7 +1034,7 @@ def _capture_ledger_state(ledger: CompletionLedger) -> tuple[object, ...]:
         tuple(
             (
                 id(item),
-                item.procedure,
+                identity_value_state(item.procedure),
                 item.state.value,
                 id(item.outcome),
             )
@@ -892,11 +1052,14 @@ def _capture_ledger_state(ledger: CompletionLedger) -> tuple[object, ...]:
                 tuple(id(source) for source in item.sources),
                 id(item.diagnostics),
                 item.diagnostics,
-                item.timestamp,
+                identity_value_state(item.finding_digest),
+                id(item.baseline),
+                identity_value_state(item.baseline),
+                identity_value_state(item.timestamp),
             )
             for item in ledger.records
         ),
-        ledger.timestamp,
+        identity_value_state(ledger.timestamp),
         ledger.successful,
         id(ledger._issuer),
     )
@@ -918,12 +1081,17 @@ def _is_issued_completion_ledger(ledger: object) -> bool:
             is not candidate.procedure_mapping_origin
         ):
             return False
+        if type(candidate.timestamp) is not str or any(
+            type(record.timestamp) is not str for record in candidate.records
+        ):
+            return False
         _require_transaction_sources(
             candidate.plan,
             candidate.rule_evidence,
             candidate.procedure_outcomes,
             candidate._procedure_mapping_snapshot,
             candidate._reconciliation_snapshot,
+            candidate.baseline_selection,
         )
         if (
             candidate._reconciliation_snapshot.completions
@@ -946,15 +1114,24 @@ def _is_issued_completion_ledger(ledger: object) -> bool:
             )
             for requirement in expected
         )
-        if not _records_match_reconciliation(
-            candidate.records, expected_records, candidate.timestamp
-        ):
+        observed = datetime.strptime(
+            candidate.timestamp, "%Y-%m-%dT%H:%M:%S.%fZ"
+        ).replace(tzinfo=timezone.utc)
+        materialized = _materialize_records(expected_records, candidate.timestamp)
+        expected_with_baselines = _apply_baselines(
+            candidate.plan,
+            materialized,
+            candidate.baseline_selection,
+            observed,
+        )
+        if not _records_match_expected(candidate.records, expected_with_baselines):
             return False
         successful = all(
             item.state is ProcedureOutcomeState.SUCCESSFUL
             for item in candidate.procedure_outcomes
         ) and all(
             item.state in {CompletionState.SATISFIED, CompletionState.INAPPLICABLE}
+            or item.baseline is not None
             for item in candidate.records
         )
         issued = _LEDGER_AUTHORITIES.lookup(candidate)

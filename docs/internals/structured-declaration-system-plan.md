@@ -139,6 +139,18 @@ requires successful graph and adjudication outcomes for every effective
 procedure. External issuance snapshots reject mapping re-entry, live-origin
 substitution, callback-time state forgery, and later ledger mutation.
 
+The migration-baseline boundary now loads a closed version 1 YAML source,
+retains its exact path and byte digest, and issues an explicit ordered selection
+from an authenticated registry. A selected baseline can account only for one
+exact violated or unchecked rule-criterion record under the resolved manifest
+owner, before its canonical UTC expiry. Its digest binds the complete rule
+obligation and canonical manual, assisted, mechanical, or absent evidence.
+Blocked rule findings, procedure predicates, operation preconditions, and
+unsuccessful procedure outcomes remain unwaivable. Resolver, selection,
+reconciliation, clock, and ledger authority checks reject callback mutation,
+equality-spoofed scalars, path substitution, ambiguous matches, and later
+carrier mutation.
+
 ## Decision log and open prerequisites
 
 - YAML is canonical; tagged Markdown is only an evidence-triggered fallback.
@@ -250,7 +262,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Harden `ResolutionResult`, `AttentionRequirements`, and `AttentionPlan` with external issuance snapshots that cover the complete resolved unit and trace, canonical requirement projections, packet entries, evaluator invocations, runner registries, fixture authority, and assurance authority before any later evidence transaction trusts the plan.
 - [x] Issue one authenticated single-use rule-evidence transaction that evaluates every effective rule criterion in canonical order and retains deliberative, assisted, and mechanical records without making the completion ledger execute evaluators.
 - [x] Issue the complete immutable ledger from optional authenticated rule evidence and a once-snapshotted mapping of every effective procedure to an exact terminal transcript or complete uncleared pre-action evidence; require admissible evidence for every effective obligation and a successful transcript for every effective procedure.
-- [ ] Implement the reviewed migration-baseline boundary: permit only explicitly selected, manifest-scoped, manifest-owner-authorized, expiring baselines for exact violated or unchecked rule-criterion findings; keep procedure, operation, and blocked findings unwaivable.
+- [x] Implement the reviewed migration-baseline boundary: permit only explicitly selected, manifest-scoped, manifest-owner-authorized, expiring baselines for exact violated or unchecked rule-criterion findings; keep procedure, operation, and blocked findings unwaivable.
 
 **Exit evidence:** clean checker output cannot complete an unmapped obligation. Unbaselined unchecked or violated rule criteria, every blocked rule criterion, and every unchecked, violated, or blocked procedure predicate or per-action operation precondition prevent success; only obligations excluded by a completed authored path may be inapplicable.
 

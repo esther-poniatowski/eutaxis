@@ -16,6 +16,7 @@ from .exceptions import (
     DeclarationSchemaError,
     EvaluatorFixtureSchemaError,
     FacetRegistrySchemaError,
+    MigrationBaselineError,
 )
 
 PathPart: TypeAlias = str | int
@@ -35,6 +36,7 @@ SchemaErrorType: TypeAlias = (
     type[DeclarationSchemaError]
     | type[EvaluatorFixtureSchemaError]
     | type[FacetRegistrySchemaError]
+    | type[MigrationBaselineError]
 )
 
 
