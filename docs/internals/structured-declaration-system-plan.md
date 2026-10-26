@@ -117,6 +117,18 @@ detector- and checker-registry origins, including runner identities and frozen
 contracts; the execution factory uses those authorities to detach the executable
 registries.
 
+The rule-evidence session now evaluates only effective rule criteria, in the
+canonical completion-requirement order. It accepts exact manual submissions and
+residual providers once, executes detector and checker entries through their
+retained authorities, and issues one typed record per criterion. External
+identity-bound state protects the session requirements, captured inputs,
+lifecycle transitions, requests, executions, and final aggregate. A blocked
+runner or result remains evidence and does not stop later criteria; every
+authority defect or other post-start failure is terminal. The checker and
+detector boundaries reject malformed or equality-spoofing result correlation
+fields before they create canonical evidence. Completion reconciliation can now
+consume authenticated rule evidence without invoking an evaluator.
+
 ## Decision log and open prerequisites
 
 - YAML is canonical; tagged Markdown is only an evidence-triggered fallback.
@@ -226,7 +238,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Extend the lifecycle session to request and validate manual and assisted detector-plus-residual evidence at exact realized invariant, postcondition, and operation-precondition boundaries.
 - [x] Extend the lifecycle session with detached checker execution and assurance-freshness checks for every realized mechanical occurrence, without rerunning known-failure fixtures or retained entry evidence; preserve authority precedence across provider and checker failures and interruptions.
 - [x] Harden `ResolutionResult`, `AttentionRequirements`, and `AttentionPlan` with external issuance snapshots that cover the complete resolved unit and trace, canonical requirement projections, packet entries, evaluator invocations, runner registries, fixture authority, and assurance authority before any later evidence transaction trusts the plan.
-- [ ] Issue one authenticated single-use rule-evidence transaction that evaluates every effective rule criterion in canonical order and retains deliberative, assisted, and mechanical records without making the completion ledger execute evaluators.
+- [x] Issue one authenticated single-use rule-evidence transaction that evaluates every effective rule criterion in canonical order and retains deliberative, assisted, and mechanical records without making the completion ledger execute evaluators.
 - [ ] Issue the complete immutable ledger from optional authenticated rule evidence and a once-snapshotted mapping of every effective procedure to an exact terminal transcript or complete uncleared pre-action evidence; require admissible evidence for every effective obligation and a successful transcript for every effective procedure.
 - [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.
 

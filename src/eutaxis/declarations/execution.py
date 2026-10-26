@@ -219,17 +219,26 @@ def execute_detector(
             path=path,
             cause=exc,
         )
-    if not isinstance(returned, DetectorResult):
+    if type(returned) is not DetectorResult:
         _raise_detector_execution_error(
             ("result",), "runner did not return DetectorResult", path=path
         )
-    if returned.evaluator != evaluator:
+    if (
+        type(returned.evaluator) is not VersionedReference
+        or type(returned.evaluator.id) is not str
+        or type(returned.evaluator.version) is not int
+        or returned.evaluator.id != evaluator.id
+        or returned.evaluator.version != evaluator.version
+    ):
         _raise_detector_execution_error(
             ("result", "evaluator"),
             "returned evaluator identity differs from the invocation",
             path=path,
         )
-    if returned.input_revision != input_revision:
+    if (
+        type(returned.input_revision) is not str
+        or returned.input_revision != input_revision
+    ):
         _raise_detector_execution_error(
             ("result", "input-revision"),
             "returned input revision differs from the invocation",
@@ -683,23 +692,32 @@ def _validate_result(
     path: Path | None,
 ) -> CheckerResult:
     """Validate untrusted runner output and return an immutable copy."""
-    if not isinstance(returned, CheckerResult):
+    if type(returned) is not CheckerResult:
         _raise_execution_error(
             ("result",), "runner did not return CheckerResult", path=path
         )
-    if returned.evaluator != evaluator:
+    if (
+        type(returned.evaluator) is not VersionedReference
+        or type(returned.evaluator.id) is not str
+        or type(returned.evaluator.version) is not int
+        or returned.evaluator.id != evaluator.id
+        or returned.evaluator.version != evaluator.version
+    ):
         _raise_execution_error(
             ("result", "evaluator"),
             "returned evaluator identity differs from the invocation",
             path=path,
         )
-    if returned.input_revision != input_revision:
+    if (
+        type(returned.input_revision) is not str
+        or returned.input_revision != input_revision
+    ):
         _raise_execution_error(
             ("result", "input-revision"),
             "returned input revision differs from the invocation",
             path=path,
         )
-    if not isinstance(returned.state, EvaluationState):
+    if type(returned.state) is not EvaluationState:
         _raise_execution_error(
             ("result", "state"),
             f"unknown result state {returned.state!r}",

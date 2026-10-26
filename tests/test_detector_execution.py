@@ -35,6 +35,11 @@ DETECTOR = VersionedReference("registry/detector", 1)
 OPERATION = VersionedReference("registry/write", 1)
 
 
+class _EqualToEverything:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+
 def _setup(
     tmp_path: Path,
     runner: object,
@@ -267,7 +272,19 @@ def test_runner_exception_with_hostile_string_blocks(tmp_path: Path) -> None:
     [
         (object(), "$.result"),
         (_result(evaluator=VersionedReference("other", 1)), "$.result.evaluator"),
+        (
+            _result(evaluator=VersionedReference(DETECTOR.id, True)),
+            "$.result.evaluator",
+        ),
+        (
+            _result(evaluator=VersionedReference(cast(str, _EqualToEverything()), 1)),
+            "$.result.evaluator",
+        ),
         (_result(revision="other"), "$.result.input-revision"),
+        (
+            _result(revision=cast(str, _EqualToEverything())),
+            "$.result.input-revision",
+        ),
         (_result(evidence=[]), "$.result.evidence"),
         (_result(evidence={"accepted": "yes"}), "$.result.evidence.accepted"),
     ],

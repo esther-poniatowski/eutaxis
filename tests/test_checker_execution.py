@@ -46,6 +46,11 @@ OPERATION = VersionedReference("registry/check-input", 1)
 FIXTURE_ID = "registry/checker/known-failure"
 
 
+class _EqualToEverything:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+
 def _result(
     *,
     evaluator: VersionedReference = CHECKER,
@@ -439,7 +444,19 @@ def test_runner_exception_with_broken_string_conversion_stays_located(
     [
         ({"state": "violated"}, "$.result"),
         (_result(evaluator=VersionedReference("other", 1)), "$.result.evaluator"),
+        (
+            _result(evaluator=VersionedReference(CHECKER.id, True)),
+            "$.result.evaluator",
+        ),
+        (
+            _result(evaluator=VersionedReference(cast(str, _EqualToEverything()), 1)),
+            "$.result.evaluator",
+        ),
         (_result(input_revision="other-v1"), "$.result.input-revision"),
+        (
+            _result(input_revision=cast(str, _EqualToEverything())),
+            "$.result.input-revision",
+        ),
         (_result(state="unknown"), "$.result.state"),
         (_result(state=EvaluationState.SATISFIED), "$.result.state"),
         (_result(evidence="not-an-object"), "$.result.evidence"),

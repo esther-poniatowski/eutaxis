@@ -196,6 +196,15 @@ class AttentionPlanningError(Exception):
         self.detail = message
 
 
+class RuleEvidenceError(Exception):
+    """Report a failed rule-evidence transaction."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid rule evidence at {location}: {message}")
+        self.location = location
+        self.detail = message
+
+
 class ProcedureRunPlanningError(Exception):
     """Report a failed procedure-run preflight boundary."""
 
