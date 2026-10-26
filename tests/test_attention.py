@@ -97,7 +97,12 @@ from eutaxis.declarations import (
     prepare_procedure_run,
     resolve_compilation_unit,
 )
-from eutaxis.declarations.attention import _is_issued_attention_plan
+from eutaxis.declarations.attention import (
+    _capture_plan_authority_state,
+    _capture_requirements_authority_state,
+    _is_issued_attention_plan,
+    _is_issued_requirements,
+)
 from eutaxis.declarations.models import JsonValue
 from eutaxis.declarations.procedure_runs import _is_issued_procedure_run_plan
 from eutaxis.declarations.procedure_evaluations import (
@@ -1608,6 +1613,106 @@ def test_private_aggregates_reject_forgery_copying_and_serialization(
         plan_attention(reconstructed, {})
 
 
+def test_requirements_authority_cannot_self_attest_equal_value_replacement(
+    tmp_path: Path,
+) -> None:
+    _, requirements, _, _, plan = _mixed_plan(tmp_path)
+    completion = list(requirements.completion)
+    completion[0] = replace(completion[0])
+    object.__setattr__(requirements, "completion", tuple(completion))
+    object.__setattr__(
+        requirements,
+        "_state",
+        _capture_requirements_authority_state(requirements),
+    )
+
+    assert not _is_issued_requirements(requirements)
+    assert not _is_issued_attention_plan(plan)
+
+
+def test_plan_authority_cannot_self_attest_equal_value_packet_replacement(
+    tmp_path: Path,
+) -> None:
+    _, requirements, _, _, plan = _mixed_plan(tmp_path)
+    entries = list(plan.assisted.entries)
+    entries[0] = replace(entries[0])
+    object.__setattr__(plan.assisted, "entries", tuple(entries))
+    object.__setattr__(plan, "_state", _capture_plan_authority_state(plan))
+
+    assert _is_issued_requirements(requirements)
+    assert not _is_issued_attention_plan(plan)
+
+
+def test_plan_authority_ignores_fixture_bytes_until_mechanical_execution(
+    tmp_path: Path,
+) -> None:
+    _, _, fixtures, _, plan = _mixed_plan(tmp_path)
+    fixture = next(iter(fixtures.fixtures.values()))
+    source = next(digest.path for digest in fixture.digests if digest.role == "source")
+    source.write_text("changed: true\n", encoding="utf-8")
+
+    assert _is_issued_attention_plan(plan)
+
+
+def test_plan_authority_rejects_fixture_descriptor_carrier_replacement(
+    tmp_path: Path,
+) -> None:
+    _, _, fixtures, _, plan = _mixed_plan(tmp_path)
+    fixture = next(iter(fixtures.fixtures.values()))
+    replacement = Path(str(fixture.path))
+    assert replacement == fixture.path and replacement is not fixture.path
+    object.__setattr__(fixture, "path", replacement)
+
+    assert not _is_issued_attention_plan(plan)
+
+
+def test_plan_authority_ignores_stateful_runner_internal_state(tmp_path: Path) -> None:
+    @dataclass
+    class StatefulChecker:
+        calls: int = 0
+
+        def __call__(self, input_data):
+            self.calls += 1
+            return _checker_result_for_input(input_data)
+
+    @dataclass
+    class StatefulDetector:
+        calls: int = 0
+
+        def __call__(self, input_data):
+            self.calls += 1
+            return _detector_result()
+
+    checker = StatefulChecker()
+    detector = StatefulDetector()
+    _, _, _, run = _precondition_run(
+        tmp_path,
+        checker_runner=cast(CheckerRunner, checker),
+        detector_runner=cast(DetectorRunner, detector),
+    )
+
+    checker.calls += 1
+    detector.calls += 1
+
+    assert _is_issued_attention_plan(run.attention)
+
+
+@pytest.mark.parametrize("aggregate", ["requirements", "plan"])
+def test_attention_authority_rejects_token_replacement(
+    tmp_path: Path, aggregate: str
+) -> None:
+    _, requirements, _, _, plan = _mixed_plan(tmp_path)
+    target = requirements if aggregate == "requirements" else plan
+    object.__setattr__(target, "_token", object())
+
+    validator = (
+        _is_issued_requirements
+        if aggregate == "requirements"
+        else _is_issued_attention_plan
+    )
+    assert not validator(target)
+
+
 def test_irrelevant_runner_authority_is_rejected_for_empty_class(
     tmp_path: Path,
 ) -> None:
@@ -2051,8 +2156,8 @@ def test_procedure_run_preflight_contains_hostile_requirement_mapping(
     with pytest.raises(ProcedureRunPlanningError) as error:
         _procedure_run(run.attention)
 
-    assert error.value.location.startswith("$.requirements[")
-    assert "retained authority data" in error.value.detail
+    assert error.value.location == "$.attention"
+    assert "not issued by planning" in error.value.detail
 
 
 def test_precondition_evaluation_plan_rejects_same_output_binding_substitution(
@@ -2126,8 +2231,8 @@ def test_procedure_run_preflight_contains_incomplete_packet_entry(
     with pytest.raises(ProcedureRunPlanningError) as error:
         _procedure_run(run.attention)
 
-    assert error.value.location.startswith("$.attention.packets[")
-    assert "cannot be read" in error.value.detail
+    assert error.value.location == "$.attention"
+    assert "not issued by planning" in error.value.detail
 
 
 def test_precondition_evaluation_plan_rejects_complete_run_semantic_substitutions(
@@ -2200,8 +2305,8 @@ def test_procedure_run_preflight_contains_incomplete_completion_requirement(
     with pytest.raises(ProcedureRunPlanningError) as error:
         _procedure_run(run.attention)
 
-    assert error.value.location == "$"
-    assert "cannot be read" in error.value.detail
+    assert error.value.location == "$.attention"
+    assert "not issued by planning" in error.value.detail
 
 
 def test_precondition_evaluation_plan_rechecks_packet_identity_after_semantic_reads(
@@ -2320,9 +2425,9 @@ def test_precondition_evaluation_plan_rechecks_scalars_after_semantic_reads(
                 object.__setattr__(obligation, "purpose", "Substituted purpose")
             return super().items()
 
+    run = _procedure_run(source_run.attention)
     backing = MutatingBacking(original_expression)
     object.__setattr__(obligation.predicate, "expression", MappingProxyType(backing))
-    run = _procedure_run(source_run.attention)
     supplied = _provider_inputs(run)
     provider_calls = 0
     backing.armed = True
@@ -2393,11 +2498,6 @@ def test_precondition_evaluation_plan_rechecks_maps_after_packet_side_effect(
     )
     obligation = cast(ProcedureObligationSnapshot, requirement.obligation)
     expression_backing = dict(obligation.predicate.expression)
-    object.__setattr__(
-        obligation.predicate,
-        "expression",
-        MappingProxyType(expression_backing),
-    )
     entry = next(
         item
         for item in source_run.attention.assisted.entries
@@ -2416,9 +2516,14 @@ def test_precondition_evaluation_plan_rechecks_maps_after_packet_side_effect(
                 )
             return super().items()
 
+    run = _procedure_run(source_run.attention)
+    object.__setattr__(
+        obligation.predicate,
+        "expression",
+        MappingProxyType(expression_backing),
+    )
     invocation_input = MutatingInput(dict(invocation.input_data))
     object.__setattr__(invocation, "input_data", MappingProxyType(invocation_input))
-    run = _procedure_run(source_run.attention)
     supplied = _provider_inputs(run)
     provider_calls = 0
     invocation_input.armed = True
@@ -2494,7 +2599,6 @@ def test_precondition_evaluation_plan_contains_late_invocation_mutation(
     )
     invocation = entry.invocation
     invocation_backing = dict(invocation.input_data)
-    object.__setattr__(invocation, "input_data", MappingProxyType(invocation_backing))
 
     class MutatingDocument(dict[str, object]):
         armed = False
@@ -2505,8 +2609,9 @@ def test_precondition_evaluation_plan_contains_late_invocation_mutation(
             return super().items()
 
     document = MutatingDocument(dict(source_run.procedure.document))
-    object.__setattr__(source_run.procedure, "document", MappingProxyType(document))
     run = _procedure_run(source_run.attention)
+    object.__setattr__(invocation, "input_data", MappingProxyType(invocation_backing))
+    object.__setattr__(source_run.procedure, "document", MappingProxyType(document))
     supplied = _provider_inputs(run)
     provider_calls = 0
     document.armed = True
@@ -2845,7 +2950,7 @@ def test_precondition_evaluation_plan_requires_exact_runner_registries(
         ],
     )
     object.__setattr__(checker_run.attention, "checker_registry", checker_registry)
-    with pytest.raises(ProcedureEvaluationPlanningError, match="identity differs"):
+    with pytest.raises(ProcedureEvaluationPlanningError, match="issued by planning"):
         plan_procedure_precondition_evaluations(checker_run, providers_for(checker_run))
 
 

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import NoReturn, SupportsIndex, TypeAlias, cast
 
+from ._authority import IdentityAuthorityStore, identity_value_state
 from ._runner_support import exception_detail
 from .embedded_schema import validate_json_instance
 from .enforcement import (
@@ -22,6 +23,7 @@ from .enforcement import (
 from .exceptions import AttentionPlanningError, CheckerExecutionError
 from .execution import (
     KnownFailureAssurance,
+    _capture_assurance_state,
     _is_issued_known_failure_assurance,
     _verify_fixture_digests,
 )
@@ -57,6 +59,10 @@ from .runners import (
 
 _REQUIREMENTS_ISSUER = object()
 _PLAN_ISSUER = object()
+_REQUIREMENTS_AUTHORITIES: IdentityAuthorityStore[AttentionRequirements] = (
+    IdentityAuthorityStore()
+)
+_PLAN_AUTHORITIES: IdentityAuthorityStore[AttentionPlan] = IdentityAuthorityStore()
 
 
 @dataclass(frozen=True)
@@ -210,6 +216,8 @@ class AttentionRequirements:
     mechanical: tuple[RunnableAttentionRequirement, ...]
     checker_registry: CheckerRunnerRegistry | None
     detector_registry: DetectorRunnerRegistry | None
+    _token: object
+    _state: tuple[object, ...]
     _issuer: object
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -309,6 +317,8 @@ class AttentionPlan:
     fixture_index: EvaluatorFixtureIndex | None
     assurance: KnownFailureAssurance | None
     detector_registry: DetectorRunnerRegistry | None
+    _token: object
+    _state: tuple[object, ...]
     _issuer: object
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -1034,15 +1044,34 @@ def _issue_requirements(
     object.__setattr__(requirements, "checker_registry", checker_registry)
     object.__setattr__(requirements, "detector_registry", detector_registry)
     object.__setattr__(requirements, "_issuer", _REQUIREMENTS_ISSUER)
+    state = _capture_requirements_authority_state(requirements)
+    token = _REQUIREMENTS_AUTHORITIES.issue(requirements, state)
+    object.__setattr__(requirements, "_token", token)
+    object.__setattr__(requirements, "_state", state)
     return requirements
 
 
 def _is_issued_requirements(requirements: object) -> bool:
-    """Return whether requirements carry this process's derivation authority."""
-    return (
-        isinstance(requirements, AttentionRequirements)
-        and getattr(requirements, "_issuer", None) is _REQUIREMENTS_ISSUER
-    )
+    """Return whether requirements retain their complete derivation authority."""
+    if (
+        type(requirements) is not AttentionRequirements
+        or getattr(requirements, "_issuer", None) is not _REQUIREMENTS_ISSUER
+        or type(getattr(requirements, "_state", None)) is not tuple
+    ):
+        return False
+    try:
+        if not _is_issued_resolution_result(requirements.resolution):
+            return False
+        issued = _REQUIREMENTS_AUTHORITIES.lookup(requirements)
+        return (
+            issued is not None
+            and requirements._token is issued[0]
+            and requirements._state == issued[1]
+            and requirements._state
+            == _capture_requirements_authority_state(requirements)
+        )
+    except Exception:
+        return False
 
 
 def _issue_plan(
@@ -1065,14 +1094,128 @@ def _issue_plan(
     object.__setattr__(plan, "assurance", assurance)
     object.__setattr__(plan, "detector_registry", requirements.detector_registry)
     object.__setattr__(plan, "_issuer", _PLAN_ISSUER)
+    state = _capture_plan_authority_state(plan)
+    token = _PLAN_AUTHORITIES.issue(plan, state)
+    object.__setattr__(plan, "_token", token)
+    object.__setattr__(plan, "_state", state)
     return plan
 
 
 def _is_issued_attention_plan(plan: object) -> bool:
-    """Return whether a plan carries this process's planning authority."""
+    """Return whether a plan retains its complete planning authority."""
+    if (
+        type(plan) is not AttentionPlan
+        or getattr(plan, "_issuer", None) is not _PLAN_ISSUER
+        or type(getattr(plan, "_state", None)) is not tuple
+    ):
+        return False
+    try:
+        if (
+            not _is_issued_requirements(plan.requirements)
+            or plan.resolution is not plan.requirements.resolution
+            or plan.checker_registry is not plan.requirements.checker_registry
+            or plan.detector_registry is not plan.requirements.detector_registry
+        ):
+            return False
+        if plan.fixture_index is None:
+            if plan.assurance is not None:
+                return False
+        elif (
+            plan.assurance is None
+            or not _is_loader_issued_fixture_index(plan.fixture_index)
+            or not _is_issued_known_failure_assurance(plan.assurance)
+            or plan.assurance.fixtures is not plan.fixture_index
+            or plan.assurance.runners is not plan.checker_registry
+            or plan.assurance.declarations is not plan.resolution.registry
+        ):
+            return False
+        issued = _PLAN_AUTHORITIES.lookup(plan)
+        return (
+            issued is not None
+            and plan._token is issued[0]
+            and plan._state == issued[1]
+            and plan._state == _capture_plan_authority_state(plan)
+        )
+    except Exception:
+        return False
+
+
+def _capture_requirements_authority_state(
+    requirements: AttentionRequirements,
+) -> tuple[object, ...]:
+    """Capture canonical requirements and exact runnable projections."""
     return (
-        isinstance(plan, AttentionPlan)
-        and getattr(plan, "_issuer", None) is _PLAN_ISSUER
+        id(requirements.resolution),
+        id(requirements.completion),
+        tuple(identity_value_state(item) for item in requirements.completion),
+        id(requirements.deliberative),
+        tuple(identity_value_state(item) for item in requirements.deliberative),
+        id(requirements.assisted),
+        tuple(identity_value_state(item) for item in requirements.assisted),
+        id(requirements.mechanical),
+        tuple(identity_value_state(item) for item in requirements.mechanical),
+        _runner_registry_authority_state(requirements.checker_registry),
+        _runner_registry_authority_state(requirements.detector_registry),
+        id(requirements._issuer),
+    )
+
+
+def _capture_plan_authority_state(plan: AttentionPlan) -> tuple[object, ...]:
+    """Capture packet, invocation, readiness, and assurance authority."""
+    assurance_state = (
+        None if plan.assurance is None else _capture_assurance_state(plan.assurance)
+    )
+    return (
+        id(plan.requirements),
+        id(plan.resolution),
+        identity_value_state(plan.deliberative),
+        identity_value_state(plan.assisted),
+        identity_value_state(plan.mechanical),
+        id(plan.checker_registry),
+        id(plan.detector_registry),
+        (
+            None
+            if plan.fixture_index is None
+            else identity_value_state(plan.fixture_index)
+        ),
+        id(plan.assurance),
+        assurance_state,
+        id(plan._issuer),
+    )
+
+
+def _runner_registry_authority_state(
+    registry: CheckerRunnerRegistry | DetectorRunnerRegistry | None,
+) -> tuple[object, ...] | None:
+    """Capture registry contracts while treating runner callables as identities."""
+    if registry is None:
+        return None
+    return (
+        type(registry),
+        id(registry),
+        id(registry._issuer),
+        id(registry.declarations),
+        id(registry.bindings),
+        tuple(
+            (
+                id(reference),
+                reference.id,
+                reference.version,
+                id(binding),
+                id(binding.evaluator),
+                binding.evaluator.id,
+                binding.evaluator.version,
+                id(binding.operation),
+                binding.operation.id,
+                binding.operation.version,
+                id(binding.runner),
+            )
+            for reference, binding in registry.bindings.items()
+        ),
+        id(registry.input_contracts),
+        identity_value_state(registry.input_contracts),
+        id(registry.evaluator_records),
+        identity_value_state(registry.evaluator_records),
     )
 
 

@@ -102,6 +102,13 @@ assurance carrier. Each realized mechanical occurrence revalidates structural
 authority and fixture digests around its input provider and checker call, without
 rerunning known-failure fixtures or retained entry evidence. An unreachable
 mechanical postcondition performs no freshness read.
+Resolution, requirement, and attention-plan authorities now retain external
+identity-indexed weak issuance snapshots. The snapshots cover the complete
+resolved unit and trace, canonical requirement projections, packet invocations,
+runner registries, fixture carriers, and known-failure assurance. Embedded-state
+rewriting and equal-value carrier replacement cannot self-attest a mutation.
+Stateful runner internals and current fixture-file bytes remain outside this
+structural authority; their respective execution boundaries own those checks.
 Procedure preflight now retains one canonical detached lifecycle-evaluation
 union for every evaluator-backed invariant, postcondition, and expanded
 operation precondition. Each variant binds its exact live source identities to
@@ -218,7 +225,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Retain one canonical detached lifecycle-evaluation union at procedure preflight, including exact source-key, requirement, and packet-entry authority; class-specific evaluator, invocation, and schema contracts; evaluator timing; and detector-registry origin authority for every evaluator-backed invariant, postcondition, and expanded operation precondition.
 - [x] Extend the lifecycle session to request and validate manual and assisted detector-plus-residual evidence at exact realized invariant, postcondition, and operation-precondition boundaries.
 - [x] Extend the lifecycle session with detached checker execution and assurance-freshness checks for every realized mechanical occurrence, without rerunning known-failure fixtures or retained entry evidence; preserve authority precedence across provider and checker failures and interruptions.
-- [ ] Harden `ResolutionResult`, `AttentionRequirements`, and `AttentionPlan` with external issuance snapshots that cover the complete resolved unit and trace, canonical requirement projections, packet entries, evaluator invocations, runner registries, fixture authority, and assurance authority before any later evidence transaction trusts the plan.
+- [x] Harden `ResolutionResult`, `AttentionRequirements`, and `AttentionPlan` with external issuance snapshots that cover the complete resolved unit and trace, canonical requirement projections, packet entries, evaluator invocations, runner registries, fixture authority, and assurance authority before any later evidence transaction trusts the plan.
 - [ ] Issue one authenticated single-use rule-evidence transaction that evaluates every effective rule criterion in canonical order and retains deliberative, assisted, and mechanical records without making the completion ledger execute evaluators.
 - [ ] Issue the complete immutable ledger from optional authenticated rule evidence and a once-snapshotted mapping of every effective procedure to an exact terminal transcript or complete uncleared pre-action evidence; require admissible evidence for every effective obligation and a successful transcript for every effective procedure.
 - [ ] Permit only explicit, owned, expiring migration baselines as terminal non-blocking findings.

@@ -7,6 +7,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Mapping, NoReturn, SupportsIndex, cast
 
+from ._authority import IdentityAuthorityStore, identity_value_state
 from .applicability import (
     ApplicabilityTrace,
     TruthValue,
@@ -28,6 +29,9 @@ from .registry import ConflictPair, DeclarationRegistry, RegisteredDeclaration
 from .source import DocumentPath, nearest_location
 
 _RESOLUTION_RESULT_ISSUER = object()
+_RESOLUTION_AUTHORITIES: IdentityAuthorityStore[ResolutionResult] = (
+    IdentityAuthorityStore()
+)
 
 
 @dataclass(frozen=True)
@@ -186,6 +190,8 @@ class ResolutionResult:
     unit: ResolvedCompilationUnit
     trace: ResolutionTrace
     _facet_registry_state: object = field(compare=False, repr=False)
+    _token: object = field(compare=False, repr=False)
+    _state: tuple[object, ...] = field(compare=False, repr=False)
     _issuer: object = field(compare=False, repr=False)
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -210,18 +216,95 @@ class ResolutionResult:
 
 
 def _is_issued_resolution_result(result: object) -> bool:
-    """Return whether ``result`` carries this process's resolver authority."""
+    """Return whether ``result`` retains its complete resolver authority."""
     if (
         type(result) is not ResolutionResult
         or getattr(result, "_issuer", None) is not _RESOLUTION_RESULT_ISSUER
+        or type(getattr(result, "_state", None)) is not tuple
     ):
         return False
     try:
-        return _facet_registry_state_matches(
-            result.registry, result._facet_registry_state
+        issued = _RESOLUTION_AUTHORITIES.lookup(result)
+        return (
+            issued is not None
+            and result._token is issued[0]
+            and result._state == issued[1]
+            and result._state == _capture_resolution_authority_state(result)
+            and _facet_registry_state_matches(
+                result.registry, result._facet_registry_state
+            )
         )
     except Exception:
         return False
+
+
+def _capture_resolution_authority_state(
+    result: ResolutionResult,
+) -> tuple[object, ...]:
+    """Capture the complete resolved unit and trace without retaining the result."""
+    registry = result.registry
+    unit = result.unit
+    components: list[object] = []
+    for component in unit.components:
+        record = registry.records[component.declaration]
+        declaration = record.declaration
+        components.append(
+            (
+                id(component),
+                component.section,
+                component.declaration,
+                component.rank,
+                id(record),
+                id(declaration),
+                getattr(declaration, "version", None),
+                declaration.kind.value,
+            )
+        )
+    trace = result.trace
+    return (
+        id(registry),
+        _resolution_facet_authority_state(registry),
+        id(unit),
+        unit.manifest,
+        id(unit.components),
+        tuple(components),
+        id(unit.dependencies),
+        tuple(identity_value_state(item) for item in unit.dependencies),
+        id(unit.rule_projections),
+        tuple(identity_value_state(item) for item in unit.rule_projections),
+        id(trace),
+        trace.manifest,
+        trace.facet_registry,
+        trace.facet_source_revision,
+        id(trace.events),
+        tuple(identity_value_state(event) for event in trace.events),
+        id(result._issuer),
+    )
+
+
+def _resolution_facet_authority_state(
+    registry: DeclarationRegistry,
+) -> tuple[object, ...]:
+    """Capture facet carriers and values without reading external resources."""
+    facets = registry.facet_registry
+    return (
+        id(facets),
+        facets.schema_version,
+        facets.id,
+        facets.owner,
+        facets.source_revision,
+        id(facets.facets),
+        tuple(
+            (
+                key,
+                id(facet),
+                facet.id,
+                id(facet.value_schema),
+                identity_value_state(facet.value_schema),
+            )
+            for key, facet in facets.facets.items()
+        ),
+    )
 
 
 def _capture_facet_registry_state(registry: DeclarationRegistry) -> tuple[object, ...]:
@@ -1279,4 +1362,8 @@ def _issue_result(
         result, "_facet_registry_state", _capture_facet_registry_state(registry)
     )
     object.__setattr__(result, "_issuer", _RESOLUTION_RESULT_ISSUER)
+    state = _capture_resolution_authority_state(result)
+    token = _RESOLUTION_AUTHORITIES.issue(result, state)
+    object.__setattr__(result, "_token", token)
+    object.__setattr__(result, "_state", state)
     return result

@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import pickle
 import shutil
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
 
 import pytest
@@ -27,6 +27,10 @@ from eutaxis.declarations import (
     load_facet_registry,
     plan_cumulative_composition,
     resolve_compilation_unit,
+)
+from eutaxis.declarations.resolution import (
+    _capture_resolution_authority_state,
+    _is_issued_resolution_result,
 )
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "resolution" / "valid"
@@ -76,6 +80,13 @@ def _resolve(root: Path = FIXTURE_ROOT, **context: object):
     )
 
 
+def _equal_private_carrier(value):
+    clone = object.__new__(type(value))
+    for field in fields(value):
+        object.__setattr__(clone, field.name, getattr(value, field.name))
+    return clone
+
+
 def test_resolution_is_deterministic_and_composition_ready() -> None:
     first = resolve_compilation_unit(_registry(), "resolution/manifest", _context())
     second = resolve_compilation_unit(
@@ -84,6 +95,9 @@ def test_resolution_is_deterministic_and_composition_ready() -> None:
 
     assert first is not second
     assert first == second
+    assert _is_issued_resolution_result(first)
+    assert _is_issued_resolution_result(second)
+    assert first._token is not second._token
     assert tuple(component.declaration for component in first.unit.components) == (
         "resolution/base",
         "resolution/refined",
@@ -112,6 +126,36 @@ def test_resolution_is_deterministic_and_composition_ready() -> None:
     assert plan_cumulative_composition(_registry(), first.unit).manifest == (
         "resolution/manifest"
     )
+
+
+@pytest.mark.parametrize("target", ["unit", "component", "trace", "event"])
+def test_resolution_authority_rejects_equal_value_carrier_replacement(
+    target: str,
+) -> None:
+    result = _resolve()
+
+    if target == "unit":
+        object.__setattr__(result, "unit", _equal_private_carrier(result.unit))
+    elif target == "component":
+        components = list(result.unit.components)
+        components[0] = replace(components[0])
+        object.__setattr__(result.unit, "components", tuple(components))
+    elif target == "trace":
+        object.__setattr__(result, "trace", _equal_private_carrier(result.trace))
+    else:
+        events = list(result.trace.events)
+        events[0] = _equal_private_carrier(events[0])
+        object.__setattr__(result.trace, "events", tuple(events))
+
+    assert not _is_issued_resolution_result(result)
+
+
+def test_resolution_authority_cannot_self_attest_after_mutation() -> None:
+    result = _resolve()
+    object.__setattr__(result.unit, "components", result.unit.components[1:])
+    object.__setattr__(result, "_state", _capture_resolution_authority_state(result))
+
+    assert not _is_issued_resolution_result(result)
 
 
 def test_rule_set_is_expanded_but_never_becomes_effective() -> None:
