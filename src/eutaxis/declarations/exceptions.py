@@ -246,6 +246,15 @@ class AcquisitionContractError(Exception):
         self.detail = message
 
 
+class ByteCarrierError(Exception):
+    """Report a descriptor-bound directory or byte-carrier failure."""
+
+    def __init__(self, path: str, message: str) -> None:
+        super().__init__(f"Invalid byte carrier at {path!r}: {message}")
+        self.path = path
+        self.detail = message
+
+
 class ProcedureRunPlanningError(Exception):
     """Report a failed procedure-run preflight boundary."""
 

@@ -43,6 +43,23 @@ class IdentityAuthorityStore(Generic[_T]):
                 return None
             return entry[1], entry[2]
 
+    def state(self, aggregate: _T) -> AuthorityState | None:
+        """Return the existing authority state without constructing a wrapper."""
+        with self._lock:
+            entry = self._entries.get(id(aggregate))
+            if entry is None or entry[0]() is not aggregate:
+                return None
+            return entry[2]
+
+    def retire(self, aggregate: _T) -> AuthorityState | None:
+        """Atomically remove and return authority owned by ``aggregate``."""
+        with self._lock:
+            entry = self._entries.get(id(aggregate))
+            if entry is None or entry[0]() is not aggregate:
+                return None
+            del self._entries[id(aggregate)]
+            return entry[2]
+
     def _release(self, key: int, reference: ReferenceType[_T]) -> None:
         """Remove only the entry owned by the weak reference being collected."""
         with self._lock:

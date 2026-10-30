@@ -13,11 +13,11 @@ from .acquisition_schema import (
     validate_acquisition_lock_document,
     validate_acquisition_manifest_document,
 )
+from .acquisition_paths import AcquisitionPathError, normalized_relative_path
 from .canonical_json import (
     CanonicalJsonError,
     jcs_bytes,
     parse_canonical_json_bytes,
-    require_unicode_scalar_text,
 )
 from .exceptions import AcquisitionContractError
 from .facets import FACET_REGISTRY_FILENAME
@@ -846,24 +846,10 @@ def _object_id(value: object, object_format: str, location: str) -> str:
 
 
 def _normalized_path(value: object, *, allow_dot: bool, location: str) -> str:
-    text = _text(value, location)
     try:
-        require_unicode_scalar_text(text)
-    except CanonicalJsonError as exc:
+        return normalized_relative_path(value, allow_dot=allow_dot)
+    except AcquisitionPathError as exc:
         _fail(location, str(exc))
-    if text == ".":
-        if allow_dot:
-            return text
-        _fail(location, "'.' is admitted only for a source root")
-    if (
-        not text
-        or text.startswith("/")
-        or "\\" in text
-        or "\x00" in text
-        or any(part in {"", ".", ".."} for part in text.split("/"))
-    ):
-        _fail(location, "value is not a normalized relative POSIX path")
-    return text
 
 
 def _exact_version(value: object, location: str) -> None:

@@ -279,7 +279,9 @@ This phase has turned the validated registry into a static query boundary, resol
 
 - [x] Decide the identifier namespace and cross-repository acquisition contract.
 - [x] Implement the closed manifest, canonical lock, revision algebra, and normalized path models.
-- [ ] Implement descriptor-anchored byte carriers, the packaged internal source, and additive composite facet authority.
+- [ ] Implement the byte and facet authority boundary:
+  - [x] Implement descriptor-anchored authoritative and verification byte carriers.
+  - [ ] Implement the packaged internal source and additive composite facet authority.
 - [ ] Implement workspace and vendored acquisition through one issued result.
 - [ ] Implement the closed Git-submodule proof and repeatable transport verification.
 - [ ] Enforce namespace, owner, and declaration-reference grammar before combined registry construction.
@@ -299,6 +301,19 @@ finding from the preceding passes had been repaired. Its targeted evidence is
 the acquisition, canonical-JSON and migration-baseline test set, static typing
 of the new source modules, and a built-wheel inspection of both schema
 resources.
+
+The descriptor-carrier sub-slice retains trusted roots and their parents by
+open descriptor, rejects link traversal and non-normalized paths, and issues
+public carrier values from immutable primitive snapshots. Verification reopens
+the same logical path through the retained parent and compares the root
+identity, exact bytes, and file metadata before it issues matching evidence.
+Thirteen independent adversarial passes examined descriptor ownership, failed
+issuance, exceptional cleanup, concurrent close and descriptor reuse, carrier
+forgery and mutation, and provenance stability. The thirteenth pass approved
+the slice after every preceding finding had been repaired. Its targeted
+evidence is the byte-carrier, authority-store, acquisition-contract, and
+canonical-JSON test set together with static typing of the acquisition source
+modules.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 
