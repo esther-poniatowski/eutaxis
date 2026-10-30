@@ -33,7 +33,6 @@ from eutaxis.declarations import (
     build_operation_runner_registry,
     derive_attention_requirements,
     load_declaration_registry,
-    load_facet_registry,
     observe_procedure_preconditions,
     plan_attention,
     prepare_procedure_run,
@@ -45,10 +44,10 @@ from eutaxis.declarations.observations import (
     _is_issued_procedure_precondition_observation,
 )
 from eutaxis.declarations.procedure_runs import ProcedureRunPlan
+from tests._facet_authority import issue_test_composite
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REGISTRY_FIXTURES = FIXTURES / "registry" / "valid"
-FACET_FIXTURE = FIXTURES / "facets" / "valid" / "context-facets.yaml"
 PROCEDURE = "content/write"
 WRITE = VersionedReference("registry/write", 1)
 
@@ -121,7 +120,7 @@ def _run_plan(tmp_path: Path, *, empty: bool = False) -> ProcedureRunPlan:
     procedure_path.write_text(
         yaml.safe_dump(procedure, sort_keys=False), encoding="utf-8"
     )
-    facets = load_facet_registry(FACET_FIXTURE)
+    facets = issue_test_composite()
     declarations = load_declaration_registry(sorted(root.glob("*.yaml")), facets)
     resolution = resolve_compilation_unit(declarations, "registry/manifest", _context())
     requirements = derive_attention_requirements(resolution)
@@ -512,7 +511,7 @@ def test_registry_rejects_wrong_facets_and_async_or_invalid_provider(
 ) -> None:
     run = _run_plan(tmp_path)
     declarations = run.attention.resolution.registry
-    equal_but_distinct = load_facet_registry(FACET_FIXTURE)
+    equal_but_distinct = issue_test_composite()
     with pytest.raises(ObservationProviderRegistryError) as wrong_facets:
         build_observation_provider_registry(
             declarations,

@@ -9,7 +9,7 @@ from typing import Callable, Iterable, Mapping, NoReturn, TypeAlias, TypeGuard, 
 
 from .embedded_schema import normalize_json_subschema, validate_json_subschema
 from .exceptions import DeclarationRegistryError
-from .facets import FacetRegistry
+from .facets import FacetRegistryView
 from .loader import LoadedDeclarationSource, load_declaration_source
 from .models import (
     AnyDeclaration,
@@ -61,7 +61,7 @@ class DeclarationRegistry:
     """An immutable, cross-record validated declaration index."""
 
     paths: tuple[Path, ...]
-    facet_registry: FacetRegistry
+    facet_registry: FacetRegistryView
     records: Mapping[str, RegisteredDeclaration]
     families: Mapping[str, ContractFamily]
     conflicts: frozenset[ConflictPair]
@@ -87,7 +87,7 @@ class _FamilyState:
 
 
 def load_declaration_registry(
-    paths: Iterable[Path], facets: FacetRegistry
+    paths: Iterable[Path], facets: FacetRegistryView
 ) -> DeclarationRegistry:
     """Load and cross-validate a deterministic declaration corpus."""
     return _RegistryBuilder(paths, facets).build()
@@ -96,7 +96,8 @@ def load_declaration_registry(
 class _RegistryBuilder:
     """Index sources first, then validate contracts against the closed index."""
 
-    def __init__(self, paths: Iterable[Path], facets: FacetRegistry) -> None:
+    def __init__(self, paths: Iterable[Path], facets: FacetRegistryView) -> None:
+        facets.require_authority()
         self.paths = tuple(
             sorted({path.resolve() for path in paths}, key=lambda path: str(path))
         )

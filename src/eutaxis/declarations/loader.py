@@ -9,7 +9,7 @@ from typing import Mapping, NoReturn, TypedDict, cast
 
 from .applicability import conjoin_applicability
 from .exceptions import DeclarationSemanticError
-from .facets import FacetRegistry, validate_declaration_facets
+from .facets import FacetRegistryView, validate_declaration_facets
 from .models import (
     Action,
     AnyDeclaration,
@@ -81,14 +81,14 @@ def load_declaration(path: Path) -> AnyDeclaration:
 
 
 def load_facet_validated_declaration(
-    path: Path, facets: FacetRegistry
+    path: Path, facets: FacetRegistryView
 ) -> AnyDeclaration:
     """Load a declaration after validating every applicability facet."""
     return load_declaration_source(path, facets=facets).declaration
 
 
 def load_declaration_source(
-    path: Path, *, facets: FacetRegistry | None = None
+    path: Path, *, facets: FacetRegistryView | None = None
 ) -> LoadedDeclarationSource:
     """Load one declaration and retain its immutable document and source map."""
     document, locations, source_sha256 = load_yaml_document(path)

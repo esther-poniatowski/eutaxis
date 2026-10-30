@@ -26,7 +26,7 @@ from .exceptions import (
     ObservationProviderRegistryError,
     ProcedureObservationError,
 )
-from .facets import FacetRegistry
+from .facets import FacetRegistryView
 from .models import JsonValue, VersionedReference, freeze_json, json_values_equal
 from .procedure_runs import ProcedureRunPlan, _is_issued_procedure_run_plan
 from .registry import DeclarationRegistry
@@ -90,7 +90,7 @@ class ObservationProviderRegistry:
     """Process-local authority for one coherent batch observation provider."""
 
     declarations: DeclarationRegistry
-    facets: FacetRegistry
+    facets: FacetRegistryView
     provider: ObservationProvider
     _issuer: object
 
@@ -157,7 +157,7 @@ class ProcedurePreconditionObservation:
 
 def build_observation_provider_registry(
     declarations: DeclarationRegistry,
-    facets: FacetRegistry,
+    facets: FacetRegistryView,
     provider: ObservationProvider,
 ) -> ObservationProviderRegistry:
     """Bind one reviewed batch provider to exact declaration and facet registries."""
@@ -239,7 +239,7 @@ def _is_issued_procedure_precondition_observation(evidence: object) -> bool:
 
 def _validated_trace_context(
     observations: tuple[ProcedurePredicateObservation, ...],
-    facets: FacetRegistry,
+    facets: FacetRegistryView,
 ) -> Mapping[str, JsonValue]:
     """Reconstruct and validate one context shared by every retained trace."""
     observed: dict[str, tuple[bool, JsonValue]] = {}
@@ -382,7 +382,7 @@ def _issue_request(
 def _snapshot_observation(
     returned: object,
     requested: tuple[str, ...],
-    facets: FacetRegistry,
+    facets: FacetRegistryView,
 ) -> Mapping[str, JsonValue]:
     if not isinstance(returned, Mapping):
         _fail(("provider", "result"), "provider result must be a mapping")

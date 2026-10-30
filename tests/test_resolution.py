@@ -14,6 +14,7 @@ import pytest
 import yaml
 
 from eutaxis.declarations import (
+    AcquisitionContractError,
     CompositionError,
     FacetContextError,
     ResolutionError,
@@ -34,6 +35,7 @@ from eutaxis.declarations.resolution import (
     _capture_resolution_authority_state,
     _is_issued_resolution_result,
 )
+from tests._facet_authority import issue_test_composite
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "resolution" / "valid"
 FACET_PATH = (
@@ -57,7 +59,7 @@ def _context(**overrides: object) -> dict[str, object]:
 
 def _registry(root: Path = FIXTURE_ROOT, *, reverse: bool = False):
     paths = sorted(root.glob("*.yaml"), reverse=reverse)
-    return load_declaration_registry(tuple(paths), load_facet_registry(FACET_PATH))
+    return load_declaration_registry(tuple(paths), issue_test_composite())
 
 
 def _mutable_fixture(tmp_path: Path) -> Path:
@@ -119,8 +121,11 @@ def test_resolution_is_deterministic_and_composition_ready() -> None:
         ("resolution/base", ("preserve",), ("preservation",)),
         ("resolution/refined", ("refine",), ("refined-check",)),
     )
-    assert first.trace.facet_registry == "tests/context-facets"
-    assert first.trace.facet_source_revision == "fixture-1"
+    assert first.trace.facet_registry == "composite/context-facets-v1"
+    assert (
+        first.trace.facet_content_revision
+        == first.registry.facet_registry.content_revision
+    )
     assert [event.ordinal for event in first.trace.events] == list(
         range(len(first.trace.events))
     )
@@ -128,6 +133,16 @@ def test_resolution_is_deterministic_and_composition_ready() -> None:
     assert plan_cumulative_composition(_registry(), first.unit).manifest == (
         "resolution/manifest"
     )
+
+
+def test_resolution_rejects_single_facet_registry() -> None:
+    registry = load_declaration_registry(
+        tuple(sorted(FIXTURE_ROOT.glob("*.yaml"))),
+        load_facet_registry(FACET_PATH),
+    )
+
+    with pytest.raises(TypeError, match="issued composite"):
+        resolve_compilation_unit(registry, "resolution/manifest", _context())
 
 
 @pytest.mark.parametrize("target", ["unit", "component", "trace", "event"])
@@ -156,6 +171,19 @@ def test_resolution_authority_cannot_self_attest_after_mutation() -> None:
     result = _resolve()
     object.__setattr__(result.unit, "components", result.unit.components[1:])
     object.__setattr__(result, "_state", _capture_resolution_authority_state(result))
+
+    assert not _is_issued_resolution_result(result)
+
+
+def test_resolution_authority_binds_complete_composite_facet_state() -> None:
+    result = _resolve()
+    facets = result.registry.facet_registry
+
+    object.__setattr__(
+        facets,
+        "facet_authorities",
+        MappingProxyType(dict(facets.facet_authorities)),
+    )
 
     assert not _is_issued_resolution_result(result)
 
@@ -295,6 +323,11 @@ def test_manifest_predicate_failures_carry_exact_evidence(
     assert tuple(event.kind for event in error.trace.events) == (
         ResolutionEventKind.MANIFEST_EVALUATED,
     )
+    assert error.trace.facet_registry == "composite/context-facets-v1"
+    assert (
+        error.trace.facet_content_revision
+        == _registry().facet_registry.content_revision
+    )
     assert error.source is not None
     assert error.source.document_path == ("applicability",)
 
@@ -306,6 +339,99 @@ def test_context_validation_precedes_event_issuance() -> None:
             "resolution/manifest",
             {**_context(), "unknown.facet": True},
         )
+
+
+@pytest.mark.parametrize("target", [True, False])
+def test_context_iterator_cannot_mutate_composite_before_result_or_failure(
+    target: bool,
+) -> None:
+    registry = _registry()
+    facets = registry.facet_registry
+    context = _context(**{"target.codex": target})
+
+    class MutatingContext(Mapping):
+        def __getitem__(self, key):
+            return context[key]
+
+        def __iter__(self):
+            return iter(context)
+
+        def __len__(self):
+            return len(context)
+
+        def items(self):
+            yield from context.items()
+            object.__setattr__(
+                facets,
+                "content_revision",
+                "sha256:" + "f" * 64,
+            )
+
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        resolve_compilation_unit(
+            registry,
+            "resolution/manifest",
+            MutatingContext(),
+        )
+
+
+def test_resolution_rejects_nested_context_schema_aba() -> None:
+    registry = _registry()
+    facets = registry.facet_registry
+    facet = facets.facets["artifact.created"]
+    original_schema = facet.value_schema
+
+    class SchemaSwitchingValue(Mapping):
+        calls = 0
+
+        def __getitem__(self, key):
+            raise KeyError(key)
+
+        def __iter__(self):
+            return iter(())
+
+        def __len__(self):
+            return 0
+
+        def items(self):
+            type(self).calls += 1
+            schema = (
+                MappingProxyType({"type": "object"})
+                if self.calls == 1
+                else original_schema
+            )
+            object.__setattr__(facet, "value_schema", schema)
+            return {}.items()
+
+    with pytest.raises(FacetContextError, match="boolean"):
+        resolve_compilation_unit(
+            registry,
+            "resolution/manifest",
+            _context(**{"artifact.created": SchemaSwitchingValue()}),
+        )
+    facets.require_authority()
+
+
+def test_resolution_rejects_hostile_context_key_before_lookup() -> None:
+    registry = _registry()
+
+    class HostileKey(str):
+        armed = False
+
+        def __hash__(self):
+            if self.armed:
+                raise RuntimeError("hostile key was hashed")
+            return super().__hash__()
+
+    key = HostileKey("artifact.created")
+    context = _context()
+    value = context.pop("artifact.created")
+    context[key] = value
+    key.armed = True
+
+    with pytest.raises(FacetContextError, match="exact strings"):
+        resolve_compilation_unit(registry, "resolution/manifest", context)
+    registry.facet_registry.require_authority()
 
 
 @pytest.mark.parametrize(

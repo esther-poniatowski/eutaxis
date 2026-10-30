@@ -40,7 +40,7 @@ def _freeze_json(value: object, active: set[int]) -> JsonValue:
         frozen: dict[str, JsonValue] = {}
         try:
             for key, item in value.items():
-                if not isinstance(key, str):
+                if type(key) is not str:
                     raise TypeError("JSON object keys must be strings")
                 frozen[key] = _freeze_json(item, active)
             return MappingProxyType(frozen)
@@ -55,9 +55,9 @@ def _freeze_json(value: object, active: set[int]) -> JsonValue:
             return tuple(_freeze_json(item, active) for item in value)
         finally:
             active.remove(identity)
-    if value is None or isinstance(value, (bool, int, str)):
+    if value is None or type(value) in {bool, int, str}:
         return value
-    if isinstance(value, float) and math.isfinite(value):
+    if type(value) is float and math.isfinite(value):
         return value
     raise TypeError(f"Unsupported JSON value: {type(value).__name__}")
 

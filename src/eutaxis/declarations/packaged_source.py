@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Callable, NamedTuple, NoReturn, SupportsIndex, TypeGuard
 
-from ._authority import IdentityAuthorityStore
+from ._authority import IdentityAuthorityStore, identity_value_state
 from .acquisition_contract import (
     AcquisitionLock,
     FacetConstituentLock,
@@ -28,6 +28,10 @@ from .source import load_yaml_bytes
 class _PackagedState(NamedTuple):
     facet_evidence: VerifiedByteCarrier
     declaration_evidence: tuple[VerifiedByteCarrier, ...]
+    facet_lock: FacetConstituentLock
+    facet_lock_state: object
+    facet_registry: FacetRegistry
+    facet_registry_state: object
     facet_document: Mapping[str, JsonValue]
     declaration_documents: tuple[JsonValue, ...]
     facet_content_revision: str
@@ -51,6 +55,31 @@ def _issued_state(
             "packaged source is not issued here",
         )
     return state
+
+
+def _issued_packaged_facet_state(
+    value: object,
+) -> tuple[VerifiedByteCarrier, FacetConstituentLock, FacetRegistry]:
+    """Return the exact verified packaged facet constituent and its lock."""
+    state = _issued_state(value)
+    evidence = state.facet_evidence
+    lock = state.facet_lock
+    registry = state.facet_registry
+    if identity_value_state(lock) != state.facet_lock_state:
+        _fail("$.facet-registry.base", "packaged facet lock state changed")
+    if identity_value_state(registry) != state.facet_registry_state:
+        _fail("$.facet-registry.base", "packaged facet registry state changed")
+    authoritative = evidence.authoritative
+    if authoritative.path != lock.path or authoritative.sha256 != lock.sha256:
+        _fail("$.facet-registry.base", "packaged facet evidence differs from lock")
+    if registry.id != lock.id or registry.owner != lock.owner:
+        _fail("$.facet-registry.base", "packaged facet registry differs from lock")
+    if (
+        lock.content_revision != state.facet_content_revision
+        or lock.acquisition_revision != state.facet_acquisition_revision
+    ):
+        _fail("$.facet-registry.base", "packaged facet revisions changed")
+    return evidence, lock, registry
 
 
 class PackagedInternalSource:
@@ -78,6 +107,14 @@ class PackagedInternalSource:
     ) -> tuple[VerifiedByteCarrier, ...]:
         """Return matching observations in the code-owned declaration order."""
         return _state(self).declaration_evidence
+
+    @property
+    def facet_registry(
+        self,
+        _state: Callable[[object], _PackagedState] = _issued_state,
+    ) -> FacetRegistry:
+        """Return the exact parsed packaged facet registry."""
+        return _state(self).facet_registry
 
     @property
     def facet_document(
@@ -328,6 +365,10 @@ def _acquire_from_retained_roots(
     state = dependencies.state_type(
         facet_evidence=facet_verified,
         declaration_evidence=declaration_verified,
+        facet_lock=base_lock,
+        facet_lock_state=identity_value_state(base_lock),
+        facet_registry=facet_registry,
+        facet_registry_state=identity_value_state(facet_registry),
         facet_document=frozen_facet_document,
         declaration_documents=tuple(declaration_documents),
         facet_content_revision=base_lock.content_revision,

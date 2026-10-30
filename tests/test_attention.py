@@ -90,7 +90,6 @@ from eutaxis.declarations import (
     execute_known_failure_fixtures,
     load_declaration_registry,
     load_evaluator_fixture_index,
-    load_facet_registry,
     observe_procedure_preconditions,
     plan_attention,
     plan_procedure_precondition_evaluations,
@@ -104,10 +103,11 @@ from eutaxis.declarations.attention import (
     _is_issued_requirements,
 )
 from eutaxis.declarations.models import JsonValue
-from eutaxis.declarations.procedure_runs import _is_issued_procedure_run_plan
 from eutaxis.declarations.procedure_evaluations import (
     _is_issued_procedure_precondition_evaluation_plan,
 )
+from eutaxis.declarations.procedure_runs import _is_issued_procedure_run_plan
+from tests._facet_authority import issue_test_composite
 from eutaxis.declarations.pre_action_evidence import (
     _SESSION_CONTROLS,
     _is_issued_pre_action_evidence,
@@ -115,7 +115,6 @@ from eutaxis.declarations.pre_action_evidence import (
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REGISTRY_FIXTURES = FIXTURES / "registry" / "valid"
-FACETS = FIXTURES / "facets" / "valid" / "context-facets.yaml"
 CHECKER = VersionedReference("registry/checker", 1)
 DETECTOR = VersionedReference("registry/detector", 1)
 MANUAL = VersionedReference("registry/manual", 1)
@@ -536,7 +535,7 @@ def _prepare_registry(
     _write(root, "manifest.yaml", manifest)
 
     declarations = load_declaration_registry(
-        tuple(sorted(root.glob("*.yaml"))), load_facet_registry(FACETS)
+        tuple(sorted(root.glob("*.yaml"))), issue_test_composite()
     )
     resolution = resolve_compilation_unit(declarations, "registry/manifest", _context())
     checker_registry = None

@@ -58,7 +58,7 @@ Only declared incompatibilities enter conflict resolution. Each policy names the
 
 Version 1 gives policy authority to the manifest owner. Every policy referenced by a manifest must have the same owner as that manifest. The manifest may still select records owned elsewhere. An authorized policy affects only that compilation unit and does not mutate the source of another owner.
 
-The live declaration registry retains the exact immutable facet registry used to validate its sources. The public resolver accepts that declaration registry, a manifest identifier, and a context. It accepts no separate facet registry. Therefore, runtime predicates use the same facet definitions as source validation. Persisted catalog indexes cannot enter resolution because they contain neither complete declarations nor this bound facet registry.
+The exact immutable composite remains in the live `DeclarationRegistry`. That composite checks the registry sources. Packaged callers obtain the composite through `acquire_packaged_composite_facet_registry(lock)`. The public resolver accepts the bound registry, a manifest identifier, and a context. The resolver rejects a separate facet registry. Therefore, runtime predicates use the same facet schemas as the source checks. A persisted catalog index lacks complete records. The persisted catalog index also lacks an issued composite. Therefore, the resolver rejects the persisted catalog index.
 
 ## Registry diagnostics
 

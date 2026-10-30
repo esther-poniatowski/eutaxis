@@ -146,8 +146,13 @@ from .fixtures import (
 from .facets import (
     ContextFacet,
     FacetRegistry,
+    FacetRegistryView,
     facet_registry_path,
     load_facet_registry,
+)
+from .composite_facets import (
+    CompositeFacetRegistry,
+    acquire_packaged_composite_facet_registry,
 )
 from .applicability import (
     ApplicabilityTrace,
@@ -483,8 +488,10 @@ __all__ = [
     "ExactContractKey",
     "ExceptionClause",
     "FacetContextError",
+    "CompositeFacetRegistry",
     "FacetRegistry",
     "FacetRegistryError",
+    "FacetRegistryView",
     "MigrationBaseline",
     "MigrationBaselineError",
     "MigrationBaselineFinding",
@@ -643,6 +650,7 @@ __all__ = [
     "build_detector_runner_registry",
     "build_operation_runner_registry",
     "build_observation_provider_registry",
+    "acquire_packaged_composite_facet_registry",
     "create_pre_action_evidence_session",
     "create_procedure_execution_session",
     "create_rule_evidence_session",

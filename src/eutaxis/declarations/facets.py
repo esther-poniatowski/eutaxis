@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping, NoReturn, cast
+from typing import Mapping, NoReturn, Protocol, cast
 
 from .. import data_path
 from .embedded_schema import (
@@ -52,6 +52,15 @@ class FacetRegistry:
     source_revision: str
     facets: Mapping[str, ContextFacet]
 
+    def require_authority(self) -> None:
+        """Accept the legacy single-registry compatibility value."""
+
+    def authority_for(self, facet_id: str) -> "FacetRegistry":
+        """Return this registry as the authority for one known facet."""
+        if facet_id not in self.facets:
+            raise KeyError(facet_id)
+        return self
+
     def validate_context(
         self, context: Mapping[str, object]
     ) -> Mapping[str, JsonValue]:
@@ -62,25 +71,83 @@ class FacetRegistry:
         FacetContextError
             If a key is unknown or a present value violates its facet schema.
         """
-        validated: dict[str, JsonValue] = {}
-        for facet_id, value in context.items():
-            if not isinstance(facet_id, str):
-                raise FacetContextError(str(facet_id), "context keys must be strings")
-            facet = self.facets.get(facet_id)
-            if facet is None:
-                raise FacetContextError(facet_id, "facet is not registered")
-            _require_json_context_value(facet_id, value)
-            try:
-                validate_self_contained_schema(facet.value_schema)
-            except EmbeddedSchemaContractError as exc:
-                raise FacetContextError(
-                    facet_id, f"registered schema is invalid: {exc.message}"
-                ) from exc
-            error = validate_json_instance(facet.value_schema, value)
-            if error is not None:
-                raise FacetContextError(facet_id, error.message)
-            validated[facet_id] = freeze_json(value)
-        return MappingProxyType(validated)
+        return _validate_context(self, context)
+
+
+class FacetRegistryView(Protocol):
+    """Read-only registry surface shared by single and composite values."""
+
+    @property
+    def schema_version(self) -> int:
+        """Return the facet-schema version."""
+
+    @property
+    def id(self) -> str:
+        """Return the registry display identifier."""
+
+    @property
+    def facets(self) -> Mapping[str, ContextFacet]:
+        """Return the immutable merged facet mapping."""
+
+    def require_authority(self) -> None:
+        """Require any process-local authority carried by this registry."""
+
+    def authority_for(self, facet_id: str) -> FacetRegistry:
+        """Return the exact constituent that owns one known facet."""
+
+    def validate_context(
+        self, context: Mapping[str, object]
+    ) -> Mapping[str, JsonValue]:
+        """Validate and freeze one runtime context."""
+
+
+def _validate_context(
+    registry: FacetRegistryView,
+    context: Mapping[str, object],
+) -> Mapping[str, JsonValue]:
+    """Validate and freeze context values through one registry view."""
+    registry.require_authority()
+    validated: dict[str, JsonValue] = {}
+    for facet_id, value in context.items():
+        if type(facet_id) is not str:
+            raise FacetContextError(
+                "<context-key>",
+                "context keys must be exact strings",
+            )
+        if registry.facets.get(facet_id) is None:
+            raise FacetContextError(
+                facet_id,
+                f"facet is not registered in {registry.id!r}",
+            )
+        _require_json_context_value(facet_id, value)
+        try:
+            frozen = freeze_json(value)
+        except TypeError as exc:
+            raise FacetContextError(facet_id, str(exc)) from exc
+        registry.require_authority()
+        facet = registry.facets.get(facet_id)
+        if facet is None:
+            raise FacetContextError(
+                facet_id,
+                f"facet is not registered in {registry.id!r}",
+            )
+        authority = registry.authority_for(facet_id)
+        try:
+            validate_self_contained_schema(facet.value_schema)
+        except EmbeddedSchemaContractError as exc:
+            raise FacetContextError(
+                facet_id,
+                f"schema registered by {authority.id!r} is invalid: {exc.message}",
+            ) from exc
+        error = validate_json_instance(facet.value_schema, frozen)
+        if error is not None:
+            raise FacetContextError(
+                facet_id,
+                f"value registered by {authority.id!r} is invalid: {error.message}",
+            )
+        validated[facet_id] = frozen
+    registry.require_authority()
+    return MappingProxyType(validated)
 
 
 @dataclass(frozen=True)
@@ -92,9 +159,10 @@ class ApplicabilityFacetViolation:
 
 
 def validate_applicability_expression(
-    predicate: Mapping[str, object], registry: FacetRegistry
+    predicate: Mapping[str, object], registry: FacetRegistryView
 ) -> ApplicabilityFacetViolation | None:
     """Validate one structurally valid applicability tree against ``registry``."""
+    registry.require_authority()
     for boolean_operator in ("all", "any"):
         if boolean_operator in predicate:
             for index, child in enumerate(
@@ -133,12 +201,14 @@ def validate_applicability_expression(
     for index, value in enumerate(values):
         error = validate_json_instance(facet.value_schema, value)
         if error is not None:
+            authority = registry.authority_for(facet_id)
             prefix: DocumentPath = (
                 ("value",) if operator == "equals" else ("value", index)
             )
             return ApplicabilityFacetViolation(
                 (*prefix, *error.absolute_path),
-                f"value for facet {facet.id!r} is invalid: {error.message}",
+                f"value for facet {facet.id!r} from {authority.id!r} is invalid: "
+                f"{error.message}",
             )
     return None
 
@@ -218,7 +288,7 @@ def _facet_registry_from_document(
 
 def validate_declaration_facets(
     document: Mapping[str, object],
-    registry: FacetRegistry,
+    registry: FacetRegistryView,
     *,
     path: Path,
     locations: SourceMap,
@@ -281,7 +351,7 @@ def validate_declaration_facets(
 
 def _validate_rule_facets(
     rule: Mapping[str, object],
-    registry: FacetRegistry,
+    registry: FacetRegistryView,
     *,
     path: Path,
     parts: DocumentPath,
@@ -310,7 +380,7 @@ def _validate_rule_facets(
 
 def _validate_applicability(
     predicate: Mapping[str, object],
-    registry: FacetRegistry,
+    registry: FacetRegistryView,
     *,
     path: Path,
     parts: DocumentPath,
@@ -376,8 +446,11 @@ def _require_json_context_value(
         identity = _enter_context_container(facet_id, value, active)
         try:
             for key, child in value.items():
-                if not isinstance(key, str):
-                    raise FacetContextError(facet_id, "object keys must be strings")
+                if type(key) is not str:
+                    raise FacetContextError(
+                        facet_id,
+                        "object keys must be exact strings",
+                    )
                 _require_json_context_value(facet_id, child, active)
         finally:
             active.remove(identity)
@@ -390,9 +463,9 @@ def _require_json_context_value(
         finally:
             active.remove(identity)
         return
-    if value is None or isinstance(value, (bool, int, str)):
+    if value is None or type(value) in {bool, int, str}:
         return
-    if isinstance(value, float) and math.isfinite(value):
+    if type(value) is float and math.isfinite(value):
         return
     raise FacetContextError(
         facet_id, f"{type(value).__name__} is not a finite JSON value"

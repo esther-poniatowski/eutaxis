@@ -17,6 +17,8 @@ Resolver evidence must reconstruct every semantic decision without exposing a pa
 
 ## Public boundary
 
+The packaged route begins with `acquire_packaged_composite_facet_registry(lock)`. The callable first checks the packaged lock. Next, the callable acquires the code-owned source. Finally, the callable issues its composite. A caller passes that composite to `load_declaration_registry` and then calls the resolver. No caller needs the private composite issuer.
+
 The public call is:
 
 ```python
@@ -27,18 +29,28 @@ resolve_compilation_unit(
 ) -> ResolutionResult
 ```
 
-The call uses only the facet registry retained by `DeclarationRegistry`. It resolves the manifest before validating the context. An unknown or wrong-kind manifest raises `ResolutionError` before a trace exists. For a known composition manifest, the bound facet registry validates the complete context once. A `FacetContextError` propagates before the resolver issues an event.
+The resolver reads only the facet registry retained by `DeclarationRegistry`. Only an issued `CompositeFacetRegistry` can enter the resolver. By contrast, a legacy single registry can check source files but cannot enter the resolver.
+
+The current composite issuer accepts one source-issued constituent. An issued packaged source supplies that base registry. The issuer rejects caller-supplied registries. The [external-source boundary](external-declaration-identity-and-acquisition.md) will admit additive registries later. That boundary will accept only an issued result that owns their source roots and transport proofs.
+
+The current composite keeps the packaged registry as its sole constituent. Each facet points to that declaring registry. The external-source boundary will extend this invariant to the ordered external constituents and will reject repeated facet identifiers.
+
+The resolver first resolves the manifest. An unknown or wrong-kind manifest raises `ResolutionError` before a trace exists. For a known composition manifest, the composite checks the complete context once. After traversing the caller-supplied context, the composite checks its issued state again. Therefore, an invalid context raises `FacetContextError` before the resolver records an event.
 
 Only `resolution.py` issues the following frozen values; their constructors reject direct calls:
 
 - `ResolutionResult(unit, trace)`
-- `ResolutionTrace(manifest, facet_registry, facet_source_revision, events)`
+- `ResolutionTrace(manifest, facet_registry, facet_content_revision, events)`
 - `ResolutionEvent(...)`
 - `ResolvedCompilationUnit(manifest, components, dependencies, rule_projections)`
 
 `ResolvedRuleProjection(declaration: str, norms: tuple[str, ...], criteria: tuple[str, ...])` contains ordered local identifiers. The unit contains exactly one projection for each effective rule and no projection for a procedure. `ManifestAnchor(section: str, rank: int)`, `ResolvedComponent`, `ResolvedDependency`, and `ResolvedRuleProjection` are publicly constructible frozen leaves. Tests and consumers use them as structural values; only the aggregate certified objects require private issuance.
 
-A successful result contains one correlated unit and trace. The trace records `registry.facet_registry.id` and `registry.facet_registry.source_revision` in its two facet fields. A `ResolutionError` may contain a failure trace but never a unit. Persisted catalog indexes cannot call the resolver.
+A successful call returns one correlated unit and trace. The trace records the fixed composite identifier in `facet_registry`. The `facet_content_revision` field stores the transport-independent digest.
+
+The issued result records the exact composite object and exact constituent objects. The issued result also records the two merged tables. Each nested facet schema remains part of the recorded state. Exchanging a recorded object for an equal-valued object makes the result invalid. Changing a recorded object after issue also makes the result invalid.
+
+A `ResolutionError` may contain a failure trace with the same composite identifier and revision. The error contains no unit. Persisted catalog indexes cannot call the resolver.
 
 ## Exact source and anchor types
 

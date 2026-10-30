@@ -132,6 +132,8 @@ def test_packaged_source_retains_verified_resources_in_code_owned_order() -> Non
 
     assert acquired.facet_document["id"] == "eutaxis/context-facets"
     assert acquired.facet_document["owner"] == "eutaxis"
+    assert acquired.facet_registry.id == "eutaxis/context-facets"
+    assert acquired.facet_registry.owner == "eutaxis"
     assert (
         tuple(evidence.authoritative.path for evidence in acquired.declaration_evidence)
         == PACKAGED_DECLARATION_PATHS

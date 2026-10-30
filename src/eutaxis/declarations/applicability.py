@@ -7,7 +7,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Literal, Mapping, TypeAlias
 
-from .facets import FacetRegistry
+from .facets import FacetRegistryView
 from .models import JsonValue, freeze_json, json_values_equal
 
 
@@ -70,7 +70,7 @@ def conjoin_applicability(
 def evaluate_applicability(
     predicate: Mapping[str, object],
     context: Mapping[str, object],
-    facets: FacetRegistry,
+    facets: FacetRegistryView,
 ) -> TruthValue:
     """Validate ``context`` and evaluate one normalized predicate.
 
@@ -88,7 +88,7 @@ def evaluate_applicability(
 def evaluate_applicability_with_trace(
     predicate: Mapping[str, object],
     context: Mapping[str, object],
-    facets: FacetRegistry,
+    facets: FacetRegistryView,
 ) -> ApplicabilityTrace:
     """Evaluate one predicate and retain its complete predicate-tree trace.
 

@@ -14,6 +14,10 @@ from .applicability import (
     _evaluate_validated_applicability_with_trace,
     conjoin_applicability,
 )
+from .composite_facets import (
+    CompositeFacetRegistry,
+    _is_issued_composite_facet_registry,
+)
 from .models import (
     CompositionManifestDeclaration,
     ExceptionClause,
@@ -22,8 +26,6 @@ from .models import (
     ResolutionPolicyDeclaration,
     RuleDeclaration,
     RuleSetDeclaration,
-    freeze_json,
-    json_values_equal,
 )
 from .registry import ConflictPair, DeclarationRegistry, RegisteredDeclaration
 from .source import DocumentPath, nearest_location
@@ -158,7 +160,7 @@ class ResolutionTrace:
 
     manifest: str
     facet_registry: str
-    facet_source_revision: str
+    facet_content_revision: str
     events: tuple[ResolutionEvent, ...]
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -290,7 +292,7 @@ def _capture_resolution_authority_state(
         id(trace),
         trace.manifest,
         trace.facet_registry,
-        trace.facet_source_revision,
+        trace.facet_content_revision,
         id(trace.events),
         tuple(identity_value_state(event) for event in trace.events),
         id(result._issuer),
@@ -302,78 +304,28 @@ def _resolution_facet_authority_state(
 ) -> tuple[object, ...]:
     """Capture facet carriers and values without reading external resources."""
     facets = registry.facet_registry
-    return (
-        id(facets),
-        facets.schema_version,
-        facets.id,
-        facets.owner,
-        facets.source_revision,
-        id(facets.facets),
-        tuple(
-            (
-                key,
-                id(facet),
-                facet.id,
-                id(facet.value_schema),
-                identity_value_state(facet.value_schema),
-            )
-            for key, facet in facets.facets.items()
-        ),
-    )
+    if not _is_issued_composite_facet_registry(facets):
+        raise ValueError("resolution facet registry is not issued")
+    return (identity_value_state(facets),)
 
 
 def _capture_facet_registry_state(registry: DeclarationRegistry) -> tuple[object, ...]:
     facets = registry.facet_registry
-    records: list[object] = []
-    for key, facet in facets.facets.items():
-        records.append(
-            (
-                key,
-                facet,
-                facet.id,
-                facet.value_schema,
-                freeze_json(facet.value_schema),
-            )
-        )
-    return (
-        facets,
-        facets.schema_version,
-        facets.id,
-        facets.owner,
-        facets.source_revision,
-        facets.facets,
-        tuple(records),
-    )
+    if not _is_issued_composite_facet_registry(facets):
+        raise ValueError("resolution facet registry is not issued")
+    return (facets, identity_value_state(facets))
 
 
 def _facet_registry_state_matches(
     registry: DeclarationRegistry, expected: object
 ) -> bool:
-    if type(expected) is not tuple or len(expected) != 7:
+    if type(expected) is not tuple or len(expected) != 2:
         return False
-    current = _capture_facet_registry_state(registry)
-    if not all(current[index] is expected[index] for index in range(6)):
+    try:
+        current = _capture_facet_registry_state(registry)
+    except Exception:
         return False
-    current_records = current[6]
-    expected_records = expected[6]
-    if (
-        type(current_records) is not tuple
-        or type(expected_records) is not tuple
-        or len(current_records) != len(expected_records)
-    ):
-        return False
-    for current_record, expected_record in zip(current_records, expected_records):
-        if type(current_record) is not tuple or type(expected_record) is not tuple:
-            return False
-        if len(current_record) != 5 or len(expected_record) != 5:
-            return False
-        if not all(
-            current_record[index] is expected_record[index] for index in range(4)
-        ):
-            return False
-        if not json_values_equal(current_record[4], expected_record[4]):
-            return False
-    return True
+    return current[0] is expected[0] and current[1] == expected[1]
 
 
 class ResolutionError(Exception):
@@ -485,6 +437,12 @@ def resolve_compilation_unit(
     context: Mapping[str, object],
 ) -> ResolutionResult:
     """Resolve one composition manifest under its registry-bound context."""
+    if type(
+        registry.facet_registry
+    ) is not CompositeFacetRegistry or not _is_issued_composite_facet_registry(
+        registry.facet_registry
+    ):
+        raise TypeError("semantic resolution requires an issued composite registry")
     return _Resolver(registry, manifest_id, context).resolve()
 
 
@@ -1317,13 +1275,18 @@ class _Resolver:
         )
 
     def _trace(self) -> ResolutionTrace:
+        facets = cast(CompositeFacetRegistry, self.registry.facet_registry)
+        facets.require_authority()
+        facet_registry = facets.id
+        facet_content_revision = facets.content_revision
+        facets.require_authority()
         trace = object.__new__(ResolutionTrace)
         object.__setattr__(trace, "manifest", self.manifest_id)
-        object.__setattr__(trace, "facet_registry", self.registry.facet_registry.id)
+        object.__setattr__(trace, "facet_registry", facet_registry)
         object.__setattr__(
             trace,
-            "facet_source_revision",
-            self.registry.facet_registry.source_revision,
+            "facet_content_revision",
+            facet_content_revision,
         )
         object.__setattr__(trace, "events", tuple(self.events))
         return trace

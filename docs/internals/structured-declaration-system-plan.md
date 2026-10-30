@@ -281,14 +281,15 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Implement the closed manifest, canonical lock, revision algebra, and normalized path models.
 - [ ] Implement the byte and facet authority boundary:
   - [x] Implement descriptor-anchored authoritative and verification byte carriers.
-  - [ ] Implement the packaged internal source and additive composite facet authority:
+  - [x] Secure the packaged internal source and composite facets:
     - [x] Parse and locate YAML directly from retained byte evidence.
     - [x] Issue the locked packaged internal source.
-    - [ ] Issue additive composite facet authority with its consumer migration.
-- [ ] Implement workspace and vendored acquisition through one issued result.
+    - [x] Issue the packaged composite and migrate its semantic consumers.
+- [ ] Acquire workspace and vendored sources through one issued result:
+  - [ ] Admit the ordered additive facet set through the result that owns every external root and transport proof.
 - [ ] Implement the closed Git-submodule proof and repeatable transport verification.
 - [ ] Enforce namespace, owner, and declaration-reference grammar before combined registry construction.
-- [ ] Migrate persisted catalog provenance to revision 2 and bind resolution traces to the composite facet content revision.
+- [ ] Move the persisted catalog to `index-revision: 2`.
 - [ ] Publish migration tooling, semantic-diff tooling, and rollback before converting an external source.
 - [ ] Only then pilot one coherent Oikos rule set and one procedure.
 
@@ -341,6 +342,33 @@ defect. Then, the eleventh pass approved the slice. All 235 targeted tests passe
 MyPy accepted four production modules. Black accepted six changed Python files.
 Hermeneia accepted the decision record and plan. The fresh wheel contained every
 packaged acquisition resource.
+
+The issued packaged source retains the facet lock. The packaged composite
+computes `content_revision` from that lock. The resolver, observation provider,
+and attention pipeline retain that exact composite. Success and failure traces
+record its fixed identifier and `content_revision`. A legacy single registry
+can still check source files but cannot enter the resolver.
+
+The public `acquire_packaged_composite_facet_registry` callable accepts the
+packaged lock and returns the issued composite. Callers pass that value to the
+existing declaration-registry loader. Therefore, the public resolver retains a
+successful packaged route while the combined external result remains pending.
+
+Three independent adversarial gates examined this sub-slice. The first two
+gates showed why external facets require the complete source boundary. Those
+gates also found unbound registry state and hostile context paths. The third
+gate found hostile primitive subclasses and the missing public route. Repairs
+closed every reported high- and medium-severity defect. Then, the third gate
+and its focused re-gate approved the repaired slice. All 350 targeted tests passed.
+MyPy accepted eight production modules. Black accepted fifteen changed Python
+files. Hermeneia accepted the three changed decision and planning records.
+
+The packaged composite rejects facet carriers from external sources. A free
+verified carrier proves stable bytes. However, that carrier does not prove the
+external source root or transport. Therefore, the workspace and vendored source
+boundary must issue the complete ordered additive set. The resulting boundary
+will enforce global namespace uniqueness. The boundary will also bind every
+facet carrier to the retained source root before extending the composite.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 
