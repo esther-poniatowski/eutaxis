@@ -283,7 +283,7 @@ This phase has turned the validated registry into a static query boundary, resol
   - [x] Implement descriptor-anchored authoritative and verification byte carriers.
   - [ ] Implement the packaged internal source and additive composite facet authority:
     - [x] Parse and locate YAML directly from retained byte evidence.
-    - [ ] Issue the locked packaged internal source.
+    - [x] Issue the locked packaged internal source.
     - [ ] Issue additive composite facet authority with its consumer migration.
 - [ ] Implement workspace and vendored acquisition through one issued result.
 - [ ] Implement the closed Git-submodule proof and repeatable transport verification.
@@ -317,6 +317,30 @@ the slice after every preceding finding had been repaired. Its targeted
 evidence is the byte-carrier, authority-store, acquisition-contract, and
 canonical-JSON test set together with static typing of the acquisition source
 modules.
+
+The packaged source follows these steps:
+
+1. The module retains the running package directory on a supported descriptor platform.
+2. The public acquisition callable keeps the retained directory descriptor private.
+3. A detached, validated acquisition lock supplies the code-owned paths and their declaration order.
+4. The retained directory opens both resource roots without following symbolic links.
+5. The source reads every named carrier and compares its digest with the lock.
+6. The source parses only the retained bytes and confirms the facet identifier and owner.
+7. The source reopens every logical path. The source compares the directory device and inode values, file metadata, and bytes.
+8. The source issues immutable JSON values and exact verified evidence without accepting a caller-supplied root or registry.
+
+The [acquisition trust boundary](../adr/external-declaration-identity-and-acquisition.md)
+treats the loaded implementation and interpreter as trusted. Therefore, the
+source does not claim to resist code that changes private Python state. On an
+unsupported platform, the package API remains importable. The public source
+callable fails before it opens a resource.
+
+Eleven independent adversarial passes examined the packaged source. The passes
+reported high- and medium-severity defects. Repairs resolved every reported
+defect. Then, the eleventh pass approved the slice. All 235 targeted tests passed.
+MyPy accepted four production modules. Black accepted six changed Python files.
+Hermeneia accepted the decision record and plan. The fresh wheel contained every
+packaged acquisition resource.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 

@@ -246,6 +246,17 @@ def parse_acquisition_lock_bytes(source: bytes) -> AcquisitionLock:
     return _parse_acquisition_lock_document(document)
 
 
+def validated_packaged_lock(
+    lock: AcquisitionLock,
+) -> tuple[FacetConstituentLock, InternalSourceLock]:
+    """Detach and validate the code-owned components of one closed lock."""
+    _require_lock_state(lock)
+    detached = _parse_acquisition_lock_document(_lock_document(lock))
+    _validate_base_facets(detached.facet_registry)
+    _validate_internal_source(detached.internal_source)
+    return detached.facet_registry.base, detached.internal_source
+
+
 def validate_acquisition_contract(
     manifest: AcquisitionManifest, lock: AcquisitionLock
 ) -> None:
@@ -466,7 +477,11 @@ def _locked_files(value: object, location: str) -> tuple[LockedFile, ...]:
     return files
 
 
-def _validate_base_facets(registry: FacetRegistryLock) -> None:
+def _validate_base_facets(
+    registry: FacetRegistryLock,
+    *,
+    packaged_path: str = PACKAGED_FACET_PATH,
+) -> None:
     base = registry.base
     location = "$.facet-registry.base"
     expected_fields = {
@@ -474,7 +489,7 @@ def _validate_base_facets(registry: FacetRegistryLock) -> None:
         "namespace": "eutaxis",
         "owner": "eutaxis",
         "id": "eutaxis/context-facets",
-        "path": PACKAGED_FACET_PATH,
+        "path": packaged_path,
     }
     for field, expected in expected_fields.items():
         if getattr(base, field) != expected:
@@ -490,7 +505,7 @@ def _validate_base_facets(registry: FacetRegistryLock) -> None:
             "kind": "packaged",
             "distribution": "eutaxis",
             "resource-root": "data",
-            "path": PACKAGED_FACET_PATH,
+            "path": packaged_path,
             "content-revision": content,
         }
     )
@@ -501,7 +516,11 @@ def _validate_base_facets(registry: FacetRegistryLock) -> None:
     )
 
 
-def _validate_internal_source(source: InternalSourceLock) -> None:
+def _validate_internal_source(
+    source: InternalSourceLock,
+    *,
+    packaged_paths: tuple[str, ...] = PACKAGED_DECLARATION_PATHS,
+) -> None:
     location = "$.internal-source"
     if source.kind != "packaged":
         _fail(location + ".kind", "packaged internal-source kind is not canonical")
@@ -510,10 +529,10 @@ def _validate_internal_source(source: InternalSourceLock) -> None:
             location + ".namespace",
             "packaged internal-source namespace is not canonical",
         )
-    if len(source.files) != len(PACKAGED_DECLARATION_PATHS):
+    if len(source.files) != len(packaged_paths):
         _fail(location + ".files", "packaged declaration file count is not canonical")
     for index, (file, expected_path) in enumerate(
-        zip(source.files, PACKAGED_DECLARATION_PATHS, strict=True)
+        zip(source.files, packaged_paths, strict=True)
     ):
         if file.path != expected_path:
             _fail(

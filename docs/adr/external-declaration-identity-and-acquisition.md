@@ -33,6 +33,37 @@ defined below; callers cannot supply a registry in its place. External
 acquisition applies only to the manifest's `sources` entries. Both source
 classes use one issued composite facet registry and enter one combined registry.
 
+## Trust boundary
+
+The trusted computing base contains four components:
+
+- loaded Eutaxis implementation
+- private authority stores
+- Python interpreter
+- imported implementation dependencies
+
+Issuer checks apply only when a consumer must authenticate a process-local
+object.
+These consumers accept the exact objects recorded by Eutaxis. Other public APIs
+accept caller values and validate them structurally. Copies and reconstructed
+values fail the issuer checks. Serialized values also fail those checks when
+restored. By contrast, code that changes private module or class state belongs
+to the trusted base and can bypass same-process Python invariants.
+
+Callers can supply malformed manifest or lock values. Callers can also control
+filesystem bytes and Git state. The packaged-acquisition entry point accepts no
+caller-supplied carrier. Its loader creates carriers from retained descriptors.
+The lock supplies reviewed policy. The loader compares each acquired source with
+the lock. The loader cannot determine whether an internally consistent
+replacement lock received review. Finally, the contract cannot detect a change
+when a filesystem actor restores every observable value between checks.
+
+If untrusted Python code shares the host process, then an isolated worker must
+load sources. The worker must also run each consumer of issued objects. The
+worker cannot return a process-local token to the untrusted parent without
+losing the authority boundary. Accordingly, the present contract omits this
+worker protocol.
+
 ## Semantic identity
 
 An external declaration identifier has exactly this form:
@@ -552,11 +583,9 @@ retains the exact manifest, lock, facet-base, facet-extension, packaged-source,
 external-source, and Git carriers; every constituent and the issued composite
 facet registry; byte-owned parsed records; computed revisions; and resulting
 declaration registry. A process-local, identity-indexed issuance record
-authenticates the result and its nested carriers. Serialization, copying,
-reconstruction, equal-value
-replacement, or later mutation cannot create an accepted result. Resolution
-and catalog construction consume this issued result rather than paths or a
-caller-supplied registry.
+authenticates the result and its nested carriers within the trusted computing
+base. The resolver accepts only this issued result. The catalog builder accepts
+the same object. Neither consumer accepts paths or a caller-supplied registry.
 
 ## Catalog provenance
 

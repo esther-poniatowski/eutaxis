@@ -60,6 +60,10 @@ from .byte_carriers import (
     TrustedDirectory,
     VerifiedByteCarrier,
 )
+from .packaged_source import (
+    PackagedInternalSource,
+    acquire_packaged_internal_source,
+)
 from .exceptions import (
     AcquisitionContractError,
     AttentionPlanningError,
@@ -388,9 +392,11 @@ __all__ = [
     "LockedFile",
     "PACKAGED_DECLARATION_PATHS",
     "PACKAGED_FACET_PATH",
+    "PackagedInternalSource",
     "RetainedDirectory",
     "TrustedDirectory",
     "VerifiedByteCarrier",
+    "acquire_packaged_internal_source",
     "acquisition_lock_schema",
     "acquisition_lock_schema_path",
     "acquisition_manifest_schema",

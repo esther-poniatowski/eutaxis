@@ -26,6 +26,7 @@ from .source import (
     DocumentPath,
     SourceMap,
     format_document_path,
+    load_yaml_bytes,
     load_yaml_document,
     nearest_location,
 )
@@ -160,6 +161,26 @@ def load_facet_registry(path: Path) -> FacetRegistry:
     document, locations, _source_sha256 = load_yaml_document(
         path, error_type=FacetRegistrySchemaError
     )
+    return _facet_registry_from_document(document, path=path, locations=locations)
+
+
+def load_facet_registry_bytes(source: bytes, *, path: Path) -> FacetRegistry:
+    """Load one facet registry from already-retained exact bytes."""
+    document, locations, _source_sha256 = load_yaml_bytes(
+        source,
+        path=path,
+        error_type=FacetRegistrySchemaError,
+    )
+    return _facet_registry_from_document(document, path=path, locations=locations)
+
+
+def _facet_registry_from_document(
+    document: object,
+    *,
+    path: Path,
+    locations: SourceMap,
+) -> FacetRegistry:
+    """Validate and detach one parsed facet-registry document."""
     validated = validate_facet_registry_document(
         document, path=path, locations=locations
     )
