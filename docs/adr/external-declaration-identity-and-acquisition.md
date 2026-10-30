@@ -181,6 +181,14 @@ exact composite validates the packaged and external declarations, enters the
 combined declaration registry, and governs resolution. A caller cannot supply,
 reorder, merge, or replace a constituent.
 
+Only a process-issued provenance record can supply the composite assembler.
+The issuer for each source class selects the exact constituent registries and
+locks. The assembler does not accept constituent values from its caller. The
+packaged issuer derives its record from the issued packaged source. The
+external issuer must derive its record from the complete workspace/vendored
+record described below. This constraint prevents the shared assembler from
+bypassing the source checks.
+
 The composite is a distinct immutable `CompositeFacetRegistry`, not an ordinary
 single-owner `FacetRegistry`. It retains `schema_version: 1`, the ordered exact
 constituents, the merged immutable facet mapping, an immutable mapping from each

@@ -20,8 +20,11 @@ from eutaxis.declarations import (
 )
 from eutaxis.declarations.composite_facets import (
     COMPOSITE_FACET_REGISTRY_ID,
+    _FacetCompositeProvenance,
     _is_issued_composite_facet_registry,
+    _issue_composite_from_provenance,
     _issue_composite_facet_registry,
+    _issue_packaged_provenance,
 )
 from eutaxis.declarations.packaged_source import _issued_packaged_facet_state
 from tests._facet_authority import issue_test_composite, packaged_lock, packaged_source
@@ -58,6 +61,33 @@ def test_composite_rejects_construction_copying_and_serialization() -> None:
     with pytest.raises(TypeError, match="cannot be serialized"):
         pickle.dumps(composite)
     assert not hasattr(declarations, "_issue_composite_facet_registry")
+
+
+def test_composite_core_accepts_only_issued_provenance() -> None:
+    with pytest.raises(TypeError, match="must be issued"):
+        _FacetCompositeProvenance()
+    forged = object.__new__(_FacetCompositeProvenance)
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        _issue_composite_from_provenance(forged)
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        _issue_composite_from_provenance(object())
+
+    provenance = _issue_packaged_provenance(packaged_source())
+    with pytest.raises(TypeError, match="cannot be copied"):
+        copy.copy(provenance)
+    with pytest.raises(TypeError, match="cannot be serialized"):
+        pickle.dumps(provenance)
+    composite = _issue_composite_from_provenance(provenance)
+    assert _is_issued_composite_facet_registry(composite)
+
+
+def test_provenance_rejects_source_mutation_before_composite_issuance() -> None:
+    packaged = packaged_source()
+    provenance = _issue_packaged_provenance(packaged)
+    object.__setattr__(packaged.facet_registry, "facets", MappingProxyType({}))
+
+    with pytest.raises(AcquisitionContractError, match="registry state changed"):
+        _issue_composite_from_provenance(provenance)
 
 
 def test_public_packaged_acquisition_issues_the_composite() -> None:
@@ -209,6 +239,36 @@ def test_composite_retires_interrupted_publication(monkeypatch) -> None:
 
     with pytest.raises(KeyboardInterrupt):
         _issue_composite_facet_registry(packaged)
+
+    assert retired == attempted
+
+
+def test_provenance_retires_interrupted_publication(monkeypatch) -> None:
+    attempted: list[_FacetCompositeProvenance] = []
+    retired: list[_FacetCompositeProvenance] = []
+    original_retire = composite_facets._FACET_PROVENANCE_AUTHORITIES.retire
+
+    def interrupt(value, _state):
+        attempted.append(value)
+        raise KeyboardInterrupt
+
+    def retire(value):
+        retired.append(value)
+        return original_retire(value)
+
+    monkeypatch.setattr(
+        composite_facets._FACET_PROVENANCE_AUTHORITIES,
+        "issue",
+        interrupt,
+    )
+    monkeypatch.setattr(
+        composite_facets._FACET_PROVENANCE_AUTHORITIES,
+        "retire",
+        retire,
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        _issue_packaged_provenance(packaged_source())
 
     assert retired == attempted
 

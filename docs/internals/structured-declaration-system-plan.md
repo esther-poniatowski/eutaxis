@@ -287,7 +287,8 @@ This phase has turned the validated registry into a static query boundary, resol
     - [x] Issue the packaged composite and migrate its semantic consumers.
 - [ ] Privately issue workspace and vendored source state:
   - [x] Parse each retained YAML carrier and expose ordered packaged read phases.
-  - [ ] Issue the external composite only after one provenance record authenticates every constituent; preserve the packaged-only public route.
+  - [x] Require an issued provenance record at the composite core and preserve the packaged-only public route.
+  - [ ] Derive external provenance only from the complete workspace/vendored source record.
   - [ ] Retain one contract without Git entries in a non-consumable stage:
     - [ ] retain every external root and carrier
     - [ ] retain the ordered additive facet set
@@ -400,6 +401,18 @@ The following checks exercised the changed behavior:
 - Black accepted six changed Python files
 - the changed-file check passed
 - Hermeneia accepted both changed documentation files
+
+The second step is complete:
+
+- the composite core accepts only process-issued provenance records
+- the packaged issuer obtains its lock and registry from the issued source
+- every authority check revalidates the source and its locked registry
+- the same check recomputes the composite state
+- interrupted issuers retire their provisional records
+
+A second independent adversarial pass found no high- or medium-severity defect.
+The focused test set contains 181 passing tests. MyPy and Black accepted the
+changed Python files. The changed-file check also passed.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 
