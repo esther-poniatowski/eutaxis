@@ -15,6 +15,7 @@ from .acquisition_contract import (
     validated_packaged_lock,
 )
 from .byte_carriers import (
+    AuthoritativeByteCarrier,
     RetainedDirectory,
     TrustedDirectory,
     VerifiedByteCarrier,
@@ -38,6 +39,21 @@ class _PackagedState(NamedTuple):
     facet_acquisition_revision: str
     content_revision: str
     acquisition_revision: str
+
+
+class _PackagedFacetRead(NamedTuple):
+    """Retain the parsed packaged facet base before final verification."""
+
+    authoritative: AuthoritativeByteCarrier
+    registry: FacetRegistry
+    document: Mapping[str, JsonValue]
+
+
+class _PackagedDeclarationReads(NamedTuple):
+    """Retain ordered packaged declarations before final verification."""
+
+    authoritative: tuple[AuthoritativeByteCarrier, ...]
+    documents: tuple[JsonValue, ...]
 
 
 _PACKAGED_AUTHORITIES: IdentityAuthorityStore[object] = IdentityAuthorityStore()
@@ -247,6 +263,83 @@ _SYSTEM_DEPENDENCIES = _PackagedDependencies(
 )
 
 
+class _PackagedAcquisitionSession:
+    """Let one outer transaction order packaged facet and declaration phases."""
+
+    def __init__(
+        self,
+        base_lock: FacetConstituentLock,
+        source_lock: InternalSourceLock,
+        facet_root: RetainedDirectory,
+        declaration_root: RetainedDirectory,
+        dependencies: _PackagedDependencies,
+    ) -> None:
+        self._base_lock = base_lock
+        self._source_lock = source_lock
+        self._facet_root = facet_root
+        self._declaration_root = declaration_root
+        self._dependencies = dependencies
+        self._facet_read: _PackagedFacetRead | None = None
+        self._declaration_reads: _PackagedDeclarationReads | None = None
+        self._finished = False
+
+    def read_facet(self) -> _PackagedFacetRead:
+        """Read and parse the packaged facet base exactly once."""
+        if self._finished or self._facet_read is not None:
+            self._dependencies.fail(
+                "$.facet-registry.base",
+                "packaged facet phase has already run",
+            )
+        self._facet_read = _read_packaged_facet(
+            self._base_lock,
+            self._facet_root,
+            self._dependencies,
+        )
+        return self._facet_read
+
+    def read_declarations(self) -> _PackagedDeclarationReads:
+        """Read and parse packaged declarations after the facet phase."""
+        if self._facet_read is None:
+            self._dependencies.fail(
+                "$.internal-source",
+                "packaged facet phase must run before declarations",
+            )
+        if self._finished or self._declaration_reads is not None:
+            self._dependencies.fail(
+                "$.internal-source",
+                "packaged declaration phase has already run",
+            )
+        self._declaration_reads = _read_packaged_declarations(
+            self._source_lock,
+            self._declaration_root,
+            self._dependencies,
+        )
+        return self._declaration_reads
+
+    def verify_and_issue(self) -> PackagedInternalSource:
+        """Verify every retained read and issue one packaged source."""
+        if self._facet_read is None or self._declaration_reads is None:
+            self._dependencies.fail(
+                "$.internal-source",
+                "packaged reads are incomplete",
+            )
+        if self._finished:
+            self._dependencies.fail(
+                "$.internal-source",
+                "packaged acquisition session has already finished",
+            )
+        self._finished = True
+        return _verify_and_issue_packaged_source(
+            self._base_lock,
+            self._source_lock,
+            self._facet_root,
+            self._declaration_root,
+            self._facet_read,
+            self._declaration_reads,
+            self._dependencies,
+        )
+
+
 def _trusted_directory_from_path(
     root_path: Path,
     dependencies: _PackagedDependencies,
@@ -300,28 +393,30 @@ def _acquire_from_retained_roots(
     dependencies: _PackagedDependencies,
 ) -> PackagedInternalSource:
     """Acquire one source through already-retained resource roots."""
-    facet_authoritative = facet_root.read_authoritative(base_lock.path)
-    declaration_authoritative = tuple(
-        declaration_root.read_authoritative(locked_file.path)
-        for locked_file in source_lock.files
+    session = _PackagedAcquisitionSession(
+        base_lock,
+        source_lock,
+        facet_root,
+        declaration_root,
+        dependencies,
     )
+    session.read_facet()
+    session.read_declarations()
+    return session.verify_and_issue()
+
+
+def _read_packaged_facet(
+    base_lock: FacetConstituentLock,
+    facet_root: RetainedDirectory,
+    dependencies: _PackagedDependencies,
+) -> _PackagedFacetRead:
+    """Read, authenticate, and parse the packaged facet base."""
+    facet_authoritative = facet_root.read_authoritative(base_lock.path)
     dependencies.require_digest(
         facet_authoritative.sha256,
         base_lock.sha256,
         "$.facet-registry.base.sha256",
     )
-    for index, (carrier, locked_file) in enumerate(
-        zip(
-            declaration_authoritative,
-            source_lock.files,
-            strict=True,
-        )
-    ):
-        dependencies.require_digest(
-            carrier.sha256,
-            locked_file.sha256,
-            f"$.internal-source.files[{index}].sha256",
-        )
     facet_registry = dependencies.load_facet_registry(
         facet_authoritative.data,
         path=dependencies.path(base_lock.path),
@@ -340,37 +435,77 @@ def _acquire_from_retained_roots(
         facet_authoritative.data,
         path=dependencies.path(base_lock.path),
     )
-    declaration_documents: list[JsonValue] = []
-    for carrier, locked_file in zip(
-        declaration_authoritative,
-        source_lock.files,
-        strict=True,
-    ):
-        document, _locations, _digest = dependencies.load_yaml(
-            carrier.data,
-            path=dependencies.path(locked_file.path),
-        )
-        declaration_documents.append(dependencies.freeze(document))
-    facet_verified = facet_root.verify(facet_authoritative)
-    declaration_verified = tuple(
-        declaration_root.verify(carrier) for carrier in declaration_authoritative
-    )
-    result = object.__new__(dependencies.result_type)
     frozen_facet_document = dependencies.freeze(facet_document_value)
     if not dependencies.is_json_mapping(frozen_facet_document):
         dependencies.fail(
             "$.facet-registry.base",
             "packaged facet document is not a mapping",
         )
+    return _PackagedFacetRead(
+        authoritative=facet_authoritative,
+        registry=facet_registry,
+        document=frozen_facet_document,
+    )
+
+
+def _read_packaged_declarations(
+    source_lock: InternalSourceLock,
+    declaration_root: RetainedDirectory,
+    dependencies: _PackagedDependencies,
+) -> _PackagedDeclarationReads:
+    """Read, authenticate, and parse packaged declarations in lock order."""
+    declaration_authoritative = tuple(
+        declaration_root.read_authoritative(locked_file.path)
+        for locked_file in source_lock.files
+    )
+    declaration_documents: list[JsonValue] = []
+    for index, (carrier, locked_file) in enumerate(
+        zip(
+            declaration_authoritative,
+            source_lock.files,
+            strict=True,
+        )
+    ):
+        dependencies.require_digest(
+            carrier.sha256,
+            locked_file.sha256,
+            f"$.internal-source.files[{index}].sha256",
+        )
+        document, _locations, _digest = dependencies.load_yaml(
+            carrier.data,
+            path=dependencies.path(locked_file.path),
+        )
+        declaration_documents.append(dependencies.freeze(document))
+    return _PackagedDeclarationReads(
+        authoritative=declaration_authoritative,
+        documents=tuple(declaration_documents),
+    )
+
+
+def _verify_and_issue_packaged_source(
+    base_lock: FacetConstituentLock,
+    source_lock: InternalSourceLock,
+    facet_root: RetainedDirectory,
+    declaration_root: RetainedDirectory,
+    facet_read: _PackagedFacetRead,
+    declaration_reads: _PackagedDeclarationReads,
+    dependencies: _PackagedDependencies,
+) -> PackagedInternalSource:
+    """Verify phased packaged reads and issue their immutable source."""
+    facet_verified = facet_root.verify(facet_read.authoritative)
+    declaration_verified = tuple(
+        declaration_root.verify(carrier) for carrier in declaration_reads.authoritative
+    )
+    result = object.__new__(dependencies.result_type)
     state = dependencies.state_type(
         facet_evidence=facet_verified,
         declaration_evidence=declaration_verified,
         facet_lock=base_lock,
         facet_lock_state=identity_value_state(base_lock),
-        facet_registry=facet_registry,
-        facet_registry_state=identity_value_state(facet_registry),
-        facet_document=frozen_facet_document,
-        declaration_documents=tuple(declaration_documents),
+        facet_registry=facet_read.registry,
+        facet_registry_state=identity_value_state(facet_read.registry),
+        facet_document=facet_read.document,
+        declaration_documents=declaration_reads.documents,
         facet_content_revision=base_lock.content_revision,
         facet_acquisition_revision=base_lock.acquisition_revision,
         content_revision=source_lock.content_revision,

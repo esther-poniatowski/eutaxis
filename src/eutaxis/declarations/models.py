@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import Mapping, TypeAlias
+from typing import Mapping, TypeAlias, cast
 
 JsonValue: TypeAlias = (
     None
@@ -56,7 +56,7 @@ def _freeze_json(value: object, active: set[int]) -> JsonValue:
         finally:
             active.remove(identity)
     if value is None or type(value) in {bool, int, str}:
-        return value
+        return cast(bool | int | str | None, value)
     if type(value) is float and math.isfinite(value):
         return value
     raise TypeError(f"Unsupported JSON value: {type(value).__name__}")

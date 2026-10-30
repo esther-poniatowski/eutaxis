@@ -43,6 +43,7 @@ from .source import (
     DocumentPath,
     SourceMap,
     format_document_path,
+    load_yaml_bytes,
     load_yaml_document,
     nearest_location,
 )
@@ -92,6 +93,41 @@ def load_declaration_source(
 ) -> LoadedDeclarationSource:
     """Load one declaration and retain its immutable document and source map."""
     document, locations, source_sha256 = load_yaml_document(path)
+    return _load_declaration_source(
+        document,
+        locations,
+        source_sha256,
+        path=path,
+        facets=facets,
+    )
+
+
+def load_declaration_source_bytes(
+    source: bytes,
+    *,
+    path: Path,
+    facets: FacetRegistryView | None = None,
+) -> LoadedDeclarationSource:
+    """Load one declaration from already-retained exact bytes."""
+    document, locations, source_sha256 = load_yaml_bytes(source, path=path)
+    return _load_declaration_source(
+        document,
+        locations,
+        source_sha256,
+        path=path,
+        facets=facets,
+    )
+
+
+def _load_declaration_source(
+    document: object,
+    locations: SourceMap,
+    source_sha256: str,
+    *,
+    path: Path,
+    facets: FacetRegistryView | None,
+) -> LoadedDeclarationSource:
+    """Validate and detach one declaration parsed at a source boundary."""
     validated = validate_document(document, path=path, locations=locations)
     if facets is not None:
         validate_declaration_facets(

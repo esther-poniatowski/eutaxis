@@ -167,6 +167,7 @@ from .loader import (
     LoadedDeclarationSource,
     load_declaration,
     load_declaration_source,
+    load_declaration_source_bytes,
     load_facet_validated_declaration,
 )
 from .models import (
@@ -675,6 +676,7 @@ __all__ = [
     "load_declaration",
     "load_declaration_registry",
     "load_declaration_source",
+    "load_declaration_source_bytes",
     "load_evaluator_fixture_index",
     "load_facet_registry",
     "load_migration_baseline_registry",

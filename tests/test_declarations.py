@@ -26,6 +26,7 @@ from eutaxis.declarations import (
     declaration_schema,
     evaluate_applicability,
     load_declaration,
+    load_declaration_source_bytes,
     load_facet_registry,
     schema_path,
 )
@@ -79,6 +80,18 @@ def test_valid_declaration_fixtures_load(
     assert isinstance(declaration, expected_type)
     assert declaration.schema_version == 1
     assert declaration.owner == "eutaxis"
+
+
+def test_byte_owned_declaration_loader_uses_retained_source(tmp_path: Path) -> None:
+    retained = (FIXTURES / "valid" / "rule.yaml").read_bytes()
+    path = tmp_path / "rule.yaml"
+    path.write_text("caller-controlled: invalid\n", encoding="utf-8")
+
+    loaded = load_declaration_source_bytes(retained, path=path, facets=FACETS)
+
+    assert loaded.declaration.id == "prose/reader-purpose"
+    assert len(loaded.sha256) == 64
+    assert loaded.path == path
 
 
 def test_schema_is_packaged_and_meta_validated() -> None:

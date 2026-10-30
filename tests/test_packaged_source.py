@@ -149,6 +149,68 @@ def test_packaged_source_retains_verified_resources_in_code_owned_order() -> Non
     )
 
 
+def test_packaged_session_exposes_ordered_phases(tmp_path: Path) -> None:
+    root = _copy_resources(tmp_path)
+    base_lock, source_lock = packaged_module._SYSTEM_DEPENDENCIES.validate_lock(
+        _valid_lock(root)
+    )
+    trusted = packaged_module._trusted_directory_from_path(
+        root,
+        packaged_module._SYSTEM_DEPENDENCIES,
+    )
+    with trusted:
+        with (
+            trusted.retain_directory(".") as facet_root,
+            trusted.retain_directory("declarations/v1") as declaration_root,
+        ):
+            session = packaged_module._PackagedAcquisitionSession(
+                base_lock,
+                source_lock,
+                facet_root,
+                declaration_root,
+                packaged_module._SYSTEM_DEPENDENCIES,
+            )
+            with pytest.raises(
+                AcquisitionContractError,
+                match="facet phase must run",
+            ):
+                session.read_declarations()
+            facet_read = session.read_facet()
+            declaration_reads = session.read_declarations()
+            acquired = session.verify_and_issue()
+
+    assert facet_read.registry is acquired.facet_registry
+    assert declaration_reads.documents == acquired.declaration_documents
+
+
+def test_packaged_acquirer_verifies_only_after_all_authoritative_reads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, str, str]] = []
+    original_read = RetainedDirectory.read_authoritative
+    original_verify = RetainedDirectory.verify
+
+    def recording_read(self: RetainedDirectory, path: str):
+        events.append(("read", self.path, path))
+        return original_read(self, path)
+
+    def recording_verify(self: RetainedDirectory, carrier):
+        events.append(("verify", self.path, carrier.path))
+        return original_verify(self, carrier)
+
+    monkeypatch.setattr(RetainedDirectory, "read_authoritative", recording_read)
+    monkeypatch.setattr(RetainedDirectory, "verify", recording_verify)
+
+    acquire_packaged_internal_source(_valid_lock(data_path()))
+
+    operations = [event[0] for event in events]
+    assert operations == ["read"] * (1 + len(PACKAGED_DECLARATION_PATHS)) + [
+        "verify"
+    ] * (1 + len(PACKAGED_DECLARATION_PATHS))
+    assert events[0][2] == PACKAGED_FACET_PATH
+    assert tuple(event[2] for event in events[1:6]) == PACKAGED_DECLARATION_PATHS
+
+
 def test_packaged_source_parses_only_retained_bytes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

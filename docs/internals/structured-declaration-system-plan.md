@@ -285,8 +285,12 @@ This phase has turned the validated registry into a static query boundary, resol
     - [x] Parse and locate YAML directly from retained byte evidence.
     - [x] Issue the locked packaged internal source.
     - [x] Issue the packaged composite and migrate its semantic consumers.
-- [ ] Acquire workspace and vendored sources through one issued result:
-  - [ ] Admit the ordered additive facet set through the result that owns every external root and transport proof.
+- [ ] Privately issue workspace and vendored source state:
+  - [x] Parse each retained YAML carrier and expose ordered packaged read phases.
+  - [ ] Issue the external composite only after one provenance record authenticates every constituent; preserve the packaged-only public route.
+  - [ ] Retain one contract without Git entries in a non-consumable stage:
+    - [ ] retain every external root and carrier
+    - [ ] retain the ordered additive facet set
 - [ ] Implement the closed Git-submodule proof and repeatable transport verification.
 - [ ] Enforce namespace, owner, and declaration-reference grammar before combined registry construction.
 - [ ] Move the persisted catalog to `index-revision: 2`.
@@ -369,6 +373,33 @@ external source root or transport. Therefore, the workspace and vendored source
 boundary must issue the complete ordered additive set. The resulting boundary
 will enforce global namespace uniqueness. The boundary will also bind every
 facet carrier to the retained source root before extending the composite.
+
+Three separately gated steps establish this boundary. First, a byte-owned
+loader parses retained YAML, and private packaged methods expose the required
+read order. This order reads every facet before any rule or procedure YAML.
+Second, an issued provenance record must supply every external constituent to
+the composite issuer. The caller cannot supply constituent values. Third, a
+private workspace/vendored stage must retain one contract without Git entries
+and all correlated carriers. The stage is not an `AcquisitionResult`, and
+semantic consumers cannot accept it. Git checks remain open. Namespace and
+reference checks also remain open. Finally, the combined registry must exist
+before the package can issue the public result.
+
+The first step is complete:
+
+- `load_declaration_source_bytes` parses only the supplied bytes
+- the common loader preserves every existing source and semantic check
+- private packaged methods read facets before rule and procedure files
+- those methods verify every carrier after the final read
+
+An independent adversarial pass found no high- or medium-severity defect.
+The following checks exercised the changed behavior:
+
+- 274 targeted tests passed
+- MyPy accepted five source files
+- Black accepted six changed Python files
+- the changed-file check passed
+- Hermeneia accepted both changed documentation files
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 

@@ -555,6 +555,24 @@ it visible. The full order is:
    observation
 9. build one combined registry and apply existing cross-record contracts
 
+Private issued records may connect these steps, but those records do not
+certify that all required checks passed. A restricted workspace/vendored stage binds
+one contract that contains no Git entries. The stage retains the roots,
+carriers, and composite facet registry for that contract. The package does not
+export the stage, and semantic consumers do not accept it. If a contract
+contains a `git-submodule` entry, the restricted stage rejects the whole
+contract.
+
+Private packaged-loader methods divide their work into three ordered phases:
+
+- read and admit the packaged facet base
+- read packaged rule and procedure files after admitting every facet
+- verify every carrier after the final authoritative read
+
+The existing public packaged-only callable runs all three phases and returns
+the same issued packaged source. Instead, the combined loader can place each
+external facet read between the first and second phases.
+
 Registry traversal visits packaged internal files in code-owned order, then
 manifest source-entry order, explicit file order, and the top-level declaration
 followed by embedded records in authored order. Intrinsic errors therefore fail
@@ -578,11 +596,18 @@ existing local grammars; they are not declaration references. A schema change
 that adds a typed declaration reference must extend this traversal and its
 planted invalid-identifier test in the same change.
 
-The successful boundary returns an issued, immutable acquisition result. It
-retains the exact manifest, lock, facet-base, facet-extension, packaged-source,
-external-source, and Git carriers; every constituent and the issued composite
-facet registry; byte-owned parsed records; computed revisions; and resulting
-declaration registry. A process-local, identity-indexed issuance record
+The successful boundary alone returns an issued, immutable result. The result
+retains:
+
+- the exact manifest and lock carriers
+- the exact packaged-facet and external-facet carriers
+- the exact packaged-source and external-source carriers
+- the exact Git metadata carriers
+- every constituent and the issued composite facet registry
+- byte-owned parsed records and computed revisions
+- the resulting declaration registry
+
+A process-local, identity-indexed issuance record
 authenticates the result and its nested carriers within the trusted computing
 base. The resolver accepts only this issued result. The catalog builder accepts
 the same object. Neither consumer accepts paths or a caller-supplied registry.
