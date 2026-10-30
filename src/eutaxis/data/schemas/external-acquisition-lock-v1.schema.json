@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eutaxis.invalid/schemas/external-acquisition-lock-v1.schema.json",
+  "title": "External acquisition lock version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["facet-registry", "internal-source", "schema-version", "sources"],
+  "properties": {
+    "facet-registry": {"$ref": "#/$defs/facet-registry"},
+    "internal-source": {"$ref": "#/$defs/internal-source"},
+    "schema-version": {"const": 1},
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/external-source"}
+    }
+  },
+  "$defs": {
+    "namespace": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "facet-constituent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acquisition-revision",
+        "content-revision",
+        "id",
+        "kind",
+        "namespace",
+        "owner",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "acquisition-revision": {"$ref": "#/$defs/digest"},
+        "content-revision": {"$ref": "#/$defs/digest"},
+        "id": {"$ref": "#/$defs/identifier"},
+        "kind": {"enum": ["packaged", "workspace", "vendored", "git-submodule"]},
+        "namespace": {"$ref": "#/$defs/namespace"},
+        "owner": {"$ref": "#/$defs/namespace"},
+        "path": {"$ref": "#/$defs/path"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "facet-registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base", "content-revision", "extensions"],
+      "properties": {
+        "base": {"$ref": "#/$defs/facet-constituent"},
+        "content-revision": {"$ref": "#/$defs/digest"},
+        "extensions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/facet-constituent"}
+        }
+      }
+    },
+    "internal-source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acquisition-revision", "content-revision", "files", "kind", "namespace"],
+      "properties": {
+        "acquisition-revision": {"$ref": "#/$defs/digest"},
+        "content-revision": {"$ref": "#/$defs/digest"},
+        "files": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/file"}
+        },
+        "kind": {"const": "packaged"},
+        "namespace": {"const": "eutaxis"}
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object-format",
+        "commit",
+        "gitmodules-path",
+        "gitmodules-sha256",
+        "registered-name",
+        "registered-path",
+        "parent-index-mode",
+        "parent-index-gitlink"
+      ],
+      "properties": {
+        "object-format": {"enum": ["sha1", "sha256"]},
+        "commit": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+        "gitmodules-path": {"const": ".gitmodules"},
+        "gitmodules-sha256": {"$ref": "#/$defs/digest"},
+        "registered-name": {"$ref": "#/$defs/path"},
+        "registered-path": {"$ref": "#/$defs/path"},
+        "parent-index-mode": {"const": "160000"},
+        "parent-index-gitlink": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"}
+      }
+    },
+    "external-source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acquisition-revision", "content-revision", "files", "kind", "namespace"],
+      "properties": {
+        "acquisition-revision": {"$ref": "#/$defs/digest"},
+        "content-revision": {"$ref": "#/$defs/digest"},
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/file"}
+        },
+        "git": {"$ref": "#/$defs/git"},
+        "kind": {"enum": ["workspace", "vendored", "git-submodule"]},
+        "namespace": {"$ref": "#/$defs/namespace"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "git-submodule"}}, "required": ["kind"]},
+          "then": {"required": ["git"]},
+          "else": {"not": {"required": ["git"]}}
+        }
+      ]
+    }
+  }
+}

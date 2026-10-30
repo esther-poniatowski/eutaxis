@@ -237,6 +237,15 @@ class MigrationBaselineError(Exception):
         self.column = column
 
 
+class AcquisitionContractError(Exception):
+    """Report a malformed external-acquisition manifest, lock, or revision."""
+
+    def __init__(self, location: str, message: str) -> None:
+        super().__init__(f"Invalid external acquisition at {location}: {message}")
+        self.location = location
+        self.detail = message
+
+
 class ProcedureRunPlanningError(Exception):
     """Report a failed procedure-run preflight boundary."""
 

@@ -278,7 +278,7 @@ This phase has turned the validated registry into a static query boundary, resol
 ### Namespace, acquisition, and external pilot
 
 - [x] Decide the identifier namespace and cross-repository acquisition contract.
-- [ ] Implement the closed manifest, canonical lock, revision algebra, and normalized path models.
+- [x] Implement the closed manifest, canonical lock, revision algebra, and normalized path models.
 - [ ] Implement descriptor-anchored byte carriers, the packaged internal source, and additive composite facet authority.
 - [ ] Implement workspace and vendored acquisition through one issued result.
 - [ ] Implement the closed Git-submodule proof and repeatable transport verification.
@@ -290,6 +290,15 @@ This phase has turned the validated registry into a static query boundary, resol
 Each implementation item closes only after an independent adversarial review,
 repair of every high- and medium-severity finding, targeted verification, and a
 commit of the completed slice on the current branch.
+
+The first item packages the two closed schemas, exposes only byte-owning lock
+parsing, retains immutable manifest and lock values, and recomputes every
+content and acquisition revision. Seven independent adversarial passes examined
+the slice. The seventh pass approved it after every high- and medium-severity
+finding from the preceding passes had been repaired. Its targeted evidence is
+the acquisition, canonical-JSON and migration-baseline test set, static typing
+of the new source modules, and a built-wheel inspection of both schema
+resources.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 

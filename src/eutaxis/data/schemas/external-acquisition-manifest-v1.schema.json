@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eutaxis.invalid/schemas/external-acquisition-manifest-v1.schema.json",
+  "title": "External acquisition manifest version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema-version", "facet-extensions", "internal-source", "sources"],
+  "properties": {
+    "schema-version": {"const": 1},
+    "facet-extensions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/facet-extension"}
+    },
+    "internal-source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "kind"],
+      "properties": {
+        "namespace": {"const": "eutaxis"},
+        "kind": {"const": "packaged"}
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/source"}
+    }
+  },
+  "$defs": {
+    "namespace": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": ["workspace", "vendored", "git-submodule"]
+    },
+    "facet-extension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "kind", "root", "path"],
+      "properties": {
+        "namespace": {"$ref": "#/$defs/namespace"},
+        "kind": {"$ref": "#/$defs/kind"},
+        "root": {"$ref": "#/$defs/path"},
+        "path": {"$ref": "#/$defs/path"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "kind", "root", "files"],
+      "properties": {
+        "namespace": {"$ref": "#/$defs/namespace"},
+        "kind": {"$ref": "#/$defs/kind"},
+        "root": {"$ref": "#/$defs/path"},
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/path"}
+        }
+      }
+    }
+  }
+}
