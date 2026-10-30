@@ -66,13 +66,19 @@ eutaxis skills list -c agent-instructions.yaml
 
 Each line shows the invocation routes and the failure-mode tag, surfacing misclassified sources before any artifact is written.
 
-Install every configured Skill source on every registered adapter:
+Preview the complete configured Skill set:
 
 ```sh
-eutaxis skills install all -c agent-instructions.yaml
+eutaxis skills sync -c agent-instructions.yaml
 ```
 
-The command writes one directory per rule set into the user-scope skill directory of every registered agent. The directories are dual-marker-owned, so re-running the command is idempotent and uninstall is safe. The concrete directory paths used by each agent are listed in the [Supported agents](../../README.md#supported-agents) table.
+The preview reports one planned state for every target. Pass the apply flag only after reviewing those states:
+
+```sh
+eutaxis skills sync -c agent-instructions.yaml --apply
+```
+
+Apply mode creates one directory for each rule set. The command places that directory under every registered agent's user-level Skill root. Re-running the command produces identical files. After a successful run, Eutaxis records the names managed by this configuration. A later run can remove a retired name from that record only while its directory retains an Eutaxis ownership marker. A record belonging to another configuration protects each claimed name. Therefore, another configuration's Skills and every unmarked directory remain unchanged. The [agent table](../../README.md) lists the concrete paths.
 
 ## Author always-on globals
 
@@ -172,11 +178,11 @@ task_modules:
     ...
 ```
 
-The cumulative file shrinks; the Skill artifacts continue to be produced by `eutaxis skills install`.
+The cumulative file shrinks. Skill commands continue to produce the same Skill artifacts.
 
 ## Author on-demand rule sets as Skills
 
-A rule set authored under `task_modules` becomes a Skill artifact when the source file declares the source-schema frontmatter and `eutaxis skills install` is run.
+To compile a task module as a Skill, give its source file the source-schema frontmatter. Then run a Skill install or sync command.
 
 ### Required source-schema frontmatter
 
@@ -224,7 +230,7 @@ disclosure: progressive
 ---
 ```
 
-The next `eutaxis skills install` replaces the installed Skill with the [split layout](concepts.md#progressive-disclosure). A later install removes the file of each rule deleted from the source, and `eutaxis skills diff` reports that file beforehand.
+Running either Skill command replaces the installed Skill with the [split layout](concepts.md). When a rule disappears from the source, the following run removes its rule file. Before that run, `eutaxis skills diff` reports the obsolete file.
 
 ### Detect drift
 
@@ -255,7 +261,7 @@ The first form runs from any working directory. The location line of the second 
 
 ## Verify and maintain
 
-Four commands cover the recurring maintenance loop.
+Four checks and one synchronization command cover the recurring maintenance loop.
 
 ### Detect cumulative-file drift
 

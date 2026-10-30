@@ -65,6 +65,24 @@ Cross-agent command compilation: load command definitions, render them for each 
    :show-inheritance:
 ```
 
+## Synchronization
+
+```{eval-rst}
+.. automodule:: eutaxis.commands.synchronization
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Loading Budgets
+
+```{eval-rst}
+.. automodule:: eutaxis.commands.skill_budgets
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Data Models
 
 ```{eval-rst}

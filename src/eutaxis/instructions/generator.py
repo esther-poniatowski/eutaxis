@@ -7,14 +7,20 @@ from pathlib import Path
 from typing import Iterator
 
 from .exceptions import (
-    BudgetExceededError,
     ConfigurationError,
     RejectedLabelError,
     SourceNotFoundError,
 )
+from .instruction_budgets import (
+    enforce_instruction_chain_budgets,
+    enforce_target_budget,
+    instruction_chain_budget_report,
+    target_budget_measurement,
+)
 from .markdown import MarkdownAssembler
 from .models import (
     AgentConfig,
+    InstructionChain,
     InstructionConfig,
     ReferenceDoc,
     SourceFile,
@@ -41,12 +47,15 @@ class InstructionGenerator:
         enforce_budget: bool = True,
     ) -> dict[str, str]:
         """Generate content for enabled outputs."""
+        selected = self._selected_agents(agent_name)
         outputs: dict[str, str] = {}
-        for agent in self._selected_agents(agent_name):
+        for agent in selected:
             content = self.generate_for_agent(agent)
             if enforce_budget:
-                self._enforce_budget(agent, content)
+                enforce_target_budget(self.config, agent, content)
             outputs[agent.name] = content
+        if enforce_budget:
+            enforce_instruction_chain_budgets(self.config, outputs, selected)
         return outputs
 
     def generate_for_agent(self, agent: AgentConfig) -> str:
@@ -95,21 +104,21 @@ class InstructionGenerator:
             When ``enforce_budget`` is set and an output exceeds its budget.
         """
         self.enforce_rule_labels()
+        selected = self._selected_agents(agent_name)
+        outputs = self.generate_all(
+            agent_name=agent_name, enforce_budget=enforce_budget
+        )
         paths: list[Path] = []
 
-        for agent in self._selected_agents(agent_name):
+        for agent in selected:
             output_path = self.config.resolve(agent.target.path)
             paths.append(output_path)
-
-            content = self.generate_for_agent(agent)
-            if enforce_budget:
-                self._enforce_budget(agent, content)
 
             if dry_run:
                 continue
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(content, encoding="utf-8")
+            output_path.write_text(outputs[agent.name], encoding="utf-8")
 
         if agent_name is None:
             standalone = self.render_standalone_rule_index()
@@ -183,12 +192,25 @@ class InstructionGenerator:
             output_path.read_text(encoding="utf-8") if output_path.is_file() else ""
         )
 
+        return self._content_diff(output_path, existing, expected)
+
+    def standalone_rule_index_diff(self) -> tuple[Path, str, str] | None:
+        """Return the standalone rule index, its content, and its diff."""
+        rendered = self.render_standalone_rule_index()
+        if rendered is None:
+            return None
+        path, expected = rendered
+        existing = path.read_text(encoding="utf-8") if path.is_file() else ""
+        return path, expected, self._content_diff(path, existing, expected)
+
+    @staticmethod
+    def _content_diff(path: Path, existing: str, expected: str) -> str:
         return "".join(
             difflib.unified_diff(
                 existing.splitlines(keepends=True),
                 expected.splitlines(keepends=True),
-                fromfile=str(output_path),
-                tofile=f"{output_path} (generated)",
+                fromfile=str(path),
+                tofile=f"{path} (generated)",
             )
         )
 
@@ -209,19 +231,14 @@ class InstructionGenerator:
         """Yield (agent, byte_size, byte_budget) for each selected agent."""
         for agent in self._selected_agents(agent_name):
             content = self.generate_for_agent(agent)
-            yield (
-                agent,
-                len(content.encode("utf-8")),
-                self.config.budget_for(agent),
-            )
+            yield target_budget_measurement(self.config, agent, content)
 
-    def _enforce_budget(self, agent: AgentConfig, content: str) -> None:
-        limit = self.config.budget_for(agent)
-        if limit is None:
-            return
-        size = len(content.encode("utf-8"))
-        if size > limit:
-            raise BudgetExceededError(agent.name, size, limit)
+    def instruction_chain_budget_report(
+        self, agent_name: str | None = None
+    ) -> Iterator[tuple[InstructionChain, int, int]]:
+        """Yield each selected global-plus-project chain and its byte budget."""
+        outputs = self.generate_all(agent_name=agent_name, enforce_budget=False)
+        yield from instruction_chain_budget_report(self.config, outputs)
 
     def _render_task_module_router(self) -> str:
         modules = self.config.task_modules

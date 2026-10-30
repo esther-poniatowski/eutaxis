@@ -1,7 +1,7 @@
 """Rewrite the relative links of a compiled skill for its installed location.
 
 A source module links to sibling modules and files by relative Markdown links,
-such as ``[the audit protocol](audit-protocol.md)``. Once compiled, each task
+such as ``[the prose authoring workflow](prose-authoring-workflow.md)``. Once compiled, each task
 module is installed as its own skill directory, so a link relative to the
 source directory resolves nowhere. The renderer therefore rewrites the target
 of each relative link in every emitted Markdown file:

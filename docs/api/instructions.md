@@ -154,6 +154,15 @@ Return a unified diff for one output.
 * **Return type:**
   [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 
+<a id="eutaxis.instructions.generator.InstructionGenerator.standalone_rule_index_diff"></a>
+
+#### standalone_rule_index_diff()
+
+Return the standalone rule index, its content, and its diff.
+
+* **Return type:**
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/builtins/stdtypes.html#str), [str](https://docs.python.org/3/builtins/stdtypes.html#str)] | None
+
 <a id="eutaxis.instructions.generator.InstructionGenerator.budget_report"></a>
 
 #### budget_report(agent_name=None)
@@ -165,6 +174,17 @@ Yield (agent, byte_size, byte_budget) for each selected agent.
 * **Return type:**
   [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[[tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig), [int](https://docs.python.org/3/builtins/functions.html#int), [int](https://docs.python.org/3/builtins/functions.html#int) | None]]
 
+<a id="eutaxis.instructions.generator.InstructionGenerator.instruction_chain_budget_report"></a>
+
+#### instruction_chain_budget_report(agent_name=None)
+
+Yield each selected global-plus-project chain and its byte budget.
+
+* **Parameters:**
+  **agent_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+* **Return type:**
+  [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[[tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*InstructionChain*](#eutaxis.instructions.models.InstructionChain), [int](https://docs.python.org/3/builtins/functions.html#int), [int](https://docs.python.org/3/builtins/functions.html#int)]]
+
 <a id="eutaxis.instructions.generator.InstructionGenerator.render_standalone_rule_index"></a>
 
 #### render_standalone_rule_index()
@@ -173,6 +193,115 @@ Return (path, content) for the standalone rule-index file, if any.
 
 * **Return type:**
   [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/builtins/stdtypes.html#str)] | None
+
+<a id="module-eutaxis.instructions.instruction_budgets"></a>
+
+<a id="instruction-budgets"></a>
+
+## Instruction budgets
+
+Measure and enforce generated instruction-file budgets.
+
+<a id="eutaxis.instructions.instruction_budgets.target_budget_measurement"></a>
+
+### eutaxis.instructions.instruction_budgets.target_budget_measurement(config, agent, content)
+
+Return one generated target, its byte size, and its budget.
+
+* **Parameters:**
+  * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
+  * **agent** ([*AgentConfig*](#eutaxis.instructions.models.AgentConfig))
+  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+* **Return type:**
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig), [int](https://docs.python.org/3/builtins/functions.html#int), [int](https://docs.python.org/3/builtins/functions.html#int) | None]
+
+<a id="eutaxis.instructions.instruction_budgets.enforce_target_budget"></a>
+
+### eutaxis.instructions.instruction_budgets.enforce_target_budget(config, agent, content)
+
+Raise when one generated target exceeds its configured budget.
+
+* **Parameters:**
+  * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
+  * **agent** ([*AgentConfig*](#eutaxis.instructions.models.AgentConfig))
+  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+* **Return type:**
+  None
+
+<a id="eutaxis.instructions.instruction_budgets.instruction_chain_size"></a>
+
+### eutaxis.instructions.instruction_budgets.instruction_chain_size(config, chain, outputs)
+
+Measure one cumulative output with its project instruction sources.
+
+* **Parameters:**
+  * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
+  * **chain** ([*InstructionChain*](#eutaxis.instructions.models.InstructionChain))
+  * **outputs** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+* **Return type:**
+  [int](https://docs.python.org/3/builtins/functions.html#int)
+
+<a id="eutaxis.instructions.instruction_budgets.instruction_chain_budget_report"></a>
+
+### eutaxis.instructions.instruction_budgets.instruction_chain_budget_report(config, outputs)
+
+Yield the size and limit of each chain represented in `outputs`.
+
+* **Parameters:**
+  * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
+  * **outputs** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+* **Return type:**
+  [*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator)[[tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*InstructionChain*](#eutaxis.instructions.models.InstructionChain), [int](https://docs.python.org/3/builtins/functions.html#int), [int](https://docs.python.org/3/builtins/functions.html#int)]]
+
+<a id="eutaxis.instructions.instruction_budgets.enforce_instruction_chain_budgets"></a>
+
+### eutaxis.instructions.instruction_budgets.enforce_instruction_chain_budgets(config, outputs, selected)
+
+Raise when a selected cumulative instruction chain exceeds its budget.
+
+* **Parameters:**
+  * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
+  * **outputs** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+  * **selected** ([*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable) *[*[*AgentConfig*](#eutaxis.instructions.models.AgentConfig) *]*)
+* **Return type:**
+  None
+
+<a id="module-eutaxis.instructions.loading_units"></a>
+
+<a id="skill-composition-graph"></a>
+
+## Skill composition graph
+
+Validate and expand the graph of declared Skill loading units.
+
+<a id="eutaxis.instructions.loading_units.validate_loading_units"></a>
+
+### eutaxis.instructions.loading_units.validate_loading_units(loading_units, module_ids)
+
+Reject loading units that name unknown modules or form cycles.
+
+* **Parameters:**
+  * **loading_units** ([*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable) *[*[*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit) *]*)
+  * **module_ids** ([*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+* **Return type:**
+  None
+
+<a id="eutaxis.instructions.loading_units.expand_loading_unit"></a>
+
+### eutaxis.instructions.loading_units.expand_loading_unit(loading_unit, loading_units)
+
+Return the members declared by a loading unit and its included units.
+
+The configuration loader validates the graph first. Then,
+`expand_loading_unit` appends included units in declaration order.
+Downstream consumers deduplicate concrete files selected by overlapping
+members.
+
+* **Parameters:**
+  * **loading_unit** ([*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit))
+  * **loading_units** ([*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable) *[*[*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit) *]*)
+* **Return type:**
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillLoadingMember*](#eutaxis.instructions.models.SkillLoadingMember), …]
 
 <a id="module-eutaxis.instructions.markdown"></a>
 
@@ -186,7 +315,7 @@ Markdown transformations used by instruction-file assembly.
 
 ### eutaxis.instructions.markdown.parse_frontmatter(content)
 
-Parse a Markdown file’s YAML frontmatter block.
+Parse a Markdown file's YAML frontmatter block.
 
 Returns an empty dict when the file has no frontmatter or when the
 frontmatter is empty. Raises `yaml.YAMLError` if the block is malformed.
@@ -877,6 +1006,91 @@ A task-specific instruction module compiled to an Agent Skill artifact.
 
 #### description *: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
 
+<a id="eutaxis.instructions.models.SkillLoadingMember"></a>
+
+### *class* eutaxis.instructions.models.SkillLoadingMember(module, rules=(), include_entrypoint=True)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+One Skill and the files selected from it for a loading unit.
+
+* **Parameters:**
+  * **module** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **rules** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **include_entrypoint** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+
+<a id="eutaxis.instructions.models.SkillLoadingMember.module"></a>
+
+#### module *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.instructions.models.SkillLoadingMember.rules"></a>
+
+#### rules *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
+
+<a id="eutaxis.instructions.models.SkillLoadingMember.include_entrypoint"></a>
+
+#### include_entrypoint *: [bool](https://docs.python.org/3/builtins/functions.html#bool)* *= True*
+
+<a id="eutaxis.instructions.models.SkillLoadingUnit"></a>
+
+### *class* eutaxis.instructions.models.SkillLoadingUnit(name, max_bytes, members=(), includes=())
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+A finite, budgeted set of Skill files loaded for one task.
+
+* **Parameters:**
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **members** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*SkillLoadingMember*](#eutaxis.instructions.models.SkillLoadingMember) *,*  *...* *]*)
+  * **includes** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+
+<a id="eutaxis.instructions.models.SkillLoadingUnit.name"></a>
+
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.instructions.models.SkillLoadingUnit.max_bytes"></a>
+
+#### max_bytes *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+
+<a id="eutaxis.instructions.models.SkillLoadingUnit.members"></a>
+
+#### members *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[SkillLoadingMember](#eutaxis.instructions.models.SkillLoadingMember), ...]* *= ()*
+
+<a id="eutaxis.instructions.models.SkillLoadingUnit.includes"></a>
+
+#### includes *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
+
+<a id="eutaxis.instructions.models.InstructionChain"></a>
+
+### *class* eutaxis.instructions.models.InstructionChain(name, agent, sources, max_bytes)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+A generated global output and its project-level instruction files.
+
+* **Parameters:**
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **agent** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **sources** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *,*  *...* *]*)
+  * **max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+
+<a id="eutaxis.instructions.models.InstructionChain.name"></a>
+
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.instructions.models.InstructionChain.agent"></a>
+
+#### agent *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.instructions.models.InstructionChain.sources"></a>
+
+#### sources *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path), ...]*
+
+<a id="eutaxis.instructions.models.InstructionChain.max_bytes"></a>
+
+#### max_bytes *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+
 <a id="eutaxis.instructions.models.ReferenceDoc"></a>
 
 ### *class* eutaxis.instructions.models.ReferenceDoc(id, title, local_path, github_url, trigger, description='')
@@ -954,7 +1168,7 @@ One generated instruction output.
 
 <a id="eutaxis.instructions.models.InstructionConfig"></a>
 
-### *class* eutaxis.instructions.models.InstructionConfig(root, config_path, agents=<factory>, common_sources=<factory>, task_modules=<factory>, task_modules_heading='Task modules', task_modules_intro='', task_modules_router_enabled=True, reference_docs=<factory>, reference_docs_heading='Reference docs', reference_docs_intro='', rule_index_enabled=False, rule_index_heading='Rule index', rule_index_intro='', rule_index_pointer='', rule_index_target=None, default_max_bytes=None, strict_rule_labels=False)
+### *class* eutaxis.instructions.models.InstructionConfig(root, config_path, agents=<factory>, common_sources=<factory>, task_modules=<factory>, task_modules_heading='Task modules', task_modules_intro='', task_modules_router_enabled=True, skill_entrypoint_max_bytes=None, skill_loading_units=<factory>, instruction_chains=<factory>, reference_docs=<factory>, reference_docs_heading='Reference docs', reference_docs_intro='', rule_index_enabled=False, rule_index_heading='Rule index', rule_index_intro='', rule_index_pointer='', rule_index_target=None, default_max_bytes=None, strict_rule_labels=False)
 
 Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
@@ -969,6 +1183,9 @@ Complete instruction assembly configuration.
   * **task_modules_heading** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **task_modules_intro** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **task_modules_router_enabled** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **skill_entrypoint_max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int) *|* *None*)
+  * **skill_loading_units** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit) *]*)
+  * **instruction_chains** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*InstructionChain*](#eutaxis.instructions.models.InstructionChain) *]*)
   * **reference_docs** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*ReferenceDoc*](#eutaxis.instructions.models.ReferenceDoc) *]*)
   * **reference_docs_heading** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **reference_docs_intro** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
@@ -1011,6 +1228,18 @@ Complete instruction assembly configuration.
 <a id="eutaxis.instructions.models.InstructionConfig.task_modules_router_enabled"></a>
 
 #### task_modules_router_enabled *: [bool](https://docs.python.org/3/builtins/functions.html#bool)* *= True*
+
+<a id="eutaxis.instructions.models.InstructionConfig.skill_entrypoint_max_bytes"></a>
+
+#### skill_entrypoint_max_bytes *: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+
+<a id="eutaxis.instructions.models.InstructionConfig.skill_loading_units"></a>
+
+#### skill_loading_units *: [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[SkillLoadingUnit](#eutaxis.instructions.models.SkillLoadingUnit)]*
+
+<a id="eutaxis.instructions.models.InstructionConfig.instruction_chains"></a>
+
+#### instruction_chains *: [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[InstructionChain](#eutaxis.instructions.models.InstructionChain)]*
 
 <a id="eutaxis.instructions.models.InstructionConfig.reference_docs"></a>
 
@@ -1189,5 +1418,24 @@ Raised when a rendered output exceeds its configured byte budget.
   None
 
 <a id="eutaxis.instructions.exceptions.BudgetExceededError.exit_code"></a>
+
+#### exit_code *= 2*
+
+<a id="eutaxis.instructions.exceptions.InstructionChainBudgetExceededError"></a>
+
+### *exception* eutaxis.instructions.exceptions.InstructionChainBudgetExceededError(chain_name, size, limit)
+
+Bases: [`InstructionError`](#eutaxis.instructions.exceptions.InstructionError)
+
+Raised when a global-plus-project instruction chain exceeds its budget.
+
+* **Parameters:**
+  * **chain_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **size** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **limit** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+* **Return type:**
+  None
+
+<a id="eutaxis.instructions.exceptions.InstructionChainBudgetExceededError.exit_code"></a>
 
 #### exit_code *= 2*

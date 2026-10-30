@@ -42,8 +42,12 @@ eutaxis generate -c <config-file>
 | `--root` | `-r` | config parent or config `root` | Root used to resolve relative source and target paths. |
 | `--agent` | `-a` | all enabled agents | Generate only one configured agent output. |
 | `--dry-run` | `-n` | `false` | Show output targets without writing files. |
+| `--plan` | | `false` | With `--dry-run`, summarize cumulative-file drift and budgets. |
+| `--ignore-budget` | | `false` | Skip generated-target and cumulative-chain budget failures. |
 
 The generator reads the YAML config, resolves all source paths relative to the configured root, and writes one output file per enabled agent. See [Configuration](configuration.md) for the full schema.
+
+The command `eutaxis generate --dry-run --plan` reports the planned state of each target. For a changed target, it reports added and removed line counts without printing the complete generated file. The report also gives every generated-target and cumulative-chain byte budget.
 
 A label line that violates the [label grammar](concepts.md#rule-blocks) defines no rule, so the rule index omits that line. Each such line of a declared module is reported on standard error, with its file, its line and the violated part of the grammar. Under the configuration key `strict_rule_labels: true`, a rejected line fails the command before any file is written.
 
@@ -51,6 +55,7 @@ Exit codes:
 
 - `0` -- all agent files generated successfully.
 - `1` -- configuration, source loading or generation failed, or a label line is rejected under `strict_rule_labels`.
+- `2` -- a generated target or cumulative instruction chain exceeds its configured budget.
 
 ---
 
@@ -68,8 +73,9 @@ eutaxis check -c <config-file>
 | `--root` | `-r` | config parent or config `root` | Root used to resolve relative source and target paths. |
 | `--agent` | `-a` | all enabled agents | Check only one configured agent output. |
 | `--diff` | | `false` | Print unified diffs for stale outputs. |
+| `--ignore-budget` | | `false` | Report budget overruns without making them fail the check. |
 
-Exit code `0` means all selected outputs are current. Exit code `1` means at least one output differs from the generated content. Rejected label lines are reported in the same form as by `generate`. Under the configuration key `strict_rule_labels: true`, they also fail the check.
+Exit code `0` means all selected outputs are current and within budget. Exit code `1` means that an output differs from its generated content or exceeds a configured budget. The command reports rejected label lines in the same form as `generate`. With `strict_rule_labels: true`, a rejected label also fails the check.
 
 ---
 
@@ -113,7 +119,9 @@ Exit codes:
 
 ### `skills`
 
-Compile config-registered instruction files to Agent Skill artifacts. The per-rule-set analogue of `commands`, which discovers sources from layered directories. Discovery is config-driven: every Markdown file listed under `task_modules` is a Skill candidate, provided its frontmatter satisfies the source schema (`name`, `description`, `invocation`, `failure-mode`, and `required-visibility` when silent).
+The configuration registers instruction files. The `skills` command compiles them into Agent Skill artifacts. ^skills-command
+
+Markdown files under `task_modules` are candidate sources. Their frontmatter must satisfy the source schema. Sources with a silent failure mode must also declare `required-visibility`.
 
 ```sh
 eutaxis skills list -c <config-file>
@@ -121,6 +129,8 @@ eutaxis skills show <name> -c <config-file> [--agent claude|codex]
 eutaxis skills install <name|all> -c <config-file> [--agent <agent>] [--scope user|project]
 eutaxis skills uninstall <name> -c <config-file> [--agent <agent>] [--scope user|project]
 eutaxis skills diff [<name>] -c <config-file>
+eutaxis skills sync -c <config-file> [--agent <agent>] [--scope user|project] [--project <root>] [--apply]
+eutaxis skills budget -c <config-file> [--agent claude|codex]
 ```
 
 | Subcommand | Use it to |
@@ -130,6 +140,8 @@ eutaxis skills diff [<name>] -c <config-file>
 | `install` | Install one Skill artifact (by name) or all artifacts (`all`) into the selected adapter and scope. |
 | `uninstall` | Remove one installed Skill artifact from the selected adapter and scope. |
 | `diff` | Show drift between rendered output and installed artifacts. |
+| `sync` | Preview or apply the complete configured Skill set and remove retired artifacts recorded for this configuration. |
+| `budget` | Measure every rendered entrypoint and declared loading unit against its configured byte limit. |
 
 The failure-mode gate ([failure-mode-as-source-field](../adr/failure-mode-as-source-field.md)) applies at render time: the renderer refuses to emit a `model-invoked` artifact from a silent-failure source and a `user-invoked` artifact whose `required-visibility` is `pre-invocation`. There is no `--force` escape for these checks.
 
@@ -137,10 +149,27 @@ A source whose frontmatter declares `disclosure: progressive` compiles to a [spl
 
 The compiler rewrites the relative links of each emitted file, as described in [Links between modules](concepts.md#links-between-modules). The commands `show`, `install` and `diff` report on standard error each relative link whose target does not exist, with the source file and the line of the link.
 
+The `sync` command previews changes unless the caller passes `--apply`. During preview, the command renders every configured artifact. The preview rejects populated targets that lack an Eutaxis ownership marker.
+
+With `--apply`, the command:
+
+- installs every configured Skill first;
+- protects every name recorded by another configuration;
+- removes a marked artifact only when this configuration's preceding record contained its name;
+- records the resulting set for the configuration, adapter, and deployment target after all writes and removals succeed;
+- leaves every unmarked directory unchanged.
+
+The first successful sync writes the configuration record. For project scope, Eutaxis records the resolved root. Therefore, one configuration can manage each project independently. The configuration record does not include artifacts installed by other configurations. A corrupted install registry or sync manifest blocks the plan before any write. Each apply stage is idempotent, but the stages can succeed separately. After a write failure, correct its cause and run the same command again.
+
 Exit codes of `diff`:
 
 - `0` -- every artifact matches its render.
 - `1` -- at least one artifact differs from its render: a file is outdated, edited by hand or missing, or a file of a deleted rule remains on disk.
+
+Exit codes of `budget`:
+
+- `0` -- every entrypoint and loading unit exists and fits within its limit.
+- `1` -- a limit is exceeded, a loading unit names an unknown module or rule, or rendering fails.
 
 ---
 

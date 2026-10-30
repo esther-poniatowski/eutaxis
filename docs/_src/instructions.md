@@ -20,6 +20,24 @@ Instruction assembly: load YAML configuration, render per-agent instruction file
    :show-inheritance:
 ```
 
+## Instruction budgets
+
+```{eval-rst}
+.. automodule:: eutaxis.instructions.instruction_budgets
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
+## Skill composition graph
+
+```{eval-rst}
+.. automodule:: eutaxis.instructions.loading_units
+   :members:
+   :undoc-members:
+   :show-inheritance:
+```
+
 ## Markdown Assembly
 
 ```{eval-rst}

@@ -23,7 +23,7 @@ Two agents are supported:
 
 The wipe operation removes every regular file under the resolved
 directory, leaves the directory structure in place, and refuses to
-operate on any path that does not lie under the agent’s allowed root.
+operate on any path that does not lie under the agent's allowed root.
 A `--backup` mode copies the tree to a sibling
 `memory.bak.YYYYMMDD-HHMMSS/` before deletion. `--dry-run` reports
 the paths that would be removed without touching the filesystem.

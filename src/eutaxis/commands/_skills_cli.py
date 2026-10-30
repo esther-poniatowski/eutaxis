@@ -14,6 +14,7 @@ applies unchanged.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from pathlib import Path
 
 import typer
@@ -21,11 +22,15 @@ import typer
 from . import (
     CommandError,
     CommandNotFoundError,
+    SkillSyncManifest,
     all_adapters,
+    apply_skill_sync,
     diff_command,
     get_adapter,
     install_command,
     load_from_instruction_config,
+    measure_skill_budgets,
+    plan_skill_sync,
     render_command,
     uninstall_command,
 )
@@ -229,6 +234,147 @@ def cli_diff(
                 drift = True
                 typer.echo(diff)
     if drift:
+        raise typer.Exit(code=1)
+
+
+@skills_app.command("sync")
+def cli_sync(
+    config: str = typer.Option(
+        ..., "--config", "-c", help="Path to the instruction-assembly configuration."
+    ),
+    scope: str = typer.Option("user", "--scope", help="user|project"),
+    agent: str = typer.Option("all", "--agent", "-a"),
+    project_root: str | None = typer.Option(None, "--project"),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Apply the displayed plan. Without this flag, the command is read-only.",
+    ),
+) -> None:
+    """Preview or apply the complete set of managed Skills."""
+    from ..instructions import InstructionError
+
+    try:
+        config_path = Path(config).expanduser().resolve()
+        sources = _load(str(config_path))
+        adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
+        project = _resolve_project(project_root)
+        home = Path.home()
+        registry = Registry(default_state_dir(home))
+        registry.load()
+        manifest = SkillSyncManifest(default_state_dir(home), config_path)
+        sync_lock = manifest.locked() if apply else nullcontext()
+        with sync_lock:
+            managed_names = {
+                adapter.name: manifest.managed_names(
+                    adapter=adapter.name,
+                    scope=scope,
+                    project_root=project,
+                )
+                for adapter in adapters
+            }
+            protected_names = {
+                adapter.name: manifest.names_managed_by_other_configs(
+                    adapter=adapter.name,
+                    scope=scope,
+                    project_root=project,
+                )
+                for adapter in adapters
+            }
+            actions = plan_skill_sync(
+                sources,
+                adapters,
+                scope=scope,
+                project_root=project,
+                home=home,
+                managed_names_by_adapter=managed_names,
+                protected_names_by_adapter=protected_names,
+            )
+            if apply:
+                expected_names = {
+                    adapter.name: {
+                        action.name
+                        for action in actions
+                        if action.adapter.name == adapter.name
+                        and action.source is not None
+                    }
+                    for adapter in adapters
+                }
+                actions = apply_skill_sync(
+                    actions,
+                    project_root=project,
+                    home=home,
+                    registry=registry,
+                )
+                manifest.update(
+                    scope=scope,
+                    project_root=project,
+                    names_by_adapter=expected_names,
+                )
+    except (CommandError, InstructionError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=getattr(exc, "exit_code", 1)) from exc
+
+    reported: set[str] = set()
+    for action in actions:
+        _echo_warnings(action.warnings, reported)
+        typer.echo(
+            f"[{action.action.upper():9}] {action.name}@{action.adapter.name} "
+            f"({action.scope}) -> {action.path}"
+        )
+    if not apply:
+        typer.echo("Preview only; pass --apply to write the plan.")
+
+
+@skills_app.command("budget")
+def cli_budget(
+    config: str = typer.Option(
+        ..., "--config", "-c", help="Path to the instruction-assembly configuration."
+    ),
+    agent: str = typer.Option("all", "--agent", "-a", help="Adapter name or 'all'."),
+    project_root: str | None = typer.Option(None, "--project"),
+) -> None:
+    """Report and validate Skill entrypoints and loading units."""
+    from ..instructions import InstructionError, load_config
+
+    try:
+        config_path = Path(config).expanduser().resolve()
+        loaded = load_config(config_path)
+        sources = load_from_instruction_config(config_path)
+        adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
+        project = _resolve_project(project_root)
+        reports = [
+            measurement
+            for adapter in adapters
+            for measurement in measure_skill_budgets(
+                loaded,
+                sources,
+                adapter,
+                project_root=project,
+                home=Path.home(),
+            )
+        ]
+    except (CommandError, InstructionError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=getattr(exc, "exit_code", 1)) from exc
+
+    over_budget = False
+    for measurement in reports:
+        if measurement.byte_budget is None:
+            size_note = f"{measurement.byte_size} B"
+        else:
+            flag = "OVER" if measurement.over_budget else "ok"
+            size_note = f"{measurement.byte_size}/{measurement.byte_budget} B {flag}"
+        status = "OVER" if measurement.over_budget else "OK"
+        typer.echo(
+            f"[{status:4}] {measurement.kind} "
+            f"{measurement.name}@{measurement.adapter} [{size_note}]"
+        )
+        if measurement.kind == "loading-unit":
+            for path in measurement.files:
+                typer.echo(f"       - {path}")
+        over_budget = over_budget or measurement.over_budget
+    if over_budget:
         raise typer.Exit(code=1)
 
 

@@ -35,6 +35,7 @@ from .adapters import (
     get_adapter,
     register_adapter,
 )
+from .skill_budgets import SkillBudgetMeasurement, measure_skill_budgets
 from .exceptions import (
     CommandError,
     CommandNotFoundError,
@@ -53,6 +54,12 @@ from .loader import load_from_instruction_config, load_sources
 from .models import ArtifactFile, CommandSource, InstallRecord, RenderedArtifact
 from .registry import Registry, RegistryCorruptedError
 from .rendering import check_failure_mode, render_command
+from .synchronization import (
+    SkillSyncAction,
+    SkillSyncManifest,
+    apply_skill_sync,
+    plan_skill_sync,
+)
 
 __all__ = [
     "AgentAdapter",
@@ -67,8 +74,12 @@ __all__ = [
     "Registry",
     "RegistryCorruptedError",
     "RenderedArtifact",
+    "SkillBudgetMeasurement",
+    "SkillSyncAction",
+    "SkillSyncManifest",
     "TemplateError",
     "all_adapters",
+    "apply_skill_sync",
     "check_failure_mode",
     "diff_command",
     "get_adapter",
@@ -76,6 +87,8 @@ __all__ = [
     "is_eutaxis_owned",
     "load_from_instruction_config",
     "load_sources",
+    "measure_skill_budgets",
+    "plan_skill_sync",
     "register_adapter",
     "render_command",
     "uninstall_command",

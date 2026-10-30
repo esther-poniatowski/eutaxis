@@ -58,6 +58,18 @@ def test_missing_frontmatter_raises(tmp_path: Path) -> None:
         load_sources(home=tmp_path, project_root=tmp_path)
 
 
+@pytest.mark.parametrize("name", ["../escape", "two words", "UPPER", "end-"])
+def test_unsafe_skill_name_raises(tmp_path: Path, name: str) -> None:
+    _write_source(
+        tmp_path / ".eutaxis" / "commands" / "unsafe.md",
+        f"---\nname: {name!r}\ndescription: x\ninvocation: [user]\n"
+        "failure-mode: visible\n---\nbody\n",
+    )
+
+    with pytest.raises(CommandRenderError, match="lowercase hyphen-separated slug"):
+        load_sources(home=tmp_path, project_root=tmp_path)
+
+
 def test_unsupported_invocation_value_raises(tmp_path: Path) -> None:
     _write_source(
         tmp_path / ".eutaxis" / "commands" / "weird.md",

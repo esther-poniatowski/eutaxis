@@ -32,7 +32,7 @@ Display version and platform diagnostics.
 
 <a id="eutaxis.cli.cli_generate"></a>
 
-### eutaxis.cli.cli_generate(config=<typer.models.OptionInfo object>, root=<typer.models.OptionInfo object>, agent=<typer.models.OptionInfo object>, dry_run=<typer.models.OptionInfo object>, ignore_budget=<typer.models.OptionInfo object>)
+### eutaxis.cli.cli_generate(config=<typer.models.OptionInfo object>, root=<typer.models.OptionInfo object>, agent=<typer.models.OptionInfo object>, dry_run=<typer.models.OptionInfo object>, plan=<typer.models.OptionInfo object>, ignore_budget=<typer.models.OptionInfo object>)
 
 Assemble agent instruction files from modular prompt sources.
 
@@ -45,6 +45,7 @@ any file is written.
   * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **agent** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **dry_run** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **plan** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
   * **ignore_budget** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
 * **Return type:**
   None
@@ -132,7 +133,7 @@ Prompt composition framework.
 ## Generate
 
 `eutaxis.generate` is a thin backward-compatibility shim that re-exports
-the public surface of `eutaxis.instructions`. Only the module’s own
+the public surface of `eutaxis.instructions`. Only the module's own
 entry point is documented here; the re-exported classes appear under
 [Instructions](instructions.md).
 

@@ -23,7 +23,7 @@ The framework treats stability as a binary. The reality is that even the committ
 
 ## Current state
 
-No mechanism currently tracks vendor-doc revision. The supporting notes under `~/Documents/work/techne/tutorials/ai-agents/` are the de facto reference, with no automatic check that they remain in sync with upstream documentation.
+No mechanism currently tracks vendor-doc revision. The supporting notes under `~/Documents/techne/tutorials/ai-agents/` are the de facto reference, with no automatic check that they remain in sync with upstream documentation.
 
 The commands subsystem rewrite (the work that produced the existing ADR set) is itself an unforced response to substrate movement — the legacy `.claude/commands/` and `~/.codex/prompts/` surfaces were deprecated; the rewrite is the catch-up.
 

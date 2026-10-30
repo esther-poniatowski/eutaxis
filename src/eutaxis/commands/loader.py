@@ -13,6 +13,7 @@ from .. import data_path
 from .disclosure import DISCLOSURE_INLINE, DISCLOSURE_MODES
 from .exceptions import CommandRenderError
 from .links import normalize_path
+from .names import is_skill_name
 from .models import (
     ActionSpec,
     AdapterPassthrough,
@@ -137,6 +138,13 @@ def _build_source(
                 f"Command source {path} missing required key: {required!r}"
             )
 
+    name = meta["name"]
+    if not is_skill_name(name):
+        raise CommandRenderError(
+            f"Skill name in {path} must be a lowercase hyphen-separated slug "
+            f"starting with a letter; got {name!r}"
+        )
+
     invocation = _parse_invocation(meta["invocation"], path=path)
     failure_mode = str(meta["failure-mode"])
     if failure_mode not in _SUPPORTED_FAILURE_MODES:
@@ -168,7 +176,7 @@ def _build_source(
         )
 
     return CommandSource(
-        name=str(meta["name"]),
+        name=name,
         description=str(meta["description"]),
         invocation=invocation,
         failure_mode=failure_mode,

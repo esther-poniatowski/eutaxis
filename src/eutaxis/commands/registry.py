@@ -75,7 +75,7 @@ class Registry:
         ]
 
     def upsert(self, record: InstallRecord) -> None:
-        """Insert or replace the record matching (name, adapter, scope)."""
+        """Insert or replace the record for the same deployment target."""
         with self._locked():
             records = self.load()
             records = [
@@ -85,13 +85,24 @@ class Registry:
                     row.name == record.name
                     and row.adapter == record.adapter
                     and row.scope == record.scope
+                    and (
+                        record.scope != "project" or row.path == record.path
+                    )
                 )
             ]
             records.append(record)
             self._write(records)
 
-    def remove(self, *, name: str, adapter: str, scope: str) -> InstallRecord | None:
+    def remove(
+        self,
+        *,
+        name: str,
+        adapter: str,
+        scope: str,
+        path: Path | None = None,
+    ) -> InstallRecord | None:
         """Drop the matching record and return it, if any."""
+        _require_project_path(scope, path)
         with self._locked():
             records = self.load()
             kept: list[InstallRecord] = []
@@ -101,6 +112,7 @@ class Registry:
                     row.name == name
                     and row.adapter == adapter
                     and row.scope == scope
+                    and (scope != "project" or path is None or row.path == path)
                 ):
                     removed = row
                     continue
@@ -109,14 +121,21 @@ class Registry:
             return removed
 
     def find(
-        self, *, name: str, adapter: str, scope: str
+        self,
+        *,
+        name: str,
+        adapter: str,
+        scope: str,
+        path: Path | None = None,
     ) -> InstallRecord | None:
         """Return the matching record, if any."""
+        _require_project_path(scope, path)
         for row in self.load():
             if (
                 row.name == name
                 and row.adapter == adapter
                 and row.scope == scope
+                and (scope != "project" or path is None or row.path == path)
             ):
                 return row
         return None
@@ -160,6 +179,11 @@ class Registry:
 def utcnow_iso() -> str:
     """Return the current UTC time as an ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _require_project_path(scope: str, path: Path | None) -> None:
+    if scope == "project" and path is None:
+        raise CommandError("Project-scope registry operations require a path.")
 
 
 def default_state_dir(home: Path | None = None) -> Path:

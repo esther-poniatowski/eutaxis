@@ -18,7 +18,7 @@ import difflib
 import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from .adapters import AgentAdapter
 from .exceptions import OwnershipError
@@ -65,7 +65,13 @@ def install_command(
     target_dir = adapter.artifact_dir(
         source.name, scope, home=home, project_root=project_root
     )
+    for artifact_file in rendered.files:
+        _owned_path(target_dir, artifact_file.relative_path)
 
+    if target_dir.is_symlink():
+        raise OwnershipError(
+            f"Refusing to install through symbolic-link target: {target_dir}."
+        )
     if target_dir.exists():
         existing = _read_existing(target_dir)
         if existing.eutaxis_owned is False and not force:
@@ -74,6 +80,14 @@ def install_command(
                 "Re-run with --force to overwrite, or back up the contents first."
             )
         if existing.matches(rendered, target_dir):
+            _reconcile_registry(
+                registry,
+                source=source,
+                adapter=adapter,
+                scope=scope,
+                target_dir=target_dir,
+                content_hash=rendered.content_hash,
+            )
             return InstallOutcome(
                 name=source.name,
                 adapter=adapter.name,
@@ -91,15 +105,13 @@ def install_command(
     for artifact_file in rendered.files:
         _write_artifact_file(target_dir, artifact_file)
 
-    registry.upsert(
-        InstallRecord(
-            name=source.name,
-            adapter=adapter.name,
-            scope=scope,
-            path=target_dir,
-            content_hash=rendered.content_hash,
-            installed_at=utcnow_iso(),
-        )
+    _reconcile_registry(
+        registry,
+        source=source,
+        adapter=adapter,
+        scope=scope,
+        target_dir=target_dir,
+        content_hash=rendered.content_hash,
     )
 
     return InstallOutcome(
@@ -127,8 +139,14 @@ def uninstall_command(
         name, scope, home=home, project_root=project_root
     )
 
+    if target_dir.is_symlink():
+        raise OwnershipError(
+            f"Refusing to uninstall through symbolic-link target: {target_dir}."
+        )
     if not target_dir.exists():
-        registry.remove(name=name, adapter=adapter.name, scope=scope)
+        registry.remove(
+            name=name, adapter=adapter.name, scope=scope, path=target_dir
+        )
         return InstallOutcome(
             name=name,
             adapter=adapter.name,
@@ -146,7 +164,9 @@ def uninstall_command(
 
     _remove_owned_files(target_dir, existing.owned_paths)
     _remove_dir_if_empty(target_dir)
-    registry.remove(name=name, adapter=adapter.name, scope=scope)
+    registry.remove(
+        name=name, adapter=adapter.name, scope=scope, path=target_dir
+    )
     return InstallOutcome(
         name=name,
         adapter=adapter.name,
@@ -281,8 +301,25 @@ def _read_existing(target_dir: Path) -> _ExistingArtifact:
                 f"Ownership sidecar at {sidecar_path} is corrupted: {exc}. "
                 "Remove the directory manually or use --force."
             ) from exc
+        if not isinstance(payload, dict):
+            raise OwnershipError(
+                f"Ownership sidecar at {sidecar_path} must contain a JSON object."
+            )
         files = payload.get("files") or []
-        owned_paths = tuple(str(entry["path"]) for entry in files)
+        if not isinstance(files, list):
+            raise OwnershipError(
+                f"Ownership sidecar at {sidecar_path} has a non-list files field."
+            )
+        owned_paths_list: list[str] = []
+        for entry in files:
+            if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+                raise OwnershipError(
+                    f"Ownership sidecar at {sidecar_path} has an invalid file entry."
+                )
+            rel = entry["path"]
+            _owned_path(target_dir, rel, sidecar_path=sidecar_path)
+            owned_paths_list.append(rel)
+        owned_paths = tuple(owned_paths_list)
         if SIDECAR_FILENAME not in owned_paths:
             owned_paths = owned_paths + (SIDECAR_FILENAME,)
         return _ExistingArtifact(
@@ -327,7 +364,7 @@ def _read_frontmatter_marker(skill_md: Path) -> str | None:
 
 def _remove_owned_files(target_dir: Path, owned_paths: tuple[str, ...]) -> None:
     for rel in owned_paths:
-        path = target_dir / rel
+        path = _owned_path(target_dir, rel)
         if path.is_file() or path.is_symlink():
             path.unlink()
     # Clean up any now-empty sub-directories left behind.
@@ -336,6 +373,8 @@ def _remove_owned_files(target_dir: Path, owned_paths: tuple[str, ...]) -> None:
 
 def _prune_empty_subdirs(target_dir: Path) -> None:
     for child in sorted(target_dir.rglob("*"), key=lambda p: -len(p.parts)):
+        if child.is_symlink():
+            continue
         if child.is_dir() and not any(child.iterdir()):
             child.rmdir()
 
@@ -349,3 +388,66 @@ def _write_artifact_file(target_dir: Path, artifact: ArtifactFile) -> None:
     path = target_dir / artifact.relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(artifact.content, encoding="utf-8")
+
+
+def _owned_path(
+    target_dir: Path,
+    relative_path: str,
+    *,
+    sidecar_path: Path | None = None,
+) -> Path:
+    """Resolve one owned path without permitting escape from the artifact."""
+    rel = PurePosixPath(relative_path)
+    source = sidecar_path or target_dir / SIDECAR_FILENAME
+    if (
+        not relative_path
+        or rel.is_absolute()
+        or any(part in {"", ".", ".."} for part in rel.parts)
+    ):
+        raise OwnershipError(
+            f"Ownership sidecar at {source} contains unsafe path "
+            f"{relative_path!r}."
+        )
+    path = target_dir.joinpath(*rel.parts)
+    root = target_dir.resolve()
+    parent = path.parent.resolve(strict=False)
+    if parent != root and root not in parent.parents:
+        raise OwnershipError(
+            f"Ownership sidecar at {source} contains path outside its "
+            f"artifact directory: {relative_path!r}."
+        )
+    return path
+
+
+def _reconcile_registry(
+    registry: Registry,
+    *,
+    source: CommandSource,
+    adapter: AgentAdapter,
+    scope: str,
+    target_dir: Path,
+    content_hash: str,
+) -> None:
+    """Ensure the registry describes the artifact currently on disk."""
+    current = registry.find(
+        name=source.name,
+        adapter=adapter.name,
+        scope=scope,
+        path=target_dir,
+    )
+    if (
+        current is not None
+        and current.path == target_dir
+        and current.content_hash == content_hash
+    ):
+        return
+    registry.upsert(
+        InstallRecord(
+            name=source.name,
+            adapter=adapter.name,
+            scope=scope,
+            path=target_dir,
+            content_hash=content_hash,
+            installed_at=utcnow_iso(),
+        )
+    )
