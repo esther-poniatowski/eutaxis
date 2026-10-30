@@ -40,7 +40,7 @@ Capability emission is **never automatic** in routine `eutaxis generate` runs. A
 
 Approximate fidelity is valid only for `tool-wiring`. For `policy`, the compiler must either represent the same boundary exactly on the target surface or refuse the build. A policy source that compiles to a looser or stricter privilege boundary is not an approximate match; it is a privilege change and requires an explicit policy decision.
 
-Externally sourced capability components (from cross-repo rule-owning projects) are subject to additional supply-chain rules; see [open-questions/cross-repository-source-acquisition](../open-questions/cross-repository-source-acquisition.md) and [open-questions/capability-regime-split](../open-questions/capability-regime-split.md).
+The accepted [external declaration identity and acquisition](external-declaration-identity-and-acquisition.md) contract governs external instruction declarations only. External capability acquisition remains blocked on the supply-chain and privilege contracts in [capability regime split](../open-questions/capability-regime-split.md); it cannot inherit the instruction-source gate.
 
 ## Discarded alternatives
 

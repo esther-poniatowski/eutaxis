@@ -156,8 +156,8 @@ carrier mutation.
 - YAML is canonical; tagged Markdown is only an evidence-triggered fallback.
 - Procedures are a declaration kind, separate from the three rule axes.
 - Semantic resolution, deterministic artifact composition, and host scope precedence are separate layers.
-- Namespace algebra and cross-repository acquisition must be decided before any external owner, including Oikos or Hermeneia, becomes a pilot source.
-- Declaration identifiers remain opaque, and versioned references remain structured, until that namespace decision is recorded.
+- External declaration identity and offline acquisition now follow the [accepted namespace and acquisition contract](../adr/external-declaration-identity-and-acquisition.md).
+- The external pilot remains blocked on implementation of that contract and its migration, semantic-diff, and rollback tooling.
 - SQLite remains conditional on measured JSON-index performance.
 
 ## Work sequence
@@ -277,9 +277,19 @@ This phase has turned the validated registry into a static query boundary, resol
 
 ### Namespace, acquisition, and external pilot
 
-- [ ] Decide the identifier namespace and cross-repository acquisition contract.
+- [x] Decide the identifier namespace and cross-repository acquisition contract.
+- [ ] Implement the closed manifest, canonical lock, revision algebra, and normalized path models.
+- [ ] Implement descriptor-anchored byte carriers, the packaged internal source, and additive composite facet authority.
+- [ ] Implement workspace and vendored acquisition through one issued result.
+- [ ] Implement the closed Git-submodule proof and repeatable transport verification.
+- [ ] Enforce namespace, owner, and declaration-reference grammar before combined registry construction.
+- [ ] Migrate persisted catalog provenance to revision 2 and bind resolution traces to the composite facet content revision.
 - [ ] Publish migration tooling, semantic-diff tooling, and rollback before converting an external source.
 - [ ] Only then pilot one coherent Oikos rule set and one procedure.
+
+Each implementation item closes only after an independent adversarial review,
+repair of every high- and medium-severity finding, targeted verification, and a
+commit of the completed slice on the current branch.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 

@@ -23,7 +23,7 @@ A split is justified when separate responsibilities, audiences, activation condi
 
 Filesystem hierarchy does not encode every classification axis. Domain, reasoning axis, failure mode, activation, and ownership are orthogonal metadata queried through the catalog. Directories such as `epistemology/`, `argumentation/`, and `stylistic/` are therefore rejected as the primary organization: one hierarchy cannot represent the cross-cutting axes without duplication.
 
-The exact cross-repository namespace syntax remains governed by [identifier and namespace algebra](../open-questions/identifier-and-namespace-algebra.md). The packaging decision requires only stable set and member identities; it does not commit the separator.
+External set and member identifiers follow [external declaration identity and acquisition](external-declaration-identity-and-acquisition.md). This packaging decision remains independent of their transport and revision provenance.
 
 ## Consequences
 

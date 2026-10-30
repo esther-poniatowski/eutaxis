@@ -55,7 +55,7 @@ Rules and procedures are the only effective-content kinds. They may declare rela
 
 Every declaration has `schema-version`, stable `id`, `kind`, `owner`, lifecycle status, source revision, applicability, and relations. Classification, failure mode, visibility, rationale, title, and purpose appear only where the normative schema admits them. A required per-rule `description` is excluded because it normally paraphrases the norm. A rule set or procedure may carry one `purpose` for discovery.
 
-At this boundary, each identifier contains one or more non-whitespace characters. The schema leaves separators uninterpreted because the namespace across repositories remains undecided. A versioned evaluator or operation reference uses separate `id` and positive-integer `version` fields. Therefore, future namespace syntax cannot change how a reference is parsed.
+At this intrinsic source boundary, each identifier contains one or more non-whitespace characters. The schema leaves separators uninterpreted so internal sources remain independent of acquisition. The downstream [external-source boundary](external-declaration-identity-and-acquisition.md) applies the exact namespace grammar, owner constraint, and complete reference traversal before it constructs a combined registry. A versioned evaluator or operation reference uses separate `id` and positive-integer `version` fields.
 
 Applicability is conjunctive across nesting. The normalized version 1 language contains `all`, `any`, and `not` nodes plus typed atomic tests with operators `equals`, `in`, and `exists`. Atomic tests name registered context facets. A missing facet makes `equals` and `in` return `unknown`; `exists` always returns true or false.
 
@@ -116,14 +116,14 @@ Each operator acts uniformly across the JSON domain:
 - `equals` compares the context value with one registered value
 - `in` compares the context value with one or more alternatives; for an array-valued facet, each alternative is an array
 
-The following work remains outside schema version 1:
+The following work remains outside the intrinsic declaration schema version 1:
 
 - merging facet registries
 - defining aliases or defaults
 - coercing values
 - deriving facets
 
-A later layer may combine registries only after it specifies how registries cross owner boundaries. The same layer must specify how namespaces compose.
+The accepted [external-source boundary](external-declaration-identity-and-acquisition.md) supplies that later layer. It issues a composite registry from the mandatory packaged base and owner-authorized additive extensions, then applies external namespace rules before combined declaration registry construction. Aliases, defaults, coercions, and derived facets remain unsupported.
 
 ## Embedded-schema contract ^embedded-schema-contract
 

@@ -33,6 +33,7 @@ live under [`docs/open-questions/`](../open-questions/_index.md).
 - [YAML declaration schema](yaml-declaration-schema.md)
 - [Coherent rule-set packaging](coherent-rule-set-packaging.md)
 - [Rule relations and contextual resolution](rule-relations-and-resolution.md)
+- [External declaration identity and acquisition](external-declaration-identity-and-acquisition.md): preserves semantic identity while verifying offline source bytes and provenance
 - [Resolution evidence and failure contract](resolution-evidence-and-failures.md): fixes the evidence required to audit one resolver result
 - [Queryable declaration catalog](queryable-declaration-catalog.md)
 - [Enforcement-directed agent attention](enforcement-directed-agent-attention.md)

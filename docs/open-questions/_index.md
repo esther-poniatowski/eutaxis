@@ -20,11 +20,11 @@ Open questions for the eutaxis cross-agent compiler that the current ADR set doe
 | [capability-regime-split](capability-regime-split.md) | High | Phase 3 | Open |
 | [subagent-vs-role-routing](subagent-vs-role-routing.md) | Medium | Phase 2 | Open |
 | [behavioural-validation](behavioural-validation.md) | Medium | None (contract reframed via golden-file review) | Open as follow-up |
-| [cross-repository-source-acquisition](cross-repository-source-acquisition.md) | Medium | Phase 1 (if external fragments are consumed) | Open |
 | [substrate-volatility-tracking](substrate-volatility-tracking.md) | Low | None | Open |
-| [identifier-and-namespace-algebra](identifier-and-namespace-algebra.md) | Medium | Phase 1 (cross-repo) | Partial — `name == directory` codified for Codex |
 | [claude-md-cumulative-loading-semantics](claude-md-cumulative-loading-semantics.md) | Medium | Phase 1 (Claude-side always-on adapter) | Open |
 
 ## Resolved records
 
 - [Silent-failure classification criterion](silent-failure-classification.md): explains the question resolved by the accepted failure-mode decision
+- [Identifier and namespace algebra](identifier-and-namespace-algebra.md): records the identity question closed by the external-source decision
+- [Cross-repository source acquisition](cross-repository-source-acquisition.md): records the supply-chain question closed by the external-source decision
