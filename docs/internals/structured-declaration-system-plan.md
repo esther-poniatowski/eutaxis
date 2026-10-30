@@ -281,7 +281,10 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Implement the closed manifest, canonical lock, revision algebra, and normalized path models.
 - [ ] Implement the byte and facet authority boundary:
   - [x] Implement descriptor-anchored authoritative and verification byte carriers.
-  - [ ] Implement the packaged internal source and additive composite facet authority.
+  - [ ] Implement the packaged internal source and additive composite facet authority:
+    - [x] Parse and locate YAML directly from retained byte evidence.
+    - [ ] Issue the locked packaged internal source.
+    - [ ] Issue additive composite facet authority with its consumer migration.
 - [ ] Implement workspace and vendored acquisition through one issued result.
 - [ ] Implement the closed Git-submodule proof and repeatable transport verification.
 - [ ] Enforce namespace, owner, and declaration-reference grammar before combined registry construction.

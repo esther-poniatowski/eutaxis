@@ -93,8 +93,23 @@ def load_yaml_document(
     """
     try:
         source_bytes = path.read_bytes()
+    except OSError as exc:
+        raise error_type(path, "$", str(exc)) from exc
+    return load_yaml_bytes(source_bytes, path=path, error_type=error_type)
+
+
+def load_yaml_bytes(
+    source_bytes: bytes,
+    *,
+    path: Path,
+    error_type: SchemaErrorType = DeclarationSchemaError,
+) -> tuple[object, dict[DocumentPath, SourceLocation], str]:
+    """Parse retained YAML bytes with one diagnostic path and byte hash."""
+    if type(source_bytes) is not bytes:
+        raise error_type(path, "$", "source must be exact bytes")
+    try:
         text = source_bytes.decode("utf-8", errors="strict")
-    except (OSError, UnicodeError) as exc:
+    except UnicodeError as exc:
         raise error_type(path, "$", str(exc)) from exc
     source_sha256 = hashlib.sha256(source_bytes).hexdigest()
 
