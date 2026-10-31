@@ -38,7 +38,7 @@ The source `name` becomes both the directory name and the `name` field in `SKILL
 
 ## Rationale
 
-A single, modern surface aligns the subsystem with both vendors' recommended path and removes the per-call Bash approval friction that defined the original review's Defect 2. The cost is the multi-file artifact model, which propagates through the adapter Protocol but is paid once.
+A single, modern surface aligns the subsystem with both vendors' recommended path and removes the per-call Bash approval friction that defined the original review's Defect 2. The cost is the multi-file artifact model, which propagates through the adapter Protocol.
 
 ## Consequences
 

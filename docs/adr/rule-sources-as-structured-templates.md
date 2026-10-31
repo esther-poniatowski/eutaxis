@@ -40,7 +40,7 @@ The schema commits to the following structural properties; the exhaustive field 
 - **Keep free-form Markdown as the source form.** Rejected on the three structural defects in the context section: coupled specification/rendering, unenforced schema, no stable identifier algebra.
 - **Untyped YAML frontmatter + Markdown body (hybrid).** Rejected after session discussion. The frontmatter portion buys identifier and metadata typing, but the Markdown body retains the same convention-based structure as the current files: the ✓ / ✗ / Why / examples blocks remain section headers, parseable only by agreement, not by schema. The hybrid preserves authoring ergonomics but does not deliver the decoupling objective. This rejection does not apply to a typed, tag-delimited Markdown hybrid whose content blocks are schema-addressable fields.
 - **JSON with escaped multi-line content.** Rejected: JSON has no comment syntax, no block-string mechanism, and forces every newline in prose or example content into `\n` escapes. The schema is enforceable but the source becomes hostile to hand-authoring.
-- **Custom DSL with bespoke block delimiters.** Rejected on tooling cost: a custom format would require a parser, a validator, editor support, and a migration plan, none of which are justified when existing configuration and Markdown layers can satisfy the structural requirements.
+- **Custom DSL with bespoke block delimiters.** Rejected on tooling cost: a custom format would require a parser, a validator, and editor support, none of which are justified when existing configuration and Markdown layers can satisfy the structural requirements.
 
 ## Rationale
 
