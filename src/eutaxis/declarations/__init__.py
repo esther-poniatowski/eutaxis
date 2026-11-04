@@ -64,6 +64,12 @@ from .packaged_source import (
     PackagedInternalSource,
     acquire_packaged_internal_source,
 )
+from .external_result import (
+    AcquisitionSourceCoordinate,
+    ExternalAcquisitionResult,
+    acquire_external_declarations,
+    acquire_external_declarations_from_path,
+)
 from .exceptions import (
     AcquisitionContractError,
     AttentionPlanningError,
@@ -384,11 +390,13 @@ __all__ = [
     "AcquisitionKind",
     "AcquisitionLock",
     "AcquisitionManifest",
+    "AcquisitionSourceCoordinate",
     "AuthoritativeByteCarrier",
     "ByteCarrierError",
     "DirectoryIdentity",
     "ExternalSourceLock",
     "ExternalSourceManifest",
+    "ExternalAcquisitionResult",
     "FacetConstituentLock",
     "FacetExtensionManifest",
     "FacetRegistryLock",
@@ -403,6 +411,8 @@ __all__ = [
     "TrustedDirectory",
     "VerifiedByteCarrier",
     "acquire_packaged_internal_source",
+    "acquire_external_declarations",
+    "acquire_external_declarations_from_path",
     "acquisition_lock_schema",
     "acquisition_lock_schema_path",
     "acquisition_manifest_schema",

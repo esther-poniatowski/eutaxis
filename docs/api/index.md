@@ -11,6 +11,8 @@
   * [Rule Parser](instructions.md#module-eutaxis.instructions.rules)
   * [Data Models](instructions.md#module-eutaxis.instructions.models)
   * [Exceptions](instructions.md#module-eutaxis.instructions.exceptions)
+* [Declarations](declarations.md)
+  * [External acquisition result](declarations.md#module-eutaxis.declarations.external_result)
 * [Commands](commands.md)
   * [Loader](commands.md#module-eutaxis.commands.loader)
   * [Registry](commands.md#module-eutaxis.commands.registry)

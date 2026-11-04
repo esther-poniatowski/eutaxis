@@ -302,7 +302,7 @@ This phase has turned the validated registry into a static query boundary, resol
   - [x] Attach each verified Git proof to the private external acquisition stage.
 - [x] Enforce namespace, owner, and declaration-reference grammar before building the combined registry.
 - [x] Build the combined registry from the issued stage and apply the existing cross-record contracts.
-- [ ] Issue one public acquisition result that binds the combined registry to every retained acquisition record.
+- [x] Issue one public acquisition result that binds the combined registry to every retained acquisition record.
 - [ ] Move the persisted catalog to `index-revision: 2`.
 - [ ] Publish lock generation, semantic-diff tooling, and rollback before converting an external source.
 - [ ] Complete the query, cumulative Markdown, and compact Skill projections selected by the pilot.
@@ -593,10 +593,36 @@ The combined-registry checks report:
 - Hermeneia accepts both changed documentation files
 - `git diff --check` passes
 
-The combined registry remains private. The public acquisition result must
-retain the combined registry together with every source and transport record.
-Only that issued result can carry the combined registry into a semantic consumer.
-The result must also define portable source coordinates.
+The combined registry remains private. The public acquisition result retains
+that registry together with every source and transport record. Only the issued
+result can carry the combined registry into a semantic consumer. Each source
+coordinate records three values: the source namespace, canonical relative path
+and locked digest. These values remain identical across workspace, vendored and
+Git transports. Every property access checks the retained authority graph again.
+If that check fails, the wrapper retires the complete owned tree:
+
+- the public result and private registry
+- the stage and composite registry
+- the source-origin records and final evidence records
+
+The first adversarial pass found one missing proof. The initial implementation
+could accept a snapshotted ordinary registry. The initial implementation did
+not authenticate that registry against the retained stage. The repair introduced
+a private, code-issued stage–registry capability. The second pass required tests
+that each transport retained its verified origin records and tests for failed property
+access. The second pass also required tests that modify or substitute
+coordinates, source maps and retained registries. After those repairs, the
+independent re-gate found no high- or medium-severity defect.
+
+The public-result checks report:
+
+- 61 focused public-result, external-registry and acquisition tests pass
+- 268 targeted downstream-consumer tests pass
+- MyPy accepts the three checked production modules
+- Black accepts the four changed Python files
+- Sphinx builds the generated API pages cleanly
+- `git diff --check` passes
+
 The catalog remains at `index-revision: 1` until those coordinates exist.
 Before the pilot converts an Oikos source, Eutaxis must write the persisted
 catalog with `index-revision: 2`. Eutaxis must also verify the general conversion
