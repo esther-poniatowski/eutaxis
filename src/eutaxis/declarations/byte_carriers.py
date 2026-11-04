@@ -441,6 +441,66 @@ _VERIFIED_AUTHORITIES: IdentityAuthorityStore[VerifiedByteCarrier] = (
 )
 
 
+def _trusted_directory_from_workspace_path(path: str) -> TrustedDirectory:
+    """Retain an exact workspace path by no-follow component traversal."""
+    components, anchor_path = _workspace_path_components(path)
+    directory_flags, _file_flags = _descriptor_flags()
+    try:
+        anchor = os.open(anchor_path, directory_flags)
+    except OSError as exc:
+        raise ByteCarrierError(path, str(exc)) from exc
+    target = -1
+    trusted: TrustedDirectory | None = None
+    try:
+        target = _open_directory_at(anchor, components, path)
+        trusted = TrustedDirectory.from_fd(target, label=path)
+    except BaseException:
+        if trusted is not None:
+            trusted.close()
+        raise
+    finally:
+        first_error: BaseException | None = None
+        if target >= 0:
+            try:
+                os.close(target)
+            except BaseException as exc:
+                first_error = exc
+        try:
+            os.close(anchor)
+        except BaseException as exc:
+            if first_error is None:
+                first_error = exc
+        if first_error is not None:
+            if trusted is not None:
+                trusted.close()
+            if isinstance(first_error, OSError):
+                raise ByteCarrierError(path, str(first_error)) from first_error
+            raise first_error
+    return trusted
+
+
+def _workspace_path_components(path: object) -> tuple[tuple[str, ...], str]:
+    """Validate a workspace path and return its trusted anchor traversal."""
+    if type(path) is not str:
+        raise ByteCarrierError(str(path), "workspace path must be exact text")
+    try:
+        require_unicode_scalar_text(path)
+    except CanonicalJsonError as exc:
+        raise ByteCarrierError(path, str(exc)) from exc
+    if not path or "\\" in path or "\x00" in path:
+        raise ByteCarrierError(path, "workspace path is not normalized")
+    if path == "/":
+        return (), "/"
+    if path == ".":
+        return (), "."
+    absolute = path.startswith("/")
+    body = path[1:] if absolute else path
+    parts = body.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ByteCarrierError(path, "workspace path is not normalized")
+    return tuple(parts), "/" if absolute else "."
+
+
 def _trusted_state(value: TrustedDirectory) -> tuple[object, ...]:
     identity = value._identity
     return (
@@ -658,6 +718,25 @@ def _require_authoritative_carrier(
     return snapshot
 
 
+def _authoritative_carrier_context(
+    carrier: object,
+) -> tuple[str, DirectoryIdentity, _CarrierSnapshot]:
+    """Authenticate one authoritative carrier and expose its retained root."""
+    if type(carrier) is not AuthoritativeByteCarrier:
+        raise ByteCarrierError("<carrier>", "carrier has the wrong exact type")
+    state = _BYTE_AUTHORITIES.state(carrier)
+    if state is None or state[0] != "authoritative":
+        raise ByteCarrierError("<carrier>", "carrier is not authoritative here")
+    root_path = cast(str, state[1])
+    identity = DirectoryIdentity(cast(int, state[2]), cast(int, state[3]))
+    snapshot = _require_authoritative_carrier(
+        carrier,
+        root_path=root_path,
+        root_identity=identity,
+    )
+    return root_path, identity, snapshot
+
+
 def _issue_verified_carrier(
     authoritative: AuthoritativeByteCarrier,
     authoritative_snapshot: _CarrierSnapshot,
@@ -687,6 +766,34 @@ def _issued_verified_state(value: VerifiedByteCarrier) -> _VerifiedAuthorityStat
     if state is None:
         raise ByteCarrierError("<carrier>", "verified carrier is not issued here")
     return cast(_VerifiedAuthorityState, state)
+
+
+def _verified_carrier_context(
+    carrier: object,
+) -> tuple[str, DirectoryIdentity, _CarrierSnapshot]:
+    """Authenticate matching reads and expose their retained root context."""
+    if type(carrier) is not VerifiedByteCarrier:
+        raise ByteCarrierError("<carrier>", "verified carrier has the wrong exact type")
+    state = _issued_verified_state(carrier)
+    root_path = state[0]
+    identity = DirectoryIdentity(state[1], state[2])
+    authoritative = _require_authoritative_carrier(
+        state[3],
+        root_path=root_path,
+        root_identity=identity,
+    )
+    verification_state = _BYTE_AUTHORITIES.state(state[4])
+    expected_prefix = (
+        "verification",
+        root_path,
+        identity.device,
+        identity.inode,
+    )
+    if verification_state is None or verification_state[:-1] != expected_prefix:
+        raise ByteCarrierError(root_path, "verification carrier is not issued here")
+    if authoritative != state[5] or state[5] != state[6]:
+        raise ByteCarrierError(authoritative[0], "verified carrier state is invalid")
+    return root_path, identity, authoritative
 
 
 def _read_file_at(root_fd: int, path: str) -> _ReadObservation:

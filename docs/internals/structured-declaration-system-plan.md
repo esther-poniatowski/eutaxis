@@ -279,19 +279,19 @@ This phase has turned the validated registry into a static query boundary, resol
 
 - [x] Decide the identifier namespace and cross-repository acquisition contract.
 - [x] Implement the closed manifest, canonical lock, revision algebra, and normalized path models.
-- [ ] Implement the byte and facet authority boundary:
+- [x] Implement the byte and facet authority boundary:
   - [x] Implement descriptor-anchored authoritative and verification byte carriers.
   - [x] Secure the packaged internal source and composite facets:
     - [x] Parse and locate YAML directly from retained byte evidence.
     - [x] Issue the locked packaged internal source.
     - [x] Issue the packaged composite and migrate its semantic consumers.
-- [ ] Privately issue workspace and vendored source state:
+- [x] Privately issue workspace and vendored source state:
   - [x] Parse each retained YAML carrier and expose ordered packaged read phases.
   - [x] Require an issued provenance record at the composite core and preserve the packaged-only public route.
-  - [ ] Derive external provenance only from the complete workspace/vendored source record.
-  - [ ] Retain one contract without Git entries in a non-consumable stage:
-    - [ ] retain every external root and carrier
-    - [ ] retain the ordered additive facet set
+  - [x] Derive external provenance only from the complete workspace/vendored source record.
+  - [x] Retain one contract without Git entries in a non-consumable stage:
+    - [x] retain every external root and carrier
+    - [x] retain the ordered additive facet set
 - [ ] Implement the closed Git-submodule proof and repeatable transport verification.
 - [ ] Enforce namespace, owner, and declaration-reference grammar before combined registry construction.
 - [ ] Move the persisted catalog to `index-revision: 2`.
@@ -413,6 +413,36 @@ The second step is complete:
 A second independent adversarial pass found no high- or medium-severity defect.
 The focused test set contains 181 passing tests. MyPy and Black accepted the
 changed Python files. The changed-file check also passed.
+
+The third step is complete:
+
+- traverses the exact workspace path without following symbolic links
+- rejects any Git entry before opening an external source root
+- opens every external root before reading the packaged base and ordered facet files
+- reads packaged files before external files and parses only retained bytes
+- verifies each retained carrier before issuing the stage
+- authenticates the complete parsed-source snapshot with every stage lookup
+- places the shared evidence checks in a lower-level module without a dependency cycle
+- keeps the intermediate stage private
+- excludes combined declaration-registry, resolver, and catalog consumers
+
+The first adversarial gate identified two medium-severity defects:
+
+- `_FacetCompositeProvenance` remained issued after the composite publisher failed
+- the composite and acquisition modules imported each other
+
+Two repairs close the defects:
+
+- the composite publisher retires `_FacetCompositeProvenance` after every failure
+- the lower-level `_workspace_evidence` module supplies both consumers without importing either higher layer
+
+The repaired implementation passed the focused re-gate without a high- or
+medium-severity defect. The final checks report:
+
+- 469 targeted downstream tests pass
+- MyPy accepts five production modules
+- Black accepts eight changed Python files
+- `git diff --check` passes
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 

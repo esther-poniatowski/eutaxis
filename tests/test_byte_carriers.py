@@ -20,6 +20,7 @@ from eutaxis.declarations.byte_carriers import (
     RetainedDirectory,
     TrustedDirectory,
     VerifiedByteCarrier,
+    _trusted_directory_from_workspace_path,
 )
 from eutaxis.declarations.exceptions import ByteCarrierError
 
@@ -69,6 +70,55 @@ def test_dot_retains_the_already_open_trusted_directory(tmp_path: Path) -> None:
         with trusted.retain_directory(".") as retained:
             assert retained.identity == trusted.identity
             retained.verify(retained.read_authoritative("rule.yaml"))
+
+
+def test_workspace_path_is_retained_by_component_traversal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace_path = tmp_path / "workspace"
+    workspace_path.mkdir()
+
+    absolute = _trusted_directory_from_workspace_path(str(workspace_path))
+    try:
+        assert absolute.label == str(workspace_path)
+    finally:
+        absolute.close()
+
+    monkeypatch.chdir(tmp_path)
+    relative = _trusted_directory_from_workspace_path("workspace")
+    current = _trusted_directory_from_workspace_path(".")
+    try:
+        assert relative.identity == absolute.identity
+        assert current.label == "."
+    finally:
+        relative.close()
+        current.close()
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["", "a//b", "a/./b", "a/../b", "./a", "a/", "a\\b", "a\x00b"],
+)
+def test_workspace_path_rejects_every_non_normalized_component(path: str) -> None:
+    with pytest.raises(ByteCarrierError):
+        _trusted_directory_from_workspace_path(path)
+
+    class Text(str):
+        pass
+
+    with pytest.raises(ByteCarrierError, match="exact text"):
+        _trusted_directory_from_workspace_path(Text("."))
+
+
+def test_workspace_path_never_follows_a_symbolic_component(tmp_path: Path) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    linked = tmp_path / "linked"
+    linked.symlink_to(target, target_is_directory=True)
+
+    with pytest.raises(ByteCarrierError):
+        _trusted_directory_from_workspace_path(str(linked))
 
 
 @pytest.mark.parametrize(

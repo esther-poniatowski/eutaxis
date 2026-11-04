@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
-from typing import Callable, NamedTuple, NoReturn, SupportsIndex, TypeGuard
+from typing import Callable, Iterator, NamedTuple, NoReturn, SupportsIndex, TypeGuard
 
 from ._authority import IdentityAuthorityStore, identity_value_state
 from .acquisition_contract import (
@@ -50,9 +51,14 @@ class _PackagedFacetRead(NamedTuple):
 
 
 class _PackagedDeclarationReads(NamedTuple):
-    """Retain ordered packaged declarations before final verification."""
+    """Retain ordered packaged declaration bytes before parsing."""
 
     authoritative: tuple[AuthoritativeByteCarrier, ...]
+
+
+class _PackagedParsedDeclarations(NamedTuple):
+    """Retain ordered packaged declarations parsed from retained bytes."""
+
     documents: tuple[JsonValue, ...]
 
 
@@ -281,6 +287,7 @@ class _PackagedAcquisitionSession:
         self._dependencies = dependencies
         self._facet_read: _PackagedFacetRead | None = None
         self._declaration_reads: _PackagedDeclarationReads | None = None
+        self._parsed_declarations: _PackagedParsedDeclarations | None = None
         self._finished = False
 
     def read_facet(self) -> _PackagedFacetRead:
@@ -316,9 +323,32 @@ class _PackagedAcquisitionSession:
         )
         return self._declaration_reads
 
+    def parse_declarations(self) -> _PackagedParsedDeclarations:
+        """Parse packaged declarations after every source has been read."""
+        if self._declaration_reads is None:
+            self._dependencies.fail(
+                "$.internal-source",
+                "packaged declarations must be read before parsing",
+            )
+        if self._finished or self._parsed_declarations is not None:
+            self._dependencies.fail(
+                "$.internal-source",
+                "packaged declaration parsing has already run",
+            )
+        self._parsed_declarations = _parse_packaged_declarations(
+            self._source_lock,
+            self._declaration_reads,
+            self._dependencies,
+        )
+        return self._parsed_declarations
+
     def verify_and_issue(self) -> PackagedInternalSource:
         """Verify every retained read and issue one packaged source."""
-        if self._facet_read is None or self._declaration_reads is None:
+        if (
+            self._facet_read is None
+            or self._declaration_reads is None
+            or self._parsed_declarations is None
+        ):
             self._dependencies.fail(
                 "$.internal-source",
                 "packaged reads are incomplete",
@@ -336,6 +366,7 @@ class _PackagedAcquisitionSession:
             self._declaration_root,
             self._facet_read,
             self._declaration_reads,
+            self._parsed_declarations,
             self._dependencies,
         )
 
@@ -402,6 +433,7 @@ def _acquire_from_retained_roots(
     )
     session.read_facet()
     session.read_declarations()
+    session.parse_declarations()
     return session.verify_and_issue()
 
 
@@ -453,12 +485,11 @@ def _read_packaged_declarations(
     declaration_root: RetainedDirectory,
     dependencies: _PackagedDependencies,
 ) -> _PackagedDeclarationReads:
-    """Read, authenticate, and parse packaged declarations in lock order."""
+    """Read and authenticate packaged declarations in lock order."""
     declaration_authoritative = tuple(
         declaration_root.read_authoritative(locked_file.path)
         for locked_file in source_lock.files
     )
-    declaration_documents: list[JsonValue] = []
     for index, (carrier, locked_file) in enumerate(
         zip(
             declaration_authoritative,
@@ -471,15 +502,29 @@ def _read_packaged_declarations(
             locked_file.sha256,
             f"$.internal-source.files[{index}].sha256",
         )
+    return _PackagedDeclarationReads(
+        authoritative=declaration_authoritative,
+    )
+
+
+def _parse_packaged_declarations(
+    source_lock: InternalSourceLock,
+    declaration_reads: _PackagedDeclarationReads,
+    dependencies: _PackagedDependencies,
+) -> _PackagedParsedDeclarations:
+    """Parse packaged declarations only from their retained bytes."""
+    declaration_documents: list[JsonValue] = []
+    for carrier, locked_file in zip(
+        declaration_reads.authoritative,
+        source_lock.files,
+        strict=True,
+    ):
         document, _locations, _digest = dependencies.load_yaml(
             carrier.data,
             path=dependencies.path(locked_file.path),
         )
         declaration_documents.append(dependencies.freeze(document))
-    return _PackagedDeclarationReads(
-        authoritative=declaration_authoritative,
-        documents=tuple(declaration_documents),
-    )
+    return _PackagedParsedDeclarations(documents=tuple(declaration_documents))
 
 
 def _verify_and_issue_packaged_source(
@@ -489,6 +534,7 @@ def _verify_and_issue_packaged_source(
     declaration_root: RetainedDirectory,
     facet_read: _PackagedFacetRead,
     declaration_reads: _PackagedDeclarationReads,
+    parsed_declarations: _PackagedParsedDeclarations,
     dependencies: _PackagedDependencies,
 ) -> PackagedInternalSource:
     """Verify phased packaged reads and issue their immutable source."""
@@ -505,7 +551,7 @@ def _verify_and_issue_packaged_source(
         facet_registry=facet_read.registry,
         facet_registry_state=identity_value_state(facet_read.registry),
         facet_document=facet_read.document,
-        declaration_documents=declaration_reads.documents,
+        declaration_documents=parsed_declarations.documents,
         facet_content_revision=base_lock.content_revision,
         facet_acquisition_revision=base_lock.acquisition_revision,
         content_revision=source_lock.content_revision,
@@ -588,6 +634,35 @@ def _build_packaged_source_acquirer(
     return acquire
 
 
+def _build_packaged_session_opener(
+    distribution: TrustedDirectory,
+    dependencies: _PackagedDependencies,
+) -> Callable[
+    [AcquisitionLock],
+    AbstractContextManager[_PackagedAcquisitionSession],
+]:
+    """Bind phased packaged sessions to the retained distribution."""
+
+    @contextmanager
+    def open_session(
+        lock: AcquisitionLock,
+    ) -> Iterator[_PackagedAcquisitionSession]:
+        base_lock, source_lock = dependencies.validate_lock(lock)
+        with (
+            distribution.retain_directory("data") as facet_root,
+            distribution.retain_directory("data/declarations/v1") as declaration_root,
+        ):
+            yield _PackagedAcquisitionSession(
+                base_lock,
+                source_lock,
+                facet_root,
+                declaration_root,
+                dependencies,
+            )
+
+    return open_session
+
+
 def _build_running_distribution_acquirer(
     module_file: str,
     dependencies: _PackagedDependencies,
@@ -613,7 +688,52 @@ def _build_running_distribution_acquirer(
     )
 
 
-acquire_packaged_internal_source = _build_running_distribution_acquirer(
+def _build_running_distribution_boundaries(
+    module_file: str,
+    dependencies: _PackagedDependencies,
+) -> tuple[
+    Callable[[AcquisitionLock], PackagedInternalSource],
+    Callable[
+        [AcquisitionLock],
+        AbstractContextManager[_PackagedAcquisitionSession],
+    ],
+]:
+    """Retain one distribution for atomic and phased acquisition routes."""
+    if dependencies.nofollow is None or dependencies.root_flags is None:
+
+        def unsupported(_lock: AcquisitionLock) -> NoReturn:
+            dependencies.fail(
+                "$.internal-source",
+                "platform lacks required descriptor support",
+            )
+
+        @contextmanager
+        def unsupported_session(
+            lock: AcquisitionLock,
+        ) -> Iterator[_PackagedAcquisitionSession]:
+            unsupported(lock)
+            raise AssertionError("unreachable")
+            yield
+
+        return unsupported, unsupported_session
+    distribution = _trusted_directory_from_path(
+        dependencies.path(module_file).resolve().parent.parent,
+        dependencies,
+    )
+    return (
+        _build_packaged_source_acquirer(
+            distribution,
+            _acquire_from_retained_roots,
+            dependencies,
+        ),
+        _build_packaged_session_opener(distribution, dependencies),
+    )
+
+
+(
+    acquire_packaged_internal_source,
+    _open_running_packaged_session,
+) = _build_running_distribution_boundaries(
     __file__,
     _SYSTEM_DEPENDENCIES,
 )

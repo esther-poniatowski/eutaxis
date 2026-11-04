@@ -25,6 +25,11 @@ from .packaged_source import (
     acquire_packaged_internal_source,
     _issued_packaged_facet_state,
 )
+from ._workspace_evidence import (
+    _WorkspaceVendoredEvidence,
+    _issued_workspace_vendored_facet_state,
+    _provisional_workspace_vendored_facet_state,
+)
 
 COMPOSITE_FACET_REGISTRY_ID = "composite/context-facets-v1"
 
@@ -96,12 +101,52 @@ class _FacetCompositeProvenance:
         raise TypeError("facet composite provenance cannot be serialized")
 
 
+class _ProvisionalCompositeFacetView:
+    """Expose a provisional composite only to byte-owned declaration parsing."""
+
+    __slots__ = ("_composite",)
+
+    def __init__(self, composite: CompositeFacetRegistry) -> None:
+        self._composite = composite
+
+    @property
+    def schema_version(self) -> int:
+        return self._composite.schema_version
+
+    @property
+    def id(self) -> str:
+        return self._composite.id
+
+    @property
+    def facets(self) -> Mapping[str, ContextFacet]:
+        return self._composite.facets
+
+    def require_authority(self) -> None:
+        if not _has_composite_authority(self._composite, allow_provisional=True):
+            _fail("$.facet-registry", "provisional composite is not issued here")
+
+    def authority_for(self, facet_id: str) -> FacetRegistry:
+        self.require_authority()
+        return self._composite.facet_authorities[facet_id]
+
+    def validate_context(
+        self, context: Mapping[str, object]
+    ) -> Mapping[str, JsonValue]:
+        return _validate_context(self, context)
+
+
 class _PackagedProvenanceState(NamedTuple):
     """Bind packaged provenance to its exact source, lock, and registry."""
 
     packaged: PackagedInternalSource
     lock: FacetConstituentLock
     registry: FacetRegistry
+
+
+class _WorkspaceVendoredProvenanceState(NamedTuple):
+    """Bind external provenance to one complete correlated evidence record."""
+
+    evidence: _WorkspaceVendoredEvidence
 
 
 class _CompositeAuthorityState(NamedTuple):
@@ -124,6 +169,11 @@ def _capture_composite_authority(
 
 def _is_issued_composite_facet_registry(value: object) -> bool:
     """Return whether ``value`` retains its complete issuance snapshot."""
+    return _has_composite_authority(value, allow_provisional=False)
+
+
+def _has_composite_authority(value: object, *, allow_provisional: bool) -> bool:
+    """Check final authority, or internal provisional authority when requested."""
     if type(value) is not CompositeFacetRegistry:
         return False
     try:
@@ -133,7 +183,8 @@ def _is_issued_composite_facet_registry(value: object) -> bool:
         if state.snapshot != _capture_composite_authority(value):
             return False
         constituents, _locks, content_revision = _issued_provenance_state(
-            state.provenance
+            state.provenance,
+            allow_provisional=allow_provisional,
         )
         return (
             len(value.constituents) == len(constituents)
@@ -194,8 +245,35 @@ def _issue_packaged_provenance(
         raise
 
 
+def _issue_workspace_vendored_composite(
+    evidence: _WorkspaceVendoredEvidence,
+) -> CompositeFacetRegistry:
+    """Issue a composite only from one complete workspace/vendored record."""
+    provenance = _issue_workspace_vendored_provenance(evidence)
+    return _issue_composite_from_provenance(provenance)
+
+
+def _issue_workspace_vendored_provenance(
+    evidence: _WorkspaceVendoredEvidence,
+) -> _FacetCompositeProvenance:
+    """Bind external composite selection to exact issued source evidence."""
+    if type(evidence) is not _WorkspaceVendoredEvidence:
+        _fail("$.facet-registry", "workspace/vendored evidence has wrong type")
+    _provisional_workspace_vendored_facet_state(evidence)
+    result = object.__new__(_FacetCompositeProvenance)
+    state = _WorkspaceVendoredProvenanceState(evidence)
+    try:
+        _FACET_PROVENANCE_AUTHORITIES.issue(result, state)
+        return result
+    except BaseException:
+        _FACET_PROVENANCE_AUTHORITIES.retire(result)
+        raise
+
+
 def _issued_provenance_state(
     provenance: object,
+    *,
+    allow_provisional: bool = False,
 ) -> tuple[
     tuple[FacetRegistry, ...],
     tuple[FacetConstituentLock, ...],
@@ -205,6 +283,10 @@ def _issued_provenance_state(
     if type(provenance) is not _FacetCompositeProvenance:
         _fail("$.facet-registry", "facet composite provenance is not issued here")
     state = _FACET_PROVENANCE_AUTHORITIES.state(provenance)
+    if type(state) is _WorkspaceVendoredProvenanceState:
+        if allow_provisional:
+            return _provisional_workspace_vendored_facet_state(state.evidence)
+        return _issued_workspace_vendored_facet_state(state.evidence)
     if type(state) is not _PackagedProvenanceState:
         _fail("$.facet-registry", "facet composite provenance is not issued here")
     _evidence, current_lock, current_registry = _issued_packaged_facet_state(
@@ -225,8 +307,22 @@ def _issued_provenance_state(
 def _issue_composite_from_provenance(
     provenance: _FacetCompositeProvenance,
 ) -> CompositeFacetRegistry:
+    """Publish a composite and retire its provenance if publication fails."""
+    try:
+        return _assemble_composite_from_provenance(provenance)
+    except BaseException:
+        _FACET_PROVENANCE_AUTHORITIES.retire(provenance)
+        raise
+
+
+def _assemble_composite_from_provenance(
+    provenance: _FacetCompositeProvenance,
+) -> CompositeFacetRegistry:
     """Assemble and issue the exact constituents selected by provenance."""
-    constituents, locks, content_revision = _issued_provenance_state(provenance)
+    constituents, locks, content_revision = _issued_provenance_state(
+        provenance,
+        allow_provisional=True,
+    )
     merged: dict[str, ContextFacet] = {}
     authorities: dict[str, FacetRegistry] = {}
     for constituent_index, (registry, lock) in enumerate(
@@ -261,6 +357,24 @@ def _issue_composite_from_provenance(
     except BaseException:
         _COMPOSITE_AUTHORITIES.retire(result)
         raise
+
+
+def _retire_composite_tree(value: object) -> None:
+    """Retire a provisional composite and its provenance in dependency order."""
+    if type(value) is not CompositeFacetRegistry:
+        return
+    state = _COMPOSITE_AUTHORITIES.retire(value)
+    if type(state) is _CompositeAuthorityState:
+        _FACET_PROVENANCE_AUTHORITIES.retire(state.provenance)
+
+
+def _provisional_composite_view(
+    composite: CompositeFacetRegistry,
+) -> _ProvisionalCompositeFacetView:
+    """Return a parsing-only view after checking provisional authority."""
+    if not _has_composite_authority(composite, allow_provisional=True):
+        _fail("$.facet-registry", "provisional composite is not issued here")
+    return _ProvisionalCompositeFacetView(composite)
 
 
 def _require_constituent(

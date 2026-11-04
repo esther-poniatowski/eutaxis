@@ -175,12 +175,24 @@ def test_packaged_session_exposes_ordered_phases(tmp_path: Path) -> None:
                 match="facet phase must run",
             ):
                 session.read_declarations()
+            with pytest.raises(
+                AcquisitionContractError,
+                match="must be read before parsing",
+            ):
+                session.parse_declarations()
             facet_read = session.read_facet()
             declaration_reads = session.read_declarations()
+            with pytest.raises(AcquisitionContractError, match="reads are incomplete"):
+                session.verify_and_issue()
+            parsed_declarations = session.parse_declarations()
             acquired = session.verify_and_issue()
 
     assert facet_read.registry is acquired.facet_registry
-    assert declaration_reads.documents == acquired.declaration_documents
+    assert (
+        tuple(carrier.path for carrier in declaration_reads.authoritative)
+        == PACKAGED_DECLARATION_PATHS
+    )
+    assert parsed_declarations.documents == acquired.declaration_documents
 
 
 def test_packaged_acquirer_verifies_only_after_all_authoritative_reads(
