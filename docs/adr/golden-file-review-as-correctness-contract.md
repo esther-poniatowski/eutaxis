@@ -38,7 +38,12 @@ This contract **does not** certify behavioural correctness. Whether the agent ac
 
 ## Rationale
 
-Golden-file review is the contract a deterministic compiler can actually deliver. It is also the discipline the project's existing implementation already uses (the legacy `eutaxis generate` for instruction files). The contract scales: it covers always-on instruction files, on-demand skill directories, session-preset output-style artifacts, and capability configuration.
+A deterministic compiler can satisfy the golden-file review contract. The contract covers four artifact classes:
+
+- always-on instruction files;
+- Skill directories available when needed;
+- artifacts that control output style; and
+- settings that let agents use tools.
 
 ## Consequences
 

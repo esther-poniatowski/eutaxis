@@ -40,7 +40,7 @@ The schema commits to the following structural properties; [YAML declaration sch
 - **Keep free-form Markdown as the source form.** Rejected on the three structural defects in the context section: coupled specification/rendering, unenforced schema, no stable identifier algebra.
 - **YAML frontmatter plus a convention-shaped Markdown body.** Rejected because the ✓, ✗, rationale, and example sections remain implicit. A typed tagged-Markdown hybrid remains a fallback only if the YAML pilot demonstrates a material defect.
 - **JSON with escaped multi-line content.** Rejected: JSON has no comment syntax, no block-string mechanism, and forces every newline in prose or example content into `\n` escapes. The schema is enforceable but the source becomes hostile to hand-authoring.
-- **Custom DSL with bespoke block delimiters.** Rejected on tooling cost: a custom format would require a parser, a validator, editor support, and a migration plan, none of which are justified when existing configuration and Markdown layers can satisfy the structural requirements.
+- **Custom language with bespoke block delimiters.** Rejected because a custom format needs a dedicated parser, validator, and editor integration. YAML and Markdown meet the same structural criteria with existing tools.
 
 ## Rationale
 

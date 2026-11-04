@@ -38,7 +38,7 @@ The source `name` becomes both the directory name and the `name` field in `SKILL
 
 ## Rationale
 
-A single, modern surface aligns the subsystem with both vendors' recommended path and removes the per-call Bash approval friction that defined the original review's Defect 2. The cost is the multi-file artifact model, which propagates through the adapter Protocol but is paid once.
+Agent Skills give both vendors one modern target. The Skills route no longer asks the user to approve each Bash call. This change resolves Defect 2 in the original review. In exchange, the adapter Protocol must support multi-file artifacts.
 
 ## Consequences
 
