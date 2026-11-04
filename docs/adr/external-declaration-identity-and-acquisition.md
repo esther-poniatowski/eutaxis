@@ -185,7 +185,7 @@ Only a process-issued provenance record can supply the composite assembler.
 The issuer for each source class selects the exact constituent registries and
 locks. The assembler does not accept constituent values from its caller. The
 packaged issuer derives its record from the issued packaged source. The
-external issuer must derive its record from the complete workspace/vendored
+external issuer must derive its record from the complete external acquisition
 record described below. This constraint prevents the shared assembler from
 bypassing the source checks.
 
@@ -593,13 +593,14 @@ it visible. The full order is:
    observation
 9. build one combined registry and apply existing cross-record contracts
 
-Private issued records may connect these steps, but those records do not
-certify that all required checks passed. A restricted workspace/vendored stage binds
-one contract that contains no Git entries. The stage retains the roots,
-carriers, and composite facet registry for that contract. The package does not
-export the stage, and semantic consumers do not accept it. If a contract
-contains a `git-submodule` entry, the restricted stage rejects the whole
-contract.
+Private issued records connect these steps, but they do not certify that all
+required checks passed. The restricted external acquisition stage binds one
+complete contract. The stage retains the source roots and byte carriers. The
+stage also retains the composite facet registry and one closed transport proof
+for each Git source. Each proof binds the exact facet-registry and source-file carriers
+consumed by the parser. After the parser accepts every source file, the loader
+reruns each Git proof. The package keeps the stage private. No semantic
+consumer accepts the stage.
 
 Private packaged-loader methods divide their work into three ordered phases:
 

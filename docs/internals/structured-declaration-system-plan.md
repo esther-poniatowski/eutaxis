@@ -285,16 +285,16 @@ This phase has turned the validated registry into a static query boundary, resol
     - [x] Parse and locate YAML directly from retained byte evidence.
     - [x] Issue the locked packaged internal source.
     - [x] Issue the packaged composite and migrate its semantic consumers.
-- [x] Privately issue workspace and vendored source state:
+- [x] Privately issue external source state:
   - [x] Parse each retained YAML carrier and expose ordered packaged read phases.
   - [x] Require an issued provenance record at the composite core and preserve the packaged-only public route.
-  - [x] Derive external provenance only from the complete workspace/vendored source record.
-  - [x] Retain one contract without Git entries in a non-consumable stage:
+  - [x] Derive external provenance only from the complete external acquisition record.
+  - [x] Retain one complete contract in a non-consumable stage:
     - [x] retain every external root and carrier
     - [x] retain the ordered additive facet set
-- [ ] Prove closed Git-submodule state once before the loader reads source files and once afterward:
+- [x] Prove closed Git-submodule state once before the loader reads source files and once afterward:
   - [x] Build the private Git transport proof across two matching passes.
-  - [ ] Attach each verified Git proof to the private external acquisition stage.
+  - [x] Attach each verified Git proof to the private external acquisition stage.
 - [ ] Enforce namespace, owner, and declaration-reference grammar before combined registry construction.
 - [ ] Move the persisted catalog to `index-revision: 2`.
 - [ ] Publish migration tooling, semantic-diff tooling, and rollback before converting an external source.
@@ -382,10 +382,9 @@ loader parses retained YAML, and private packaged methods expose the required
 read order. This order reads every facet before any rule or procedure YAML.
 Second, an issued provenance record must supply every external constituent to
 the composite issuer. The caller cannot supply constituent values. Third, a
-private workspace/vendored stage must retain one contract without Git entries
-and all correlated carriers. The stage is not an `AcquisitionResult`, and
-semantic consumers cannot accept it. Git checks remain open. Namespace and
-reference checks also remain open. Finally, the combined registry must exist
+private external acquisition stage must retain one contract and all correlated
+carriers. The stage is not an `AcquisitionResult`, and semantic consumers
+cannot accept it. Namespace and reference checks remain open. Finally, the combined registry must exist
 before the package can issue the public result.
 
 The first step is complete:
@@ -419,7 +418,7 @@ changed Python files. The changed-file check also passed.
 The third step is complete:
 
 - traverses the exact workspace path without following symbolic links
-- rejects any Git entry before opening an external source root
+- retains workspace and vendored entries without transport proof
 - opens every external root before reading the packaged base and ordered facet files
 - reads packaged files before external files and parses only retained bytes
 - verifies each retained carrier before issuing the stage
@@ -436,7 +435,7 @@ The first adversarial gate identified two medium-severity defects:
 Two repairs close the defects:
 
 - the composite publisher retires `_FacetCompositeProvenance` after every failure
-- the lower-level `_workspace_evidence` module supplies both consumers without importing either higher layer
+- the lower-level `_external_evidence` module supplies both consumers without importing either higher layer
 
 The repaired implementation passed the focused re-gate without a high- or
 medium-severity defect. The final checks report:
@@ -491,13 +490,43 @@ The final checks report:
 - `git diff --check` passes
 
 Each repaired class has a planted failure. The Git transport layer remains
-private and non-consumable. The acquisition stage still rejects every Git
-entry. Thus, the parent Git item remains open. The following slice must:
+private and non-consumable.
 
-1. open one transport proof for each Git source;
-2. bind the carriers already read for parsing;
-3. repeat the transport checks after parsing;
-4. store each verified proof in the generalized external source record.
+The generalized external stage now:
+
+1. opens one independent `_GitSubmoduleSession` for each Git source;
+2. binds the exact facet and declaration carriers already consumed by parsing;
+3. waits until every source file has passed the parser before repeating each transport proof;
+4. retains each verified proof with the exact manifest, lock and selected source;
+5. preserves source order and extension order across mixed and multiple-Git contracts;
+6. closes each unfinished `_GitSubmoduleSession` whenever the parser, binder, verifier or publisher fails.
+
+An independent adversarial pass found no high- or medium-severity defect. The
+focused tests show that the stage:
+
+- accepts Git-only and mixed contracts
+- retains independent proofs for two Git sources
+- rejects spliced carriers
+- preserves source and extension order
+- closes descriptors after a failure
+- rejects forged stages
+- removes every issued record when the stage publisher raises `KeyboardInterrupt`
+
+Namespace, owner and declaration-reference checks remain open for the
+following slice.
+
+The final checks report:
+
+- 17 external-stage tests pass
+- 37 Git-transport tests pass
+- 14 composite-facet tests pass
+- 18 packaged-source tests pass
+- 85 contract tests pass
+- 63 byte-carrier tests pass
+- MyPy accepts the three changed production modules
+- Black accepts the four changed Python files
+- Hermeneia accepts both changed documentation files
+- `git diff --check` passes
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 

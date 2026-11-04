@@ -1,4 +1,4 @@
-"""Acquire workspace and vendored declarations into one private issued stage."""
+"""Acquire external declarations into one private issued stage."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import NamedTuple, NoReturn, SupportsIndex
 
 from ._authority import IdentityAuthorityStore, identity_value_state
 from .acquisition_contract import (
+    AcquisitionKind,
     AcquisitionLock,
     AcquisitionManifest,
     parse_acquisition_lock_bytes,
@@ -25,73 +26,77 @@ from .byte_carriers import (
 from .exceptions import AcquisitionContractError, DeclarationSchemaError
 from .facets import FacetRegistryView, load_facet_registry_bytes
 from .composite_facets import (
-    _issue_workspace_vendored_composite,
+    _issue_external_composite,
     _provisional_composite_view,
     _retire_composite_tree,
 )
 from .loader import LoadedDeclarationSource, load_declaration_source_bytes
+from .git_transport import (
+    _GitSubmoduleSession,
+    _GitTransportEvidence,
+    _open_git_submodule_session,
+)
 from .packaged_source import (
     _PackagedAcquisitionSession,
     _open_running_packaged_session,
 )
 from .source import load_yaml_bytes
-from ._workspace_evidence import (
+from ._external_evidence import (
     _EVIDENCE_AUTHORITIES,
     _FacetExtensionRead,
     _FinalEvidenceState,
     _OpenExternalSource,
-    _WorkspaceVendoredEvidence,
+    _ExternalAcquisitionEvidence,
     _finalize_evidence,
     _issue_provisional_evidence,
-    _issued_workspace_vendored_facet_state,
-    _require_non_git_contract,
-    _retire_workspace_vendored_evidence,
+    _issued_external_facet_state,
+    _retire_external_evidence,
     _validate_final_declaration_evidence,
 )
 
 
-class _WorkspaceVendoredStageState(NamedTuple):
+class _ExternalAcquisitionStageState(NamedTuple):
     """Bind final evidence, facets, and parsed declarations."""
 
-    evidence: _WorkspaceVendoredEvidence
+    evidence: _ExternalAcquisitionEvidence
     composite: FacetRegistryView
     declarations: tuple[LoadedDeclarationSource, ...]
     declaration_state: object
 
 
-class _WorkspaceVendoredAcquisitionStage:
-    """Retain verified non-Git acquisition state without semantic authority."""
+class _ExternalAcquisitionStage:
+    """Retain verified external acquisition state without semantic authority."""
 
     __slots__ = ("__weakref__",)
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
-        raise TypeError("workspace/vendored stages must be issued")
+        raise TypeError("external acquisition stages must be issued")
 
     def __copy__(self) -> NoReturn:
-        raise TypeError("workspace/vendored stages cannot be copied")
+        raise TypeError("external acquisition stages cannot be copied")
 
     def __deepcopy__(self, _memo: object) -> NoReturn:
-        raise TypeError("workspace/vendored stages cannot be copied")
+        raise TypeError("external acquisition stages cannot be copied")
 
     def __reduce__(self) -> NoReturn:
-        raise TypeError("workspace/vendored stages cannot be serialized")
+        raise TypeError("external acquisition stages cannot be serialized")
 
     def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
-        raise TypeError("workspace/vendored stages cannot be serialized")
+        raise TypeError("external acquisition stages cannot be serialized")
 
 
 _STAGE_AUTHORITIES: IdentityAuthorityStore[object] = IdentityAuthorityStore()
 
 
-def _acquire_workspace_vendored_stage_from_path(
+def _acquire_external_stage_from_path(
     workspace_path: str,
     manifest_path: str,
     lock_path: str,
-) -> _WorkspaceVendoredAcquisitionStage:
+) -> _ExternalAcquisitionStage:
     """Acquire one restricted contract through an exact workspace path."""
     workspace = _trusted_directory_from_workspace_path(workspace_path)
     try:
-        stage = _acquire_workspace_vendored_stage(
+        stage = _acquire_external_stage(
             workspace,
             manifest_path,
             lock_path,
@@ -111,17 +116,17 @@ def _acquire_workspace_vendored_stage_from_path(
     return stage
 
 
-def _acquire_workspace_vendored_stage(
+def _acquire_external_stage(
     workspace: TrustedDirectory,
     manifest_path: str,
     lock_path: str,
-) -> _WorkspaceVendoredAcquisitionStage:
-    """Acquire one non-Git contract through a retained workspace capability."""
+) -> _ExternalAcquisitionStage:
+    """Acquire one external contract through a retained workspace capability."""
     manifest_path = _normalized_file_path(manifest_path, "$.manifest-path")
     lock_path = _normalized_file_path(lock_path, "$.lock-path")
-    evidence: _WorkspaceVendoredEvidence | None = None
+    evidence: _ExternalAcquisitionEvidence | None = None
     composite: FacetRegistryView | None = None
-    stage: _WorkspaceVendoredAcquisitionStage | None = None
+    stage: _ExternalAcquisitionStage | None = None
     try:
         with ExitStack() as stack:
             workspace_root = stack.enter_context(workspace.retain_directory("."))
@@ -133,11 +138,11 @@ def _acquire_workspace_vendored_stage(
             )
             lock = parse_acquisition_lock_bytes(lock_authoritative.data)
             validate_acquisition_contract(manifest, lock)
-            _require_non_git_contract(manifest)
             workspace_root_path, workspace_root_identity = _issued_retained_context(
                 workspace_root
             )
             sources = _open_external_sources(workspace, manifest, lock, stack)
+            git_sessions = _open_git_sessions(workspace, manifest, lock, stack)
             with _open_running_packaged_session(lock) as packaged_session:
                 packaged_facet = packaged_session.read_facet()
                 extensions = _read_extensions(manifest, lock, sources)
@@ -152,7 +157,7 @@ def _acquire_workspace_vendored_stage(
                     sources,
                     extensions,
                 )
-                composite = _issue_workspace_vendored_composite(evidence)
+                composite = _issue_external_composite(evidence)
                 parsing_facets = _provisional_composite_view(composite)
                 packaged_reads = packaged_session.read_declarations()
                 external_authoritative = _read_external_declarations(sources)
@@ -163,6 +168,12 @@ def _acquire_workspace_vendored_stage(
                     external_authoritative,
                     parsing_facets,
                 )
+                _bind_git_carriers(
+                    git_sessions,
+                    extensions,
+                    external_authoritative,
+                )
+                git_evidence = _finish_git_sessions(git_sessions)
                 manifest_evidence = workspace_root.verify(manifest_authoritative)
                 lock_evidence = workspace_root.verify(lock_authoritative)
                 packaged = packaged_session.verify_and_issue()
@@ -188,11 +199,12 @@ def _acquire_workspace_vendored_stage(
                     extension_evidence,
                     declaration_evidence,
                     declarations[len(packaged_reads.authoritative) :],
+                    git_evidence,
                 )
                 composite.require_authority()
                 stage = _issue_stage(evidence, composite, declarations)
         if stage is None:
-            raise AssertionError("workspace/vendored stage was not issued")
+            raise AssertionError("external acquisition stage was not issued")
         return stage
     except BaseException:
         if stage is not None:
@@ -200,17 +212,17 @@ def _acquire_workspace_vendored_stage(
         if composite is not None:
             _retire_composite_tree(composite)
         if evidence is not None:
-            _retire_workspace_vendored_evidence(evidence)
+            _retire_external_evidence(evidence)
         raise
 
 
 def _retire_stage_tree(stage: object) -> None:
     """Retire a stage and both nested authority layers."""
     state = _STAGE_AUTHORITIES.retire(stage)
-    if type(state) is not _WorkspaceVendoredStageState:
+    if type(state) is not _ExternalAcquisitionStageState:
         return
     _retire_composite_tree(state.composite)
-    _retire_workspace_vendored_evidence(state.evidence)
+    _retire_external_evidence(state.evidence)
 
 
 def _parse_manifest_bytes(source: bytes, *, path: Path) -> AcquisitionManifest:
@@ -257,6 +269,57 @@ def _open_external_sources(
             )
         )
     return tuple(opened)
+
+
+def _open_git_sessions(
+    workspace: TrustedDirectory,
+    manifest: AcquisitionManifest,
+    lock: AcquisitionLock,
+    stack: ExitStack,
+) -> tuple[_GitSubmoduleSession | None, ...]:
+    """Open one independent proof session for each Git source."""
+    sessions: list[_GitSubmoduleSession | None] = []
+    for position, source in enumerate(manifest.sources):
+        if source.kind is AcquisitionKind.GIT_SUBMODULE:
+            session = _open_git_submodule_session(
+                workspace,
+                manifest,
+                lock,
+                position,
+            )
+            sessions.append(stack.enter_context(session))
+        else:
+            sessions.append(None)
+    return tuple(sessions)
+
+
+def _bind_git_carriers(
+    sessions: tuple[_GitSubmoduleSession | None, ...],
+    extensions: tuple[_FacetExtensionRead, ...],
+    declarations: tuple[tuple[AuthoritativeByteCarrier, ...], ...],
+) -> None:
+    """Bind each Git proof to the exact carriers consumed by parsing."""
+    extensions_by_source: list[list[AuthoritativeByteCarrier]] = [
+        [] for _session in sessions
+    ]
+    for extension in extensions:
+        extensions_by_source[extension.source_index].append(extension.authoritative)
+    for source_index, (session, source_declarations) in enumerate(
+        zip(sessions, declarations, strict=True)
+    ):
+        if session is not None:
+            session.bind_worktree_carriers(
+                tuple(extensions_by_source[source_index]) + source_declarations
+            )
+
+
+def _finish_git_sessions(
+    sessions: tuple[_GitSubmoduleSession | None, ...],
+) -> tuple[_GitTransportEvidence | None, ...]:
+    """Repeat each Git proof after parsing and retain its final evidence."""
+    return tuple(
+        session.finish() if session is not None else None for session in sessions
+    )
 
 
 def _read_extensions(
@@ -354,15 +417,15 @@ def _parse_all_declarations(
 
 
 def _issue_stage(
-    evidence: _WorkspaceVendoredEvidence,
+    evidence: _ExternalAcquisitionEvidence,
     composite: FacetRegistryView,
     declarations: tuple[LoadedDeclarationSource, ...],
-) -> _WorkspaceVendoredAcquisitionStage:
+) -> _ExternalAcquisitionStage:
     """Issue the private final stage after all evidence has verified."""
     if type(_EVIDENCE_AUTHORITIES.state(evidence)) is not _FinalEvidenceState:
-        _fail("$", "workspace/vendored evidence is not final")
-    result = object.__new__(_WorkspaceVendoredAcquisitionStage)
-    state = _WorkspaceVendoredStageState(
+        _fail("$", "external acquisition evidence is not final")
+    result = object.__new__(_ExternalAcquisitionStage)
+    state = _ExternalAcquisitionStageState(
         evidence,
         composite,
         declarations,
@@ -370,23 +433,23 @@ def _issue_stage(
     )
     try:
         _STAGE_AUTHORITIES.issue(result, state)
-        _issued_workspace_vendored_stage_state(result)
+        _issued_external_stage_state(result)
         return result
     except BaseException:
         _STAGE_AUTHORITIES.retire(result)
         raise
 
 
-def _issued_workspace_vendored_stage_state(
+def _issued_external_stage_state(
     stage: object,
-) -> _WorkspaceVendoredStageState:
+) -> _ExternalAcquisitionStageState:
     """Authenticate a completed private stage and every retained aggregate."""
-    if type(stage) is not _WorkspaceVendoredAcquisitionStage:
-        _fail("$", "workspace/vendored stage is not issued here")
+    if type(stage) is not _ExternalAcquisitionStage:
+        _fail("$", "external acquisition stage is not issued here")
     state = _STAGE_AUTHORITIES.state(stage)
-    if type(state) is not _WorkspaceVendoredStageState:
-        _fail("$", "workspace/vendored stage is not issued here")
-    _issued_workspace_vendored_facet_state(state.evidence)
+    if type(state) is not _ExternalAcquisitionStageState:
+        _fail("$", "external acquisition stage is not issued here")
+    _issued_external_facet_state(state.evidence)
     state.composite.require_authority()
     _validate_final_declaration_evidence(state.evidence)
     if identity_value_state(state.declarations) != state.declaration_state:

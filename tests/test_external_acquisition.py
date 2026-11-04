@@ -1,4 +1,4 @@
-"""Exercise the private workspace/vendored acquisition boundary."""
+"""Exercise the private external acquisition boundary."""
 
 from __future__ import annotations
 
@@ -7,12 +7,13 @@ import hashlib
 import os
 import pickle
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
 
-import eutaxis.declarations.workspace_acquisition as workspace_module
+import eutaxis.declarations.external_acquisition as acquisition_module
 import eutaxis.declarations.composite_facets as composite_module
 import eutaxis.declarations as declarations_api
 from eutaxis import data_path
@@ -22,6 +23,7 @@ from eutaxis.declarations.acquisition_contract import (
     ExternalSourceLock,
     FacetConstituentLock,
     FacetRegistryLock,
+    GitLock,
     LockedFile,
     _lock_document,
     composite_facet_content_revision,
@@ -31,16 +33,15 @@ from eutaxis.declarations.acquisition_contract import (
 from eutaxis.declarations.canonical_json import jcs_bytes
 from eutaxis.declarations.byte_carriers import RetainedDirectory, TrustedDirectory
 from eutaxis.declarations.exceptions import AcquisitionContractError, ByteCarrierError
-from eutaxis.declarations.workspace_acquisition import (
+from eutaxis.declarations.git_transport import _issued_git_transport_state
+from eutaxis.declarations.external_acquisition import (
     _EVIDENCE_AUTHORITIES,
     _FinalEvidenceState,
-    _WorkspaceVendoredAcquisitionStage,
-    _acquire_workspace_vendored_stage_from_path,
-    _issued_workspace_vendored_stage_state,
+    _ExternalAcquisitionStage,
+    _acquire_external_stage_from_path,
+    _issued_external_stage_state,
 )
 from tests.test_packaged_source import _valid_lock
-from tests.test_acquisition_contract import _lock as _contract_lock
-from tests.test_acquisition_contract import _manifest as _contract_manifest
 
 
 def _digest(source: bytes) -> str:
@@ -49,6 +50,36 @@ def _digest(source: bytes) -> str:
 
 def _revision(value: object) -> str:
     return "sha256:" + hashlib.sha256(jcs_bytes(value)).hexdigest()
+
+
+def _git(directory: Path, *arguments: str) -> bytes:
+    return subprocess.run(
+        ("/usr/bin/git", "-C", str(directory), *arguments),
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={
+            "HOME": str(directory),
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_CONFIG_NOSYSTEM": "1",
+        },
+    ).stdout
+
+
+def _git_document(git: GitLock) -> dict[str, str]:
+    return {
+        "object-format": git.object_format,
+        "commit": git.commit,
+        "gitmodules-path": git.gitmodules_path,
+        "gitmodules-sha256": git.gitmodules_sha256,
+        "registered-name": git.registered_name,
+        "registered-path": git.registered_path,
+        "parent-index-mode": git.parent_index_mode,
+        "parent-index-gitlink": git.parent_index_gitlink,
+    }
 
 
 def _facet_source(namespace: str) -> bytes:
@@ -95,9 +126,10 @@ def _write_contract(
     kind: AcquisitionKind = AcquisitionKind.WORKSPACE,
     root: str = ".",
     namespace: str = "oikos",
+    git: GitLock | None = None,
 ) -> tuple[str, str]:
     source_root = workspace if root == "." else workspace / root
-    (source_root / "declarations").mkdir(parents=True)
+    (source_root / "declarations").mkdir(parents=True, exist_ok=True)
     facet_path = "declarations/context-facets.yaml"
     declaration_path = "declarations/process-core.yaml"
     facet_bytes = _facet_source(namespace)
@@ -113,16 +145,17 @@ def _write_contract(
         facet_path,
         facet_sha,
     )
-    facet_acquisition = _revision(
-        {
-            "schema-version": 1,
-            "namespace": namespace,
-            "kind": kind.value,
-            "root": root,
-            "path": facet_path,
-            "content-revision": facet_content,
-        }
-    )
+    facet_payload: dict[str, object] = {
+        "schema-version": 1,
+        "namespace": namespace,
+        "kind": kind.value,
+        "root": root,
+        "path": facet_path,
+        "content-revision": facet_content,
+    }
+    if git is not None:
+        facet_payload["git"] = _git_document(git)
+    facet_acquisition = _revision(facet_payload)
     extension = FacetConstituentLock(
         facet_acquisition,
         facet_content,
@@ -135,22 +168,23 @@ def _write_contract(
     )
     locked_file = LockedFile(declaration_path, _digest(declaration_bytes))
     source_content = source_content_revision(namespace, (locked_file,))
-    source_acquisition = _revision(
-        {
-            "schema-version": 1,
-            "namespace": namespace,
-            "kind": kind.value,
-            "root": root,
-            "content-revision": source_content,
-        }
-    )
+    source_payload: dict[str, object] = {
+        "schema-version": 1,
+        "namespace": namespace,
+        "kind": kind.value,
+        "root": root,
+        "content-revision": source_content,
+    }
+    if git is not None:
+        source_payload["git"] = _git_document(git)
+    source_acquisition = _revision(source_payload)
     external = ExternalSourceLock(
         source_acquisition,
         source_content,
         (locked_file,),
         kind,
         namespace,
-        None,
+        git,
     )
     packaged = _valid_lock(data_path())
     lock = AcquisitionLock(
@@ -201,7 +235,9 @@ def _write_multi_contract(
     specs: tuple[tuple[str, AcquisitionKind, str], ...],
     *,
     extension_order: tuple[str, ...],
+    git_by_namespace: dict[str, GitLock] | None = None,
 ) -> tuple[str, str]:
+    git_by_namespace = git_by_namespace or {}
     packaged = _valid_lock(data_path())
     source_manifests: list[dict[str, object]] = []
     source_locks: list[ExternalSourceLock] = []
@@ -209,6 +245,7 @@ def _write_multi_contract(
         str, tuple[dict[str, object], FacetConstituentLock]
     ] = {}
     for namespace, kind, root in specs:
+        git = git_by_namespace.get(namespace)
         source_root = workspace if root == "." else workspace / root
         (source_root / "declarations").mkdir(parents=True, exist_ok=True)
         declaration_path = "declarations/process-core.yaml"
@@ -223,15 +260,16 @@ def _write_multi_contract(
         (source_root / declaration_path).write_bytes(declaration_bytes)
         locked_file = LockedFile(declaration_path, _digest(declaration_bytes))
         source_content = source_content_revision(namespace, (locked_file,))
-        source_acquisition = _revision(
-            {
-                "schema-version": 1,
-                "namespace": namespace,
-                "kind": kind.value,
-                "root": root,
-                "content-revision": source_content,
-            }
-        )
+        source_payload: dict[str, object] = {
+            "schema-version": 1,
+            "namespace": namespace,
+            "kind": kind.value,
+            "root": root,
+            "content-revision": source_content,
+        }
+        if git is not None:
+            source_payload["git"] = _git_document(git)
+        source_acquisition = _revision(source_payload)
         source_locks.append(
             ExternalSourceLock(
                 source_acquisition,
@@ -239,7 +277,7 @@ def _write_multi_contract(
                 (locked_file,),
                 kind,
                 namespace,
-                None,
+                git,
             )
         )
         source_manifests.append(
@@ -262,16 +300,17 @@ def _write_multi_contract(
                 facet_path,
                 facet_sha,
             )
-            acquisition = _revision(
-                {
-                    "schema-version": 1,
-                    "namespace": namespace,
-                    "kind": kind.value,
-                    "root": root,
-                    "path": facet_path,
-                    "content-revision": content,
-                }
-            )
+            extension_payload: dict[str, object] = {
+                "schema-version": 1,
+                "namespace": namespace,
+                "kind": kind.value,
+                "root": root,
+                "path": facet_path,
+                "content-revision": content,
+            }
+            if git is not None:
+                extension_payload["git"] = _git_document(git)
+            acquisition = _revision(extension_payload)
             extensions_by_namespace[namespace] = (
                 {
                     "namespace": namespace,
@@ -323,6 +362,61 @@ def _write_multi_contract(
     return manifest_path, lock_path
 
 
+def _build_git_workspace(
+    tmp_path: Path,
+    specs: tuple[tuple[str, str, bool], ...],
+) -> tuple[Path, dict[str, GitLock]]:
+    """Build a parent repository with valid declaration submodules."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _git(workspace, "init", "--object-format=sha1", "-b", "main")
+    _git(workspace, "config", "user.name", "Test")
+    _git(workspace, "config", "user.email", "test@example.invalid")
+    for namespace, root, has_extension in specs:
+        seed = tmp_path / f"seed-{namespace}"
+        seed.mkdir()
+        _git(seed, "init", "--object-format=sha1", "-b", "main")
+        _git(seed, "config", "user.name", "Test")
+        _git(seed, "config", "user.email", "test@example.invalid")
+        declarations = seed / "declarations"
+        declarations.mkdir()
+        facet = f"{namespace}.enabled" if has_extension else "artifact.created"
+        (declarations / "process-core.yaml").write_bytes(
+            _declaration_source(namespace, facet=facet)
+        )
+        if has_extension:
+            (declarations / "context-facets.yaml").write_bytes(_facet_source(namespace))
+        _git(seed, "add", ".")
+        _git(seed, "commit", "-m", "seed declarations")
+        _git(
+            workspace,
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "--name",
+            root,
+            str(seed),
+            root,
+        )
+    _git(workspace, "commit", "-m", "register declaration submodules")
+    gitmodules_sha256 = _digest((workspace / ".gitmodules").read_bytes())
+    locks: dict[str, GitLock] = {}
+    for namespace, root, _has_extension in specs:
+        commit = _git(workspace / root, "rev-parse", "HEAD").decode().strip()
+        locks[namespace] = GitLock(
+            object_format="sha1",
+            commit=commit,
+            gitmodules_path=".gitmodules",
+            gitmodules_sha256=gitmodules_sha256,
+            registered_name=root,
+            registered_path=root,
+            parent_index_mode="160000",
+            parent_index_gitlink=commit,
+        )
+    return workspace, locks
+
+
 @pytest.mark.parametrize(
     ("kind", "root"),
     [
@@ -330,7 +424,7 @@ def _write_multi_contract(
         (AcquisitionKind.VENDORED, "vendor/oikos"),
     ],
 )
-def test_workspace_vendored_stage_retains_one_verified_contract(
+def test_external_stage_retains_one_verified_contract(
     tmp_path: Path,
     kind: AcquisitionKind,
     root: str,
@@ -338,12 +432,12 @@ def test_workspace_vendored_stage_retains_one_verified_contract(
     manifest_path, lock_path = _write_contract(tmp_path, kind=kind, root=root)
     baseline = len(os.listdir("/dev/fd"))
 
-    stage = _acquire_workspace_vendored_stage_from_path(
+    stage = _acquire_external_stage_from_path(
         str(tmp_path),
         manifest_path,
         lock_path,
     )
-    state = _issued_workspace_vendored_stage_state(stage)
+    state = _issued_external_stage_state(stage)
 
     assert len(os.listdir("/dev/fd")) == baseline
     assert state.composite.authority_for("oikos.enabled").id == ("oikos/context-facets")
@@ -354,7 +448,7 @@ def test_workspace_vendored_stage_retains_one_verified_contract(
     with pytest.raises(TypeError, match="cannot be serialized"):
         pickle.dumps(stage)
     with pytest.raises(TypeError, match="must be issued"):
-        _WorkspaceVendoredAcquisitionStage()
+        _ExternalAcquisitionStage()
 
 
 def test_workspace_path_may_be_relative_dot(
@@ -364,13 +458,13 @@ def test_workspace_path_may_be_relative_dot(
     manifest_path, lock_path = _write_contract(tmp_path)
     monkeypatch.chdir(tmp_path)
 
-    stage = _acquire_workspace_vendored_stage_from_path(
+    stage = _acquire_external_stage_from_path(
         ".",
         manifest_path,
         lock_path,
     )
 
-    assert len(_issued_workspace_vendored_stage_state(stage).declarations) == 6
+    assert len(_issued_external_stage_state(stage).declarations) == 6
 
 
 def test_zero_extensions_preserves_the_packaged_composite(
@@ -382,10 +476,8 @@ def test_zero_extensions_preserves_the_packaged_composite(
         extension_order=(),
     )
 
-    stage = _acquire_workspace_vendored_stage_from_path(
-        str(tmp_path), manifest_path, lock_path
-    )
-    state = _issued_workspace_vendored_stage_state(stage)
+    stage = _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
+    state = _issued_external_stage_state(stage)
 
     assert state.composite.authority_for("artifact.created").id == (
         "eutaxis/context-facets"
@@ -407,10 +499,8 @@ def test_source_and_extension_orders_remain_independent(
         extension_order=("hermeneia", "oikos"),
     )
 
-    stage = _acquire_workspace_vendored_stage_from_path(
-        str(tmp_path), manifest_path, lock_path
-    )
-    state = _issued_workspace_vendored_stage_state(stage)
+    stage = _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
+    state = _issued_external_stage_state(stage)
 
     assert tuple(
         state.composite.authority_for(facet).id
@@ -448,7 +538,7 @@ def test_global_phase_order_establishes_roots_facets_reads_and_verification(
     monkeypatch.setattr(RetainedDirectory, "read_authoritative", recording_read)
     monkeypatch.setattr(RetainedDirectory, "verify", recording_verify)
 
-    _acquire_workspace_vendored_stage_from_path(str(tmp_path), manifest_path, lock_path)
+    _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
 
     base_read = events.index(("read", "registries/context-facets-v1.yaml"))
     assert ("open", "data") in events[:base_read]
@@ -467,7 +557,7 @@ def test_provisional_composite_is_limited_to_the_parsing_view(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     manifest_path, lock_path = _write_contract(tmp_path)
-    original_parse = workspace_module._parse_all_declarations
+    original_parse = acquisition_module._parse_all_declarations
     checked = False
 
     def checking_parse(packaged, sources, external, parsing_view):
@@ -479,17 +569,15 @@ def test_provisional_composite_is_limited_to_the_parsing_view(
         return original_parse(packaged, sources, external, parsing_view)
 
     monkeypatch.setattr(
-        workspace_module,
+        acquisition_module,
         "_parse_all_declarations",
         checking_parse,
     )
 
-    stage = _acquire_workspace_vendored_stage_from_path(
-        str(tmp_path), manifest_path, lock_path
-    )
+    stage = _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
 
     assert checked
-    _issued_workspace_vendored_stage_state(stage).composite.require_authority()
+    _issued_external_stage_state(stage).composite.require_authority()
 
 
 def test_manifest_mutation_during_later_reads_fails_final_verification(
@@ -511,9 +599,7 @@ def test_manifest_mutation_during_later_reads_fails_final_verification(
     monkeypatch.setattr(RetainedDirectory, "read_authoritative", mutating_read)
 
     with pytest.raises(ByteCarrierError, match="verification"):
-        _acquire_workspace_vendored_stage_from_path(
-            str(tmp_path), manifest_path, lock_path
-        )
+        _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
 
 
 def test_replacing_vendored_root_during_reads_fails_final_verification(
@@ -542,30 +628,26 @@ def test_replacing_vendored_root_during_reads_fails_final_verification(
     monkeypatch.setattr(RetainedDirectory, "read_authoritative", replacing_read)
 
     with pytest.raises(ByteCarrierError, match="root identity changed"):
-        _acquire_workspace_vendored_stage_from_path(
-            str(tmp_path), manifest_path, lock_path
-        )
+        _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
 
 
 def test_stage_authority_rejects_external_registry_mutation(tmp_path: Path) -> None:
     manifest_path, lock_path = _write_contract(tmp_path)
-    stage = _acquire_workspace_vendored_stage_from_path(
-        str(tmp_path), manifest_path, lock_path
-    )
-    state = _issued_workspace_vendored_stage_state(stage)
+    stage = _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
+    state = _issued_external_stage_state(stage)
     external = state.composite.authority_for("oikos.enabled")
     object.__setattr__(external, "source_revision", "changed")
 
     with pytest.raises(AcquisitionContractError, match="registry state changed"):
-        _issued_workspace_vendored_stage_state(stage)
+        _issued_external_stage_state(stage)
 
 
 def test_stage_rejects_forgery_and_is_not_public() -> None:
-    assert not hasattr(declarations_api, "WorkspaceVendoredAcquisitionStage")
-    assert not hasattr(declarations_api, "acquire_workspace_vendored_stage")
-    forged = object.__new__(_WorkspaceVendoredAcquisitionStage)
+    assert not hasattr(declarations_api, "ExternalAcquisitionStage")
+    assert not hasattr(declarations_api, "acquire_external_stage")
+    forged = object.__new__(_ExternalAcquisitionStage)
     with pytest.raises(AcquisitionContractError, match="not issued"):
-        _issued_workspace_vendored_stage_state(forged)
+        _issued_external_stage_state(forged)
 
 
 def test_interrupted_composite_publication_retires_every_authority(
@@ -591,9 +673,7 @@ def test_interrupted_composite_publication_retires_every_authority(
     monkeypatch.setattr(composite_module._COMPOSITE_AUTHORITIES, "issue", interrupt)
 
     with pytest.raises(KeyboardInterrupt, match="publication interruption"):
-        _acquire_workspace_vendored_stage_from_path(
-            str(tmp_path), manifest_path, lock_path
-        )
+        _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
 
     assert len(attempted_composites) == 1
     assert len(attempted_provenances) == 1
@@ -611,8 +691,8 @@ def test_interrupted_stage_publication_retires_every_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     manifest_path, lock_path = _write_contract(tmp_path)
-    original_issue = workspace_module._STAGE_AUTHORITIES.issue
-    attempted: list[_WorkspaceVendoredAcquisitionStage] = []
+    original_issue = acquisition_module._STAGE_AUTHORITIES.issue
+    attempted: list[_ExternalAcquisitionStage] = []
     attempted_composites = []
     attempted_provenances = []
     attempted_evidence = []
@@ -626,17 +706,15 @@ def test_interrupted_stage_publication_retires_every_authority(
         attempted_evidence.append(state.evidence)
         raise KeyboardInterrupt("injected stage publication interruption")
 
-    monkeypatch.setattr(workspace_module._STAGE_AUTHORITIES, "issue", interrupt)
+    monkeypatch.setattr(acquisition_module._STAGE_AUTHORITIES, "issue", interrupt)
     baseline = len(os.listdir("/dev/fd"))
 
     with pytest.raises(KeyboardInterrupt, match="publication interruption"):
-        _acquire_workspace_vendored_stage_from_path(
-            str(tmp_path), manifest_path, lock_path
-        )
+        _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
 
     assert len(os.listdir("/dev/fd")) == baseline
     assert len(attempted) == 1
-    assert workspace_module._STAGE_AUTHORITIES.state(attempted[0]) is None
+    assert acquisition_module._STAGE_AUTHORITIES.state(attempted[0]) is None
     assert (
         composite_module._COMPOSITE_AUTHORITIES.state(attempted_composites[0]) is None
     )
@@ -647,24 +725,122 @@ def test_interrupted_stage_publication_retires_every_authority(
     assert _EVIDENCE_AUTHORITIES.state(attempted_evidence[0]) is None
 
 
-def test_git_contract_fails_before_external_root_open(
-    tmp_path: Path,
-) -> None:
-    manifest = _contract_manifest(kind="git-submodule", root="missing/source")
-    lock = _contract_lock(kind="git-submodule", root="missing/source")
-    manifest_path = "acquisition.yaml"
-    lock_path = "acquisition.lock.json"
-    (tmp_path / manifest_path).write_text(
-        yaml.safe_dump(manifest, sort_keys=False),
-        encoding="utf-8",
+def test_git_stage_retains_verified_transport_evidence(tmp_path: Path) -> None:
+    workspace, git_locks = _build_git_workspace(
+        tmp_path,
+        (("oikos", "vendor/oikos", True),),
     )
-    (tmp_path / lock_path).write_bytes(jcs_bytes(lock))
+    manifest_path, lock_path = _write_contract(
+        workspace,
+        kind=AcquisitionKind.GIT_SUBMODULE,
+        root="vendor/oikos",
+        git=git_locks["oikos"],
+    )
     baseline = len(os.listdir("/dev/fd"))
 
-    with pytest.raises(AcquisitionContractError, match="Git proof") as raised:
-        _acquire_workspace_vendored_stage_from_path(
-            str(tmp_path), manifest_path, lock_path
+    stage = _acquire_external_stage_from_path(str(workspace), manifest_path, lock_path)
+    state = _issued_external_stage_state(stage)
+    evidence = _EVIDENCE_AUTHORITIES.state(state.evidence)
+
+    assert len(os.listdir("/dev/fd")) == baseline
+    assert type(evidence) is _FinalEvidenceState
+    git_evidence = evidence.sources[0].git_evidence
+    git_state = _issued_git_transport_state(git_evidence)
+    assert git_state.source_position == 0
+    assert git_state.acquisition_manifest is evidence.manifest
+    assert git_state.acquisition_lock is evidence.lock
+
+
+def test_mixed_transports_preserve_source_and_extension_orders(tmp_path: Path) -> None:
+    workspace, git_locks = _build_git_workspace(
+        tmp_path,
+        (("gitlib", "vendor/gitlib", True),),
+    )
+    manifest_path, lock_path = _write_multi_contract(
+        workspace,
+        specs=(
+            ("gitlib", AcquisitionKind.GIT_SUBMODULE, "vendor/gitlib"),
+            ("local", AcquisitionKind.VENDORED, "vendor/local"),
+        ),
+        extension_order=("local", "gitlib"),
+        git_by_namespace=git_locks,
+    )
+
+    stage = _acquire_external_stage_from_path(str(workspace), manifest_path, lock_path)
+    state = _issued_external_stage_state(stage)
+    evidence = _EVIDENCE_AUTHORITIES.state(state.evidence)
+
+    assert type(evidence) is _FinalEvidenceState
+    assert tuple(item.declaration.id for item in state.declarations[-2:]) == (
+        "gitlib/reader-purpose",
+        "local/reader-purpose",
+    )
+    assert tuple(
+        state.composite.authority_for(f"{namespace}.enabled").owner
+        for namespace in ("local", "gitlib")
+    ) == ("local", "gitlib")
+    assert evidence.sources[0].git_evidence is not None
+    assert evidence.sources[1].git_evidence is None
+
+
+def test_multiple_git_sources_retain_independent_proofs(tmp_path: Path) -> None:
+    workspace, git_locks = _build_git_workspace(
+        tmp_path,
+        (
+            ("alpha", "vendor/alpha", True),
+            ("beta", "vendor/beta", True),
+        ),
+    )
+    manifest_path, lock_path = _write_multi_contract(
+        workspace,
+        specs=(
+            ("alpha", AcquisitionKind.GIT_SUBMODULE, "vendor/alpha"),
+            ("beta", AcquisitionKind.GIT_SUBMODULE, "vendor/beta"),
+        ),
+        extension_order=("beta", "alpha"),
+        git_by_namespace=git_locks,
+    )
+
+    state = _issued_external_stage_state(
+        _acquire_external_stage_from_path(str(workspace), manifest_path, lock_path)
+    )
+    evidence = _EVIDENCE_AUTHORITIES.state(state.evidence)
+
+    assert type(evidence) is _FinalEvidenceState
+    proofs = tuple(source.git_evidence for source in evidence.sources)
+    assert all(proof is not None for proof in proofs)
+    assert tuple(
+        _issued_git_transport_state(proof).source_position for proof in proofs
+    ) == (
+        0,
+        1,
+    )
+
+
+def test_git_carrier_splicing_fails_and_closes_every_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace, git_locks = _build_git_workspace(
+        tmp_path,
+        (("oikos", "vendor/oikos", True),),
+    )
+    manifest_path, lock_path = _write_contract(
+        workspace,
+        kind=AcquisitionKind.GIT_SUBMODULE,
+        root="vendor/oikos",
+        git=git_locks["oikos"],
+    )
+
+    def splice(sessions, extensions, declarations):
+        sessions[0].bind_worktree_carriers(
+            (declarations[0][0], extensions[0].authoritative)
         )
 
-    assert raised.value.location == "$.sources[0].kind"
+    monkeypatch.setattr(acquisition_module, "_bind_git_carriers", splice)
+    baseline = len(os.listdir("/dev/fd"))
+
+    with pytest.raises(AcquisitionContractError, match="worktree carrier differs"):
+        _acquire_external_stage_from_path(str(workspace), manifest_path, lock_path)
+
     assert len(os.listdir("/dev/fd")) == baseline

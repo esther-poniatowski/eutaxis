@@ -25,10 +25,10 @@ from .packaged_source import (
     acquire_packaged_internal_source,
     _issued_packaged_facet_state,
 )
-from ._workspace_evidence import (
-    _WorkspaceVendoredEvidence,
-    _issued_workspace_vendored_facet_state,
-    _provisional_workspace_vendored_facet_state,
+from ._external_evidence import (
+    _ExternalAcquisitionEvidence,
+    _issued_external_facet_state,
+    _provisional_external_facet_state,
 )
 
 COMPOSITE_FACET_REGISTRY_ID = "composite/context-facets-v1"
@@ -143,10 +143,10 @@ class _PackagedProvenanceState(NamedTuple):
     registry: FacetRegistry
 
 
-class _WorkspaceVendoredProvenanceState(NamedTuple):
+class _ExternalProvenanceState(NamedTuple):
     """Bind external provenance to one complete correlated evidence record."""
 
-    evidence: _WorkspaceVendoredEvidence
+    evidence: _ExternalAcquisitionEvidence
 
 
 class _CompositeAuthorityState(NamedTuple):
@@ -245,23 +245,23 @@ def _issue_packaged_provenance(
         raise
 
 
-def _issue_workspace_vendored_composite(
-    evidence: _WorkspaceVendoredEvidence,
+def _issue_external_composite(
+    evidence: _ExternalAcquisitionEvidence,
 ) -> CompositeFacetRegistry:
-    """Issue a composite only from one complete workspace/vendored record."""
-    provenance = _issue_workspace_vendored_provenance(evidence)
+    """Issue a composite only from one complete external acquisition record."""
+    provenance = _issue_external_provenance(evidence)
     return _issue_composite_from_provenance(provenance)
 
 
-def _issue_workspace_vendored_provenance(
-    evidence: _WorkspaceVendoredEvidence,
+def _issue_external_provenance(
+    evidence: _ExternalAcquisitionEvidence,
 ) -> _FacetCompositeProvenance:
     """Bind external composite selection to exact issued source evidence."""
-    if type(evidence) is not _WorkspaceVendoredEvidence:
-        _fail("$.facet-registry", "workspace/vendored evidence has wrong type")
-    _provisional_workspace_vendored_facet_state(evidence)
+    if type(evidence) is not _ExternalAcquisitionEvidence:
+        _fail("$.facet-registry", "external acquisition evidence has wrong type")
+    _provisional_external_facet_state(evidence)
     result = object.__new__(_FacetCompositeProvenance)
-    state = _WorkspaceVendoredProvenanceState(evidence)
+    state = _ExternalProvenanceState(evidence)
     try:
         _FACET_PROVENANCE_AUTHORITIES.issue(result, state)
         return result
@@ -283,10 +283,10 @@ def _issued_provenance_state(
     if type(provenance) is not _FacetCompositeProvenance:
         _fail("$.facet-registry", "facet composite provenance is not issued here")
     state = _FACET_PROVENANCE_AUTHORITIES.state(provenance)
-    if type(state) is _WorkspaceVendoredProvenanceState:
+    if type(state) is _ExternalProvenanceState:
         if allow_provisional:
-            return _provisional_workspace_vendored_facet_state(state.evidence)
-        return _issued_workspace_vendored_facet_state(state.evidence)
+            return _provisional_external_facet_state(state.evidence)
+        return _issued_external_facet_state(state.evidence)
     if type(state) is not _PackagedProvenanceState:
         _fail("$.facet-registry", "facet composite provenance is not issued here")
     _evidence, current_lock, current_registry = _issued_packaged_facet_state(

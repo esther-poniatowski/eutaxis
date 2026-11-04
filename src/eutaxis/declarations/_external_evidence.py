@@ -1,4 +1,4 @@
-"""Authenticate private workspace and vendored acquisition evidence."""
+"""Authenticate private external acquisition evidence."""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ from .byte_carriers import (
 from .exceptions import AcquisitionContractError
 from .facets import FacetRegistry
 from .loader import LoadedDeclarationSource
+from .git_transport import _GitTransportEvidence, _issued_git_transport_state
 from .packaged_source import (
     PackagedInternalSource,
     _PackagedFacetRead,
@@ -67,6 +68,7 @@ class _FinalExternalSource(NamedTuple):
     root_identity: DirectoryIdentity
     evidence: tuple[VerifiedByteCarrier, ...]
     declarations: tuple[LoadedDeclarationSource, ...]
+    git_evidence: _GitTransportEvidence | None
 
 
 class _FinalFacetExtension(NamedTuple):
@@ -114,41 +116,28 @@ class _FinalEvidenceState(NamedTuple):
     extensions: tuple[_FinalFacetExtension, ...]
 
 
-class _WorkspaceVendoredEvidence:
-    """Authenticate one complete workspace/vendored contract across phases."""
+class _ExternalAcquisitionEvidence:
+    """Authenticate one complete external acquisition contract across phases."""
 
     __slots__ = ("__weakref__",)
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
-        raise TypeError("workspace/vendored evidence must be issued")
+        raise TypeError("external acquisition evidence must be issued")
 
     def __copy__(self) -> NoReturn:
-        raise TypeError("workspace/vendored evidence cannot be copied")
+        raise TypeError("external acquisition evidence cannot be copied")
 
     def __deepcopy__(self, _memo: object) -> NoReturn:
-        raise TypeError("workspace/vendored evidence cannot be copied")
+        raise TypeError("external acquisition evidence cannot be copied")
 
     def __reduce__(self) -> NoReturn:
-        raise TypeError("workspace/vendored evidence cannot be serialized")
+        raise TypeError("external acquisition evidence cannot be serialized")
 
     def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
-        raise TypeError("workspace/vendored evidence cannot be serialized")
+        raise TypeError("external acquisition evidence cannot be serialized")
 
 
 _EVIDENCE_AUTHORITIES: IdentityAuthorityStore[object] = IdentityAuthorityStore()
-
-
-def _require_non_git_contract(manifest: AcquisitionManifest) -> None:
-    """Reject a Git entry before the restricted stage opens source roots."""
-    for index, source in enumerate(manifest.sources):
-        if source.kind is AcquisitionKind.GIT_SUBMODULE:
-            _fail(f"$.sources[{index}].kind", "Git proof is not implemented")
-    for index, extension in enumerate(manifest.facet_extensions):
-        if extension.kind is AcquisitionKind.GIT_SUBMODULE:
-            _fail(
-                f"$.facet-extensions[{index}].kind",
-                "Git proof is not implemented",
-            )
 
 
 def _issue_provisional_evidence(
@@ -161,9 +150,9 @@ def _issue_provisional_evidence(
     packaged_facet: _PackagedFacetRead,
     sources: tuple[_OpenExternalSource, ...],
     extensions: tuple[_FacetExtensionRead, ...],
-) -> _WorkspaceVendoredEvidence:
+) -> _ExternalAcquisitionEvidence:
     """Issue the complete correlated source record used by the composite."""
-    result = object.__new__(_WorkspaceVendoredEvidence)
+    result = object.__new__(_ExternalAcquisitionEvidence)
     state = _ProvisionalEvidenceState(
         manifest_authoritative,
         lock_authoritative,
@@ -180,7 +169,7 @@ def _issue_provisional_evidence(
     )
     try:
         _EVIDENCE_AUTHORITIES.issue(result, state)
-        _provisional_workspace_vendored_facet_state(result)
+        _provisional_external_facet_state(result)
         return result
     except BaseException:
         _EVIDENCE_AUTHORITIES.retire(result)
@@ -188,7 +177,7 @@ def _issue_provisional_evidence(
 
 
 def _finalize_evidence(
-    evidence: _WorkspaceVendoredEvidence,
+    evidence: _ExternalAcquisitionEvidence,
     manifest_evidence: VerifiedByteCarrier,
     lock_evidence: VerifiedByteCarrier,
     packaged: PackagedInternalSource,
@@ -197,14 +186,17 @@ def _finalize_evidence(
     extension_evidence: tuple[VerifiedByteCarrier, ...],
     declaration_evidence: tuple[tuple[VerifiedByteCarrier, ...], ...],
     external_declarations: tuple[LoadedDeclarationSource, ...],
+    git_evidence: tuple[_GitTransportEvidence | None, ...],
 ) -> None:
     """Replace provisional state with complete verified source evidence."""
     provisional = _EVIDENCE_AUTHORITIES.state(evidence)
     if type(provisional) is not _ProvisionalEvidenceState:
-        _fail("$", "workspace/vendored evidence is not provisional")
+        _fail("$", "external acquisition evidence is not provisional")
     declaration_offset = 0
     final_sources: list[_FinalExternalSource] = []
-    for source, verified in zip(sources, declaration_evidence, strict=True):
+    for source, verified, git_proof in zip(
+        sources, declaration_evidence, git_evidence, strict=True
+    ):
         count = len(verified)
         loaded = external_declarations[declaration_offset : declaration_offset + count]
         declaration_offset += count
@@ -217,6 +209,7 @@ def _finalize_evidence(
                 source.root_identity,
                 verified,
                 loaded,
+                git_proof,
             )
         )
     final_extensions = tuple(
@@ -245,15 +238,15 @@ def _finalize_evidence(
         final_extensions,
     )
     _EVIDENCE_AUTHORITIES.issue(evidence, final)
-    _issued_workspace_vendored_facet_state(evidence)
+    _issued_external_facet_state(evidence)
 
 
-def _retire_workspace_vendored_evidence(evidence: object) -> None:
+def _retire_external_evidence(evidence: object) -> None:
     """Retire one provisional or final evidence authority."""
     _EVIDENCE_AUTHORITIES.retire(evidence)
 
 
-def _issued_workspace_vendored_facet_state(
+def _issued_external_facet_state(
     evidence: object,
 ) -> tuple[
     tuple[FacetRegistry, ...],
@@ -261,14 +254,14 @@ def _issued_workspace_vendored_facet_state(
     str,
 ]:
     """Authenticate finalized evidence and return its facet constituents."""
-    if type(evidence) is not _WorkspaceVendoredEvidence:
-        _fail("$.facet-registry", "workspace/vendored evidence is not issued here")
+    if type(evidence) is not _ExternalAcquisitionEvidence:
+        _fail("$.facet-registry", "external acquisition evidence is not issued here")
     if type(_EVIDENCE_AUTHORITIES.state(evidence)) is not _FinalEvidenceState:
-        _fail("$.facet-registry", "workspace/vendored evidence is not final")
-    return _provisional_workspace_vendored_facet_state(evidence)
+        _fail("$.facet-registry", "external acquisition evidence is not final")
+    return _provisional_external_facet_state(evidence)
 
 
-def _provisional_workspace_vendored_facet_state(
+def _provisional_external_facet_state(
     evidence: object,
 ) -> tuple[
     tuple[FacetRegistry, ...],
@@ -276,8 +269,8 @@ def _provisional_workspace_vendored_facet_state(
     str,
 ]:
     """Authenticate correlated facet state during or after acquisition."""
-    if type(evidence) is not _WorkspaceVendoredEvidence:
-        _fail("$.facet-registry", "workspace/vendored evidence is not issued here")
+    if type(evidence) is not _ExternalAcquisitionEvidence:
+        _fail("$.facet-registry", "external acquisition evidence is not issued here")
     state = _EVIDENCE_AUTHORITIES.state(evidence)
     if type(state) is _ProvisionalEvidenceState:
         _validate_contract_state(
@@ -332,7 +325,7 @@ def _provisional_workspace_vendored_facet_state(
             state.packaged
         )
         return _final_facet_values(state, base_registry, base_lock)
-    _fail("$.facet-registry", "workspace/vendored evidence is not issued here")
+    _fail("$.facet-registry", "external acquisition evidence is not issued here")
 
 
 def _validate_provisional_correlations(state: _ProvisionalEvidenceState) -> None:
@@ -375,6 +368,18 @@ def _validate_final_correlations(state: _FinalEvidenceState) -> None:
             or source.lock is not state.lock.sources[position]
         ):
             _fail(f"$.sources[{position}]", "source state differs from contract")
+        if source.manifest.kind is AcquisitionKind.GIT_SUBMODULE:
+            if source.git_evidence is None:
+                _fail(f"$.sources[{position}].git", "Git proof is missing")
+            git_state = _issued_git_transport_state(source.git_evidence)
+            if (
+                git_state.acquisition_manifest is not state.manifest
+                or git_state.acquisition_lock is not state.lock
+                or git_state.source_position != position
+            ):
+                _fail(f"$.sources[{position}].git", "Git proof differs from contract")
+        elif source.git_evidence is not None:
+            _fail(f"$.sources[{position}].git", "non-Git source has Git proof")
     for position, extension in enumerate(state.extensions):
         owner = state.sources[extension.source_index]
         if (
@@ -473,16 +478,15 @@ def _validate_contract_state(
     if identity_value_state(lock) != lock_state:
         _fail("$.lock", "lock state changed")
     validate_acquisition_contract(manifest, lock)
-    _require_non_git_contract(manifest)
 
 
 def _validate_final_declaration_evidence(
-    evidence: _WorkspaceVendoredEvidence,
+    evidence: _ExternalAcquisitionEvidence,
 ) -> None:
     """Authenticate every declaration carrier retained by final evidence."""
     state = _EVIDENCE_AUTHORITIES.state(evidence)
     if type(state) is not _FinalEvidenceState:
-        _fail("$", "workspace/vendored evidence is not final")
+        _fail("$", "external acquisition evidence is not final")
     if (
         state.packaged.content_revision != state.lock.internal_source.content_revision
         or state.packaged.acquisition_revision
