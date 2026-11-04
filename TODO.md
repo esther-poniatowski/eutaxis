@@ -18,7 +18,8 @@ The following work is complete.
 
 ## Priority
 
-- [ ] **Implement the structured declaration system.** Follow the [staged implementation plan](docs/internals/structured-declaration-system-plan.md): schema and fixtures; loader and catalog; resolution; enforcement partition; renderers; pilot. Do not begin the bulk Oikos migration or its directory rename before the pilot gate passes.
+- [ ] **Complete the external-source path and run the Oikos pilot.** Close every pre-pilot gate in the [staged implementation plan](docs/internals/structured-declaration-system-plan.md), then run the reversible pilot.
+- [ ] **Convert additional Oikos sources only after the pilot.** Do not rename the source directories before the pilot and its rollback gate pass.
 - [ ] Review the archived sources and decide which content to include, which can be deleted safely.
 - [ ] Implement a functionality to cleanup config files. This involves:
   - detecting the configs in Codex (TOML) and Claude code (JSON) that violate the recommended patterns,

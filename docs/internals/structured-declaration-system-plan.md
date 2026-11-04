@@ -157,7 +157,12 @@ carrier mutation.
 - Procedures are a declaration kind, separate from the three rule axes.
 - Semantic resolution, deterministic artifact composition, and host scope precedence are separate layers.
 - External declaration identity and offline acquisition now follow the [accepted namespace and acquisition contract](../adr/external-declaration-identity-and-acquisition.md).
-- The external pilot remains blocked on implementation of that contract and its migration, semantic-diff, and rollback tooling.
+- The external pilot remains blocked until Eutaxis:
+  - issues the public acquisition result;
+  - writes the persisted catalog with `index-revision: 2`;
+  - generates and validates canonical locks through the general command;
+  - proves semantic comparison and rollback through general commands; and
+  - emits the selected query packet and consumer artifacts.
 - SQLite remains conditional on measured JSON-index performance.
 
 ## Work sequence
@@ -299,8 +304,10 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Build the combined registry from the issued stage and apply the existing cross-record contracts.
 - [ ] Issue one public acquisition result that binds the combined registry to every retained acquisition record.
 - [ ] Move the persisted catalog to `index-revision: 2`.
-- [ ] Publish migration tooling, semantic-diff tooling, and rollback before converting an external source.
-- [ ] Only then pilot one coherent Oikos rule set and one procedure.
+- [ ] Publish lock generation, semantic-diff tooling, and rollback before converting an external source.
+- [ ] Complete the query, cumulative Markdown, and compact Skill projections selected by the pilot.
+- [ ] Pilot one coherent Oikos rule set and one procedure through the complete external-source path.
+- [ ] Convert additional sources only after the pilot passes.
 
 Each implementation item closes only after an independent adversarial review,
 repair of every high- and medium-severity finding, targeted verification, and a
@@ -591,7 +598,10 @@ retain the combined registry together with every source and transport record.
 Only that issued result can carry the combined registry into a semantic consumer.
 The result must also define portable source coordinates.
 The catalog remains at `index-revision: 1` until those coordinates exist.
-Migration commands follow the catalog change.
+Before the pilot converts an Oikos source, Eutaxis must write the persisted
+catalog with `index-revision: 2`. Eutaxis must also verify the general conversion
+commands. The pilot retains the current reviewed output as its golden artifact
+and rollback target.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 
