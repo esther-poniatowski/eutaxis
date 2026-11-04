@@ -27,6 +27,7 @@ from pathlib import Path
 from ..exceptions import CommandError
 from ..models import ArtifactFile, CommandSource
 from ..names import is_skill_name
+from . import sibling_artifact_link
 
 
 @dataclass(frozen=True)
@@ -46,9 +47,7 @@ class ClaudeCodeAdapter:
         root = self.skills_root(scope, home=home, project_root=project_root)
         return root / command_name
 
-    def skills_root(
-        self, scope: str, *, home: Path, project_root: Path
-    ) -> Path:
+    def skills_root(self, scope: str, *, home: Path, project_root: Path) -> Path:
         if scope == "user":
             return home / ".claude" / "skills"
         if scope == "project":
@@ -83,4 +82,20 @@ class ClaudeCodeAdapter:
         return tuple(
             ArtifactFile(relative_path=path, content=content)
             for path, content in passthrough.files.items()
+        )
+
+    def relative_artifact_link(
+        self,
+        *,
+        from_artifact: str,
+        from_file: str,
+        to_artifact: str,
+        to_file: str,
+    ) -> str:
+        """Return an installed relative link between Claude Skill files."""
+        return sibling_artifact_link(
+            from_artifact=from_artifact,
+            from_file=from_file,
+            to_artifact=to_artifact,
+            to_file=to_file,
         )

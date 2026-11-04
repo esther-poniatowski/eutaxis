@@ -7,6 +7,7 @@ from typing import Any
 
 import yaml
 
+from ..names import is_safe_slug
 from .exceptions import ConfigurationError
 from .loading_units import validate_loading_units
 from .markdown import parse_frontmatter
@@ -53,9 +54,7 @@ class ConfigLoader:
             common_sources=self._parse_sources(raw.get("common_sources", [])),
             agents=self._parse_agents(raw.get("agents", [])),
             task_modules=self._parse_task_modules(raw.get("task_modules", [])),
-            task_modules_heading=str(
-                raw.get("task_modules_heading", "Task modules")
-            ),
+            task_modules_heading=str(raw.get("task_modules_heading", "Task modules")),
             task_modules_intro=str(raw.get("task_modules_intro", "")),
             task_modules_router_enabled=self._as_bool(
                 raw.get("task_modules_router_enabled", True),
@@ -71,9 +70,7 @@ class ConfigLoader:
             instruction_chains=self._parse_instruction_chains(
                 raw.get("instruction_chains", [])
             ),
-            reference_docs=self._parse_reference_docs(
-                raw.get("reference_docs", [])
-            ),
+            reference_docs=self._parse_reference_docs(raw.get("reference_docs", [])),
             reference_docs_heading=str(
                 raw.get("reference_docs_heading", "Reference docs")
             ),
@@ -81,14 +78,10 @@ class ConfigLoader:
             rule_index_enabled=self._as_bool(
                 raw.get("rule_index_enabled", False), "rule_index_enabled"
             ),
-            rule_index_heading=str(
-                raw.get("rule_index_heading", "Rule index")
-            ),
+            rule_index_heading=str(raw.get("rule_index_heading", "Rule index")),
             rule_index_intro=str(raw.get("rule_index_intro", "")),
             rule_index_pointer=str(raw.get("rule_index_pointer", "")),
-            rule_index_target=self._parse_optional_target(
-                raw.get("rule_index_target")
-            ),
+            rule_index_target=self._parse_optional_target(raw.get("rule_index_target")),
             default_max_bytes=self._as_optional_positive_int(
                 raw.get("max_bytes"), "max_bytes"
             ),
@@ -157,7 +150,6 @@ class ConfigLoader:
 
         agents: list[AgentConfig] = []
         seen: set[str] = set()
-
         for raw_agent in raw_agents:
             agent = self._parse_agent(raw_agent)
             if agent.name in seen:
@@ -180,9 +172,7 @@ class ConfigLoader:
             target=self._parse_target(raw["target"]),
             sources=self._parse_sources(raw.get("sources", [])),
             enabled=self._as_bool(raw.get("enabled", True), "enabled"),
-            max_bytes=self._as_optional_positive_int(
-                raw.get("max_bytes"), "max_bytes"
-            ),
+            max_bytes=self._as_optional_positive_int(raw.get("max_bytes"), "max_bytes"),
         )
 
     def _parse_optional_target(self, raw: Any) -> TargetConfig | None:
@@ -216,18 +206,14 @@ class ConfigLoader:
         for raw in raw_modules:
             module = self._parse_task_module(raw)
             if module.id in seen:
-                raise ConfigurationError(
-                    f"Duplicate task_module id: {module.id}"
-                )
+                raise ConfigurationError(f"Duplicate task_module id: {module.id}")
             seen.add(module.id)
             modules.append(module)
         return modules
 
     def _parse_task_module(self, raw: Any) -> TaskModule:
         if not isinstance(raw, dict):
-            raise ConfigurationError(
-                f"Invalid task_module specification: {raw!r}"
-            )
+            raise ConfigurationError(f"Invalid task_module specification: {raw!r}")
         for required in ("id", "title", "path", "trigger"):
             if required not in raw:
                 raise ConfigurationError(
@@ -243,39 +229,37 @@ class ConfigLoader:
             description=str(description) if description is not None else None,
         )
 
-    def _parse_skill_loading_units(
-        self, raw_units: Any
-    ) -> list[SkillLoadingUnit]:
+    def _parse_skill_loading_units(self, raw_units: Any) -> list[SkillLoadingUnit]:
         if raw_units is None:
             return []
         if not isinstance(raw_units, list):
             raise ConfigurationError("skill_loading_units must be a list")
 
         loading_units: list[SkillLoadingUnit] = []
-        seen: set[str] = set()
+        seen_casefolded: set[str] = set()
         for raw in raw_units:
             if not isinstance(raw, dict):
                 raise ConfigurationError(f"Invalid skill loading unit: {raw!r}")
             for required in ("name", "max_bytes"):
                 if required not in raw:
                     raise ConfigurationError(
-                        "skill_loading_units entries must specify "
-                        f"'{required}'"
+                        "skill_loading_units entries must specify " f"'{required}'"
                     )
             name = str(raw["name"])
-            if name in seen:
+            folded_name = name.casefold()
+            if folded_name in seen_casefolded:
+                raise ConfigurationError(f"Duplicate skill loading unit name: {name}")
+            if not is_safe_slug(name):
                 raise ConfigurationError(
-                    f"Duplicate skill loading unit name: {name}"
+                    f"Invalid skill loading unit name {name!r}; expected a safe "
+                    "lowercase slug"
                 )
-            seen.add(name)
-            members = self._parse_skill_loading_members(
-                raw.get("members", []), name
-            )
+            seen_casefolded.add(folded_name)
+            members = self._parse_skill_loading_members(raw.get("members", []), name)
             includes = self._as_tuple(raw.get("includes", ()))
             if not members and not includes:
                 raise ConfigurationError(
-                    f"Skill loading unit '{name}' must declare "
-                    "members or includes"
+                    f"Skill loading unit '{name}' must declare " "members or includes"
                 )
             if len(set(includes)) != len(includes):
                 raise ConfigurationError(
@@ -291,6 +275,11 @@ class ConfigLoader:
                     ),
                     members=members,
                     includes=includes,
+                    publish_to=(
+                        str(raw["publish_to"])
+                        if raw.get("publish_to") is not None
+                        else None
+                    ),
                 )
             )
         return loading_units
@@ -300,8 +289,7 @@ class ConfigLoader:
     ) -> tuple[SkillLoadingMember, ...]:
         if not isinstance(raw_members, list):
             raise ConfigurationError(
-                f"Members of skill loading unit '{unit_name}' "
-                "must be a list"
+                f"Members of skill loading unit '{unit_name}' " "must be a list"
             )
         members: list[SkillLoadingMember] = []
         seen: set[str] = set()
@@ -353,14 +341,11 @@ class ConfigLoader:
             for required in ("name", "agent", "sources", "max_bytes"):
                 if required not in raw:
                     raise ConfigurationError(
-                        "instruction_chains entries must specify "
-                        f"'{required}'"
+                        "instruction_chains entries must specify " f"'{required}'"
                     )
             name = str(raw["name"])
             if name in seen:
-                raise ConfigurationError(
-                    f"Duplicate instruction chain name: {name}"
-                )
+                raise ConfigurationError(f"Duplicate instruction chain name: {name}")
             seen.add(name)
             raw_sources = raw["sources"]
             if not isinstance(raw_sources, list) or not raw_sources:
@@ -400,18 +385,14 @@ class ConfigLoader:
         for raw in raw_docs:
             doc = self._parse_reference_doc(raw)
             if doc.id in seen:
-                raise ConfigurationError(
-                    f"Duplicate reference_doc id: {doc.id}"
-                )
+                raise ConfigurationError(f"Duplicate reference_doc id: {doc.id}")
             seen.add(doc.id)
             docs.append(doc)
         return docs
 
     def _parse_reference_doc(self, raw: Any) -> ReferenceDoc:
         if not isinstance(raw, dict):
-            raise ConfigurationError(
-                f"Invalid reference_doc specification: {raw!r}"
-            )
+            raise ConfigurationError(f"Invalid reference_doc specification: {raw!r}")
         for required in ("id", "title", "local_path", "github_url", "trigger"):
             if required not in raw:
                 raise ConfigurationError(
@@ -432,9 +413,7 @@ class ConfigLoader:
         resolved: list[TaskModule] = []
         for module in config.task_modules:
             if module.description is None:
-                description = self._read_frontmatter_description(
-                    config, module.path
-                )
+                description = self._read_frontmatter_description(config, module.path)
                 if description is None:
                     raise ConfigurationError(
                         f"task_module '{module.id}' has no description: "
@@ -458,9 +437,7 @@ class ConfigLoader:
         if not resolved_path.is_file():
             return None
         try:
-            frontmatter = parse_frontmatter(
-                resolved_path.read_text(encoding="utf-8")
-            )
+            frontmatter = parse_frontmatter(resolved_path.read_text(encoding="utf-8"))
         except yaml.YAMLError as exc:
             raise ConfigurationError(
                 f"Invalid frontmatter in {resolved_path}: {exc}"
@@ -484,9 +461,7 @@ class ConfigLoader:
             return value
         raise ConfigurationError(f"Field '{field}' must be a boolean, got {value!r}")
 
-    def _as_optional_positive_int(
-        self, value: Any, field: str
-    ) -> int | None:
+    def _as_optional_positive_int(self, value: Any, field: str) -> int | None:
         if value is None:
             return None
         if isinstance(value, bool) or not isinstance(value, int):

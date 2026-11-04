@@ -23,6 +23,9 @@ from . import (
 )
 from .models import CommandSource
 from .registry import Registry, default_state_dir
+from .scopes import validate_scope
+from .cli_errors import exit_with_error
+from .synchronization import skill_write_transaction
 
 commands_app = typer.Typer(
     add_completion=False,
@@ -53,9 +56,7 @@ def cli_list(
 @commands_app.command("show")
 def cli_show(
     name: str,
-    agent: str = typer.Option(
-        "claude", "--agent", "-a", help="Adapter to render for."
-    ),
+    agent: str = typer.Option("claude", "--agent", "-a", help="Adapter to render for."),
     project_root: str | None = typer.Option(
         None, "--project", help="Project root for path substitutions."
     ),
@@ -78,36 +79,61 @@ def cli_show(
 def cli_install(
     name: str,
     scope: str = typer.Option(
-        "", "--scope", help="Install scope (user|project). Defaults to the source's scope_default."
+        "",
+        "--scope",
+        help="Install scope (user|project). Defaults to the source's scope_default.",
     ),
-    agent: str = typer.Option(
-        "all", "--agent", "-a", help="Adapter name or 'all'."
-    ),
+    agent: str = typer.Option("all", "--agent", "-a", help="Adapter name or 'all'."),
     project_root: str | None = typer.Option(
-        None, "--project", help="Project root used for project scope and path substitutions."
+        None,
+        "--project",
+        help="Project root used for project scope and path substitutions.",
     ),
     force: bool = typer.Option(
         False, "--force", help="Overwrite non-eutaxis directories at the target."
     ),
 ) -> None:
     """Install one skill artifact into the selected adapters."""
-    source = _require_source(name, project_root)
-    chosen_scope = scope or source.scope_default
-    registry = Registry(default_state_dir())
-    project = _resolve_project(project_root)
-
-    for adapter in _select_adapters(source, agent, scope=chosen_scope):
-        outcome = install_command(
-            source,
-            adapter,
-            scope=chosen_scope,
-            project_root=project,
+    try:
+        source = _require_source(name, project_root)
+        chosen_scope = scope or source.scope_default
+        validate_scope(chosen_scope)
+        registry = Registry(default_state_dir())
+        project = _resolve_project(project_root)
+        adapters = _select_adapters(source, agent, scope=chosen_scope)
+    except CommandError as exc:
+        exit_with_error(exc)
+    paths = [
+        adapter.artifact_dir(
+            source.name,
+            chosen_scope,
             home=Path.home(),
-            registry=registry,
-            force=force,
+            project_root=project,
         )
+        for adapter in adapters
+    ]
+
+    try:
+        outcomes = []
+        with skill_write_transaction(paths, registry):
+            for adapter in adapters:
+                outcomes.append(
+                    install_command(
+                        source,
+                        adapter,
+                        scope=chosen_scope,
+                        project_root=project,
+                        home=Path.home(),
+                        registry=registry,
+                        force=force,
+                    )
+                )
+    except (CommandError, OSError) as exc:
+        exit_with_error(exc)
+    for outcome in outcomes:
         typer.echo(
-            f"[{outcome.action:9}] {outcome.name}@{outcome.adapter} ({outcome.scope}) -> {outcome.path}"
+            f"[{outcome.action:9}] {outcome.name}@{outcome.adapter} "
+            f"({outcome.scope}) -> {outcome.path}"
         )
 
 
@@ -122,33 +148,51 @@ def cli_uninstall(
     ),
 ) -> None:
     """Remove one installed skill artifact from the selected adapters."""
-    registry = Registry(default_state_dir())
-    project = _resolve_project(project_root)
-    source = _maybe_source(name, project_root)
-    adapter_names = (
-        [adapter.name for adapter in all_adapters()]
-        if agent == "all"
-        else [agent]
-    )
-    for adapter_name in adapter_names:
-        if source is not None and adapter_name not in _effective_adapter_names(
-            source, [a.name for a in all_adapters()]
-        ):
-            continue
-        adapter = get_adapter(adapter_name)
-        if not adapter.supports_scope(scope):
-            continue
-        outcome = uninstall_command(
-            name=name,
-            adapter=adapter,
-            scope=scope,
-            project_root=project,
-            home=Path.home(),
-            registry=registry,
-            force=force,
+    try:
+        validate_scope(scope)
+        registry = Registry(default_state_dir())
+        project = _resolve_project(project_root)
+        source = _maybe_source(name, project_root)
+        adapter_names = (
+            [adapter.name for adapter in all_adapters()] if agent == "all" else [agent]
         )
+        adapters = []
+        for adapter_name in adapter_names:
+            if source is not None and adapter_name not in _effective_adapter_names(
+                source, [a.name for a in all_adapters()]
+            ):
+                continue
+            adapter = get_adapter(adapter_name)
+            if not adapter.supports_scope(scope):
+                continue
+            adapters.append(adapter)
+    except CommandError as exc:
+        exit_with_error(exc)
+    paths = [
+        adapter.artifact_dir(name, scope, home=Path.home(), project_root=project)
+        for adapter in adapters
+    ]
+    try:
+        outcomes = []
+        with skill_write_transaction(paths, registry):
+            for adapter in adapters:
+                outcomes.append(
+                    uninstall_command(
+                        name=name,
+                        adapter=adapter,
+                        scope=scope,
+                        project_root=project,
+                        home=Path.home(),
+                        registry=registry,
+                        force=force,
+                    )
+                )
+    except (CommandError, OSError) as exc:
+        exit_with_error(exc)
+    for outcome in outcomes:
         typer.echo(
-            f"[{outcome.action:9}] {outcome.name}@{outcome.adapter} ({outcome.scope}) -> {outcome.path}"
+            f"[{outcome.action:9}] {outcome.name}@{outcome.adapter} "
+            f"({outcome.scope}) -> {outcome.path}"
         )
 
 
@@ -160,12 +204,16 @@ def cli_diff(
     project_root: str | None = typer.Option(None, "--project"),
 ) -> None:
     """Show drift between rendered output and installed artifacts."""
-    sources = (
-        [_require_source(name, project_root)]
-        if name is not None
-        else _load(project_root)
-    )
-    project = _resolve_project(project_root)
+    try:
+        validate_scope(scope)
+        sources = (
+            [_require_source(name, project_root)]
+            if name is not None
+            else _load(project_root)
+        )
+        project = _resolve_project(project_root)
+    except CommandError as exc:
+        exit_with_error(exc)
 
     for source in sources:
         for adapter in _select_adapters(source, agent, scope=scope):
@@ -198,15 +246,11 @@ def _select_adapters(source: CommandSource, agent: str, *, scope: str) -> list:
         )
     selected = get_adapter(agent)
     if not selected.supports_scope(scope):
-        raise CommandError(
-            f"Adapter {agent!r} does not support scope {scope!r}."
-        )
+        raise CommandError(f"Adapter {agent!r} does not support scope {scope!r}.")
     return [selected]
 
 
-def _effective_adapter_names(
-    source: CommandSource, registered: list[str]
-) -> list[str]:
+def _effective_adapter_names(source: CommandSource, registered: list[str]) -> list[str]:
     base = list(source.targets.include) if source.targets.include else list(registered)
     excluded = set(source.targets.exclude)
     return [name for name in base if name in registered and name not in excluded]

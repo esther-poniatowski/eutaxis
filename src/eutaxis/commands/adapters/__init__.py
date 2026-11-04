@@ -10,8 +10,9 @@ plus one adapter class.
 
 from __future__ import annotations
 
+import posixpath
 from collections.abc import Iterable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Protocol, runtime_checkable
 
 from ..exceptions import CommandError
@@ -41,9 +42,7 @@ class AgentAdapter(Protocol):
     ) -> Path:
         """Return the on-disk directory of an installed skill artifact."""
 
-    def skills_root(
-        self, scope: str, *, home: Path, project_root: Path
-    ) -> Path:
+    def skills_root(self, scope: str, *, home: Path, project_root: Path) -> Path:
         """Return the directory containing installed Skill artifacts."""
 
     def skill_frontmatter(
@@ -63,6 +62,29 @@ class AgentAdapter(Protocol):
         Each file is rendered against ``context`` by the caller before
         being added to the artifact.
         """
+
+    def relative_artifact_link(
+        self,
+        *,
+        from_artifact: str,
+        from_file: str,
+        to_artifact: str,
+        to_file: str,
+    ) -> str:
+        """Return an installed relative link between two artifact files."""
+
+
+def sibling_artifact_link(
+    *,
+    from_artifact: str,
+    from_file: str,
+    to_artifact: str,
+    to_file: str,
+) -> str:
+    """Return a relative link for adapters with sibling artifact roots."""
+    source = PurePosixPath(from_artifact) / PurePosixPath(from_file).parent
+    target = PurePosixPath(to_artifact) / PurePosixPath(to_file)
+    return posixpath.relpath(str(target), start=str(source))
 
 
 _REGISTRY: dict[str, AgentAdapter] = {}
@@ -84,8 +106,7 @@ def get_adapter(name: str) -> AgentAdapter:
         return _REGISTRY[name]
     except KeyError as exc:
         raise CommandError(
-            f"Unknown agent adapter: {name!r}. "
-            f"Registered: {sorted(_REGISTRY)}"
+            f"Unknown agent adapter: {name!r}. " f"Registered: {sorted(_REGISTRY)}"
         ) from exc
 
 

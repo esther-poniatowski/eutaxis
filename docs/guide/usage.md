@@ -216,6 +216,8 @@ eutaxis skills install all  -c agent-instructions.yaml
 
 Without `--agent`, every registered adapter receives the Skill (see the [Supported agents](../../README.md#supported-agents) table for the current set). Without `--scope`, the install uses the source's declared `scope_default` (typically `user`, writing into the user-scope skill directory of each agent); `--scope project` writes into the project-scope skill directory instead.
 
+When the named Skill belongs to a published loading route, Eutaxis refreshes the complete route in the owner's scope. A request for a member also refreshes each owner whose manifest names that member. On write failure, Eutaxis restores the complete route. An installed route owner can require the member. In that case, the uninstall command refuses the request.
+
 ### Split a large rule set into one file per rule
 
 A Skill compiled from a large module loads every rule at once. The frontmatter field `disclosure: progressive` makes the compiler emit an index in `SKILL.md` and one file per rule under `rules/`:
@@ -257,7 +259,9 @@ eutaxis rule show calibrate-assertion --part exception
 eutaxis rule show calibrate-assertion -c agent-instructions.yaml
 ```
 
-The first form runs from any working directory. The location line of the second form points at the source file and the line range to edit. When a source entry of the configuration selects sections, the second form returns only the rules inside those sections. The listing command `eutaxis rule list` prints every label with its first ✓ line, and it reports on standard error each label line that violates the label grammar. Every option and part key of the query is listed in [CLI Reference: rule](cli-reference.md#rule).
+The first form runs from any working directory. The second form identifies the source file and line range to edit. The configuration may select only part of a source. In that case, only the rules from the selected part appear.
+
+The command `eutaxis rule list` prints every label with its first ✓ line. Malformed label lines appear on standard error. The flag `--loading-unit <name> -c <config>` restricts the checklist to one declared route. The [rule command](cli-reference.md#^rule-command) defines its flags and part keys.
 
 ## Verify and maintain
 

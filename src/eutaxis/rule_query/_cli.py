@@ -18,7 +18,8 @@ from typing import NoReturn
 import typer
 
 from ..commands import CommandError, get_adapter
-from ..instructions import InstructionError
+from ..instructions import InstructionError, load_config
+from ..instructions.loading_units import expand_loading_unit
 from .catalog import RuleCatalog, resolve_rule, select_parts
 from .exceptions import RuleQueryError, RuleSourceError
 from .sources import catalog_from_config, catalog_from_skills_dir
@@ -53,6 +54,11 @@ _AGENT_OPTION = typer.Option(
 )
 _MODULE_OPTION = typer.Option(
     None, "--module", "-m", help="Restrict the query to one module or skill."
+)
+_LOADING_UNIT_OPTION = typer.Option(
+    None,
+    "--loading-unit",
+    help="Restrict a config query to the modules of one Skill loading unit.",
 )
 
 
@@ -100,6 +106,7 @@ def cli_show(
 @rule_app.command("list")
 def cli_list(
     module: str | None = _MODULE_OPTION,
+    loading_unit: str | None = _LOADING_UNIT_OPTION,
     config: str | None = _CONFIG_OPTION,
     skills_dir: str | None = _SKILLS_DIR_OPTION,
     agent: str | None = _AGENT_OPTION,
@@ -110,6 +117,13 @@ def cli_list(
     standard error, since the rule index and the queries omit them.
     """
     try:
+        selected_modules = _loading_unit_modules(
+            loading_unit,
+            module=module,
+            config=config,
+            skills_dir=skills_dir,
+            agent=agent,
+        )
         catalog = _catalog(config, skills_dir, agent)
         if module is not None and module not in catalog.modules:
             raise RuleQueryError(
@@ -118,7 +132,11 @@ def cli_list(
             )
     except (RuleQueryError, InstructionError, CommandError) as exc:
         _fail(exc)
-    rules = catalog.select(module)
+    rules = tuple(
+        item
+        for item in catalog.select(module)
+        if selected_modules is None or item.rule.module in selected_modules
+    )
     label_width = max((len(item.rule.label) for item in rules), default=0)
     module_width = max((len(item.rule.module) for item in rules), default=0)
     for item in rules:
@@ -129,6 +147,11 @@ def cli_list(
         )
     for rejected in catalog.rejected:
         if module is not None and rejected.rejection.module != module:
+            continue
+        if (
+            selected_modules is not None
+            and rejected.rejection.module not in selected_modules
+        ):
             continue
         typer.echo(
             f"warning: {rejected.path}:{rejected.rejection.line_number}: "
@@ -153,6 +176,45 @@ def _catalog(
     if skills_dir is not None:
         return catalog_from_skills_dir(Path(skills_dir).expanduser().resolve())
     return catalog_from_skills_dir(_user_skills_dir(agent or DEFAULT_AGENT))
+
+
+def _loading_unit_modules(
+    loading_unit: str | None,
+    *,
+    module: str | None,
+    config: str | None,
+    skills_dir: str | None,
+    agent: str | None,
+) -> frozenset[str] | None:
+    """Resolve one loading unit to the authored module names in its config."""
+    if loading_unit is None:
+        return None
+    if config is None:
+        raise RuleSourceError("--loading-unit requires --config.")
+    if module is not None or skills_dir is not None or agent is not None:
+        raise RuleSourceError(
+            "--loading-unit cannot be combined with --module, --skills-dir, "
+            "or --agent."
+        )
+    loaded = load_config(Path(config).expanduser().resolve())
+    unit = next(
+        (
+            candidate
+            for candidate in loaded.skill_loading_units
+            if candidate.name == loading_unit
+        ),
+        None,
+    )
+    if unit is None:
+        names = ", ".join(item.name for item in loaded.skill_loading_units) or "none"
+        raise RuleQueryError(
+            f"Unknown Skill loading unit {loading_unit!r}. Units: {names}."
+        )
+    task_modules = {item.id: item for item in loaded.task_modules}
+    return frozenset(
+        loaded.resolve(task_modules[member.module].path).stem
+        for member in expand_loading_unit(unit, loaded.skill_loading_units)
+    )
 
 
 def _user_skills_dir(agent: str) -> Path:

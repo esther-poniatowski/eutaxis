@@ -42,9 +42,7 @@ def validate_loading_units(
     def visit(name: str) -> None:
         if name in active:
             cycle = " -> ".join([*active[active.index(name) :], name])
-            raise ConfigurationError(
-                f"Skill loading units form a cycle: {cycle}"
-            )
+            raise ConfigurationError(f"Skill loading units form a cycle: {cycle}")
         if name in visited:
             return
         active.append(name)
@@ -55,6 +53,25 @@ def validate_loading_units(
 
     for name in units_by_name:
         visit(name)
+
+    for unit in units:
+        if unit.publish_to is None:
+            continue
+        if unit.publish_to not in known_modules:
+            raise ConfigurationError(
+                f"Skill loading unit '{unit.name}' publishes to unknown "
+                f"task module: {unit.publish_to}"
+            )
+        owner_members = [
+            member
+            for member in expand_loading_unit(unit, units)
+            if member.module == unit.publish_to and member.include_entrypoint
+        ]
+        if not owner_members:
+            raise ConfigurationError(
+                f"Skill loading unit '{unit.name}' must include the entrypoint "
+                f"of its publication owner '{unit.publish_to}'"
+            )
 
 
 def expand_loading_unit(

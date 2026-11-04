@@ -315,7 +315,7 @@ Markdown transformations used by instruction-file assembly.
 
 ### eutaxis.instructions.markdown.parse_frontmatter(content)
 
-Parse a Markdown file's YAML frontmatter block.
+Parse a Markdown file’s YAML frontmatter block.
 
 Returns an empty dict when the file has no frontmatter or when the
 frontmatter is empty. Raises `yaml.YAMLError` if the block is malformed.
@@ -1033,7 +1033,7 @@ One Skill and the files selected from it for a loading unit.
 
 <a id="eutaxis.instructions.models.SkillLoadingUnit"></a>
 
-### *class* eutaxis.instructions.models.SkillLoadingUnit(name, max_bytes, members=(), includes=())
+### *class* eutaxis.instructions.models.SkillLoadingUnit(name, max_bytes, members=(), includes=(), publish_to=None)
 
 Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
@@ -1044,6 +1044,7 @@ A finite, budgeted set of Skill files loaded for one task.
   * **max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
   * **members** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*SkillLoadingMember*](#eutaxis.instructions.models.SkillLoadingMember) *,*  *...* *]*)
   * **includes** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **publish_to** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
 
 <a id="eutaxis.instructions.models.SkillLoadingUnit.name"></a>
 
@@ -1060,6 +1061,12 @@ A finite, budgeted set of Skill files loaded for one task.
 <a id="eutaxis.instructions.models.SkillLoadingUnit.includes"></a>
 
 #### includes *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
+
+<a id="eutaxis.instructions.models.SkillLoadingUnit.publish_to"></a>
+
+#### publish_to *: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+
+Task module whose Skill carries this unit’s generated manifest.
 
 <a id="eutaxis.instructions.models.InstructionChain"></a>
 

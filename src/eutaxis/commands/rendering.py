@@ -98,8 +98,12 @@ def render_command(
     """Render a command source for one adapter as a multi-file artifact."""
     check_failure_mode(source)
     body_context = _body_context(source, adapter.name, project_root, home)
+    adapter_files = tuple(adapter.sibling_files(source, context=body_context))
     rendered_body, rule_files, warnings = _layout_body(
-        source, adapter.name, render_template(source.body, body_context)
+        source,
+        adapter.name,
+        render_template(source.body, body_context),
+        sibling_paths=frozenset(file.relative_path for file in adapter_files),
     )
 
     front = adapter.skill_frontmatter(source, rendered_body=rendered_body)
@@ -110,7 +114,7 @@ def render_command(
         )
 
     siblings = _merge_siblings(
-        tuple(adapter.sibling_files(source, context=body_context)),
+        adapter_files,
         rule_files,
         adapter_name=adapter.name,
     )
@@ -145,7 +149,11 @@ def render_command(
 
 
 def _layout_body(
-    source: CommandSource, adapter_name: str, body: str
+    source: CommandSource,
+    adapter_name: str,
+    body: str,
+    *,
+    sibling_paths: frozenset[str] = frozenset(),
 ) -> tuple[str, tuple[ArtifactFile, ...], tuple[str, ...]]:
     """Split the rendered body as its disclosure mode requires, then relink it.
 
@@ -157,7 +165,10 @@ def _layout_body(
     warnings = tuple(
         missing.message
         for missing in resolver.missing(
-            body, source_path=source.source_path, first_line=source.body_start_line
+            body,
+            source_path=source.source_path,
+            first_line=source.body_start_line,
+            artifact_paths=sibling_paths,
         )
     )
     rule_files: tuple[ArtifactFile, ...] = ()
@@ -165,7 +176,9 @@ def _layout_body(
         disclosed = disclose(body, module=source.name)
         body = disclosed.entrypoint_body
         rule_files = disclosed.rule_files
-    body, rule_files = _rewrite_links(resolver, body, rule_files)
+    body, rule_files = _rewrite_links(
+        resolver, body, rule_files, sibling_paths=sibling_paths
+    )
     return body, rule_files, warnings
 
 
@@ -186,11 +199,19 @@ def _link_resolver(source: CommandSource, adapter_name: str) -> LinkResolver:
 
 
 def _rewrite_links(
-    resolver: LinkResolver, body: str, rule_files: tuple[ArtifactFile, ...]
+    resolver: LinkResolver,
+    body: str,
+    rule_files: tuple[ArtifactFile, ...],
+    *,
+    sibling_paths: frozenset[str] = frozenset(),
 ) -> tuple[str, tuple[ArtifactFile, ...]]:
     """Rewrite the relative links of the entrypoint body and of each rule file."""
     artifact_paths = frozenset(
-        {ENTRYPOINT_FILENAME, *(f.relative_path for f in rule_files)}
+        {
+            ENTRYPOINT_FILENAME,
+            *sibling_paths,
+            *(f.relative_path for f in rule_files),
+        }
     )
     rewritten_body = resolver.rewrite(
         body, emitter=ENTRYPOINT_FILENAME, artifact_paths=artifact_paths

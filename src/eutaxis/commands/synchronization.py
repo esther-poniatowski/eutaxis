@@ -6,8 +6,9 @@ import fcntl
 import hashlib
 import json
 import os
+import shutil
 import tempfile
-from collections.abc import Collection, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -129,9 +130,7 @@ class SkillSyncManifest:
                 f"Skill sync manifest at {path} is corrupted: {exc}."
             ) from exc
         if not isinstance(payload, dict):
-            raise CommandError(
-                f"Skill sync manifest at {path} must be a JSON object."
-            )
+            raise CommandError(f"Skill sync manifest at {path} must be a JSON object.")
         deployments = payload.get("deployments")
         if not isinstance(deployments, dict) or any(
             not isinstance(key, str)
@@ -287,39 +286,139 @@ def apply_skill_sync(
     project_root: Path,
     home: Path,
     registry: Registry,
+    finalize: Callable[[], None] | None = None,
+    rollback_files: Collection[Path] = (),
 ) -> tuple[SkillSyncAction, ...]:
-    """Apply every planned Skill change and return the resulting states."""
+    """Apply one failure-atomic Skill plan and return the resulting states."""
     outcomes: list[SkillSyncAction] = []
-    for action in actions:
-        if action.action == "remove":
-            outcome = uninstall_command(
-                name=action.name,
-                adapter=action.adapter,
-                scope=action.scope,
-                project_root=project_root,
-                home=home,
-                registry=registry,
+    with skill_write_transaction(
+        (action.path for action in actions),
+        registry,
+        file_paths=rollback_files,
+    ):
+        for action in actions:
+            if action.action == "remove":
+                outcome = uninstall_command(
+                    name=action.name,
+                    adapter=action.adapter,
+                    scope=action.scope,
+                    project_root=project_root,
+                    home=home,
+                    registry=registry,
+                )
+            else:
+                if action.source is None:  # pragma: no cover - dataclass invariant
+                    raise RuntimeError(f"Install action lacks source: {action.name}")
+                outcome = install_command(
+                    action.source,
+                    action.adapter,
+                    scope=action.scope,
+                    project_root=project_root,
+                    home=home,
+                    registry=registry,
+                )
+            outcomes.append(
+                SkillSyncAction(
+                    action=outcome.action,
+                    name=outcome.name,
+                    adapter=action.adapter,
+                    scope=outcome.scope,
+                    path=outcome.path,
+                    source=action.source,
+                    warnings=outcome.warnings,
+                )
             )
-        else:
-            if action.source is None:  # pragma: no cover - dataclass invariant
-                raise RuntimeError(f"Install action lacks source: {action.name}")
-            outcome = install_command(
-                action.source,
-                action.adapter,
-                scope=action.scope,
-                project_root=project_root,
-                home=home,
-                registry=registry,
-            )
-        outcomes.append(
-            SkillSyncAction(
-                action=outcome.action,
-                name=outcome.name,
-                adapter=action.adapter,
-                scope=outcome.scope,
-                path=outcome.path,
-                source=action.source,
-                warnings=outcome.warnings,
-            )
-        )
+        if finalize is not None:
+            finalize()
     return tuple(outcomes)
+
+
+@contextmanager
+def skill_write_transaction(
+    paths: Iterator[Path] | Collection[Path],
+    registry: Registry,
+    *,
+    file_paths: Collection[Path] = (),
+) -> Iterator[None]:
+    """Restore every target when one write in a managed set fails."""
+    unique_paths = tuple(dict.fromkeys(Path(path) for path in paths))
+    unique_files = tuple(dict.fromkeys(Path(path) for path in file_paths))
+    with registry.deployment_locked():
+        with tempfile.TemporaryDirectory(prefix="eutaxis-skill-transaction-") as raw:
+            scratch = Path(raw)
+            snapshots: list[tuple[Path, Path | None]] = []
+            for index, path in enumerate(unique_paths):
+                if path.is_symlink():
+                    raise OwnershipError(
+                        f"Refusing to transact through symbolic-link target: {path}."
+                    )
+                backup: Path | None = None
+                if path.exists():
+                    if not path.is_dir():
+                        raise OwnershipError(
+                            f"Refusing to transact over non-directory target: {path}."
+                        )
+                    backup = scratch / f"directory-{index}"
+                    shutil.copytree(path, backup, symlinks=True)
+                snapshots.append((path, backup))
+            file_snapshots: list[tuple[Path, bytes | None, int | None]] = []
+            for path in unique_files:
+                if path.is_symlink() or (path.exists() and not path.is_file()):
+                    raise OwnershipError(
+                        f"Refusing to transact over non-file state target: {path}."
+                    )
+                file_snapshots.append(
+                    (
+                        path,
+                        path.read_bytes() if path.is_file() else None,
+                        path.stat().st_mode if path.is_file() else None,
+                    )
+                )
+            try:
+                with registry.transaction():
+                    yield
+            except BaseException as primary:
+                cleanup_failures: list[str] = []
+                for path, backup in reversed(snapshots):
+                    try:
+                        _restore_directory_snapshot(path, backup)
+                    except BaseException as cleanup:
+                        cleanup_failures.append(
+                            f"directory {path}: {type(cleanup).__name__}: {cleanup}"
+                        )
+                for path, content, mode in file_snapshots:
+                    try:
+                        _restore_file_snapshot(path, content, mode)
+                    except BaseException as cleanup:
+                        cleanup_failures.append(
+                            f"file {path}: {type(cleanup).__name__}: {cleanup}"
+                        )
+                if cleanup_failures:
+                    primary.add_note(
+                        "Rollback cleanup also failed:\n- "
+                        + "\n- ".join(cleanup_failures)
+                    )
+                raise
+
+
+def _restore_directory_snapshot(path: Path, backup: Path | None) -> None:
+    """Restore one directory target without affecting later restorations."""
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+    if backup is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(backup, path, symlinks=True)
+
+
+def _restore_file_snapshot(path: Path, content: bytes | None, mode: int | None) -> None:
+    """Restore one state file without affecting later restorations."""
+    if content is None:
+        if path.is_file() or path.is_symlink():
+            path.unlink()
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    if mode is not None:
+        os.chmod(path, mode)

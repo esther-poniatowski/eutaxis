@@ -77,6 +77,13 @@ def workspace(tmp_path: Path) -> dict[str, Path]:
                         "trigger": "when writing",
                     }
                 ],
+                "skill_loading_units": [
+                    {
+                        "name": "style-route",
+                        "max_bytes": 10000,
+                        "members": [{"module": "style"}],
+                    }
+                ],
                 "agents": [],
             }
         ),
@@ -168,6 +175,31 @@ def test_list_filters_by_module(workspace) -> None:
     assert result.exit_code == 0, result.output
     assert "topic-first" not in result.stdout
     assert result.stderr == ""
+
+
+def test_list_filters_by_loading_unit(workspace) -> None:
+    result = _run(
+        "list",
+        "-c",
+        str(workspace["config"]),
+        "--loading-unit",
+        "style-route",
+    )
+    assert result.exit_code == 0, result.output
+    assert "topic-first" in result.stdout
+    assert "constraint-scan" not in result.stdout
+
+
+def test_loading_unit_filter_requires_config(workspace) -> None:
+    result = _run(
+        "list",
+        "--skills-dir",
+        str(workspace["home"]),
+        "--loading-unit",
+        "style-route",
+    )
+    assert result.exit_code == 1
+    assert "--loading-unit requires --config" in result.stderr
 
 
 @pytest.mark.parametrize("disclosure", ["", "disclosure: progressive\n"])

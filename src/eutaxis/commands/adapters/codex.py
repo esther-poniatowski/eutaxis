@@ -39,6 +39,7 @@ from ..exceptions import CommandError
 from ..models import ArtifactFile, CommandSource
 from ..names import is_skill_name
 from ..templating import render as render_template
+from . import sibling_artifact_link
 
 
 @dataclass(frozen=True)
@@ -58,9 +59,7 @@ class CodexAdapter:
         root = self.skills_root(scope, home=home, project_root=project_root)
         return root / command_name
 
-    def skills_root(
-        self, scope: str, *, home: Path, project_root: Path
-    ) -> Path:
+    def skills_root(self, scope: str, *, home: Path, project_root: Path) -> Path:
         if scope == "user":
             return home / ".agents" / "skills"
         if scope == "project":
@@ -109,6 +108,22 @@ class CodexAdapter:
             siblings.append(ArtifactFile(relative_path=path, content=rendered))
 
         return tuple(siblings)
+
+    def relative_artifact_link(
+        self,
+        *,
+        from_artifact: str,
+        from_file: str,
+        to_artifact: str,
+        to_file: str,
+    ) -> str:
+        """Return an installed relative link between Codex Skill files."""
+        return sibling_artifact_link(
+            from_artifact=from_artifact,
+            from_file=from_file,
+            to_artifact=to_artifact,
+            to_file=to_file,
+        )
 
 
 def _build_openai_yaml(

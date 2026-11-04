@@ -8,8 +8,14 @@ from pathlib import Path
 from ..instructions.loading_units import expand_loading_unit
 from ..instructions.models import InstructionConfig, SkillLoadingUnit
 from .adapters import AgentAdapter
-from .exceptions import CommandRenderError
 from .models import CommandSource, RenderedArtifact
+from .loading_unit_publication import (
+    LoadingUnitPublication,
+    artifact_file,
+    loading_unit_files,
+    prepare_published_loading_units,
+    sources_by_module,
+)
 from .rendering import ENTRYPOINT_FILENAME, render_command
 
 
@@ -23,6 +29,7 @@ class SkillBudgetMeasurement:
     byte_size: int
     byte_budget: int | None
     files: tuple[str, ...]
+    publication_owners: tuple[str, ...] = ()
 
     @property
     def over_budget(self) -> bool:
@@ -39,7 +46,14 @@ def measure_skill_budgets(
     home: Path,
 ) -> tuple[SkillBudgetMeasurement, ...]:
     """Measure every rendered entrypoint and declared loading unit."""
-    source_by_module = _sources_by_module(config, sources)
+    prepared, publications = prepare_published_loading_units(
+        config,
+        sources,
+        [adapter],
+        project_root=project_root,
+        home=home,
+    )
+    source_by_module = sources_by_module(config, prepared)
     rendered = {
         module_id: render_command(
             source,
@@ -66,27 +80,15 @@ def measure_skill_budgets(
             config.skill_loading_units,
             rendered,
             adapter.name,
+            publications,
         )
         for loading_unit in config.skill_loading_units
+        if all(
+            member.module in rendered
+            for member in expand_loading_unit(loading_unit, config.skill_loading_units)
+        )
     )
     return tuple(measurements)
-
-
-def _sources_by_module(
-    config: InstructionConfig, sources: list[CommandSource]
-) -> dict[str, CommandSource]:
-    by_path = {source.source_path.resolve(): source for source in sources}
-    resolved: dict[str, CommandSource] = {}
-    for module in config.task_modules:
-        path = config.resolve(module.path).resolve()
-        try:
-            resolved[module.id] = by_path[path]
-        except KeyError as exc:
-            raise CommandRenderError(
-                f"No loaded Skill source corresponds to task module "
-                f"{module.id!r} at {path}"
-            ) from exc
-    return resolved
 
 
 def _entrypoint_measurement(
@@ -95,7 +97,7 @@ def _entrypoint_measurement(
     adapter_name: str,
     limit: int | None,
 ) -> SkillBudgetMeasurement:
-    entrypoint = _artifact_file(artifact, ENTRYPOINT_FILENAME)
+    entrypoint = artifact_file(artifact, ENTRYPOINT_FILENAME)
     return SkillBudgetMeasurement(
         kind="entrypoint",
         name=module_id,
@@ -111,13 +113,59 @@ def _loading_unit_measurement(
     loading_units: list[SkillLoadingUnit],
     rendered: dict[str, RenderedArtifact],
     adapter_name: str,
+    publications: tuple[LoadingUnitPublication, ...],
 ) -> SkillBudgetMeasurement:
-    files = _loading_unit_files(
+    files = loading_unit_files(
         loading_unit,
         loading_units,
         rendered,
         adapter_name,
     )
+    publication = next(
+        (
+            candidate
+            for candidate in publications
+            if candidate.name == loading_unit.name and candidate.adapter == adapter_name
+        ),
+        None,
+    )
+    published_owners = (
+        {loading_unit.publish_to} if loading_unit.publish_to is not None else set()
+    )
+    delivery_variants: list[dict[str, str]] = []
+    if publication is not None:
+        owner = rendered[publication.owner_module]
+        route_files: dict[str, str] = {}
+        for relative_path in (
+            publication.route_path,
+            *publication.batch_paths,
+        ):
+            route_files[f"{publication.owner}/{relative_path}"] = artifact_file(
+                owner, relative_path
+            )
+        delivery_variants.append(route_files)
+    for candidate in publications:
+        if loading_unit.name in candidate.batch_units:
+            published_owners.add(candidate.owner_module)
+            index = candidate.batch_units.index(loading_unit.name)
+            owner = rendered[candidate.owner_module]
+            relative_path = candidate.batch_paths[index]
+            delivery_variants.append(
+                {
+                    f"{candidate.owner}/{relative_path}": artifact_file(
+                        owner, relative_path
+                    )
+                }
+            )
+    if delivery_variants:
+        selected_variant = max(
+            delivery_variants,
+            key=lambda variant: (
+                sum(_byte_size(content) for content in variant.values()),
+                tuple(variant),
+            ),
+        )
+        files.update(selected_variant)
     return SkillBudgetMeasurement(
         kind="loading-unit",
         name=loading_unit.name,
@@ -125,46 +173,7 @@ def _loading_unit_measurement(
         byte_size=sum(_byte_size(content) for content in files.values()),
         byte_budget=loading_unit.max_bytes,
         files=tuple(files),
-    )
-
-
-def _loading_unit_files(
-    loading_unit: SkillLoadingUnit,
-    loading_units: list[SkillLoadingUnit],
-    rendered: dict[str, RenderedArtifact],
-    adapter_name: str,
-) -> dict[str, str]:
-    files: dict[str, str] = {}
-    for member in expand_loading_unit(loading_unit, loading_units):
-        try:
-            artifact = rendered[member.module]
-        except KeyError as exc:
-            raise CommandRenderError(
-                f"Skill loading unit {loading_unit.name!r} references module "
-                f"{member.module!r}, which does not target adapter "
-                f"{adapter_name!r}"
-            ) from exc
-        if member.include_entrypoint:
-            entrypoint_path = f"{member.module}/{ENTRYPOINT_FILENAME}"
-            files[entrypoint_path] = _artifact_file(
-                artifact, ENTRYPOINT_FILENAME
-            )
-        for rule in member.rules:
-            relative_path = f"rules/{rule}.md"
-            files[f"{member.module}/{relative_path}"] = _artifact_file(
-                artifact, relative_path
-            )
-    return files
-
-
-def _artifact_file(artifact: RenderedArtifact, relative_path: str) -> str:
-    for artifact_file in artifact.files:
-        if artifact_file.relative_path == relative_path:
-            return artifact_file.content
-    raise CommandRenderError(
-        f"Rendered Skill {artifact.name!r} for {artifact.adapter!r} has no "
-        f"file {relative_path!r}; declare only rules emitted by progressive "
-        "disclosure"
+        publication_owners=tuple(sorted(published_owners)),
     )
 
 

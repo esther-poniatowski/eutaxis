@@ -183,7 +183,12 @@ class LinkResolver:
         return normalize_path(self.source_dir / path)
 
     def missing(
-        self, text: str, *, source_path: Path, first_line: int = 1
+        self,
+        text: str,
+        *,
+        source_path: Path,
+        first_line: int = 1,
+        artifact_paths: frozenset[str] = frozenset(),
     ) -> list[MissingLink]:
         """Return the relative links of ``text`` that resolve to no file.
 
@@ -199,6 +204,9 @@ class LinkResolver:
         found: list[MissingLink] = []
         for link in iter_links(text):
             if not is_relative_target(link.target):
+                continue
+            target_path = unquote(link.target.partition("#")[0])
+            if posixpath.normpath(target_path) in artifact_paths:
                 continue
             resolved = self.resolve(link.target)
             if resolved in self.skills or self.exists(resolved):

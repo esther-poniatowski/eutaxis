@@ -92,7 +92,7 @@ across CLI invocations.
 
 Robustness: writes are atomic (`os.replace` from a sibling `.tmp`
 file) and serialised under a POSIX advisory file lock so concurrent
-`eutaxis commands install` invocations cannot lose each other's
+`eutaxis commands install` invocations cannot lose each other’s
 records. A corrupted registry surfaces as `RegistryCorruptedError`
 with the path; the user can remove the file to rebuild from scratch.
 
@@ -154,6 +154,24 @@ Drop the matching record and return it, if any.
   * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
   [*InstallRecord*](#eutaxis.commands.models.InstallRecord) | None
+
+<a id="eutaxis.commands.registry.Registry.transaction"></a>
+
+#### transaction()
+
+Commit all registry mutations together or discard all of them.
+
+* **Return type:**
+  [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[None]
+
+<a id="eutaxis.commands.registry.Registry.deployment_locked"></a>
+
+#### deployment_locked()
+
+Serialize every filesystem and registry mutation of Skills.
+
+* **Return type:**
+  [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[None]
 
 <a id="eutaxis.commands.registry.Registry.find"></a>
 
@@ -655,7 +673,7 @@ Return the normalized path that a relative `target` names.
 
 <a id="eutaxis.commands.links.LinkResolver.missing"></a>
 
-#### missing(text, \*, source_path, first_line=1)
+#### missing(text, \*, source_path, first_line=1, artifact_paths=frozenset({}))
 
 Return the relative links of `text` that resolve to no file.
 
@@ -663,6 +681,7 @@ Return the relative links of `text` that resolve to no file.
   * **text** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Body of the source, before any split.
   * **source_path** (*Path*) – Source file, quoted in each diagnostic.
   * **first_line** ([*int*](https://docs.python.org/3/builtins/functions.html#int)) – Line of the source file on which `text` starts.
+  * **artifact_paths** ([*frozenset*](https://docs.python.org/3/builtins/stdtypes.html#frozenset) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
 * **Return type:**
   [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*MissingLink*](#eutaxis.commands.links.MissingLink)]
 
@@ -999,17 +1018,32 @@ Skills managed by other configurations cannot enter the removal set.
 
 <a id="eutaxis.commands.synchronization.apply_skill_sync"></a>
 
-### eutaxis.commands.synchronization.apply_skill_sync(actions, \*, project_root, home, registry)
+### eutaxis.commands.synchronization.apply_skill_sync(actions, \*, project_root, home, registry, finalize=None, rollback_files=())
 
-Apply every planned Skill change and return the resulting states.
+Apply one failure-atomic Skill plan and return the resulting states.
 
 * **Parameters:**
   * **actions** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction) *,*  *...* *]*)
   * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
+  * **finalize** ([*Callable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable) *[* *[* *]* *,* *None* *]*  *|* *None*)
+  * **rollback_files** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*)
 * **Return type:**
   [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction), …]
+
+<a id="eutaxis.commands.synchronization.skill_write_transaction"></a>
+
+### eutaxis.commands.synchronization.skill_write_transaction(paths, registry, \*, file_paths=())
+
+Restore every target when one write in a managed set fails.
+
+* **Parameters:**
+  * **paths** ([*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*  *|* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*)
+  * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
+  * **file_paths** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*)
+* **Return type:**
+  [*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator)[None]
 
 <a id="module-eutaxis.commands.skill_budgets"></a>
 
@@ -1021,7 +1055,7 @@ Measure Skill entrypoints and declared loading units.
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement"></a>
 
-### *class* eutaxis.commands.skill_budgets.SkillBudgetMeasurement(kind, name, adapter, byte_size, byte_budget, files)
+### *class* eutaxis.commands.skill_budgets.SkillBudgetMeasurement(kind, name, adapter, byte_size, byte_budget, files, publication_owners=())
 
 Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
@@ -1034,6 +1068,7 @@ One measured Skill entrypoint or loading unit.
   * **byte_size** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
   * **byte_budget** ([*int*](https://docs.python.org/3/builtins/functions.html#int) *|* *None*)
   * **files** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **publication_owners** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.kind"></a>
 
@@ -1058,6 +1093,10 @@ One measured Skill entrypoint or loading unit.
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.files"></a>
 
 #### files *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+
+<a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.publication_owners"></a>
+
+#### publication_owners *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.over_budget"></a>
 
@@ -1088,7 +1127,7 @@ Measure every rendered entrypoint and declared loading unit.
 
 Data containers for the commands subsystem.
 
-A "command" is rendered as an **Agent Skill artifact**: a directory whose
+A “command” is rendered as an **Agent Skill artifact**: a directory whose
 canonical entrypoint is `SKILL.md`, optionally accompanied by
 agent-specific sibling files (e.g. `agents/openai.yaml` for Codex). The
 multi-file artifact model is needed because Codex skills require the
@@ -1128,7 +1167,7 @@ Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Per-source allow/deny list of adapter names.
 
-An empty `include` tuple means "all registered adapters".
+An empty `include` tuple means “all registered adapters”.
 
 * **Parameters:**
   * **include** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
@@ -1255,7 +1294,7 @@ Slug used for the artifact directory and the invocation symbol.
 
 #### description *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
-One-line summary surfaced by `commands list` and the agent's
+One-line summary surfaced by `commands list` and the agent’s
 skill picker.
 
 <a id="eutaxis.commands.models.CommandSource.invocation"></a>
@@ -1555,7 +1594,7 @@ Raised when an install/uninstall target is not eutaxis-owned.
 
 Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError)
 
-Raised when a source's failure-mode classification forbids the target regime.
+Raised when a source’s failure-mode classification forbids the target regime.
 
 A `failure-mode: silent` source cannot ship as a `model-invoked` skill;
 the model-judgment activation gate gives no visibility guarantee before the
@@ -1595,7 +1634,7 @@ Invocation translation:
   Claude is free to pick the skill from its description, and user
   invocation via `/<name>` continues to work as well.
 
-Claude has no analogue to Codex's sibling `agents/openai.yaml`: all
+Claude has no analogue to Codex’s sibling `agents/openai.yaml`: all
 metadata (including `allowed-tools`, `argument-hint`) is folded
 into `SKILL.md` frontmatter.
 
@@ -1665,6 +1704,20 @@ Compile a command source into a Claude skill directory.
   * **context** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*object*](https://docs.python.org/3/builtins/functions.html#object) *]*)
 * **Return type:**
   [*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile)]
+
+<a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.relative_artifact_link"></a>
+
+#### relative_artifact_link(\*, from_artifact, from_file, to_artifact, to_file)
+
+Return an installed relative link between Claude Skill files.
+
+* **Parameters:**
+  * **from_artifact** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **from_file** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **to_artifact** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **to_file** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+* **Return type:**
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 <a id="module-eutaxis.commands.adapters.codex"></a>
 
@@ -1766,3 +1819,17 @@ Compile a command source into a Codex skill directory.
   * **context** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*object*](https://docs.python.org/3/builtins/functions.html#object) *]*)
 * **Return type:**
   [*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile)]
+
+<a id="eutaxis.commands.adapters.codex.CodexAdapter.relative_artifact_link"></a>
+
+#### relative_artifact_link(\*, from_artifact, from_file, to_artifact, to_file)
+
+Return an installed relative link between Codex Skill files.
+
+* **Parameters:**
+  * **from_artifact** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **from_file** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **to_artifact** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **to_file** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+* **Return type:**
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)

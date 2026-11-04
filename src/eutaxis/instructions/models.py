@@ -60,6 +60,8 @@ class SkillLoadingUnit:
     max_bytes: int
     members: tuple[SkillLoadingMember, ...] = ()
     includes: tuple[str, ...] = ()
+    publish_to: str | None = None
+    """Task module whose Skill carries this unit's generated manifest."""
 
 
 @dataclass(frozen=True)

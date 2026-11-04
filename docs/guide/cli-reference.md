@@ -131,6 +131,8 @@ eutaxis skills uninstall <name> -c <config-file> [--agent <agent>] [--scope user
 eutaxis skills diff [<name>] -c <config-file>
 eutaxis skills sync -c <config-file> [--agent <agent>] [--scope user|project] [--project <root>] [--apply]
 eutaxis skills budget -c <config-file> [--agent claude|codex]
+eutaxis skills loading-unit list -c <config-file> [--agent claude|codex]
+eutaxis skills loading-unit show <name> -c <config-file> [--agent claude|codex]
 ```
 
 | Subcommand | Use it to |
@@ -142,10 +144,14 @@ eutaxis skills budget -c <config-file> [--agent claude|codex]
 | `diff` | Show drift between rendered output and installed artifacts. |
 | `sync` | Preview or apply the complete configured Skill set and remove retired artifacts recorded for this configuration. |
 | `budget` | Measure every rendered entrypoint and declared loading unit against its configured byte limit. |
+| `loading-unit list` | List each loading unit with its measured size and publication owner. |
+| `loading-unit show` | Report one loading unit's exact files, generated manifests and closure digest. |
 
 The failure-mode gate ([failure-mode-as-source-field](../adr/failure-mode-as-source-field.md)) applies at render time: the renderer refuses to emit a `model-invoked` artifact from a silent-failure source and a `user-invoked` artifact whose `required-visibility` is `pre-invocation`. There is no `--force` escape for these checks.
 
 A source whose frontmatter declares `disclosure: progressive` compiles to a [split Skill](concepts.md#progressive-disclosure): an index in `SKILL.md` and one file per rule under `rules/`. The commands `show`, `install` and `diff` handle the rule files together with the other files of the artifact.
+
+The `publish_to` field generates support files inside the owner Skill. The owner entrypoint links the published route manifests. Then, each route manifest links its ordered batch manifests. The same manifest links the deduplicated file closure. The closure digest covers the selected content files after Eutaxis removes generated ownership-marker values. A separate owner-artifact hash covers the generated index and manifests.
 
 The compiler rewrites the relative links of each emitted file, as described in [Links between modules](concepts.md#links-between-modules). The commands `show`, `install` and `diff` report on standard error each relative link whose target does not exist, with the source file and the line of the link.
 
@@ -159,14 +165,14 @@ With `--apply`, the command:
 - records the resulting set for the configuration, adapter, and deployment target after all writes and removals succeed;
 - leaves every unmarked directory unchanged.
 
-The first successful sync writes the configuration record. For project scope, Eutaxis records the resolved root. Therefore, one configuration can manage each project independently. The configuration record does not include artifacts installed by other configurations. A corrupted install registry or sync manifest blocks the plan before any write. Each apply stage is idempotent, but the stages can succeed separately. After a write failure, correct its cause and run the same command again.
+The first successful sync writes the configuration record. For project scope, Eutaxis records the resolved root. Therefore, one configuration can manage each project independently. The configuration record does not include artifacts installed by other configurations. A corrupted install registry or sync manifest blocks the plan before any write. The Skill directories, install registry and sync manifest form one failure-atomic set. If any write fails, Eutaxis restores every directory. Eutaxis also restores the two state files. Correct the cause and run the same command again.
 
 Exit codes of `diff`:
 
 - `0` -- every artifact matches its render.
 - `1` -- at least one artifact differs from its render: a file is outdated, edited by hand or missing, or a file of a deleted rule remains on disk.
 
-Exit codes of `budget`:
+Exit codes of `budget` and `loading-unit`:
 
 - `0` -- every entrypoint and loading unit exists and fits within its limit.
 - `1` -- a limit is exceeded, a loading unit names an unknown module or rule, or rendering fails.
@@ -174,12 +180,13 @@ Exit codes of `budget`:
 ---
 
 ### `rule`
+^rule-command
 
 Print one rule of an instruction module, or one part of that rule, without reading the whole module. Each rule spans one [rule block](concepts.md#rule-blocks), and each part is one statement or field of that block.
 
 ```sh
 eutaxis rule show <label> [--part <key>] [--module <name>] [-c <config-file> | --skills-dir <dir> | --agent <agent>]
-eutaxis rule list [--module <name>] [-c <config-file> | --skills-dir <dir> | --agent <agent>]
+eutaxis rule list [--module <name> | --loading-unit <name>] [-c <config-file> | --skills-dir <dir> | --agent <agent>]
 ```
 
 | Subcommand | Use it to |
@@ -191,6 +198,7 @@ eutaxis rule list [--module <name>] [-c <config-file> | --skills-dir <dir> | --a
 |--------|-------|---------|-------------|
 | `--part` | `-p` | whole rule | Key of the part to print, from the part keys listed below. |
 | `--module` | `-m` | all modules | Module or Skill that holds the rule. Required when several modules define the label. |
+| `--loading-unit` | | none | Loading unit whose authored modules supply the list. Requires `--config` and cannot be combined with another source or module filter. |
 | `--config` | `-c` | none | Configuration whose modules are read: `common_sources`, agent `sources` and `task_modules`. A source entry that selects sections contributes only the rules inside those sections. |
 | `--skills-dir` | | none | Directory whose eutaxis-owned Skills are read. |
 | `--agent` | `-a` | `claude` | Adapter whose user-scope skill directory is read when neither `--config` nor `--skills-dir` is given. |

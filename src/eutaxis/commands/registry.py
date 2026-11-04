@@ -43,9 +43,13 @@ class Registry:
         self.state_dir = state_dir
         self.path = state_dir / "installed-commands.json"
         self.lock_path = state_dir / "installed-commands.lock"
+        self.deployment_lock_path = state_dir / "skill-deployment.lock"
+        self._pending_records: list[InstallRecord] | None = None
 
     def load(self) -> list[InstallRecord]:
         """Return all install records currently on disk."""
+        if self._pending_records is not None:
+            return list(self._pending_records)
         if not self.path.is_file():
             return []
         raw_text = self.path.read_text(encoding="utf-8")
@@ -76,22 +80,11 @@ class Registry:
 
     def upsert(self, record: InstallRecord) -> None:
         """Insert or replace the record for the same deployment target."""
+        if self._pending_records is not None:
+            self._pending_records[:] = self._upserted(self._pending_records, record)
+            return
         with self._locked():
-            records = self.load()
-            records = [
-                row
-                for row in records
-                if not (
-                    row.name == record.name
-                    and row.adapter == record.adapter
-                    and row.scope == record.scope
-                    and (
-                        record.scope != "project" or row.path == record.path
-                    )
-                )
-            ]
-            records.append(record)
-            self._write(records)
+            self._write(self._upserted(self.load(), record))
 
     def remove(
         self,
@@ -103,22 +96,56 @@ class Registry:
     ) -> InstallRecord | None:
         """Drop the matching record and return it, if any."""
         _require_project_path(scope, path)
+        if self._pending_records is not None:
+            kept, removed = self._removed(
+                self._pending_records,
+                name=name,
+                adapter=adapter,
+                scope=scope,
+                path=path,
+            )
+            self._pending_records[:] = kept
+            return removed
         with self._locked():
-            records = self.load()
-            kept: list[InstallRecord] = []
-            removed: InstallRecord | None = None
-            for row in records:
-                if (
-                    row.name == name
-                    and row.adapter == adapter
-                    and row.scope == scope
-                    and (scope != "project" or path is None or row.path == path)
-                ):
-                    removed = row
-                    continue
-                kept.append(row)
+            kept, removed = self._removed(
+                self.load(),
+                name=name,
+                adapter=adapter,
+                scope=scope,
+                path=path,
+            )
             self._write(kept)
             return removed
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Commit all registry mutations together or discard all of them."""
+        if self._pending_records is not None:
+            raise RuntimeError("Registry transaction is already active")
+        with self._locked():
+            records = self.load()
+            self._pending_records = records
+            try:
+                yield
+                self._write(records)
+            finally:
+                self._pending_records = None
+
+    @contextmanager
+    def deployment_locked(self) -> Iterator[None]:
+        """Serialize every filesystem and registry mutation of Skills."""
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(
+            self.deployment_lock_path,
+            os.O_RDWR | os.O_CREAT,
+            0o644,
+        )
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            os.close(descriptor)
 
     def find(
         self,
@@ -174,6 +201,46 @@ class Registry:
             encoding="utf-8",
         )
         os.replace(tmp_path, self.path)
+
+    @staticmethod
+    def _upserted(
+        records: list[InstallRecord], record: InstallRecord
+    ) -> list[InstallRecord]:
+        kept = [
+            row
+            for row in records
+            if not (
+                row.name == record.name
+                and row.adapter == record.adapter
+                and row.scope == record.scope
+                and (record.scope != "project" or row.path == record.path)
+            )
+        ]
+        kept.append(record)
+        return kept
+
+    @staticmethod
+    def _removed(
+        records: list[InstallRecord],
+        *,
+        name: str,
+        adapter: str,
+        scope: str,
+        path: Path | None,
+    ) -> tuple[list[InstallRecord], InstallRecord | None]:
+        kept: list[InstallRecord] = []
+        removed: InstallRecord | None = None
+        for row in records:
+            if (
+                row.name == name
+                and row.adapter == adapter
+                and row.scope == scope
+                and (scope != "project" or path is None or row.path == path)
+            ):
+                removed = row
+                continue
+            kept.append(row)
+        return kept, removed
 
 
 def utcnow_iso() -> str:

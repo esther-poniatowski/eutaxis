@@ -97,13 +97,16 @@ skill_loading_units:
           - priority-core
   - name: prose-route
     max_bytes: 92160
+    publish_to: prose-authoring-workflow
     includes:
       - prose-batch
 ```
 
-Each `module` must match a task-module `id`. The optional `rules` list selects files in `rules/` for that skill. The field `include_entrypoint` defaults to `true`. Set it to `false` only for a direct rule-file dependency that does not activate the Skill. The optional `includes` list composes other declared loading units. Eutaxis deduplicates files shared by several included units and rejects composition cycles.
+Each `module` must match a task-module `id`. Each loading-unit `name` must match the lowercase slug grammar `[a-z][a-z0-9]*(-[a-z0-9]+)*`. Names must also be unique after case folding. The optional `rules` list selects files in `rules/` for that skill. The field `include_entrypoint` defaults to `true`. Set it to `false` only when a dependency selects a rule file directly. Such a dependency does not activate the Skill. The optional `includes` list composes other declared loading units. Eutaxis deduplicates files shared by several included units and rejects composition cycles.
 
-Use small loading units for tool-read batches and composite loading units for complete task routes. A batch limit prevents one tool response from truncating. A route limit constrains the full context activated by the task. The command `eutaxis skills budget -c <config> --agent <adapter>` reports every entrypoint, batch, and route. The command fails when bytes cross a declared limit or the rendered skill lacks a named rule.
+The optional `publish_to` field names the task module whose Skill owns a generated route manifest. A published unit must include that owner's entrypoint. Eutaxis adds one route index to the owner entrypoint. Eutaxis places the route and included batch manifests under `routes/`. The generated files link to the exact installed Skill files for the selected adapter. The owner's hash and budget cover them, while the drift and sync commands manage them. Publishing a loading unit does not add another native Skill entry.
+
+Use small loading units for tool-read batches and composite loading units for complete task routes. A batch limit prevents one tool response from truncating. A route limit constrains the full context activated by the task. The command `eutaxis skills budget -c <config> --agent <adapter>` reports every entrypoint, batch, and route. For a published route, the reported byte total includes its generated manifests. When several owners publish one batch, the batch limit covers the largest owner-specific manifest. The loading-unit diagnostic reports every owner variant. The command fails when bytes cross a declared limit or the rendered Skill lacks a named rule.
 
 ## Cumulative instruction chains
 
