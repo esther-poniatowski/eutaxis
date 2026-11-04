@@ -64,6 +64,28 @@ def test_authoritative_and_verification_reads_retain_exact_evidence(
     assert verified.verification.before == authoritative.before
 
 
+def test_optional_reads_distinguish_absence_from_rejected_paths(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "present").write_bytes(b"present")
+    (source / "directory").mkdir()
+    (source / "linked").symlink_to(source / "present")
+    baseline = _fd_count()
+
+    with _trusted(tmp_path) as workspace:
+        with workspace.retain_directory("source") as retained:
+            assert retained.read_optional_authoritative("missing") is None
+            assert retained.read_optional_authoritative("present").data == b"present"
+            with pytest.raises(ByteCarrierError):
+                retained.read_optional_authoritative("directory")
+            with pytest.raises(ByteCarrierError):
+                retained.read_optional_authoritative("linked")
+
+    assert _fd_count() == baseline
+
+
 def test_dot_retains_the_already_open_trusted_directory(tmp_path: Path) -> None:
     (tmp_path / "rule.yaml").write_bytes(b"rule")
     with _trusted(tmp_path) as trusted:

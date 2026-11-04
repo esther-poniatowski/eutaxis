@@ -528,6 +528,36 @@ The commit-type and blob reads disable lazy fetching and use only the admitted
 local object store. Declaration bytes still come from the descriptor boundary;
 the Git blob reads are comparisons and never become parser input.
 
+The version 1 runner selects `/usr/bin/git` from a code-owned constant. The
+runner records three groups of filesystem fields:
+
+- device and inode
+- mode and size
+- modification timestamp and change timestamp
+
+The recorded fields must remain unchanged when Git starts. Then, the runner
+forks a child through a borrowed workspace descriptor. The child closes every
+non-standard descriptor and executes Git.
+The child passes normalized Git-directory and worktree paths relative to the
+retained workspace. Thus, ambient current-directory paths cannot select either
+repository.
+
+The runner bounds output size and execution time. Fixed locale and environment
+values exclude ambient inputs. The passive configuration profile accepts two
+remote forms:
+
+- local, relative and secure-copy-like paths
+- the standard scheme set `file|git|http|https|ssh`
+
+An unknown scheme or explicit remote-helper form fails before any repository
+query.
+
+Before Git reads an object, the runner walks both local `objects` trees through
+retained descriptors. The runner rejects every symbolic link and special file.
+Otherwise, Git could follow a path outside the validated Git directory. After
+declaration parsing, the runner walks both trees again and repeats the local Git
+queries. The two runs must return matching tree snapshots and query results.
+
 The loader performs the authoritative read of every Git metadata carrier,
 declaration carrier, manifest, lock, and facet carrier, then performs the
 verification reads after all declaration parsing. Each reopened path must name

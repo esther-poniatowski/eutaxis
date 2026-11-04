@@ -327,6 +327,29 @@ class RetainedDirectory:
             root_identity=root_identity,
         )
 
+    def read_optional_authoritative(self, path: str) -> AuthoritativeByteCarrier | None:
+        """Read an optional file, while rejecting every non-absence failure."""
+        root_path, root_identity = _issued_retained_context(self)
+        root = _borrow_retained_descriptor(self, parent=False)
+        try:
+            try:
+                observation = _read_file_at(root, path)
+            except ByteCarrierError as exc:
+                if isinstance(exc.__cause__, FileNotFoundError):
+                    return None
+                raise
+        finally:
+            try:
+                os.close(root)
+            except OSError as exc:
+                raise ByteCarrierError(root_path, str(exc)) from exc
+        return _issue_byte_carrier(
+            observation,
+            role="authoritative",
+            root_path=root_path,
+            root_identity=root_identity,
+        )
+
     def verify(self, carrier: AuthoritativeByteCarrier) -> VerifiedByteCarrier:
         """Revalidate the root, reopen the logical path, and compare observations."""
         root_path, root_identity = _issued_retained_context(self)

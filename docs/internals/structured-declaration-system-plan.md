@@ -292,7 +292,9 @@ This phase has turned the validated registry into a static query boundary, resol
   - [x] Retain one contract without Git entries in a non-consumable stage:
     - [x] retain every external root and carrier
     - [x] retain the ordered additive facet set
-- [ ] Implement the closed Git-submodule proof and repeatable transport verification.
+- [ ] Prove closed Git-submodule state once before the loader reads source files and once afterward:
+  - [x] Build the private Git transport proof across two matching passes.
+  - [ ] Attach each verified Git proof to the private external acquisition stage.
 - [ ] Enforce namespace, owner, and declaration-reference grammar before combined registry construction.
 - [ ] Move the persisted catalog to `index-revision: 2`.
 - [ ] Publish migration tooling, semantic-diff tooling, and rollback before converting an external source.
@@ -443,6 +445,59 @@ medium-severity defect. The final checks report:
 - MyPy accepts five production modules
 - Black accepts eight changed Python files
 - `git diff --check` passes
+
+The private Git transport code now proves one source against the complete
+acquisition contract. The code derives every declaration path and owned facet
+path from that contract. Each returned proof retains the selected contract
+objects.
+
+The proof follows this order:
+
+1. The transport checks the parent index and `.gitmodules`.
+2. The transport checks both repository configurations.
+3. The transport checks the nested pointer and every reference carrier.
+4. The transport walks both local object stores.
+5. The transport binds each worktree carrier to a regular blob in the commit.
+6. The loader reads every source file.
+7. The transport repeats every carrier read and absence check.
+8. The transport walks both object stores again.
+9. The transport repeats each local Git query.
+10. The transport closes every root after both passes match.
+11. The transport returns the proof only after the roots close.
+
+Four adversarial passes examined this sub-slice:
+
+- pass one found five defect classes:
+  - object-store paths could escape
+  - Git paths admitted non-canonical forms
+  - repository configuration remained open
+  - the packed-reference parser skipped admitted carriers
+  - exceptional process paths leaked resources
+- pass two found four incomplete repairs:
+  - detached contract members permitted proof splicing
+  - descriptors were borrowed before temporary files were ready
+  - remote values still admitted commands
+  - the parser ignored declared sort order
+- pass three found one remaining route through an unknown remote scheme
+- pass four found no high- or medium-severity defect
+
+The final checks report:
+
+- 139 focused Git and carrier tests pass
+- 359 targeted downstream tests pass
+- MyPy accepts four production modules
+- Black accepts six changed Python files
+- Hermeneia accepts both changed documentation files
+- `git diff --check` passes
+
+Each repaired class has a planted failure. The Git transport layer remains
+private and non-consumable. The acquisition stage still rejects every Git
+entry. Thus, the parent Git item remains open. The following slice must:
+
+1. open one transport proof for each Git source;
+2. bind the carriers already read for parsing;
+3. repeat the transport checks after parsing;
+4. store each verified proof in the generalized external source record.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 
