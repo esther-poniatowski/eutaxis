@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from types import MappingProxyType
 from typing import NoReturn, cast
 
+from .acquisition_paths import AcquisitionPathError, normalized_relative_path
 from .catalog import CATALOG_INDEX_REVISION, CatalogSource, ExactContractKey
 from .catalog_schema import validate_catalog_index_payload
 from .exceptions import DeclarationCatalogError
@@ -18,6 +20,9 @@ from .static_query import StaticCatalogQuery, matches_static_query
 _CONTENT_KINDS = frozenset(
     {DeclarationKind.RULE_SET, DeclarationKind.RULE, DeclarationKind.PROCEDURE}
 )
+_NAMESPACE = re.compile(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")
+_V1_DIGEST = re.compile(r"[0-9a-f]{64}")
+_V2_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 @dataclass(frozen=True)
@@ -32,6 +37,7 @@ class PersistedCatalogRelation:
 class PersistedCatalogProvenance:
     """Portable source coordinates retained by a persisted index row."""
 
+    namespace: str | None
     path: str
     document_path: tuple[str | int, ...]
     line: int
@@ -61,6 +67,7 @@ class PersistedCatalogIndex:
     """An immutable query projection, never a registry or resolver input."""
 
     revision: int
+    facet_content_revision: str | None
     sources: tuple[CatalogSource, ...]
     declarations: Mapping[str, PersistedCatalogEntry]
     contracts: Mapping[ExactContractKey, PersistedCatalogEntry]
@@ -131,16 +138,15 @@ def load_persisted_catalog_index(
         )
     except (_DuplicateKeyError, ValueError, json.JSONDecodeError) as error:
         _fail(source, "$", str(error))
-    if isinstance(parsed, Mapping):
-        revision = parsed.get("index-revision")
-        if revision != CATALOG_INDEX_REVISION:
-            _fail(
-                source,
-                "$.index-revision",
-                f"unsupported index revision {revision!r}",
-            )
+    revision = parsed.get("index-revision") if isinstance(parsed, Mapping) else None
+    if type(revision) is not int or revision not in (1, CATALOG_INDEX_REVISION):
+        _fail(
+            source,
+            "$.index-revision",
+            f"unsupported index revision {revision!r}",
+        )
     document = validate_catalog_index_payload(parsed, source=source)
-    return _build_persisted_index(document, source=source)
+    return _build_persisted_index(document, revision=revision, source=source)
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -158,29 +164,69 @@ def _reject_constant(value: str) -> object:
     raise ValueError(f"non-JSON numeric constant {value!r}")
 
 
+def _source_key(value: tuple[str | None, str]) -> tuple[str, str]:
+    """Sort legacy and namespaced source coordinates deterministically."""
+    return value[0] or "", value[1]
+
+
 def _build_persisted_index(
     document: Mapping[str, object],
     *,
+    revision: int,
     source: Path | None,
 ) -> PersistedCatalogIndex:
     """Freeze validated rows after checking cross-entry index integrity."""
+    facet_content_revision = cast(str | None, document.get("facet-content-revision"))
+    if revision == CATALOG_INDEX_REVISION:
+        _validate_digest(
+            cast(str, facet_content_revision),
+            revision=revision,
+            source=source,
+            location="$.facet-content-revision",
+        )
     source_rows = cast(list[dict[str, object]], document["sources"])
-    sources: dict[str, CatalogSource] = {}
+    sources: dict[tuple[str | None, str], CatalogSource] = {}
     for index, source_row in enumerate(source_rows):
         path = cast(str, source_row["path"])
+        namespace = (
+            cast(str, source_row["namespace"])
+            if revision == CATALOG_INDEX_REVISION
+            else None
+        )
         _validate_portable_path(
             path, source=source, location=f"$.sources[{index}].path"
         )
-        if path in sources:
-            _fail(source, f"$.sources[{index}].path", f"duplicate source path {path!r}")
-        sources[path] = CatalogSource(path=path, sha256=cast(str, source_row["sha256"]))
+        if namespace is not None:
+            _validate_namespace(
+                namespace,
+                source=source,
+                location=f"$.sources[{index}].namespace",
+            )
+        _validate_digest(
+            cast(str, source_row["sha256"]),
+            revision=revision,
+            source=source,
+            location=f"$.sources[{index}].sha256",
+        )
+        source_key = (namespace, path)
+        if source_key in sources:
+            _fail(
+                source,
+                f"$.sources[{index}].path",
+                f"duplicate source coordinate {source_key!r}",
+            )
+        sources[source_key] = CatalogSource(
+            namespace=namespace,
+            path=path,
+            sha256=cast(str, source_row["sha256"]),
+        )
 
     declarations: dict[str, PersistedCatalogEntry] = {}
     entry_locations: dict[int, str] = {}
     for index, declaration_row in enumerate(
         cast(list[Mapping[str, object]], document["declarations"])
     ):
-        entry = _entry(declaration_row, version=None)
+        entry = _entry(declaration_row, version=None, revision=revision)
         if entry.id in declarations:
             _fail(
                 source,
@@ -196,7 +242,7 @@ def _build_persisted_index(
         cast(list[Mapping[str, object]], document["contracts"])
     ):
         version = cast(int, contract_row["version"])
-        entry = _entry(contract_row, version=version)
+        entry = _entry(contract_row, version=version, revision=revision)
         if entry.id in declarations:
             _fail(
                 source,
@@ -233,7 +279,9 @@ def _build_persisted_index(
     conflicts = _validated_conflicts(
         cast(list[list[str]], document["conflicts"]), source=source
     )
-    used_sources = {entry.source.path for entry in all_entries}
+    used_sources = {
+        (entry.source.namespace, entry.source.path) for entry in all_entries
+    }
     orphaned = sorted(set(sources) - used_sources)
     if orphaned:
         _fail(source, "$.sources", f"orphan source path {orphaned[0]!r}")
@@ -243,8 +291,9 @@ def _build_persisted_index(
         key=lambda item: (item[0].kind.value, item[0].id, item[0].version),
     )
     return PersistedCatalogIndex(
-        revision=CATALOG_INDEX_REVISION,
-        sources=tuple(sources[path] for path in sorted(sources)),
+        revision=revision,
+        facet_content_revision=facet_content_revision,
+        sources=tuple(sources[key] for key in sorted(sources, key=_source_key)),
         declarations=MappingProxyType(
             {
                 identifier: declarations[identifier]
@@ -260,6 +309,7 @@ def _entry(
     row: Mapping[str, object],
     *,
     version: int | None,
+    revision: int,
 ) -> PersistedCatalogEntry:
     """Copy one schema-valid mutable row into immutable value objects."""
     kind = DeclarationKind(cast(str, row["kind"]))
@@ -301,6 +351,11 @@ def _entry(
         query=query,
         containing_rule_set=cast(str | None, row["containing-rule-set"]),
         source=PersistedCatalogProvenance(
+            namespace=(
+                cast(str, source_row["namespace"])
+                if revision == CATALOG_INDEX_REVISION
+                else None
+            ),
             path=cast(str, source_row["path"]),
             document_path=tuple(cast(list[str | int], source_row["document-path"])),
             line=cast(int, source_row["line"]),
@@ -313,7 +368,7 @@ def _entry(
 def _validate_entry_integrity(
     entries: tuple[PersistedCatalogEntry, ...],
     declarations: Mapping[str, PersistedCatalogEntry],
-    source_paths: frozenset[str],
+    source_paths: frozenset[tuple[str | None, str]],
     raw_conflicts: list[list[str]],
     entry_locations: Mapping[int, str],
     *,
@@ -328,16 +383,32 @@ def _validate_entry_integrity(
     asserted_conflicts: dict[tuple[str, str], str] = {}
     dependency_edges: dict[str, list[tuple[str, str]]] = {}
     supersedes_edges: dict[str, list[tuple[str, str]]] = {}
-    coordinates: dict[tuple[str, tuple[str | int, ...]], str] = {}
+    coordinates: dict[tuple[str | None, str, tuple[str | int, ...]], str] = {}
     for entry in entries:
         entry_location = entry_locations[id(entry)]
-        if entry.source.path not in source_paths:
+        _validate_portable_path(
+            entry.source.path,
+            source=source,
+            location=f"{entry_location}.source.path",
+        )
+        if entry.source.namespace is not None:
+            _validate_namespace(
+                entry.source.namespace,
+                source=source,
+                location=f"{entry_location}.source.namespace",
+            )
+        source_key = (entry.source.namespace, entry.source.path)
+        if source_key not in source_paths:
             _fail(
                 source,
                 f"{entry_location}.source.path",
                 f"unknown source path {entry.source.path!r}",
             )
-        coordinate = (entry.source.path, entry.source.document_path)
+        coordinate = (
+            entry.source.namespace,
+            entry.source.path,
+            entry.source.document_path,
+        )
         if coordinate in coordinates:
             _fail(
                 source,
@@ -409,7 +480,13 @@ def _validate_entry_integrity(
                     f"{container!r} is not an indexed rule set",
                 )
             assert target is not None
-            if target.source.path != entry.source.path:
+            if (
+                target.source.namespace,
+                target.source.path,
+            ) != (
+                entry.source.namespace,
+                entry.source.path,
+            ):
                 _fail(
                     source,
                     f"{entry_location}.containing-rule-set",
@@ -516,15 +593,34 @@ def _validate_portable_path(
     location: str,
 ) -> None:
     """Reject paths that are not normalized relative POSIX paths."""
-    parts = value.split("/")
-    if (
-        value.startswith("/")
-        or "\\" in value
-        or "\x00" in value
-        or any(part in {"", ".", ".."} for part in parts)
-        or PurePosixPath(value).as_posix() != value
-    ):
+    try:
+        normalized_relative_path(value, allow_dot=False)
+    except AcquisitionPathError:
         _fail(source, location, f"path {value!r} is not portable and normalized")
+
+
+def _validate_namespace(
+    value: str,
+    *,
+    source: Path | None,
+    location: str,
+) -> None:
+    """Require an exact namespace grammar match."""
+    if _NAMESPACE.fullmatch(value) is None:
+        _fail(source, location, f"namespace {value!r} is invalid")
+
+
+def _validate_digest(
+    value: str,
+    *,
+    revision: int,
+    source: Path | None,
+    location: str,
+) -> None:
+    """Require the exact digest grammar of one index revision."""
+    pattern = _V2_DIGEST if revision == CATALOG_INDEX_REVISION else _V1_DIGEST
+    if pattern.fullmatch(value) is None:
+        _fail(source, location, f"digest {value!r} is invalid")
 
 
 def _canonical_json(value: object) -> JsonValue:

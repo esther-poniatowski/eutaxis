@@ -22,11 +22,13 @@ from eutaxis.declarations import (
     ProcedurePredicateEnforcement,
     RuleCriterionEnforcement,
     VersionedReference,
-    build_declaration_catalog,
-    catalog_json_bytes,
     derive_enforcement_class,
     load_declaration_registry,
     load_facet_registry,
+)
+from eutaxis.declarations.catalog import (
+    _build_declaration_catalog_from_registry as build_declaration_catalog,
+    _legacy_catalog_json_bytes as catalog_json_bytes,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"

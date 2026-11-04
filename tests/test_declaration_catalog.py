@@ -18,10 +18,12 @@ from eutaxis.declarations import (
     DeclarationKind,
     DeclarationRegistry,
     ExactContractKey,
-    build_declaration_catalog,
-    catalog_json_bytes,
     load_declaration_registry,
     load_facet_registry,
+)
+from eutaxis.declarations.catalog import (
+    _build_declaration_catalog_from_registry as build_declaration_catalog,
+    _legacy_catalog_json_bytes as catalog_json_bytes,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -108,7 +110,7 @@ def test_catalog_json_is_deterministic_under_registry_iteration_changes() -> Non
     assert not first.endswith(b"\n\n")
 
 
-def test_catalog_serializer_canonicalizes_public_collection_order() -> None:
+def test_catalog_serializer_rejects_unissued_reordered_copy() -> None:
     catalog = _catalog()
     reordered = replace(
         catalog,
@@ -122,7 +124,9 @@ def test_catalog_serializer_canonicalizes_public_collection_order() -> None:
         ),
     )
 
-    assert catalog_json_bytes(reordered) == catalog_json_bytes(catalog)
+    with pytest.raises(DeclarationCatalogError, match="not issued here"):
+        catalog_json_bytes(reordered)
+    assert catalog_json_bytes(catalog) == catalog_json_bytes(catalog)
 
 
 def test_catalog_json_is_relocatable_and_preserves_unicode(tmp_path: Path) -> None:

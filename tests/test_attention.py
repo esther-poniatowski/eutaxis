@@ -81,7 +81,6 @@ from eutaxis.declarations import (
     RunnableAttentionRequirement,
     VersionedReference,
     build_checker_runner_registry,
-    build_declaration_catalog,
     build_detector_runner_registry,
     build_operation_runner_registry,
     build_observation_provider_registry,
@@ -95,6 +94,9 @@ from eutaxis.declarations import (
     plan_procedure_precondition_evaluations,
     prepare_procedure_run,
     resolve_compilation_unit,
+)
+from eutaxis.declarations.catalog import (
+    _build_declaration_catalog_from_registry as build_declaration_catalog,
 )
 from eutaxis.declarations.attention import (
     _capture_plan_authority_state,

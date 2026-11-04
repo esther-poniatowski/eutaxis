@@ -303,7 +303,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Enforce namespace, owner, and declaration-reference grammar before building the combined registry.
 - [x] Build the combined registry from the issued stage and apply the existing cross-record contracts.
 - [x] Issue one public acquisition result that binds the combined registry to every retained acquisition record.
-- [ ] Move the persisted catalog to `index-revision: 2`.
+- [x] Move the persisted catalog to `index-revision: 2`.
 - [ ] Publish lock generation, semantic-diff tooling, and rollback before converting an external source.
 - [ ] Complete the query, cumulative Markdown, and compact Skill projections selected by the pilot.
 - [ ] Pilot one coherent Oikos rule set and one procedure through the complete external-source path.
@@ -623,11 +623,39 @@ The public-result checks report:
 - Sphinx builds the generated API pages cleanly
 - `git diff --check` passes
 
-The catalog remains at `index-revision: 1` until those coordinates exist.
-Before the pilot converts an Oikos source, Eutaxis must write the persisted
-catalog with `index-revision: 2`. Eutaxis must also verify the general conversion
-commands. The pilot retains the current reviewed output as its golden artifact
-and rollback target.
+The public catalog builder now accepts only an issued external acquisition
+result. The builder writes `index-revision: 2` with the authenticated facet digest
+and portable `(namespace, path)` source coordinates. A private store binds each
+exact catalog object to its result, its source map and its emitted fields. Every
+public query and serializer checks this binding before reading any row and again
+after it finishes. The persisted loader reads the index number and selects one
+of two packaged schemas. The loader still reads index 1 but cannot use it to
+authorize externally acquired rules.
+
+The first catalog adversarial pass found three high-severity defects in how a
+catalog proved its origin. Two medium validation gaps accompanied them. The
+repair moved private state into the store. Every consumer now checks the catalog
+before reading and after finishing. The serializer records its inputs before it
+builds the payload. Its final check rejects any changed input.
+Exact runtime validators check scalar and path
+grammars. A planted case moves an embedded rule across namespaces at the same
+path. The second pass found two medium lifecycle gaps. Failed catalog checks did
+not discard their private entries. Two publication branches lacked interruption
+tests. After those repairs, the final re-gate found no high- or medium-severity
+defect.
+
+The revision-2 catalog checks report:
+
+- 130 focused tests of catalogs, persisted indexes and their consumers pass
+- 388 targeted downstream-consumer tests pass
+- MyPy accepts the four checked modules
+- Black accepts the eight checked Python files
+- the revision-1 and revision-2 golden indexes both pass
+- `git diff --check` passes
+
+Eutaxis must next publish and verify the general lock-generation, semantic-diff
+and rollback commands. The pilot retains the current reviewed output as its
+golden artifact and rollback target.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 

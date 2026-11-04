@@ -19,12 +19,14 @@ from eutaxis.declarations import (
     StaticCatalogQuery,
     StaticField,
     StaticPredicate,
-    build_declaration_catalog,
     catalog_index_schema,
-    catalog_json_bytes,
     load_declaration_registry,
     load_facet_registry,
     load_persisted_catalog_index,
+)
+from eutaxis.declarations.catalog import (
+    _build_declaration_catalog_from_registry as build_declaration_catalog,
+    _legacy_catalog_json_bytes as catalog_json_bytes,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -107,7 +109,7 @@ def test_packaged_schema_is_isolated_and_accepts_emitted_golden() -> None:
     second = catalog_index_schema()
     first["title"] = "mutated"
 
-    assert second["title"] == "Eutaxis static catalog index revision 1"
+    assert second["title"] == "Eutaxis static catalog index revision 2"
     loaded = load_persisted_catalog_index(
         catalog_json_bytes(_live_catalog()), source=GOLDEN_INDEX
     )
@@ -116,16 +118,17 @@ def test_packaged_schema_is_isolated_and_accepts_emitted_golden() -> None:
 
 def test_emitter_validates_its_payload_against_the_packaged_schema() -> None:
     catalog = _live_catalog()
-    invalid = replace(
+    object.__setattr__(
         catalog,
-        sources=(
-            CatalogSource(catalog.sources[0].path, "not-a-sha256"),
+        "sources",
+        (
+            CatalogSource(None, catalog.sources[0].path, "not-a-sha256"),
             *catalog.sources[1:],
         ),
     )
 
-    with pytest.raises(DeclarationCatalogError, match=r"sources\[0\].sha256"):
-        catalog_json_bytes(invalid)
+    with pytest.raises(DeclarationCatalogError, match="projection state changed"):
+        catalog_json_bytes(catalog)
 
 
 def test_persisted_lookup_and_nested_values_are_immutable() -> None:
@@ -191,7 +194,7 @@ def test_noncanonical_json_loads_into_canonical_collection_order() -> None:
         (b"\xff", "invalid UTF-8"),
         (b'{"index-revision":NaN}', "non-JSON numeric constant"),
         (b"{}", "unsupported index revision None"),
-        (b'{"index-revision":2}', "unsupported index revision 2"),
+        (b'{"index-revision":3}', "unsupported index revision 3"),
     ],
 )
 def test_loader_rejects_invalid_json_boundaries(data: bytes, message: str) -> None:
