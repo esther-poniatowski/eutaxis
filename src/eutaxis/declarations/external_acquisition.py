@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple, NoReturn, SupportsIndex
 
 from ._authority import IdentityAuthorityStore, identity_value_state
+from ._external_semantics import _validate_external_declaration_semantics
 from .acquisition_contract import (
     AcquisitionKind,
     AcquisitionLock,
@@ -167,6 +168,12 @@ def _acquire_external_stage(
                     sources,
                     external_authoritative,
                     parsing_facets,
+                )
+                _validate_all_declarations(
+                    len(packaged_reads.authoritative),
+                    sources,
+                    external_authoritative,
+                    declarations,
                 )
                 _bind_git_carriers(
                     git_sessions,
@@ -394,26 +401,51 @@ def _parse_all_declarations(
     external: tuple[tuple[AuthoritativeByteCarrier, ...], ...],
     composite: FacetRegistryView,
 ) -> tuple[LoadedDeclarationSource, ...]:
-    """Parse every retained declaration against the exact issued composite."""
+    """Parse every declaration in source order before authorization."""
     loaded: list[LoadedDeclarationSource] = []
     for carrier in packaged:
-        loaded.append(
-            load_declaration_source_bytes(
-                carrier.data,
-                path=Path(carrier.path),
-                facets=composite,
-            )
+        declaration = load_declaration_source_bytes(
+            carrier.data,
+            path=Path(carrier.path),
+            facets=composite,
         )
+        loaded.append(declaration)
     for source, carriers in zip(sources, external, strict=True):
         for carrier in carriers:
-            loaded.append(
-                load_declaration_source_bytes(
-                    carrier.data,
-                    path=Path(source.manifest.root) / carrier.path,
-                    facets=composite,
-                )
+            declaration = load_declaration_source_bytes(
+                carrier.data,
+                path=Path(source.manifest.root) / carrier.path,
+                facets=composite,
             )
+            loaded.append(declaration)
     return tuple(loaded)
+
+
+def _validate_all_declarations(
+    packaged_count: int,
+    sources: tuple[_OpenExternalSource, ...],
+    external: tuple[tuple[AuthoritativeByteCarrier, ...], ...],
+    declarations: tuple[LoadedDeclarationSource, ...],
+) -> None:
+    """Authorize the complete parsed corpus in its acquisition order."""
+    offset = 0
+    for file_index in range(packaged_count):
+        _validate_external_declaration_semantics(
+            declarations[offset],
+            "eutaxis",
+            f"$.internal-source.files[{file_index}]",
+        )
+        offset += 1
+    for source, carriers in zip(sources, external, strict=True):
+        for file_index, _carrier in enumerate(carriers):
+            _validate_external_declaration_semantics(
+                declarations[offset],
+                source.manifest.namespace,
+                f"$.sources[{source.position}].files[{file_index}]",
+            )
+            offset += 1
+    if offset != len(declarations):
+        raise AssertionError("parsed declaration count differs from acquired files")
 
 
 def _issue_stage(

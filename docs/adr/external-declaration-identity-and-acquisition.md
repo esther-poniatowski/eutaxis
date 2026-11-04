@@ -593,6 +593,10 @@ it visible. The full order is:
    observation
 9. build one combined registry and apply existing cross-record contracts
 
+The loader completes step 6 for the whole corpus before it begins step 7. The
+parser reports a schema or intrinsic-semantic defect in the final file before
+the namespace validator examines the first file.
+
 Private issued records connect these steps, but they do not certify that all
 required checks passed. The restricted external acquisition stage binds one
 complete contract. The stage retains the source roots and byte carriers. The

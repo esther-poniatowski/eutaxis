@@ -295,7 +295,8 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Prove closed Git-submodule state once before the loader reads source files and once afterward:
   - [x] Build the private Git transport proof across two matching passes.
   - [x] Attach each verified Git proof to the private external acquisition stage.
-- [ ] Enforce namespace, owner, and declaration-reference grammar before combined registry construction.
+- [x] Enforce namespace, owner, and declaration-reference grammar before building the combined registry.
+- [ ] Build the combined registry from the issued stage and apply the existing cross-record contracts.
 - [ ] Move the persisted catalog to `index-revision: 2`.
 - [ ] Publish migration tooling, semantic-diff tooling, and rollback before converting an external source.
 - [ ] Only then pilot one coherent Oikos rule set and one procedure.
@@ -512,10 +513,44 @@ focused tests show that the stage:
 - rejects forged stages
 - removes every issued record when the stage publisher raises `KeyboardInterrupt`
 
-Namespace, owner and declaration-reference checks remain open for the
-following slice.
+The external stage now authorizes the complete parsed corpus before the stage
+binds Git carriers or becomes final. The authorization pass:
 
-The final checks report:
+- requires every top-level and embedded identifier to use its source namespace
+- requires every declaration owner to equal that namespace
+- checks identifiers against the external grammar across the closed set of typed fields
+- accepts syntactically valid unknown targets for the combined registry to resolve
+- leaves local identifiers under their existing intrinsic grammars
+
+The first adversarial pass found one medium-severity defect in the phase order.
+The initial implementation authorized each file as soon as the parser returned
+that file. The per-file order could hide an intrinsic error in a file parsed
+afterward. The repaired implementation first parses the whole corpus. Only a
+successful final parser call starts the authorization pass. The precedence
+test places a namespace error in the first parsed file. The same test places an
+intrinsic error in the last file. The intrinsic error exits the parser before
+the validator runs. The focused re-gate found no high- or medium-severity
+defect.
+
+The combined registry must still:
+
+- reject duplicate identifiers
+- require each target to exist
+- require each target to have the expected kind
+- enforce version constraints
+
+The registry must pass these checks before the persisted catalog moves to
+`index-revision: 2`. Migration commands follow the catalog change.
+
+The authorization checks report:
+
+- 407 targeted tests pass
+- MyPy accepts the four checked production modules
+- Black accepts the four changed Python files
+- Hermeneia accepts both changed documentation files
+- `git diff --check` passes
+
+The Git-integration checks report:
 
 - 17 external-stage tests pass
 - 37 Git-transport tests pass

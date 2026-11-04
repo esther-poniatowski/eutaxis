@@ -18,6 +18,7 @@ import eutaxis.declarations.composite_facets as composite_module
 import eutaxis.declarations as declarations_api
 from eutaxis import data_path
 from eutaxis.declarations.acquisition_contract import (
+    PACKAGED_DECLARATION_PATHS,
     AcquisitionKind,
     AcquisitionLock,
     ExternalSourceLock,
@@ -32,7 +33,11 @@ from eutaxis.declarations.acquisition_contract import (
 )
 from eutaxis.declarations.canonical_json import jcs_bytes
 from eutaxis.declarations.byte_carriers import RetainedDirectory, TrustedDirectory
-from eutaxis.declarations.exceptions import AcquisitionContractError, ByteCarrierError
+from eutaxis.declarations.exceptions import (
+    AcquisitionContractError,
+    ByteCarrierError,
+    DeclarationSemanticError,
+)
 from eutaxis.declarations.git_transport import _issued_git_transport_state
 from eutaxis.declarations.external_acquisition import (
     _EVIDENCE_AUTHORITIES,
@@ -127,13 +132,14 @@ def _write_contract(
     root: str = ".",
     namespace: str = "oikos",
     git: GitLock | None = None,
+    declaration_bytes: bytes | None = None,
 ) -> tuple[str, str]:
     source_root = workspace if root == "." else workspace / root
     (source_root / "declarations").mkdir(parents=True, exist_ok=True)
     facet_path = "declarations/context-facets.yaml"
     declaration_path = "declarations/process-core.yaml"
     facet_bytes = _facet_source(namespace)
-    declaration_bytes = _declaration_source(namespace)
+    declaration_bytes = declaration_bytes or _declaration_source(namespace)
     (source_root / facet_path).write_bytes(facet_bytes)
     (source_root / declaration_path).write_bytes(declaration_bytes)
 
@@ -465,6 +471,110 @@ def test_workspace_path_may_be_relative_dot(
     )
 
     assert len(_issued_external_stage_state(stage).declarations) == 6
+
+
+def test_acquisition_authorizes_every_packaged_and_external_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, lock_path = _write_contract(tmp_path)
+    original = acquisition_module._validate_external_declaration_semantics
+    original_parse = acquisition_module.load_declaration_source_bytes
+    calls: list[tuple[str, str]] = []
+    events: list[str] = []
+
+    def parse(*args, **kwargs):
+        events.append("parse")
+        return original_parse(*args, **kwargs)
+
+    def record(source, namespace, location):
+        events.append("authorize")
+        calls.append((namespace, location))
+        return original(source, namespace, location)
+
+    monkeypatch.setattr(acquisition_module, "load_declaration_source_bytes", parse)
+    monkeypatch.setattr(
+        acquisition_module,
+        "_validate_external_declaration_semantics",
+        record,
+    )
+
+    _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
+
+    assert events == ["parse"] * len(calls) + ["authorize"] * len(calls)
+    assert calls == [
+        *(
+            ("eutaxis", f"$.internal-source.files[{index}]")
+            for index, _path in enumerate(PACKAGED_DECLARATION_PATHS)
+        ),
+        ("oikos", "$.sources[0].files[0]"),
+    ]
+
+
+def test_acquisition_rejects_external_namespace_impersonation(tmp_path: Path) -> None:
+    source = _declaration_source("oikos").replace(
+        b"id: oikos/reader-purpose",
+        b"id: other/reader-purpose",
+    )
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        declaration_bytes=source,
+    )
+
+    with pytest.raises(
+        AcquisitionContractError,
+        match="identifier namespace differs",
+    ) as raised:
+        _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
+
+    assert raised.value.location == "$.sources[0].files[0].id"
+
+
+def test_later_intrinsic_failure_precedes_earlier_authorization_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, lock_path = _write_contract(tmp_path)
+    original_parse = acquisition_module.load_declaration_source_bytes
+    parse_count = 0
+    authorization_count = 0
+
+    def parse(*args, **kwargs):
+        nonlocal parse_count
+        declaration = original_parse(*args, **kwargs)
+        parse_count += 1
+        if parse_count == 1:
+            object.__setattr__(declaration.declaration, "id", "other/impersonation")
+        if parse_count == len(PACKAGED_DECLARATION_PATHS) + 1:
+            raise DeclarationSemanticError(
+                declaration.path,
+                "$.later-field",
+                "injected later intrinsic failure",
+            )
+        return declaration
+
+    monkeypatch.setattr(acquisition_module, "load_declaration_source_bytes", parse)
+    original_authorize = acquisition_module._validate_external_declaration_semantics
+
+    def count_authorization(*args, **kwargs):
+        nonlocal authorization_count
+        authorization_count += 1
+        return original_authorize(*args, **kwargs)
+
+    monkeypatch.setattr(
+        acquisition_module,
+        "_validate_external_declaration_semantics",
+        count_authorization,
+    )
+
+    with pytest.raises(
+        DeclarationSemanticError,
+        match="injected later intrinsic failure",
+    ):
+        _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
+
+    assert parse_count == len(PACKAGED_DECLARATION_PATHS) + 1
+    assert authorization_count == 0
 
 
 def test_zero_extensions_preserves_the_packaged_composite(
