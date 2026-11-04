@@ -296,7 +296,8 @@ This phase has turned the validated registry into a static query boundary, resol
   - [x] Build the private Git transport proof across two matching passes.
   - [x] Attach each verified Git proof to the private external acquisition stage.
 - [x] Enforce namespace, owner, and declaration-reference grammar before building the combined registry.
-- [ ] Build the combined registry from the issued stage and apply the existing cross-record contracts.
+- [x] Build the combined registry from the issued stage and apply the existing cross-record contracts.
+- [ ] Issue one public acquisition result that binds the combined registry to every retained acquisition record.
 - [ ] Move the persisted catalog to `index-revision: 2`.
 - [ ] Publish migration tooling, semantic-diff tooling, and rollback before converting an external source.
 - [ ] Only then pilot one coherent Oikos rule set and one procedure.
@@ -532,16 +533,6 @@ intrinsic error in the last file. The intrinsic error exits the parser before
 the validator runs. The focused re-gate found no high- or medium-severity
 defect.
 
-The combined registry must still:
-
-- reject duplicate identifiers
-- require each target to exist
-- require each target to have the expected kind
-- enforce version constraints
-
-The registry must pass these checks before the persisted catalog moves to
-`index-revision: 2`. Migration commands follow the catalog change.
-
 The authorization checks report:
 
 - 407 targeted tests pass
@@ -562,6 +553,45 @@ The Git-integration checks report:
 - Black accepts the four changed Python files
 - Hermeneia accepts both changed documentation files
 - `git diff --check` passes
+
+The private combined-registry boundary now:
+
+- reads only the parsed sources retained by the issued stage
+- preserves packaged, manifest-source, file and authored record order
+- retains the exact composite facet registry used during parsing
+- applies the existing checks for duplicate identifiers and relations
+- resolves exact contracts and checks every procedure `action` against its operation contract
+- validates policies and composition manifests
+- reauthenticates the stage after both successful and failed builds
+
+The first adversarial pass found two medium-severity defects. The initial
+refactor parsed all legacy paths before it indexed any source. Therefore, a
+malformed final source hid a duplicate in the preceding source. The repaired
+loader for explicit paths authenticates its facet registry first. Each
+canonical path enters the registry in lexical order. In contrast, the external
+route alone accepts preloaded sources in acquisition order.
+
+The second defect left the failure branch of the final stage check without a
+planted failure. The test for the failure branch changes retained declaration
+state and raises a registry error during the same build. The stage check reports
+the authority error and preserves the registry error as its cause. The focused
+re-gate found no high- or medium-severity defect.
+
+The combined-registry checks report:
+
+- 66 focused tests pass
+- 498 downstream-consumer tests pass
+- MyPy accepts the three checked production modules
+- Black accepts the five changed Python files
+- Hermeneia accepts both changed documentation files
+- `git diff --check` passes
+
+The combined registry remains private. The public acquisition result must
+retain the combined registry together with every source and transport record.
+Only that issued result can carry the combined registry into a semantic consumer.
+The result must also define portable source coordinates.
+The catalog remains at `index-revision: 1` until those coordinates exist.
+Migration commands follow the catalog change.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 

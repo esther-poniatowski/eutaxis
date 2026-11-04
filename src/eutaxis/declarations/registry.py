@@ -90,17 +90,45 @@ def load_declaration_registry(
     paths: Iterable[Path], facets: FacetRegistryView
 ) -> DeclarationRegistry:
     """Load and cross-validate a deterministic declaration corpus."""
-    return _RegistryBuilder(paths, facets).build()
+    facets.require_authority()
+    canonical_paths = tuple(
+        sorted({path.resolve() for path in paths}, key=lambda path: str(path))
+    )
+    return _RegistryBuilder(
+        canonical_paths,
+        lambda: (
+            load_declaration_source(path, facets=facets) for path in canonical_paths
+        ),
+        facets,
+    ).build()
+
+
+def _build_declaration_registry_from_sources(
+    sources: Iterable[LoadedDeclarationSource],
+    facets: FacetRegistryView,
+) -> DeclarationRegistry:
+    """Cross-validate parsed sources in their caller-established order."""
+    facets.require_authority()
+    ordered_sources = tuple(sources)
+    return _RegistryBuilder(
+        tuple(source.path for source in ordered_sources),
+        lambda: ordered_sources,
+        facets,
+    ).build()
 
 
 class _RegistryBuilder:
     """Index sources first, then validate contracts against the closed index."""
 
-    def __init__(self, paths: Iterable[Path], facets: FacetRegistryView) -> None:
+    def __init__(
+        self,
+        paths: tuple[Path, ...],
+        sources: Callable[[], Iterable[LoadedDeclarationSource]],
+        facets: FacetRegistryView,
+    ) -> None:
         facets.require_authority()
-        self.paths = tuple(
-            sorted({path.resolve() for path in paths}, key=lambda path: str(path))
-        )
+        self.paths = paths
+        self.sources = sources
         self.facets = facets
         self.records: dict[str, RegisteredDeclaration] = {}
         self.families: dict[str, _FamilyState] = {}
@@ -137,8 +165,7 @@ class _RegistryBuilder:
 
     def _index_sources(self) -> None:
         """Register top-level declarations and embedded rules in source order."""
-        for path in self.paths:
-            source = load_declaration_source(path, facets=self.facets)
+        for source in self.sources():
             declaration = source.declaration
             self._register(declaration, source, (), containing_rule_set=None)
             if isinstance(declaration, RuleSetDeclaration):

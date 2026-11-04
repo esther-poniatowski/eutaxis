@@ -597,6 +597,17 @@ The loader completes step 6 for the whole corpus before it begins step 7. The
 parser reports a schema or intrinsic-semantic defect in the final file before
 the namespace validator examines the first file.
 
+Step 9 accepts only the issued external acquisition stage. The private
+external-registry boundary authenticates that stage and obtains the exact
+loaded declaration sources and composite facet registry. Therefore, the shared
+registry builder reuses those values without reopening a declaration path. The
+shared builder preserves acquisition order and applies every existing
+cross-record contract. The private boundary authenticates the stage again
+after both successful and failed builds. The combined registry remains private
+until the public acquisition result binds the registry to every retained
+acquisition record. The loader for explicit source paths continues to visit
+canonical paths in lexical order.
+
 Private issued records connect these steps, but they do not certify that all
 required checks passed. The restricted external acquisition stage binds one
 complete contract. The stage retains the source roots and byte carriers. The
@@ -799,6 +810,10 @@ The following failures are distinct:
   process-local issued result before the Oikos pilot.
 - The combined registry always includes the locked packaged Eutaxis contracts
   and uses the one locked facet vocabulary retained by the acquisition result.
+- Paths in the combined registry identify diagnostics and record order only.
+  The builder for `index-revision: 2` must obtain portable source coordinates
+  from the issued acquisition result. The current catalog builder cannot
+  accept the private external registry.
 - Catalog index revision 2 becomes a coordinated schema and API migration; the
   current index remains a compatibility reader, not an external authority.
 - Lock generation, semantic diffing, and rollback tooling remain required

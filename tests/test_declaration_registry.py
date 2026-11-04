@@ -111,6 +111,28 @@ def test_future_resolution_corpus_satisfies_static_registry_contracts(
     assert registry.conflicts == {("resolution/alternate", "resolution/refined")}
 
 
+def test_legacy_loader_indexes_each_source_before_loading_the_next(
+    tmp_path: Path,
+    facets,
+) -> None:
+    source = (REGISTRY_FIXTURES / "evaluator.yaml").read_bytes()
+    first = tmp_path / "a-first.yaml"
+    duplicate = tmp_path / "b-duplicate.yaml"
+    malformed = tmp_path / "z-malformed.yaml"
+    first.write_bytes(source)
+    duplicate.write_bytes(source)
+    malformed.write_bytes(b"not: [valid")
+
+    with pytest.raises(
+        DeclarationRegistryError,
+        match="duplicate contract version",
+    ) as raised:
+        load_declaration_registry((malformed, duplicate, first), facets)
+
+    assert raised.value.path == duplicate.resolve()
+    assert raised.value.location == "$.version"
+
+
 def test_non_content_relations_fail_at_the_first_relation_item(
     tmp_path: Path, facets
 ) -> None:

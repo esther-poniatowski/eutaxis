@@ -133,15 +133,27 @@ def _write_contract(
     namespace: str = "oikos",
     git: GitLock | None = None,
     declaration_bytes: bytes | None = None,
+    declaration_files: tuple[tuple[str, bytes], ...] | None = None,
 ) -> tuple[str, str]:
     source_root = workspace if root == "." else workspace / root
     (source_root / "declarations").mkdir(parents=True, exist_ok=True)
     facet_path = "declarations/context-facets.yaml"
-    declaration_path = "declarations/process-core.yaml"
     facet_bytes = _facet_source(namespace)
-    declaration_bytes = declaration_bytes or _declaration_source(namespace)
+    if declaration_files is None:
+        declaration_files = (
+            (
+                "declarations/process-core.yaml",
+                (
+                    declaration_bytes
+                    if declaration_bytes is not None
+                    else _declaration_source(namespace)
+                ),
+            ),
+        )
     (source_root / facet_path).write_bytes(facet_bytes)
-    (source_root / declaration_path).write_bytes(declaration_bytes)
+    for declaration_path, source in declaration_files:
+        (source_root / declaration_path).parent.mkdir(parents=True, exist_ok=True)
+        (source_root / declaration_path).write_bytes(source)
 
     facet_sha = _digest(facet_bytes)
     facet_content = facet_content_revision(
@@ -172,8 +184,11 @@ def _write_contract(
         facet_path,
         facet_sha,
     )
-    locked_file = LockedFile(declaration_path, _digest(declaration_bytes))
-    source_content = source_content_revision(namespace, (locked_file,))
+    locked_files = tuple(
+        LockedFile(declaration_path, _digest(source))
+        for declaration_path, source in declaration_files
+    )
+    source_content = source_content_revision(namespace, locked_files)
     source_payload: dict[str, object] = {
         "schema-version": 1,
         "namespace": namespace,
@@ -187,7 +202,7 @@ def _write_contract(
     external = ExternalSourceLock(
         source_acquisition,
         source_content,
-        (locked_file,),
+        locked_files,
         kind,
         namespace,
         git,
@@ -222,7 +237,7 @@ def _write_contract(
                 "namespace": namespace,
                 "kind": kind.value,
                 "root": root,
-                "files": [declaration_path],
+                "files": [path for path, _source in declaration_files],
             }
         ],
     }
