@@ -782,6 +782,58 @@ def test_generate_plan_reports_drift_and_cumulative_budgets(tmp_path: Path) -> N
     assert index_target.read_text(encoding="utf-8") == "# Old index\n"
 
 
+def test_check_fails_for_stale_standalone_rule_index(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text(
+        "# Rules\n\n**purpose**:\n\nCurrent.\n", encoding="utf-8"
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        "common_sources:\n  - rules.md\n"
+        "rule_index_enabled: true\n"
+        "rule_index_target:\n"
+        "  path: rule-index.md\n"
+        "agents:\n"
+        "  - name: codex\n"
+        "    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    generated = runner.invoke(app, ["generate", "-c", str(config)])
+    assert generated.exit_code == 0, generated.output
+    (tmp_path / "rule-index.md").write_text("# Stale index\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["check", "-c", str(config)])
+
+    assert result.exit_code == 1
+    assert "[OK      ] codex" in result.output
+    assert "[OUTDATED] rule-index" in result.output
+
+
+def test_check_reports_current_standalone_rule_index(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text(
+        "# Rules\n\n**purpose**:\n\nCurrent.\n", encoding="utf-8"
+    )
+    config = tmp_path / "agent-instructions.yaml"
+    config.write_text(
+        "common_sources:\n  - rules.md\n"
+        "rule_index_enabled: true\n"
+        "rule_index_target:\n"
+        "  path: rule-index.md\n"
+        "agents:\n"
+        "  - name: codex\n"
+        "    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    generated = runner.invoke(app, ["generate", "-c", str(config)])
+    assert generated.exit_code == 0, generated.output
+
+    result = runner.invoke(app, ["check", "-c", str(config)])
+
+    assert result.exit_code == 0, result.output
+    assert "[OK      ] rule-index" in result.output
+
+
 def test_strict_rule_labels_fails_generate_before_writing(tmp_path: Path) -> None:
     config = _rejected_label_workspace(tmp_path, strict=True)
 

@@ -75,7 +75,7 @@ eutaxis check -c <config-file>
 | `--diff` | | `false` | Print unified diffs for stale outputs. |
 | `--ignore-budget` | | `false` | Report budget overruns without making them fail the check. |
 
-Exit code `0` means all selected outputs are current and within budget. Exit code `1` means that an output differs from its generated content or exceeds a configured budget. The command reports rejected label lines in the same form as `generate`. With `strict_rule_labels: true`, a rejected label also fails the check.
+Exit code `0` means all selected outputs are current and within budget. Without an agent filter, the selected outputs include the standalone rule index. Exit code `1` means that an output differs from its generated content or exceeds a configured budget. The command reports rejected label lines in the same form as `generate`. With `strict_rule_labels: true`, a rejected label also fails the check.
 
 ---
 

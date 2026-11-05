@@ -224,6 +224,9 @@ def cli_check(
         chain_reports = list(
             generator.instruction_chain_budget_report(agent_name=agent)
         )
+        standalone_report = (
+            generator.standalone_rule_index_diff() if agent is None else None
+        )
     except InstructionError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=exc.exit_code) from exc
@@ -245,6 +248,17 @@ def cli_check(
         stale = stale or differs
         if diff and differs:
             typer.echo(generator.unified_diff(agent_config.name))
+
+    if standalone_report is not None:
+        path, content, standalone_diff = standalone_report
+        differs = bool(standalone_diff)
+        status = "OUTDATED" if differs else "OK"
+        typer.echo(
+            f"[{status:8}] rule-index [{len(content.encode('utf-8'))} B]: {path}"
+        )
+        stale = stale or differs
+        if diff and differs:
+            typer.echo(standalone_diff)
 
     for chain, size, limit in chain_reports:
         over = size > limit
