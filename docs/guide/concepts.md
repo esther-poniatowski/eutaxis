@@ -71,7 +71,6 @@ Rule blocks serve two surfaces: the [rule query](cli-reference.md#rule) and the 
 The configuration carries four top-level lists, each tied to one role:
 
 ```yaml
-root: .                    # optional; resolves relative paths
 common_sources: [ ... ]    # feeds the cumulative file (always-on)
 task_modules:  [ ... ]     # feeds the Skill compiler (on-demand)
 agents:        [ ... ]     # one entry per cumulative-file target
@@ -104,7 +103,7 @@ agents:
       path: .claude/CLAUDE.md
 ```
 
-Running `eutaxis generate -c agent-instructions.yaml` against this configuration writes the two cumulative files. Running `eutaxis skills install all -c agent-instructions.yaml` compiles the prose-writing-style module to a Skill on every registered adapter, provided the module's frontmatter declares the source schema below.
+Running `eutaxis generate` against this configuration writes the two cumulative files. Running `eutaxis skills install all` compiles the prose-writing-style module to a Skill on every registered adapter, provided the module's frontmatter declares the source schema below.
 
 ## Source schema for task_modules
 

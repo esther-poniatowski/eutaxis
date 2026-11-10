@@ -16,14 +16,32 @@ index: ""
 
 ## Root and settings file
 
-The option `--root` (`-r`) names the project folder of a command. The commands `generate`, `check`, `list`, `scan` and `init`, every `skills` and `commands` subcommand, and `ops clean-memory` accept it. Without `--root`, the root is the current folder. The `commands` subcommands are the one exception: without `--root`, they read no project layer.
+Every command that works on a project resolves one root folder. The settings file is looked up below the root, and the relative paths written in the settings file resolve against the root. The root is the first answer in this order:
 
-Without `--config`, a command that reads the settings file looks for it below the root, in this order:
+1. the root option `--root` (`-r`);
+2. the environment variable `EUTAXIS_ROOT`, when it is set and not empty;
+3. the nearest folder, from the current folder upward, that holds `config/tools/eutaxis.yml` or `eutaxis.yml`;
+4. the current folder.
 
-1. `config/tools/agent-instructions.yaml`;
-2. `agent-instructions.yaml`.
+The ancestor search of step 3 lets a command run from any subfolder of a project. The environment variable serves editors and continuous integration without a change of command.
 
-An explicit `--config` path is used as given, relative to the current folder. The relative paths inside the settings file resolve against its `root` key, or against its own folder when the key is absent. For `generate`, `check`, `list` and `scan`, an explicit `--root` replaces that key. A settings file stored in `config/tools/` therefore declares `root: ../..`.
+The settings file is named `eutaxis.yml`. Without the settings option `--config` (`-c`), a command reads `config/tools/eutaxis.yml` or `eutaxis.yml` below the root. The command stops with an error that names both files when both exist, and with an error that names both places when neither exists: Eutaxis declares every source and every output in the settings file, so it has no built-in defaults.
+
+A path given on the command line, including the value of `--config`, is relative to the current folder. A path written in the settings file is relative to the root, so the file moves between the root and `config/tools/` without an edit. A settings file that declares the retired key `root` is a configuration error.
+
+## Exit statuses
+
+Every command exits with one of three statuses:
+
+- `0` -- the command succeeded, and its check, if any, found no problem;
+- `1` -- a check or a validation found a problem: an outdated output, a drifted artifact, an exceeded budget, a rejected label under `strict_rule_labels`, or a source that the [failure-mode gate](../adr/failure-mode-as-source-field.md) rejects;
+- `2` -- a usage or configuration error prevented the command from running as asked: an unknown option or name, an invalid or missing settings file, a declared source that is missing or malformed, a corrupted state file, a file that only `--force` may replace, or a missing confirmation.
+
+## Files and confirmations
+
+A command overwrites the files that it derives, such as a generated instruction file or an Eutaxis-owned Skill directory. A command replaces or deletes a file that it cannot regenerate, such as an edited scaffold file or a Skill directory without an Eutaxis ownership marker, only under the force option `--force`.
+
+A command that deletes files outside its outputs, such as `ops clean-memory`, lists the files and asks for a confirmation on a terminal. The confirmation option `--yes` answers the confirmation in advance. Without a terminal and without `--yes`, the command stops with status `2`.
 
 ## Commands
 
@@ -50,23 +68,23 @@ eutaxis generate [-c <config-file>] [--root <folder>]
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
 | `--config` | `-c` | [lookup below the root](#root-and-settings-file) | Settings file. |
-| `--root` | `-r` | current folder for the lookup; `root` key of the settings file for paths | Project folder in which the settings file is looked up and against which relative source and target paths resolve. |
+| `--root` | `-r` | [resolved root](#root-and-settings-file) | Folder below which the settings file is looked up and against which its paths resolve. |
 | `--agent` | `-a` | all enabled agents | Generate only one configured agent output. |
-| `--dry-run` | `-n` | `false` | Show output targets without writing files. |
+| `--dry-run` | | `false` | Show output targets without writing files. |
 | `--plan` | | `false` | With `--dry-run`, summarize cumulative-file drift and budgets. |
 | `--ignore-budget` | | `false` | Skip generated-target and cumulative-chain budget failures. |
 
-The generator reads the YAML config, resolves all source paths relative to the configured root, and writes one output file per enabled agent. See [Configuration](configuration.md) for the full schema.
+The generator reads the settings file, resolves all source paths relative to the root, and writes one output file per enabled agent. See [Configuration](configuration.md) for the full schema.
 
 The command `eutaxis generate --dry-run --plan` reports the planned state of each target. For a changed target, it reports added and removed line counts without printing the complete generated file. The report also gives every generated-target and cumulative-chain byte budget.
 
 A label line that violates the [label grammar](concepts.md#rule-blocks) defines no rule, so the rule index omits that line. Each such line of a declared module is reported on standard error, with its file, its line and the violated part of the grammar. Under the configuration key `strict_rule_labels: true`, a rejected line fails the command before any file is written.
 
-Exit codes:
+Exit statuses:
 
-- `0` -- all agent files generated successfully.
-- `1` -- configuration, source loading or generation failed, or a label line is rejected under `strict_rule_labels`.
-- `2` -- a generated target or cumulative instruction chain exceeds its configured budget.
+- `0` -- all agent files were generated, or, under `--dry-run`, would be generated.
+- `1` -- a generated target or a cumulative instruction chain exceeds its configured budget, or a label line is rejected under `strict_rule_labels`.
+- `2` -- the settings file or a declared source cannot be read.
 
 ---
 
@@ -81,12 +99,12 @@ eutaxis check [-c <config-file>] [--root <folder>]
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
 | `--config` | `-c` | [lookup below the root](#root-and-settings-file) | Settings file. |
-| `--root` | `-r` | current folder for the lookup; `root` key of the settings file for paths | Project folder in which the settings file is looked up and against which relative source and target paths resolve. |
+| `--root` | `-r` | [resolved root](#root-and-settings-file) | Folder below which the settings file is looked up and against which its paths resolve. |
 | `--agent` | `-a` | all enabled agents | Check only one configured agent output. |
 | `--diff` | | `false` | Print unified diffs for stale outputs. |
 | `--ignore-budget` | | `false` | Report budget overruns without making them fail the check. |
 
-Exit code `0` means all selected outputs are current and within budget. Without an agent filter, the selected outputs include the standalone rule index. Exit code `1` means that an output differs from its generated content or exceeds a configured budget. The command reports rejected label lines in the same form as `generate`. With `strict_rule_labels: true`, a rejected label also fails the check.
+Exit status `0` means all selected outputs are current and within budget. Without an agent filter, the selected outputs include the standalone rule index. Exit status `1` means that an output differs from its generated content or exceeds a configured budget. The command reports rejected label lines in the same form as `generate`. With `strict_rule_labels: true`, a rejected label also fails the check.
 
 ---
 
@@ -101,7 +119,7 @@ eutaxis list [-c <config-file>] [--root <folder>]
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
 | `--config` | `-c` | [lookup below the root](#root-and-settings-file) | Settings file. |
-| `--root` | `-r` | current folder for the lookup; `root` key of the settings file for paths | Project folder in which the settings file is looked up and against which relative source and target paths resolve. |
+| `--root` | `-r` | [resolved root](#root-and-settings-file) | Folder below which the settings file is looked up and against which its paths resolve. |
 
 ---
 
@@ -110,18 +128,19 @@ eutaxis list [-c <config-file>] [--root <folder>]
 Compare instruction files on disk against the files the config registers.
 
 ```sh
-eutaxis scan [-c <config-file>] [--root <folder>]
+eutaxis scan [-c <config-file>] [--root <folder>] [--dir <folder>]
 ```
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
 | `--config` | `-c` | [lookup below the root](#root-and-settings-file) | Settings file. |
-| `--root` | `-r` | current folder for the lookup; parent folders of registered files for the walk | Project folder in which the settings file is looked up and the instruction files are walked. |
+| `--root` | `-r` | [resolved root](#root-and-settings-file) | Folder below which the settings file is looked up and against which its paths resolve. |
+| `--dir` | | folders of the registered files | Folder walked for instruction files. |
 | `--register` | | `false` | Print a YAML snippet registering any unregistered files. |
 
 The command emits three groups: registered-and-present, unregistered-and-present, and registered-but-missing. Files whose frontmatter sets `enabled: false` are excluded from the unregistered report. `--register` prints a paste-ready snippet to stdout; the on-disk config is never rewritten.
 
-Exit codes:
+Exit statuses:
 
 - `0` -- no drift: every registered file is present and every present file is registered (or opted out).
 - `1` -- drift detected, or a discovered file has malformed frontmatter.
@@ -136,17 +155,17 @@ Markdown files under `task_modules` are candidate sources. Their frontmatter mus
 
 ```sh
 eutaxis skills list [-c <config-file>] [--root <folder>]
-eutaxis skills show <name> [-c <config-file>] [--root <folder>] [--agent claude|codex]
-eutaxis skills install <name|all> [-c <config-file>] [--root <folder>] [--agent <agent>] [--scope user|project]
-eutaxis skills uninstall <name> [-c <config-file>] [--root <folder>] [--agent <agent>] [--scope user|project]
-eutaxis skills diff [<name>] [-c <config-file>] [--root <folder>]
-eutaxis skills sync [-c <config-file>] [--root <folder>] [--agent <agent>] [--scope user|project] [--apply]
-eutaxis skills budget [-c <config-file>] [--root <folder>] [--agent claude|codex]
-eutaxis skills loading-unit list [-c <config-file>] [--root <folder>] [--agent claude|codex]
-eutaxis skills loading-unit show <name> [-c <config-file>] [--root <folder>] [--agent claude|codex]
+eutaxis skills show <name> [-c <config-file>] [--root <folder>] [--target-project <folder>] [--agent claude|codex]
+eutaxis skills install <name|all> [-c <config-file>] [--root <folder>] [--target-project <folder>] [--agent <agent>] [--scope user|project]
+eutaxis skills uninstall <name> [-c <config-file>] [--root <folder>] [--target-project <folder>] [--agent <agent>] [--scope user|project]
+eutaxis skills diff [<name>] [-c <config-file>] [--root <folder>] [--target-project <folder>]
+eutaxis skills sync [-c <config-file>] [--root <folder>] [--target-project <folder>] [--agent <agent>] [--scope user|project] [--apply]
+eutaxis skills budget [-c <config-file>] [--root <folder>] [--target-project <folder>] [--agent claude|codex]
+eutaxis skills loading-unit list [-c <config-file>] [--root <folder>] [--target-project <folder>] [--agent claude|codex]
+eutaxis skills loading-unit show <name> [-c <config-file>] [--root <folder>] [--target-project <folder>] [--agent claude|codex]
 ```
 
-The root is the project that receives a project-scope install and the value substituted for `{{ project_root }}`. Without `--config`, the settings file is [looked up below the root](#root-and-settings-file).
+Two folders govern a `skills` subcommand. The [root](#root-and-settings-file) holds the settings file and the Skill sources, whose paths resolve against it. The target project receives the project-scope artifacts, and its path is the value substituted for `{{ project_root }}`. The target project is the root, unless the target-project option `--target-project` names another folder. One settings file can therefore install project-scope Skills into several projects.
 
 | Subcommand | Use it to |
 |------------|-----------|
@@ -178,17 +197,18 @@ With `--apply`, the command:
 - records the resulting set for the configuration, adapter, and deployment target after all writes and removals succeed;
 - leaves every unmarked directory unchanged.
 
-The first successful sync writes the configuration record. For project scope, Eutaxis records the resolved root. Therefore, one configuration can manage each project independently. The configuration record does not include artifacts installed by other configurations. A corrupted install registry or sync manifest blocks the plan before any write. The Skill directories, install registry and sync manifest form one failure-atomic set. If any write fails, Eutaxis restores every directory. Eutaxis also restores the two state files. Correct the cause and run the same command again.
+The first successful sync writes the configuration record. For project scope, Eutaxis records the resolved target project. Therefore, one configuration can manage each project independently. The configuration record does not include artifacts installed by other configurations. A corrupted install registry or sync manifest blocks the plan before any write. The Skill directories, install registry and sync manifest form one failure-atomic set. If any write fails, Eutaxis restores every directory. Eutaxis also restores the two state files. Correct the cause and run the same command again.
 
-Exit codes of `diff`:
+Exit statuses of `diff`:
 
 - `0` -- every artifact matches its render.
 - `1` -- at least one artifact differs from its render: a file is outdated, edited by hand or missing, or a file of a deleted rule remains on disk.
 
-Exit codes of `budget` and `loading-unit`:
+Exit statuses of `budget` and `loading-unit`:
 
 - `0` -- every entrypoint and loading unit exists and fits within its limit.
-- `1` -- a limit is exceeded, a loading unit names an unknown module or rule, or rendering fails.
+- `1` -- a limit is exceeded.
+- `2` -- a loading unit names an unknown module or rule, or a source cannot be rendered.
 
 ---
 
@@ -198,8 +218,10 @@ Exit codes of `budget` and `loading-unit`:
 Print one rule of an instruction module, or one part of that rule, without reading the whole module. Each rule spans one [rule block](concepts.md#rule-blocks), and each part is one statement or field of that block.
 
 ```sh
-eutaxis rule show <label> [--part <key>] [--module <name>] [-c <config-file> | --skills-dir <dir> | --agent <agent>]
-eutaxis rule list [--module <name> | --loading-unit <name>] [-c <config-file> | --skills-dir <dir> | --agent <agent>]
+eutaxis rule show <label> [--part <key>] [--module <name>] [-c <config-file>] [--root <folder>]
+eutaxis rule show <label> [--part <key>] [--module <name>] [--skills-dir <dir> | --agent <agent>]
+eutaxis rule list [--module <name> | --loading-unit <name>] [-c <config-file>] [--root <folder>]
+eutaxis rule list [--module <name> | --loading-unit <name>] [--skills-dir <dir> | --agent <agent>]
 ```
 
 | Subcommand | Use it to |
@@ -212,9 +234,10 @@ eutaxis rule list [--module <name> | --loading-unit <name>] [-c <config-file> | 
 | `--part` | `-p` | whole rule | Key of the part to print, from the part keys listed below. |
 | `--module` | `-m` | all modules | Module or Skill that holds the rule. Required when several modules define the label. |
 | `--loading-unit` | | none | Loading unit whose authored modules supply the list. Requires `--config` and cannot be combined with another source or module filter. |
-| `--config` | `-c` | none | Configuration whose modules are read: `common_sources`, agent `sources` and `task_modules`. A source entry that selects sections contributes only the rules inside those sections. |
+| `--config` | `-c` | none | Settings file whose modules are read: `common_sources`, agent `sources` and `task_modules`. A source entry that selects sections contributes only the rules inside those sections. |
+| `--root` | `-r` | [resolved root](#root-and-settings-file) with `--config` | Folder below which the settings file is looked up and against which its paths resolve. Given alone, it selects the authored modules of that settings file. |
 | `--skills-dir` | | none | Directory whose eutaxis-owned Skills are read. |
-| `--agent` | `-a` | `claude` | Adapter whose user-scope skill directory is read when neither `--config` nor `--skills-dir` is given. |
+| `--agent` | `-a` | `claude` | Adapter whose user-scope skill directory is read when none of `--config`, `--root` and `--skills-dir` is given. |
 
 The part keys select the statements, the lead or the fields of a rule:
 
@@ -225,12 +248,12 @@ The part keys select the statements, the lead or the fields of a rule:
 - `test`, `key`, `scope`, `warning` and `relation` each select the field of that name, its plural, and any title opening on that word, such as `*Relation to the neighbouring rules.*`;
 - the slug of any other title selects that field, as `precedence-among-the-three-enumeration-rules` selects `*Precedence among the three enumeration rules.*`.
 
-The default source is the deployed Skills, so the query runs from any working directory. Always-on modules compile into the cumulative instruction file, so their rules are absent from the Skills and are read with `--config`.
+The default source is the deployed Skills, so the query runs from any working directory. Always-on modules compile into the cumulative instruction file, so their rules are absent from the Skills and are read with `--config` or `--root`.
 
 The query below prints the exception clause of one rule from the authored modules:
 
 ```sh
-eutaxis rule show warnings-have-a-zero-baseline --part exception -c agent-instructions.yaml
+eutaxis rule show warnings-have-a-zero-baseline --part exception --root .
 ```
 
 ```text
@@ -240,10 +263,10 @@ verification > Verification > warnings-have-a-zero-baseline [exception] (<root>/
 ...
 ```
 
-Exit codes:
+Exit statuses:
 
 - `0` -- the rule, the part or the listing was printed.
-- `1` -- the label is unknown or ambiguous, the rule lacks the part, or the source cannot be read. The message lists the close labels, the modules or the parts of the rule.
+- `2` -- the label is unknown or ambiguous, the rule lacks the part, or the source cannot be read. The message lists the close labels, the modules or the parts of the rule.
 
 ---
 
@@ -259,7 +282,7 @@ eutaxis validate <paths...>
 |----------|-------------|
 | `paths` | One or more files or directories to validate. |
 
-**Status:** not yet implemented. Prints a notice and exits with code 0.
+**Status:** not yet implemented. Prints a notice and exits with status 0.
 
 ---
 
@@ -273,8 +296,29 @@ eutaxis init --template codex-project --root <folder>
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--root` | `-r` | current folder | Project folder that receives the scaffold. |
+| `--root` | `-r` | [resolved root](#root-and-settings-file) | Project folder that receives the scaffold. |
 | `--template` | | `codex-project` | Template directory under `eutaxis/data/templates`. |
 | `--force` | | `false` | Overwrite existing scaffold files. |
 
-The command copies tracked starter files from the selected template into the root. Existing files are not overwritten unless `--force` is passed.
+The command copies tracked starter files from the selected template into the root, including the settings file `eutaxis.yml`. A scaffold file may hold edits, so an existing file is overwritten only under `--force`; without it, the command stops with status `2` and names the file.
+
+---
+
+### `ops clean-memory`
+
+Delete the agent memory files of a project.
+
+```sh
+eutaxis ops clean-memory --agent claude|codex|all [--root <folder>] [--all] [--backup] [--dry-run] [--yes]
+```
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--agent` | `-a` | required | Agent whose memory is deleted. |
+| `--root` | `-r` | [resolved root](#root-and-settings-file) | Project whose agent memory is deleted. |
+| `--all` | | `false` | Delete the memory of every Claude project. |
+| `--backup` | | `false` | Copy each memory folder to a timestamped sibling first. |
+| `--dry-run` | | `false` | List the files without deleting them. |
+| `--yes` | | `false` | Answer the confirmation in advance. |
+
+The memory files lie outside the outputs of Eutaxis, so the command lists them and [asks for a confirmation](#files-and-confirmations) on a terminal. A script or an agent passes `--yes`.

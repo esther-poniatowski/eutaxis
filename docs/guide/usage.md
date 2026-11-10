@@ -29,9 +29,9 @@ The fastest path is the project scaffolder:
 eutaxis init --template codex-project
 ```
 
-The command writes a starter `agent-instructions.yaml`, an `AGENTS.md` placeholder, and a `docs/instructions/` tree. Two templates are available; see [Project scaffolding](project-scaffolding.md) for the difference between them.
+The command writes a starter settings file `eutaxis.yml`, an `AGENTS.md` placeholder, and a `docs/instructions/` tree. Two templates are available; see [Project scaffolding](project-scaffolding.md) for the difference between them.
 
-A configuration may also be written by hand. A minimal example:
+A configuration may also be written by hand, as `eutaxis.yml` at the project root or as `config/tools/eutaxis.yml`. The minimal configuration below declares two shared sources and one cumulative-file target:
 
 ```yaml
 common_sources:
@@ -46,13 +46,15 @@ agents:
 
 ### 3. Generate the cumulative instruction file
 
+Running the `generate` command from any folder of the project writes the cumulative instruction file:
+
 ```sh
-eutaxis generate -c agent-instructions.yaml
+eutaxis generate
 ```
 
-The command writes the file declared under `agents[0].target.path` (the project `AGENTS.md` in the example above). The on-disk path is also reported by `eutaxis list -c agent-instructions.yaml`.
+The command writes the file declared under `agents[0].target.path` (the project `AGENTS.md` in the example above). The on-disk path is also reported by `eutaxis list`.
 
-Without the `-c` flag, `eutaxis generate` looks for `config/tools/agent-instructions.yaml`, then for `agent-instructions.yaml`, below the current folder or below the folder given with `--root`. The same lookup serves `check`, `list`, `scan` and the `skills` subcommands.
+The command finds the project root as the nearest folder, from the current folder upward, that holds `eutaxis.yml` or `config/tools/eutaxis.yml`, and every path of the settings file resolves against that root. The root option `--root` and the environment variable `EUTAXIS_ROOT` name the root explicitly, and the settings option `-c` names a settings file kept elsewhere; see [Root and settings file](cli-reference.md#root-and-settings-file). The same resolution serves `check`, `list`, `scan`, `rule` and the `skills` subcommands.
 
 ### 4. Compile on-demand rule sets to Skills (optional)
 
@@ -61,7 +63,7 @@ This step applies only when the configuration's `task_modules` list is non-empty
 Inspect the configured Skill sources first:
 
 ```sh
-eutaxis skills list -c agent-instructions.yaml
+eutaxis skills list
 ```
 
 Each line shows the invocation routes and the failure-mode tag, surfacing misclassified sources before any artifact is written.
@@ -69,13 +71,13 @@ Each line shows the invocation routes and the failure-mode tag, surfacing miscla
 Preview the complete configured Skill set:
 
 ```sh
-eutaxis skills sync -c agent-instructions.yaml
+eutaxis skills sync
 ```
 
 The preview reports one planned state for every target. Pass the apply flag only after reviewing those states:
 
 ```sh
-eutaxis skills sync -c agent-instructions.yaml --apply
+eutaxis skills sync --apply
 ```
 
 Apply mode creates one directory for each rule set. The command places that directory under every registered agent's user-level Skill root. Re-running the command produces identical files. After a successful run, Eutaxis records the names managed by this configuration. A later run can remove a retired name from that record only while its directory retains an Eutaxis ownership marker. A record belonging to another configuration protects each claimed name. Therefore, another configuration's Skills and every unmarked directory remain unchanged. The [agent table](../../README.md) lists the concrete paths.
@@ -86,16 +88,14 @@ The cumulative instruction file carries rules that must hold on every turn. The 
 
 ### Project-local versus global targets
 
-Two deployment patterns differ only in the configuration's `root` field and the target paths:
+Two deployment patterns differ only in the repository that holds the configuration and in the target paths:
 
-- **Project-local.** The configuration sits at the project root; `root` is absent (defaults to the configuration's parent directory); target paths are project-relative.
-- **Global.** The configuration sits outside any single project (typically a personal configuration repository); `root` points at that repository; target paths are absolute paths to each agent's global instruction file (see the [Supported agents](../../README.md#supported-agents) table for the per-agent paths).
+- **Project-local.** The configuration sits in the project; source and target paths are relative to the project root.
+- **Global.** The configuration sits in a personal configuration repository, such as `~/agent-config/config/tools/eutaxis.yml`; source paths are relative to that repository; target paths are absolute paths to each agent's global instruction file (see the [Supported agents](../../README.md#supported-agents) table for the per-agent paths). The commands run from that repository, or name it with `--root ~/agent-config`.
 
 The configuration below illustrates the global pattern with two agent outputs:
 
 ```yaml
-root: ~/agent-config
-
 common_sources:
   - modules/global/file-authority.md
   - modules/global/git-safety.md
@@ -138,7 +138,7 @@ agents:
 Generation writes all enabled outputs. To restrict generation to one agent:
 
 ```sh
-eutaxis generate -c agent-instructions.yaml --agent codex
+eutaxis generate --agent codex
 ```
 
 To skip an output without removing it from the configuration, set `enabled: false` on the agent entry. The generator prints a notice and proceeds with the remaining outputs.
@@ -202,7 +202,7 @@ The four required fields and their roles are documented in [Concepts: source sch
 ### Render a single Skill before installing
 
 ```sh
-eutaxis skills show <name> -c agent-instructions.yaml --agent claude
+eutaxis skills show <name> --agent claude
 ```
 
 The command prints the rendered `SKILL.md` and any sibling files to stdout, without writing to disk. Use it to confirm the frontmatter and body before committing to an install.
@@ -210,11 +210,11 @@ The command prints the rendered `SKILL.md` and any sibling files to stdout, with
 ### Install one Skill or every Skill
 
 ```sh
-eutaxis skills install <name> -c agent-instructions.yaml --agent claude
-eutaxis skills install all  -c agent-instructions.yaml
+eutaxis skills install <name> --agent claude
+eutaxis skills install all
 ```
 
-Without `--agent`, every registered adapter receives the Skill (see the [Supported agents](../../README.md#supported-agents) table for the current set). Without `--scope`, the install uses the source's declared `scope_default` (typically `user`, writing into the user-scope skill directory of each agent); `--scope project` writes into the project-scope skill directory instead.
+Without `--agent`, every registered adapter receives the Skill (see the [Supported agents](../../README.md#supported-agents) table for the current set). Without `--scope`, the install uses the source's declared `scope_default` (typically `user`, writing into the user-scope skill directory of each agent); `--scope project` writes into the project-scope skill directory of the root instead. The target-project option `--target-project <folder>` sends the project-scope artifacts to another project, while the sources still resolve against the root.
 
 When the named Skill belongs to a published loading route, Eutaxis refreshes the complete route in the owner's scope. A request for a member also refreshes each owner whose manifest names that member. On write failure, Eutaxis restores the complete route. An installed route owner can require the member. In that case, the uninstall command refuses the request.
 
@@ -237,7 +237,7 @@ Running either Skill command replaces the installed Skill with the [split layout
 ### Detect drift
 
 ```sh
-eutaxis skills diff -c agent-instructions.yaml
+eutaxis skills diff
 ```
 
 The command compares each rendered Skill artifact against its installed directory and reports drift. Exit code `1` on drift makes the command usable as a CI check. The command also reports on standard error each relative link whose target does not exist, with the source file and the line of the link. Such a link is kept as written in the installed Skill, as described in [Links between modules](concepts.md#links-between-modules).
@@ -245,7 +245,7 @@ The command compares each rendered Skill artifact against its installed director
 ### Uninstall
 
 ```sh
-eutaxis skills uninstall <name> -c agent-instructions.yaml --agent claude
+eutaxis skills uninstall <name> --agent claude
 ```
 
 The dual ownership marker prevents the command from removing directories Eutaxis did not write.
@@ -256,7 +256,7 @@ A linter finding or a review comment names a rule by its label. Consequently, th
 
 ```sh
 eutaxis rule show calibrate-assertion --part exception
-eutaxis rule show calibrate-assertion -c agent-instructions.yaml
+eutaxis rule show calibrate-assertion --root .
 ```
 
 The first form runs from any working directory. The second form identifies the source file and line range to edit. The configuration may select only part of a source. In that case, only the rules from the selected part appear.
@@ -270,8 +270,8 @@ Four checks and one synchronization command cover the recurring maintenance loop
 ### Detect cumulative-file drift
 
 ```sh
-eutaxis check -c agent-instructions.yaml
-eutaxis check -c agent-instructions.yaml --diff
+eutaxis check
+eutaxis check --diff
 ```
 
 The first form reports `OK` or `OUTDATED` per agent and exits with code `1` when any output differs from the rendered content. The `--diff` flag prints a unified diff for each `OUTDATED` output.
@@ -279,7 +279,7 @@ The first form reports `OK` or `OUTDATED` per agent and exits with code `1` when
 ### Detect Skill-artifact drift
 
 ```sh
-eutaxis skills diff -c agent-instructions.yaml
+eutaxis skills diff
 ```
 
 Same purpose as `check` but for Skill directories instead of cumulative files. Equivalent exit-code semantics.
@@ -287,7 +287,7 @@ Same purpose as `check` but for Skill directories instead of cumulative files. E
 ### Detect registry drift
 
 ```sh
-eutaxis scan -c agent-instructions.yaml
+eutaxis scan
 ```
 
 The command compares the Markdown files registered in the configuration against the files present in the directories it walks. It reports three groups: registered-and-present, unregistered-and-present, and registered-but-missing. Exit code `1` when either of the latter two groups is non-empty.
@@ -297,7 +297,7 @@ Instruction files whose frontmatter declares `enabled: false` are skipped in the
 To preview a YAML snippet that would register every unregistered file under `common_sources`:
 
 ```sh
-eutaxis scan -c agent-instructions.yaml --register
+eutaxis scan --register
 ```
 
 The on-disk configuration is never rewritten. The snippet is printed to stdout for manual review and paste.
@@ -305,7 +305,7 @@ The on-disk configuration is never rewritten. The snippet is printed to stdout f
 ### Inspect the configuration
 
 ```sh
-eutaxis list -c agent-instructions.yaml
+eutaxis list
 ```
 
 The command prints every agent entry, its enabled status, its resolved target path, and any agent-specific sources. Useful for auditing what a configuration would actually produce before running `generate`.
@@ -325,7 +325,7 @@ from pathlib import Path
 
 from eutaxis.instructions import InstructionGenerator, load_config
 
-config = load_config(Path("agent-instructions.yaml"))
+config = load_config(Path("eutaxis.yml"))
 generator = InstructionGenerator(config)
 generator.write_all()
 ```

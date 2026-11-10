@@ -17,7 +17,7 @@ The user guide is sequenced for a first read in this order:
 1. [Installation](guide/installation.md) — prerequisites and source-install instructions.
 2. [Concepts](guide/concepts.md) — the mental model behind the configuration (compilation surfaces, source schema, activation regimes). Read this before the Usage guide.
 3. [Usage](guide/usage.md) — step-by-step workflows from first setup to ongoing maintenance.
-4. [CLI Reference](guide/cli-reference.md) — commands, options, exit codes.
+4. [CLI Reference](guide/cli-reference.md) — commands, options, exit statuses.
 
 ## Supplementary navigation
 

@@ -71,10 +71,10 @@ Eutaxis currently ships the checked features. The unchecked features remain plan
 
 ## Quick Start
 
-A project's instruction layout is declared in `config/tools/agent-instructions.yaml`, or in `agent-instructions.yaml` at the project root. The configuration below lists two shared Markdown sources and one cumulative-file target:
+A project's instruction layout is declared in the settings file `config/tools/eutaxis.yml`, or in `eutaxis.yml` at the project root. The configuration below lists two shared Markdown sources and one cumulative-file target:
 
 ```yaml
-# agent-instructions.yaml
+# eutaxis.yml
 common_sources:
   - path: docs/instructions/file-authority.md
   - path: docs/instructions/verification.md
@@ -85,7 +85,7 @@ agents:
       path: AGENTS.md
 ```
 
-Running the `generate` command from the project root finds this configuration and writes the cumulative instruction file at the declared target path:
+Running the `generate` command from any folder of the project finds this configuration and writes the cumulative instruction file at the declared target path:
 
 ```sh
 eutaxis generate
@@ -102,7 +102,7 @@ The full first-time walkthrough — installation, scaffolding, on-demand Skill c
 | [Installation](docs/guide/installation.md) | Prerequisites and source setup. |
 | [Concepts](docs/guide/concepts.md) | Mental model behind the configuration: compilation surfaces, source schema, activation regimes. |
 | [Usage](docs/guide/usage.md) | Step-by-step workflows from first setup to ongoing maintenance. |
-| [CLI Reference](docs/guide/cli-reference.md) | Commands, options, exit codes. |
+| [CLI Reference](docs/guide/cli-reference.md) | Commands, options, exit statuses. |
 | [Configuration](docs/guide/configuration.md) | YAML schema and worked examples. |
 | [Project Scaffolding](docs/guide/project-scaffolding.md) | Starter templates. |
 | [Instruction Assembly API](docs/api/instructions.md) | Python API for embedding generation in another tool. |
