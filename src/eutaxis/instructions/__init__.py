@@ -1,6 +1,12 @@
 """Composable instruction-file generation for AI coding agents."""
 
-from .config import ConfigLoader, load_config
+from .config import (
+    CONFIG_FILENAME,
+    CONFIG_SEARCH_PATHS,
+    ConfigLoader,
+    find_config,
+    load_config,
+)
 from .exceptions import (
     BudgetExceededError,
     ConfigurationError,
@@ -41,6 +47,8 @@ from .scanner import (
 )
 
 __all__ = [
+    "CONFIG_FILENAME",
+    "CONFIG_SEARCH_PATHS",
     "LABEL_PATTERN",
     "AgentConfig",
     "BudgetExceededError",
@@ -69,6 +77,7 @@ __all__ = [
     "collect_registered_paths",
     "declared_sources",
     "field_key",
+    "find_config",
     "format_registration_snippet",
     "load_config",
     "parse_frontmatter",

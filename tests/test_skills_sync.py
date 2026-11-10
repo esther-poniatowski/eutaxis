@@ -223,7 +223,7 @@ def test_project_sync_tracks_each_project_root_independently(tmp_path: Path) -> 
             str(config),
             "--scope",
             "project",
-            "--project",
+            "--root",
             str(project),
             "--apply",
         )
@@ -238,7 +238,7 @@ def test_project_sync_tracks_each_project_root_independently(tmp_path: Path) -> 
             str(config),
             "--scope",
             "project",
-            "--project",
+            "--root",
             str(retired),
             "--apply",
         )

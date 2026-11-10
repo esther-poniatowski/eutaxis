@@ -11,17 +11,29 @@ installed as a script. Subcommands:
 - ``init`` — scaffold prompt composition into a project (planned).
 """
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import typer
 from . import info as pkg_info, __version__
+from ._cli_options import explicit_root, former_root_option, root_option
 from .commands._cli import commands_app
 from .commands._skills_cli import skills_app
 from .ops._cli import ops_app
 from .rule_query._cli import rule_app
 
 if TYPE_CHECKING:
-    from .instructions import InstructionGenerator
+    from .instructions import InstructionConfig, InstructionGenerator
+
+_CONFIG_HELP = (
+    "Settings file. Default: config/tools/agent-instructions.yaml below the "
+    "root, then agent-instructions.yaml at the root."
+)
+_ROOT_HELP = (
+    "Project folder in which the settings file is looked up and against which "
+    "relative source and target paths resolve. Without it, the lookup runs in "
+    "the current folder and paths resolve against the root of the settings file."
+)
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 app.add_typer(commands_app, name="commands")
@@ -38,18 +50,8 @@ def cli_info() -> None:
 
 @app.command("generate")
 def cli_generate(
-    config: str = typer.Option(
-        "agent-instructions.yaml",
-        "--config",
-        "-c",
-        help="Path to generation config.",
-    ),
-    root: str | None = typer.Option(
-        None,
-        "--root",
-        "-r",
-        help="Root used to resolve relative source and target paths.",
-    ),
+    config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
+    root: str | None = root_option(_ROOT_HELP),
     agent: str | None = typer.Option(
         None,
         "--agent",
@@ -79,15 +81,14 @@ def cli_generate(
     error. Under ``strict_rule_labels``, such a line fails the command before
     any file is written.
     """
-    from pathlib import Path as P
-    from .instructions import InstructionError, InstructionGenerator, load_config
+    from .instructions import InstructionError, InstructionGenerator
 
     if plan and not dry_run:
         typer.echo("Error: --plan requires --dry-run.", err=True)
         raise typer.Exit(code=2)
 
     try:
-        loaded = load_config(P(config), root=P(root) if root else None)
+        loaded = _load_settings(config, root)
         generator = InstructionGenerator(loaded)
         _echo_rejected_labels(generator)
         paths = generator.write_all(
@@ -174,18 +175,8 @@ def _line_changes(diff: str) -> tuple[int, int]:
 
 @app.command("check")
 def cli_check(
-    config: str = typer.Option(
-        "agent-instructions.yaml",
-        "--config",
-        "-c",
-        help="Path to generation config.",
-    ),
-    root: str | None = typer.Option(
-        None,
-        "--root",
-        "-r",
-        help="Root used to resolve relative source and target paths.",
-    ),
+    config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
+    root: str | None = root_option(_ROOT_HELP),
     agent: str | None = typer.Option(
         None,
         "--agent",
@@ -208,11 +199,10 @@ def cli_check(
     Rejected label lines are reported as by ``generate``, and they fail the
     check under ``strict_rule_labels``.
     """
-    from pathlib import Path as P
-    from .instructions import InstructionError, InstructionGenerator, load_config
+    from .instructions import InstructionError, InstructionGenerator
 
     try:
-        loaded = load_config(P(config), root=P(root) if root else None)
+        loaded = _load_settings(config, root)
         generator = InstructionGenerator(loaded)
         _echo_rejected_labels(generator)
         generator.enforce_rule_labels()
@@ -282,27 +272,32 @@ def _echo_rejected_labels(generator: "InstructionGenerator") -> None:
         )
 
 
+def _load_settings(config: str | None, root: str | None) -> "InstructionConfig":
+    """Find and load the settings file of a command.
+
+    Without ``--config``, the file is looked up below ``--root``, or below
+    the current folder when ``--root`` is absent. An explicit ``--root``
+    also overrides the ``root`` key of the file.
+    """
+    from .instructions import find_config, load_config
+
+    base = Path(root).expanduser().resolve() if root else None
+    config_path = find_config(
+        Path(config) if config else None, base if base is not None else Path.cwd()
+    )
+    return load_config(config_path, root=base)
+
+
 @app.command("list")
 def cli_list(
-    config: str = typer.Option(
-        "agent-instructions.yaml",
-        "--config",
-        "-c",
-        help="Path to generation config.",
-    ),
-    root: str | None = typer.Option(
-        None,
-        "--root",
-        "-r",
-        help="Root used to resolve relative source and target paths.",
-    ),
+    config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
+    root: str | None = root_option(_ROOT_HELP),
 ) -> None:
     """List configured instruction outputs and their source counts."""
-    from pathlib import Path as P
-    from .instructions import InstructionError, load_config
+    from .instructions import InstructionError
 
     try:
-        loaded = load_config(P(config), root=P(root) if root else None)
+        loaded = _load_settings(config, root)
     except InstructionError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=exc.exit_code) from exc
@@ -325,17 +320,11 @@ def cli_list(
 
 @app.command("scan")
 def cli_scan(
-    config: str = typer.Option(
-        "agent-instructions.yaml",
-        "--config",
-        "-c",
-        help="Path to generation config.",
-    ),
-    root: str | None = typer.Option(
-        None,
-        "--root",
-        "-r",
-        help="Override the directory walked for instruction files.",
+    config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
+    root: str | None = root_option(
+        "Project folder in which the settings file is looked up and the "
+        "instruction files are walked. Without it, the lookup runs in the "
+        "current folder and the registered folders are walked."
     ),
     register: bool = typer.Option(
         False,
@@ -344,18 +333,16 @@ def cli_scan(
     ),
 ) -> None:
     """Report instruction files that drift from the configured registry."""
-    from pathlib import Path as P
     from .instructions import (
         InstructionError,
         format_registration_snippet,
-        load_config,
         scan_instructions,
     )
 
     try:
-        loaded = load_config(P(config), root=P(root) if root else None)
+        loaded = _load_settings(config, root)
         report = scan_instructions(
-            loaded, root=P(root) if root else None
+            loaded, root=Path(root).expanduser().resolve() if root else None
         )
     except InstructionError as exc:
         typer.echo(f"Error: {exc}", err=True)
@@ -403,7 +390,10 @@ def cli_validate(
 
 @app.command("init")
 def cli_init(
-    target: str = typer.Option(".", "--target", "-t", help="Target workspace directory."),
+    root: str | None = root_option(
+        "Project folder that receives the scaffold. Default: current folder."
+    ),
+    former_target: str | None = former_root_option("--target", "-t"),
     template: str = typer.Option(
         "codex-project",
         "--template",
@@ -416,11 +406,11 @@ def cli_init(
     ),
 ) -> None:
     """Scaffold prompt-composition structure into a project."""
-    from pathlib import Path as P
     from .scaffold import ScaffoldError, scaffold_workspace
 
+    target = explicit_root(root, former_target, "--target") or Path.cwd()
     try:
-        paths = scaffold_workspace(P(target), template=template, force=force)
+        paths = scaffold_workspace(target, template=template, force=force)
     except ScaffoldError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc

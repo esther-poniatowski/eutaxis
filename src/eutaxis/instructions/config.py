@@ -488,6 +488,54 @@ class ConfigLoader:
         return value
 
 
+CONFIG_FILENAME = "agent-instructions.yaml"
+"""File name of the instruction-assembly settings file."""
+
+CONFIG_SEARCH_PATHS: tuple[Path, ...] = (
+    Path("config") / "tools" / CONFIG_FILENAME,
+    Path(CONFIG_FILENAME),
+)
+"""Locations of the settings file below the root, in the order they are tried."""
+
+
+def find_config(config: Path | None, root: Path) -> Path:
+    """Return the settings file that a command reads.
+
+    Parameters
+    ----------
+    config : Path, optional
+        Path given with ``--config``. When set, it is returned resolved
+        against the current folder, without any lookup.
+    root : Path
+        Root folder of the project. Without ``config``, the lookup tries
+        each entry of ``CONFIG_SEARCH_PATHS`` below this folder:
+        ``config/tools/agent-instructions.yaml``, then
+        ``agent-instructions.yaml``.
+
+    Returns
+    -------
+    Path
+        Absolute path of the settings file.
+
+    Raises
+    ------
+    ConfigurationError
+        When ``config`` is absent and no candidate exists below ``root``.
+    """
+    if config is not None:
+        return config.expanduser().resolve()
+    base = root.expanduser().resolve()
+    candidates = [base / relative for relative in CONFIG_SEARCH_PATHS]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    searched = ", ".join(str(candidate) for candidate in candidates)
+    raise ConfigurationError(
+        f"No settings file found below {base} (searched: {searched}). "
+        "Pass --config or --root."
+    )
+
+
 def load_config(config_path: Path, root: Path | None = None) -> InstructionConfig:
     """Load instruction configuration from disk."""
     return ConfigLoader(config_path, root=root).load()

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import typer
 
+from .._cli_options import explicit_root, former_root_option, root_option
 from . import (
     CommandError,
     CommandNotFoundError,
@@ -27,6 +28,12 @@ from .scopes import validate_scope
 from .cli_errors import exit_with_error
 from .synchronization import skill_write_transaction
 
+_ROOT_HELP = (
+    "Project folder whose .eutaxis/commands layer is read, used for project "
+    "scope and path substitutions. Default: current folder, without the "
+    "project layer."
+)
+
 commands_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
@@ -36,11 +43,11 @@ commands_app = typer.Typer(
 
 @commands_app.command("list")
 def cli_list(
-    project_root: str | None = typer.Option(
-        None, "--project", help="Project root for project-layer discovery."
-    ),
+    root: str | None = root_option(_ROOT_HELP),
+    former_project: str | None = former_root_option("--project"),
 ) -> None:
     """List all discovered command sources and their targets."""
+    project_root = explicit_root(root, former_project, "--project")
     sources = _load(project_root)
     if not sources:
         typer.echo("No commands found.")
@@ -57,11 +64,11 @@ def cli_list(
 def cli_show(
     name: str,
     agent: str = typer.Option("claude", "--agent", "-a", help="Adapter to render for."),
-    project_root: str | None = typer.Option(
-        None, "--project", help="Project root for path substitutions."
-    ),
+    root: str | None = root_option(_ROOT_HELP),
+    former_project: str | None = former_root_option("--project"),
 ) -> None:
     """Render and print one skill artifact for one adapter."""
+    project_root = explicit_root(root, former_project, "--project")
     source = _require_source(name, project_root)
     adapter = get_adapter(agent)
     rendered = render_command(
@@ -84,16 +91,14 @@ def cli_install(
         help="Install scope (user|project). Defaults to the source's scope_default.",
     ),
     agent: str = typer.Option("all", "--agent", "-a", help="Adapter name or 'all'."),
-    project_root: str | None = typer.Option(
-        None,
-        "--project",
-        help="Project root used for project scope and path substitutions.",
-    ),
+    root: str | None = root_option(_ROOT_HELP),
+    former_project: str | None = former_root_option("--project"),
     force: bool = typer.Option(
         False, "--force", help="Overwrite non-eutaxis directories at the target."
     ),
 ) -> None:
     """Install one skill artifact into the selected adapters."""
+    project_root = explicit_root(root, former_project, "--project")
     try:
         source = _require_source(name, project_root)
         chosen_scope = scope or source.scope_default
@@ -142,12 +147,14 @@ def cli_uninstall(
     name: str,
     scope: str = typer.Option("user", "--scope", help="user|project"),
     agent: str = typer.Option("all", "--agent", "-a"),
-    project_root: str | None = typer.Option(None, "--project"),
+    root: str | None = root_option(_ROOT_HELP),
+    former_project: str | None = former_root_option("--project"),
     force: bool = typer.Option(
         False, "--force", help="Delete non-eutaxis directories at the target."
     ),
 ) -> None:
     """Remove one installed skill artifact from the selected adapters."""
+    project_root = explicit_root(root, former_project, "--project")
     try:
         validate_scope(scope)
         registry = Registry(default_state_dir())
@@ -201,9 +208,11 @@ def cli_diff(
     name: str | None = typer.Argument(None, help="Command name (omit for all)."),
     scope: str = typer.Option("user", "--scope"),
     agent: str = typer.Option("all", "--agent", "-a"),
-    project_root: str | None = typer.Option(None, "--project"),
+    root: str | None = root_option(_ROOT_HELP),
+    former_project: str | None = former_root_option("--project"),
 ) -> None:
     """Show drift between rendered output and installed artifacts."""
+    project_root = explicit_root(root, former_project, "--project")
     try:
         validate_scope(scope)
         sources = (

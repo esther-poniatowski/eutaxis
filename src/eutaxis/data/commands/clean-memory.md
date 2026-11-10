@@ -8,7 +8,7 @@ scope_default: user
 argument-hint: "[--all] [--backup] [--dry-run]"
 action:
   kind: shell
-  template: "eutaxis ops clean-memory --agent {{ agent }} --project {{ project_root }} --yes"
+  template: "eutaxis ops clean-memory --agent {{ agent }} --root {{ project_root }} --yes"
 adapters:
   claude:
     frontmatter:

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import typer
 
+from .._cli_options import explicit_root, former_root_option, root_option
 from .exceptions import OpsError
 from .memory import clean_memory
 
@@ -27,9 +26,10 @@ def cli_clean_memory(
     agent: str = typer.Option(
         ..., "--agent", "-a", help="claude | codex | all"
     ),
-    project_root: str | None = typer.Option(
-        None, "--project", help="Project root (defaults to CWD)."
+    root: str | None = root_option(
+        "Project folder whose agent memory is deleted. Default: current folder."
     ),
+    former_project: str | None = former_root_option("--project"),
     wipe_all: bool = typer.Option(
         False, "--all", help="Wipe all Claude project memories, not just the current one."
     ),
@@ -44,6 +44,7 @@ def cli_clean_memory(
     ),
 ) -> None:
     """Delete this project's agent memory files (Claude and/or Codex)."""
+    project_root = explicit_root(root, former_project, "--project")
     if not yes and not dry_run:
         typer.echo(
             "Refusing destructive operation without --yes. "
@@ -55,9 +56,7 @@ def cli_clean_memory(
     try:
         result = clean_memory(
             agent=agent,
-            project_root=Path(project_root).expanduser().resolve()
-            if project_root
-            else None,
+            project_root=project_root,
             wipe_all=wipe_all,
             backup=backup,
             dry_run=dry_run,
