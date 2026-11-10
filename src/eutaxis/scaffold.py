@@ -9,7 +9,13 @@ from . import data_path
 
 
 class ScaffoldError(RuntimeError):
-    """Raised when a scaffold operation cannot be completed safely."""
+    """Raised when a scaffold operation cannot be completed safely.
+
+    Every scaffold error is a usage error (exit status 2): an unknown
+    template, or an existing file that only ``--force`` may overwrite.
+    """
+
+    exit_code = 2
 
 
 def template_root() -> Path:

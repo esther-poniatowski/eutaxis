@@ -39,11 +39,11 @@ from .exceptions import RuleSourceError
 
 SKILLS_HINT = (
     "Always-on modules compile into the cumulative instruction file, not "
-    "into skills; query their rules with -c <config>."
+    "into skills; query their rules with -c <config> or --root <folder>."
 )
 
 
-def catalog_from_config(config_path: Path) -> RuleCatalog:
+def catalog_from_config(config_path: Path, root: Path | None = None) -> RuleCatalog:
     """Collect the rules of every module that a configuration declares.
 
     A module declared by several entries contributes the union of their
@@ -54,13 +54,16 @@ def catalog_from_config(config_path: Path) -> RuleCatalog:
     ----------
     config_path : Path
         Instruction-assembly configuration.
+    root : Path, optional
+        Folder against which the paths of the configuration resolve.
+        Default: the root implied by the place of the file.
 
     Raises
     ------
     RuleSourceError
         When a declared module is missing on disk.
     """
-    config = load_config(config_path)
+    config = load_config(config_path, root=root)
     selections: dict[Path, list[SourceFile | None]] = {}
     for path, source in declared_sources(config):
         selections.setdefault(path, []).append(source)

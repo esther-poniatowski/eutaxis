@@ -4,9 +4,15 @@ from __future__ import annotations
 
 
 class CommandError(Exception):
-    """Base exception for the commands subsystem."""
+    """Base exception for the commands subsystem.
 
-    exit_code = 1
+    The exit status follows the command-line conventions: 2 for an error
+    that prevents the command from running as asked (an unknown name, an
+    invalid source or state file, a target that requires ``--force``), and
+    1 for a source that a validation gate rejects.
+    """
+
+    exit_code = 2
 
 
 class CommandNotFoundError(CommandError):
@@ -38,4 +44,4 @@ class FailureModeError(CommandError):
     ``failure-mode-as-source-field`` ADR.
     """
 
-    exit_code = 3
+    exit_code = 1

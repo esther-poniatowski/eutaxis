@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import functools
+
 import typer
 
-from .._cli_options import explicit_root, former_root_option, root_option
-from .exceptions import OpsError
-from .memory import clean_memory
+from .._cli_options import command_root, confirmation_needed, reports_errors, root_option
+from .memory import MemoryWipeResult, clean_memory
 
 ops_app = typer.Typer(
     add_completion=False,
@@ -22,14 +23,16 @@ def cli_list() -> None:
 
 
 @ops_app.command("clean-memory")
+@reports_errors
 def cli_clean_memory(
     agent: str = typer.Option(
         ..., "--agent", "-a", help="claude | codex | all"
     ),
     root: str | None = root_option(
-        "Project folder whose agent memory is deleted. Default: current folder."
+        "Project folder whose agent memory is deleted. Default: EUTAXIS_ROOT, "
+        "then the nearest folder above the current one that holds the "
+        "settings file, then the current folder."
     ),
-    former_project: str | None = former_root_option("--project"),
     wipe_all: bool = typer.Option(
         False, "--all", help="Wipe all Claude project memories, not just the current one."
     ),
@@ -40,32 +43,43 @@ def cli_clean_memory(
         False, "--dry-run", help="Report paths without touching the filesystem."
     ),
     yes: bool = typer.Option(
-        False, "--yes", help="Required to perform a non-dry-run deletion."
+        False,
+        "--yes",
+        help=(
+            "Answer the confirmation. Without a terminal, the deletion "
+            "requires it."
+        ),
     ),
 ) -> None:
-    """Delete this project's agent memory files (Claude and/or Codex)."""
-    project_root = explicit_root(root, former_project, "--project")
-    if not yes and not dry_run:
-        typer.echo(
-            "Refusing destructive operation without --yes. "
-            "Re-run with --yes to confirm, or --dry-run to preview.",
-            err=True,
-        )
-        raise typer.Exit(code=1)
+    """Delete this project's agent memory files (Claude and/or Codex).
 
-    try:
-        result = clean_memory(
-            agent=agent,
-            project_root=project_root,
-            wipe_all=wipe_all,
-            backup=backup,
-            dry_run=dry_run,
-        )
-    except OpsError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=exc.exit_code) from exc
+    The memory files lie outside the outputs of Eutaxis, so the deletion asks
+    for a confirmation on a terminal. ``--yes`` answers it; without a
+    terminal and without ``--yes``, the command stops with status 2.
+    """
+    clean = functools.partial(
+        clean_memory,
+        agent=agent,
+        project_root=command_root(root),
+        wipe_all=wipe_all,
+        backup=backup,
+    )
+    if not dry_run and confirmation_needed(yes, "Deleting agent memory"):
+        preview = clean(dry_run=True)
+        if preview.removed:
+            _echo_result(preview, "Would remove")
+            if not typer.confirm(
+                f"Delete these {len(preview.removed)} file(s)?", default=False
+            ):
+                typer.echo("Nothing deleted.")
+                return
 
-    verb = "Would remove" if dry_run else "Removed"
+    result = clean(dry_run=dry_run)
+    _echo_result(result, "Would remove" if dry_run else "Removed")
+
+
+def _echo_result(result: MemoryWipeResult, verb: str) -> None:
+    """Print the files removed, or to remove, with backups and skipped paths."""
     typer.echo(f"{verb} {len(result.removed)} file(s):")
     for path in result.removed:
         typer.echo(f"  - {path}")

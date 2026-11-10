@@ -69,8 +69,14 @@ def load_sources(
     return sorted(by_name.values(), key=lambda src: src.name)
 
 
-def load_from_instruction_config(config_path: Path) -> list[CommandSource]:
+def load_from_instruction_config(
+    config_path: Path, root: Path | None = None
+) -> list[CommandSource]:
     """Load Skill sources from an instruction-assembly configuration.
+
+    The paths of the configuration resolve against ``root``, or, when it is
+    absent, against the root implied by the place of the file (see
+    ``eutaxis.instructions.settings_root``).
 
     Each ``task_modules`` entry names a Markdown file whose frontmatter
     must satisfy the Skill source schema (``name``, ``description``,
@@ -83,7 +89,7 @@ def load_from_instruction_config(config_path: Path) -> list[CommandSource]:
     """
     from ..instructions.config import load_config
 
-    config = load_config(config_path)
+    config = load_config(config_path, root=root)
     sources: list[CommandSource] = []
     for module in config.task_modules:
         path = config.resolve(module.path)

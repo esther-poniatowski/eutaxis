@@ -22,7 +22,7 @@ def test_load_config_supports_existing_agent_instructions_shape(tmp_path: Path) 
     source.parent.mkdir()
     source.write_text("# Rules\n\nUse the project style.\n", encoding="utf-8")
 
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -45,17 +45,16 @@ agents:
     )
 
 
-def test_config_root_supports_global_instruction_outputs(tmp_path: Path) -> None:
+def test_explicit_root_supports_global_instruction_outputs(tmp_path: Path) -> None:
     project = tmp_path / "project"
     codex_home = tmp_path / ".codex"
     project.mkdir()
     codex_home.mkdir()
     (project / "shared.md").write_text("# Shared\n\nRead current files.\n", encoding="utf-8")
 
-    config = tmp_path / "global-instructions.yaml"
+    config = tmp_path / "global-instructions.yml"
     config.write_text(
         f"""
-root: {project}
 common_sources:
   - shared.md
 agents:
@@ -65,7 +64,7 @@ agents:
         encoding="utf-8",
     )
 
-    loaded = load_config(config)
+    loaded = load_config(config, root=project)
     paths = InstructionGenerator(loaded).write_all()
 
     assert paths == [codex_home / "AGENTS.md"]
@@ -135,7 +134,7 @@ Keep public.
 def test_diff_report_detects_stale_output(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\nNew.\n", encoding="utf-8")
     (tmp_path / "AGENTS.md").write_text("# Rules\n\nOld.\n", encoding="utf-8")
-    (tmp_path / "agent-instructions.yaml").write_text(
+    (tmp_path / "eutaxis.yml").write_text(
         """
 common_sources:
   - rules.md
@@ -146,7 +145,7 @@ agents:
         encoding="utf-8",
     )
 
-    loaded = load_config(tmp_path / "agent-instructions.yaml")
+    loaded = load_config(tmp_path / "eutaxis.yml")
     report = list(InstructionGenerator(loaded).diff_report())
 
     assert len(report) == 1
@@ -155,7 +154,7 @@ agents:
 
 
 def test_missing_source_raises(tmp_path: Path) -> None:
-    (tmp_path / "agent-instructions.yaml").write_text(
+    (tmp_path / "eutaxis.yml").write_text(
         """
 common_sources:
   - missing.md
@@ -166,14 +165,14 @@ agents:
         encoding="utf-8",
     )
 
-    loaded = load_config(tmp_path / "agent-instructions.yaml")
+    loaded = load_config(tmp_path / "eutaxis.yml")
 
     with pytest.raises(SourceNotFoundError):
         InstructionGenerator(loaded).generate_all()
 
 
 def test_duplicate_agent_names_raise(tmp_path: Path) -> None:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 agents:
@@ -190,7 +189,7 @@ agents:
 
 
 def test_string_boolean_values_raise(tmp_path: Path) -> None:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 agents:
@@ -207,7 +206,7 @@ agents:
 
 def test_task_modules_router_section_is_appended(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -249,7 +248,7 @@ agents:
 
 def test_task_modules_router_omitted_when_empty(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -268,7 +267,7 @@ agents:
 def test_task_modules_router_disabled_by_flag(tmp_path: Path) -> None:
     """The list is still parsed (for `eutaxis skills`) but the router section is omitted."""
     (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -297,7 +296,7 @@ agents:
 
 
 def test_duplicate_task_module_id_raises(tmp_path: Path) -> None:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 task_modules:
@@ -320,7 +319,7 @@ agents: []
 
 def test_reference_docs_section_is_appended(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -364,7 +363,7 @@ agents:
 
 def test_reference_docs_section_omitted_when_empty(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -381,7 +380,7 @@ agents:
 
 
 def test_duplicate_reference_doc_id_raises(tmp_path: Path) -> None:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 reference_docs:
@@ -405,7 +404,7 @@ agents: []
 
 
 def test_reference_doc_missing_required_field_raises(tmp_path: Path) -> None:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 reference_docs:
@@ -434,7 +433,7 @@ def test_rule_index_scans_labels_and_groups_by_file(tmp_path: Path) -> None:
         "**annotations**:\n\n ✓ Annotate.\n",
         encoding="utf-8",
     )
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -467,7 +466,7 @@ def test_rule_index_omitted_when_disabled(tmp_path: Path) -> None:
         "# Globals\n\n**precedence**:\n\n ✓ Project wins.\n",
         encoding="utf-8",
     )
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -488,7 +487,7 @@ def test_rule_index_omitted_when_no_labels_found(tmp_path: Path) -> None:
         "# Globals\n\nJust prose, no labels.\n",
         encoding="utf-8",
     )
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -514,7 +513,7 @@ def test_rule_index_externalized_when_target_set(tmp_path: Path) -> None:
         "# Programming\n\n**design-axes**:\n\n ✓ Design.\n",
         encoding="utf-8",
     )
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -573,7 +572,7 @@ def test_rule_index_inline_when_no_target(tmp_path: Path) -> None:
         "# Globals\n\n**precedence**:\n\n ✓ Project wins.\n",
         encoding="utf-8",
     )
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -607,7 +606,7 @@ def test_task_module_description_falls_back_to_frontmatter(
         "# Programming\n",
         encoding="utf-8",
     )
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 task_modules:
@@ -636,7 +635,7 @@ def test_config_description_overrides_frontmatter(tmp_path: Path) -> None:
         "# Programming\n",
         encoding="utf-8",
     )
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 task_modules:
@@ -665,7 +664,7 @@ def test_task_module_description_missing_everywhere_raises(
         "# Programming\n\nNo frontmatter.\n",
         encoding="utf-8",
     )
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 task_modules:
@@ -685,7 +684,7 @@ agents:
 
 
 def test_negative_heading_offset_raises(tmp_path: Path) -> None:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -707,7 +706,7 @@ def _rejected_label_workspace(tmp_path: Path, *, strict: bool | None) -> Path:
         encoding="utf-8",
     )
     strict_line = "" if strict is None else f"strict_rule_labels: {str(strict).lower()}\n"
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         f"common_sources:\n  - rules.md\n{strict_line}"
         "agents:\n  - name: codex\n    target: AGENTS.md\n",
@@ -750,7 +749,7 @@ def test_generate_plan_reports_drift_and_cumulative_budgets(tmp_path: Path) -> N
     target.write_text("# Rules\n\nOld.\n", encoding="utf-8")
     index_target = tmp_path / "rule-index.md"
     index_target.write_text("# Old index\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         "common_sources:\n  - rules.md\n"
         "instruction_chains:\n"
@@ -860,7 +859,7 @@ def test_strict_rule_labels_fails_check(tmp_path: Path) -> None:
 
 
 def test_strict_rule_labels_must_be_boolean(tmp_path: Path) -> None:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text('strict_rule_labels: "yes"\nagents: []\n', encoding="utf-8")
 
     with pytest.raises(ConfigurationError, match="strict_rule_labels"):

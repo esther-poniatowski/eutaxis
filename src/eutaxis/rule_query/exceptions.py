@@ -4,9 +4,9 @@ from __future__ import annotations
 
 
 class RuleQueryError(Exception):
-    """Base exception for rule queries; carries the CLI exit code."""
+    """Base exception for rule queries; every one is a usage error (exit status 2)."""
 
-    exit_code = 1
+    exit_code = 2
 
 
 class RuleSourceError(RuleQueryError):

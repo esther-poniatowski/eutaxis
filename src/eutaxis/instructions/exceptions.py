@@ -6,9 +6,15 @@ from pathlib import Path
 
 
 class InstructionError(Exception):
-    """Base exception for instruction assembly errors."""
+    """Base exception for instruction assembly errors.
 
-    exit_code = 1
+    The exit status follows the command-line conventions: 2 for an error
+    that prevents the command from running as asked, such as an invalid
+    settings file or a missing source, and 1 for a problem that a check or
+    a validation finds in the declared files.
+    """
+
+    exit_code = 2
 
 
 class ConfigurationError(InstructionError):
@@ -26,6 +32,8 @@ class SourceNotFoundError(InstructionError):
 class RejectedLabelError(InstructionError):
     """Raised under ``strict_rule_labels`` when a module holds a rejected label line."""
 
+    exit_code = 1
+
     def __init__(self, locations: list[str]) -> None:
         super().__init__(
             f"{len(locations)} label line(s) violate the label grammar, and "
@@ -38,7 +46,7 @@ class RejectedLabelError(InstructionError):
 class BudgetExceededError(InstructionError):
     """Raised when a rendered output exceeds its configured byte budget."""
 
-    exit_code = 2
+    exit_code = 1
 
     def __init__(self, agent_name: str, size: int, limit: int) -> None:
         super().__init__(
@@ -53,7 +61,7 @@ class BudgetExceededError(InstructionError):
 class InstructionChainBudgetExceededError(InstructionError):
     """Raised when a global-plus-project instruction chain exceeds its budget."""
 
-    exit_code = 2
+    exit_code = 1
 
     def __init__(self, chain_name: str, size: int, limit: int) -> None:
         super().__init__(

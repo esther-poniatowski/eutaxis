@@ -63,11 +63,11 @@ def declared_sources(
 
 
 def scan_instructions(
-    config: InstructionConfig, root: Path | None = None
+    config: InstructionConfig, directory: Path | None = None
 ) -> ScanReport:
     """Scan instruction directories and report drift against the config.
 
-    When ``root`` is provided, the scan walks that single directory.
+    When ``directory`` is provided, the scan walks that single directory.
     Otherwise it walks the union of parent directories of every currently
     registered file.
 
@@ -78,8 +78,8 @@ def scan_instructions(
     registered = collect_registered_paths(config)
     registered_set = {path.resolve() for path in registered}
 
-    if root is not None:
-        scan_dirs = [root.expanduser().resolve()]
+    if directory is not None:
+        scan_dirs = [directory.expanduser().resolve()]
     else:
         scan_dirs = sorted(
             {path.parent for path in registered if path.parent.exists()}

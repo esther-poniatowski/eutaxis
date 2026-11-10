@@ -25,9 +25,8 @@ def _write_module(path: Path, *, name: str, body: str = "rule body\n", **fm) -> 
     path.write_text(f"---\nname: {name}\n{fm_text}---\n{body}", encoding="utf-8")
 
 
-def _write_config(path: Path, root: Path, modules: list[dict]) -> None:
+def _write_config(path: Path, modules: list[dict]) -> None:
     payload = {
-        "root": str(root),
         "common_sources": [],
         "task_modules": modules,
         "agents": [],
@@ -40,10 +39,9 @@ def test_load_from_instruction_config_returns_sources(tmp_path: Path) -> None:
     _write_module(root / "instructions" / "rules" / "first.md", name="first")
     _write_module(root / "instructions" / "rules" / "second.md", name="second")
 
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "first",
@@ -68,10 +66,9 @@ def test_load_from_instruction_config_returns_sources(tmp_path: Path) -> None:
 
 def test_load_from_instruction_config_raises_on_missing_file(tmp_path: Path) -> None:
     root = tmp_path
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "ghost",
@@ -99,10 +96,9 @@ def test_load_from_instruction_config_raises_on_missing_failure_mode(
         "---\nname: incomplete\ndescription: x\ninvocation: [model, user]\n---\nbody\n",
         encoding="utf-8",
     )
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "incomplete",
@@ -126,10 +122,9 @@ def test_skills_list_cli_reports_each_source(tmp_path: Path) -> None:
         invocation="[user]",
         **{"failure-mode": "silent", "required-visibility": "pre-action"},
     )
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "alpha",
@@ -159,10 +154,9 @@ def test_skills_list_cli_reports_each_source(tmp_path: Path) -> None:
 def test_skills_show_renders_for_claude(tmp_path: Path) -> None:
     root = tmp_path
     _write_module(root / "instructions" / "rules" / "gamma.md", name="gamma")
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "gamma",
@@ -187,10 +181,9 @@ def test_skills_show_renders_for_claude(tmp_path: Path) -> None:
 def test_skills_install_writes_artifact(tmp_path: Path) -> None:
     root = tmp_path
     _write_module(root / "instructions" / "rules" / "delta.md", name="delta")
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "delta",
@@ -222,10 +215,9 @@ def _diff_workspace(tmp_path: Path, body: str, **fm) -> tuple[Path, Path, Path]:
     """Write one module and its configuration; return config, module and HOME."""
     module = tmp_path / "instructions" / "rules" / "epsilon.md"
     _write_module(module, name="epsilon", body=body, **fm)
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=tmp_path,
         modules=[
             {
                 "id": "epsilon",

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -25,11 +27,16 @@ from .models import (
 
 
 class ConfigLoader:
-    """Load and validate instruction assembly configuration."""
+    """Load and validate instruction assembly configuration.
+
+    The relative paths of the settings file resolve against ``root``, or,
+    when ``root`` is absent, against ``settings_root(config_path)``. The
+    retired key ``root`` is rejected.
+    """
 
     def __init__(self, config_path: Path, root: Path | None = None) -> None:
         self.config_path = config_path.expanduser().resolve()
-        self.root_override = root.expanduser().resolve() if root else None
+        self.root = root.expanduser().resolve() if root else None
 
     def load(self) -> InstructionConfig:
         """Load a YAML configuration file."""
@@ -99,17 +106,19 @@ class ConfigLoader:
         return config
 
     def _resolve_root(self, raw: dict[str, Any]) -> Path:
-        if self.root_override is not None:
-            return self.root_override
-
-        raw_root = raw.get("root")
-        if raw_root is None:
-            return self.config_path.parent
-
-        root = Path(str(raw_root)).expanduser()
-        if not root.is_absolute():
-            root = self.config_path.parent / root
-        return root.resolve()
+        if "root" in raw:
+            raise ConfigurationError(
+                f"{self.config_path} declares the key 'root', which is retired. "
+                "The paths of the settings file resolve against the root of "
+                "the command: --root, then EUTAXIS_ROOT, then the nearest "
+                "folder above the current one that holds config/tools/eutaxis.yml "
+                "or eutaxis.yml, then the current folder. Remove the key. To "
+                "install project-scope Skills into another project, pass "
+                "--target-project to the skills subcommands."
+            )
+        if self.root is not None:
+            return self.root
+        return settings_root(self.config_path)
 
     def _parse_sources(self, raw_sources: Any) -> list[SourceFile]:
         if raw_sources is None:
@@ -488,14 +497,73 @@ class ConfigLoader:
         return value
 
 
-CONFIG_FILENAME = "agent-instructions.yaml"
-"""File name of the instruction-assembly settings file."""
+CONFIG_FILENAME = "eutaxis.yml"
+"""File name of the settings file of Eutaxis."""
 
 CONFIG_SEARCH_PATHS: tuple[Path, ...] = (
     Path("config") / "tools" / CONFIG_FILENAME,
     Path(CONFIG_FILENAME),
 )
-"""Locations of the settings file below the root, in the order they are tried."""
+"""Places of the settings file below the root. At most one of them may exist."""
+
+ROOT_ENV_VAR = "EUTAXIS_ROOT"
+"""Environment variable that names the root when ``--root`` is absent."""
+
+
+def resolve_root(
+    root: Path | None = None,
+    *,
+    cwd: Path | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    """Return the root of a command, from the first source that gives one.
+
+    The sources are tried in this order:
+
+    1. ``root``, the value of ``--root``;
+    2. the environment variable ``EUTAXIS_ROOT``, when set and not empty;
+    3. the nearest ancestor of the current folder, the folder itself
+       included, that holds a settings file at one of ``CONFIG_SEARCH_PATHS``;
+    4. the current folder.
+
+    Parameters
+    ----------
+    root : Path, optional
+        Root given on the command line, relative to the current folder.
+    cwd : Path, optional
+        Current folder. Default: the working directory of the process.
+    environ : Mapping[str, str], optional
+        Environment variables. Default: ``os.environ``.
+
+    Returns
+    -------
+    Path
+        Absolute root folder.
+    """
+    current = (cwd or Path.cwd()).expanduser().resolve()
+    if root is not None:
+        return _absolute(root, current)
+    variable = (os.environ if environ is None else environ).get(ROOT_ENV_VAR, "")
+    if variable:
+        return _absolute(Path(variable), current)
+    for folder in (current, *current.parents):
+        if any((folder / place).is_file() for place in CONFIG_SEARCH_PATHS):
+            return folder
+    return current
+
+
+def settings_root(config_path: Path) -> Path:
+    """Return the root implied by the place of a settings file.
+
+    A file in ``config/tools/`` implies the folder that holds ``config/``;
+    any other file implies its own folder. ``load_config`` uses this root
+    when its caller gives none; the command line always passes the root
+    that ``resolve_root`` returns.
+    """
+    folder = config_path.expanduser().resolve().parent
+    if folder.name == "tools" and folder.parent.name == "config":
+        return folder.parent.parent
+    return folder
 
 
 def find_config(config: Path | None, root: Path) -> Path:
@@ -505,12 +573,11 @@ def find_config(config: Path | None, root: Path) -> Path:
     ----------
     config : Path, optional
         Path given with ``--config``. When set, it is returned resolved
-        against the current folder, without any lookup.
+        against the current folder, without any lookup; ``load_config``
+        reports it when it does not exist.
     root : Path
-        Root folder of the project. Without ``config``, the lookup tries
-        each entry of ``CONFIG_SEARCH_PATHS`` below this folder:
-        ``config/tools/agent-instructions.yaml``, then
-        ``agent-instructions.yaml``.
+        Root folder of the project. Without ``config``, the settings file is
+        ``config/tools/eutaxis.yml`` or ``eutaxis.yml`` below this folder.
 
     Returns
     -------
@@ -520,22 +587,45 @@ def find_config(config: Path | None, root: Path) -> Path:
     Raises
     ------
     ConfigurationError
-        When ``config`` is absent and no candidate exists below ``root``.
+        When ``config`` is absent and either both places or no place below
+        ``root`` holds a settings file. Eutaxis has no built-in defaults:
+        every source and every output is declared in the settings file.
     """
     if config is not None:
         return config.expanduser().resolve()
     base = root.expanduser().resolve()
     candidates = [base / relative for relative in CONFIG_SEARCH_PATHS]
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    searched = ", ".join(str(candidate) for candidate in candidates)
+    present = [candidate for candidate in candidates if candidate.is_file()]
+    if len(present) > 1:
+        raise ConfigurationError(
+            "Two settings files compete: "
+            + " and ".join(str(path) for path in present)
+            + ". Keep one of them."
+        )
+    if present:
+        return present[0]
+    searched = " or ".join(str(candidate) for candidate in candidates)
     raise ConfigurationError(
-        f"No settings file found below {base} (searched: {searched}). "
-        "Pass --config or --root."
+        f"No settings file at {searched}. Eutaxis has no built-in defaults: "
+        "create the file (eutaxis init scaffolds one), or pass --config or --root."
     )
 
 
 def load_config(config_path: Path, root: Path | None = None) -> InstructionConfig:
-    """Load instruction configuration from disk."""
+    """Load instruction configuration from disk.
+
+    Parameters
+    ----------
+    config_path : Path
+        Settings file.
+    root : Path, optional
+        Folder against which the relative paths of the file resolve.
+        Default: ``settings_root(config_path)``.
+    """
     return ConfigLoader(config_path, root=root).load()
+
+
+def _absolute(path: Path, base: Path) -> Path:
+    """Return ``path`` made absolute against ``base``, without symbolic links."""
+    path = path.expanduser()
+    return (path if path.is_absolute() else base / path).resolve()

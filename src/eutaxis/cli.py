@@ -11,12 +11,11 @@ installed as a script. Subcommands:
 - ``init`` — scaffold prompt composition into a project (planned).
 """
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import typer
 from . import info as pkg_info, __version__
-from ._cli_options import explicit_root, former_root_option, root_option
+from ._cli_options import command_path, command_root, root_option
 from .commands._cli import commands_app
 from .commands._skills_cli import skills_app
 from .ops._cli import ops_app
@@ -26,13 +25,14 @@ if TYPE_CHECKING:
     from .instructions import InstructionConfig, InstructionGenerator
 
 _CONFIG_HELP = (
-    "Settings file. Default: config/tools/agent-instructions.yaml below the "
-    "root, then agent-instructions.yaml at the root."
+    "Settings file, relative to the current folder. Default: "
+    "config/tools/eutaxis.yml or eutaxis.yml below the root."
 )
 _ROOT_HELP = (
-    "Project folder in which the settings file is looked up and against which "
-    "relative source and target paths resolve. Without it, the lookup runs in "
-    "the current folder and paths resolve against the root of the settings file."
+    "Folder below which the settings file is looked up and against which the "
+    "paths of the settings file resolve. Default: EUTAXIS_ROOT, then the "
+    "nearest folder above the current one that holds the settings file, then "
+    "the current folder."
 )
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -61,7 +61,6 @@ def cli_generate(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        "-n",
         help="Show targets without writing files.",
     ),
     plan: bool = typer.Option(
@@ -275,16 +274,15 @@ def _echo_rejected_labels(generator: "InstructionGenerator") -> None:
 def _load_settings(config: str | None, root: str | None) -> "InstructionConfig":
     """Find and load the settings file of a command.
 
-    Without ``--config``, the file is looked up below ``--root``, or below
-    the current folder when ``--root`` is absent. An explicit ``--root``
-    also overrides the ``root`` key of the file.
+    The root comes from ``--root``, ``EUTAXIS_ROOT``, the nearest folder that
+    holds the settings file, or the current folder. Without ``--config``, the
+    settings file is looked up below the root. The paths written in the file
+    resolve against the root.
     """
     from .instructions import find_config, load_config
 
-    base = Path(root).expanduser().resolve() if root else None
-    config_path = find_config(
-        Path(config) if config else None, base if base is not None else Path.cwd()
-    )
+    base = command_root(root)
+    config_path = find_config(command_path(config), base)
     return load_config(config_path, root=base)
 
 
@@ -321,10 +319,14 @@ def cli_list(
 @app.command("scan")
 def cli_scan(
     config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
-    root: str | None = root_option(
-        "Project folder in which the settings file is looked up and the "
-        "instruction files are walked. Without it, the lookup runs in the "
-        "current folder and the registered folders are walked."
+    root: str | None = root_option(_ROOT_HELP),
+    directory: str | None = typer.Option(
+        None,
+        "--dir",
+        help=(
+            "Folder walked for instruction files, relative to the current "
+            "folder. Default: the folders of the registered files."
+        ),
     ),
     register: bool = typer.Option(
         False,
@@ -341,9 +343,7 @@ def cli_scan(
 
     try:
         loaded = _load_settings(config, root)
-        report = scan_instructions(
-            loaded, root=Path(root).expanduser().resolve() if root else None
-        )
+        report = scan_instructions(loaded, directory=command_path(directory))
     except InstructionError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=exc.exit_code) from exc
@@ -391,9 +391,10 @@ def cli_validate(
 @app.command("init")
 def cli_init(
     root: str | None = root_option(
-        "Project folder that receives the scaffold. Default: current folder."
+        "Folder that receives the scaffold. Default: EUTAXIS_ROOT, then the "
+        "nearest folder above the current one that holds the settings file, "
+        "then the current folder."
     ),
-    former_target: str | None = former_root_option("--target", "-t"),
     template: str = typer.Option(
         "codex-project",
         "--template",
@@ -402,18 +403,17 @@ def cli_init(
     force: bool = typer.Option(
         False,
         "--force",
-        help="Overwrite existing scaffold files.",
+        help="Overwrite existing scaffold files, which may hold edits.",
     ),
 ) -> None:
     """Scaffold prompt-composition structure into a project."""
     from .scaffold import ScaffoldError, scaffold_workspace
 
-    target = explicit_root(root, former_target, "--target") or Path.cwd()
     try:
-        paths = scaffold_workspace(target, template=template, force=force)
+        paths = scaffold_workspace(command_root(root), template=template, force=force)
     except ScaffoldError as exc:
         typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=exc.exit_code) from exc
 
     typer.echo(f"Created {len(paths)} file(s):")
     for path in paths:

@@ -57,17 +57,16 @@ GLOBAL = dedent("""\
 
 
 @pytest.fixture
-def workspace(tmp_path: Path) -> dict[str, Path]:
+def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     root = tmp_path / "src"
     (root / "tasks").mkdir(parents=True)
     (root / "global").mkdir()
     (root / "tasks" / "style.md").write_text(STYLE.format(extra=""), encoding="utf-8")
     (root / "global" / "verification.md").write_text(GLOBAL, encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = root / "eutaxis.yml"
     config.write_text(
         yaml.safe_dump(
             {
-                "root": str(root),
                 "common_sources": [{"path": "global/verification.md"}],
                 "task_modules": [
                     {
@@ -91,6 +90,7 @@ def workspace(tmp_path: Path) -> dict[str, Path]:
     )
     home = tmp_path / "home"
     home.mkdir()
+    monkeypatch.chdir(root)
     return {"root": root, "config": config, "home": home}
 
 
@@ -130,28 +130,28 @@ def test_show_missing_part_lists_available_parts(workspace) -> None:
     result = _run(
         "show", "topic-first", "--part", "exception", "-c", str(workspace["config"])
     )
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "has no 'exception' part" in result.stderr
     assert "Available parts: valid." in result.stderr
 
 
 def test_show_unknown_label_suggests_close_labels(workspace) -> None:
     result = _run("show", "topic-frst", "-c", str(workspace["config"]))
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "Unknown rule label 'topic-frst'" in result.stderr
     assert "Close labels: topic-first." in result.stderr
 
 
 def test_show_rejected_label_names_the_offending_line(workspace) -> None:
     result = _run("show", "3d-plots", "-c", str(workspace["config"]))
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "lowercase letter" in result.stderr
     assert "style.md" in result.stderr
 
 
 def test_show_ambiguous_label_requires_module(workspace) -> None:
     result = _run("show", "short-sentences", "-c", str(workspace["config"]))
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "several modules (verification, style)" in result.stderr
     assert "--module" in result.stderr
 
@@ -251,13 +251,13 @@ def test_default_source_is_the_user_skills_dir_of_the_agent(workspace) -> None:
     assert ".agents/skills/style/SKILL.md" in codex.stdout
 
     missing = _run("show", "constraint-scan", home=home)
-    assert missing.exit_code == 1
+    assert missing.exit_code == 2
     assert "query their rules with -c <config>" in missing.stderr
 
 
 def test_missing_skills_dir_is_reported(tmp_path: Path) -> None:
     result = _run("list", "--skills-dir", str(tmp_path / "absent"))
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "Skills directory not found" in result.stderr
 
 
@@ -265,7 +265,7 @@ def test_config_and_skills_dir_are_exclusive(workspace) -> None:
     result = _run(
         "list", "-c", str(workspace["config"]), "--skills-dir", str(workspace["home"])
     )
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "cannot be combined" in result.stderr
 
 
@@ -273,7 +273,7 @@ def _section_config(workspace, entry: dict) -> Path:
     config = workspace["config"].with_name("sections.yaml")
     config.write_text(
         yaml.safe_dump(
-            {"root": str(workspace["root"]), "common_sources": [entry], "agents": []}
+            {"common_sources": [entry], "agents": []}
         ),
         encoding="utf-8",
     )
@@ -295,7 +295,7 @@ def test_config_section_selection_keeps_only_selected_rules(workspace) -> None:
     ]
     assert listing.stderr == ""
     assert shown.stdout.splitlines()[0].endswith("style.md:12-19)")
-    assert outside.exit_code == 1
+    assert outside.exit_code == 2
     assert "Unknown rule label 'topic-first'" in outside.stderr
 
 
@@ -315,7 +315,6 @@ def test_config_whole_module_entry_overrides_a_section_selection(workspace) -> N
     config.write_text(
         yaml.safe_dump(
             {
-                "root": str(workspace["root"]),
                 "common_sources": [{"path": "tasks/style.md", "sections": ["Topic"]}],
                 "agents": [
                     {

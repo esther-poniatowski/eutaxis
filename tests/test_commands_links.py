@@ -41,7 +41,7 @@ def _module(path: Path, name: str, body: str, **fm: str) -> None:
 
 
 @pytest.fixture
-def workspace(tmp_path: Path):
+def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     def build(
         *, alpha_fm: dict[str, str] | None = None, beta_fm: dict[str, str] | None = None
     ):
@@ -55,11 +55,10 @@ def workspace(tmp_path: Path):
         )
         (root / "global").mkdir(exist_ok=True)
         (root / "global" / "guard.md").write_text("# Guard\n", encoding="utf-8")
-        config = tmp_path / "agent-instructions.yaml"
+        config = root / "eutaxis.yml"
         config.write_text(
             yaml.safe_dump(
                 {
-                    "root": str(root),
                     "task_modules": [
                         {"id": n, "title": n, "path": f"tasks/{n}.md", "trigger": "t"}
                         for n in ("alpha", "beta")
@@ -69,6 +68,7 @@ def workspace(tmp_path: Path):
             ),
             encoding="utf-8",
         )
+        monkeypatch.chdir(root)
         return root, config
 
     return build

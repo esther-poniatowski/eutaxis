@@ -12,7 +12,7 @@ def test_scaffold_workspace_copies_codex_project_template(tmp_path: Path) -> Non
 
     expected = {
         tmp_path / "AGENTS.md",
-        tmp_path / "agent-instructions.yaml",
+        tmp_path / "eutaxis.yml",
         tmp_path / "docs" / "instructions" / "project-overview.md",
         tmp_path / "docs" / "instructions" / "repository-layout.md",
         tmp_path / "docs" / "instructions" / "tasks" / "programming.md",
@@ -44,7 +44,7 @@ def test_scaffold_workspace_force_overwrites_existing_files(tmp_path: Path) -> N
 def test_scaffold_workspace_copies_multi_agent_template(tmp_path: Path) -> None:
     scaffold_workspace(tmp_path, template="multi-agent-project")
 
-    config = (tmp_path / "agent-instructions.yaml").read_text(encoding="utf-8")
+    config = (tmp_path / "eutaxis.yml").read_text(encoding="utf-8")
 
     assert "path: AGENTS.md" in config
     assert "path: .claude/CLAUDE.md" in config

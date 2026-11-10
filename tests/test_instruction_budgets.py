@@ -20,7 +20,7 @@ from eutaxis.instructions import InstructionChainBudgetExceededError
 
 def test_budget_exceeded_blocks_generation(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\n" + "x" * 200 + "\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -44,7 +44,7 @@ agents:
 
 def test_budget_enforced_per_agent_default_applies(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\n" + "x" * 200 + "\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 max_bytes: 80
@@ -73,7 +73,7 @@ agents:
 
 def test_budget_report_yields_size_and_limit(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\nAlways.\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -98,7 +98,7 @@ agents:
 
 def test_budget_can_be_disabled(tmp_path: Path) -> None:
     (tmp_path / "rules.md").write_text("# Rules\n\n" + "x" * 200 + "\n", encoding="utf-8")
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 common_sources:
@@ -118,7 +118,7 @@ agents:
 
 
 def _write_instruction_chain_config(tmp_path: Path, limit: int) -> Path:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         f"""
 common_sources:
@@ -198,7 +198,7 @@ def test_instruction_chain_budget_reports_missing_project_source(
 
 
 def test_non_positive_max_bytes_raises(tmp_path: Path) -> None:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
 agents:

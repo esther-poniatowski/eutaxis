@@ -4,9 +4,9 @@ from __future__ import annotations
 
 
 class OpsError(Exception):
-    """Base exception for operations."""
+    """Base exception for operations; every one is a usage error (exit status 2)."""
 
-    exit_code = 1
+    exit_code = 2
 
 
 class OutsideAllowedRootError(OpsError):

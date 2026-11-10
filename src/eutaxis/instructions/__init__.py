@@ -3,9 +3,12 @@
 from .config import (
     CONFIG_FILENAME,
     CONFIG_SEARCH_PATHS,
+    ROOT_ENV_VAR,
     ConfigLoader,
     find_config,
     load_config,
+    resolve_root,
+    settings_root,
 )
 from .exceptions import (
     BudgetExceededError,
@@ -50,6 +53,7 @@ __all__ = [
     "CONFIG_FILENAME",
     "CONFIG_SEARCH_PATHS",
     "LABEL_PATTERN",
+    "ROOT_ENV_VAR",
     "AgentConfig",
     "BudgetExceededError",
     "ConfigLoader",
@@ -82,5 +86,7 @@ __all__ = [
     "load_config",
     "parse_frontmatter",
     "parse_module",
+    "resolve_root",
     "scan_instructions",
+    "settings_root",
 ]

@@ -25,7 +25,7 @@ def _write_module(path: Path, name: str, body: str = "rule body\n") -> None:
     )
 
 
-def _write_config(path: Path, root: Path, names: tuple[str, ...]) -> None:
+def _write_config(path: Path, names: tuple[str, ...]) -> None:
     modules = [
         {
             "id": name,
@@ -38,7 +38,6 @@ def _write_config(path: Path, root: Path, names: tuple[str, ...]) -> None:
     path.write_text(
         yaml.safe_dump(
             {
-                "root": str(root),
                 "common_sources": [],
                 "task_modules": modules,
                 "agents": [],
@@ -58,8 +57,8 @@ def _skills(home: Path, *arguments: str):
 
 def test_skills_sync_previews_without_writing(tmp_path: Path) -> None:
     _write_module(tmp_path / "instructions" / "alpha.md", "alpha")
-    config = tmp_path / "agent-instructions.yaml"
-    _write_config(config, tmp_path, ("alpha",))
+    config = tmp_path / "eutaxis.yml"
+    _write_config(config, ("alpha",))
     home = tmp_path / "home"
     home.mkdir()
 
@@ -77,8 +76,8 @@ def test_skills_sync_applies_updates_and_owned_orphan_removals(
 ) -> None:
     for name in ("alpha", "retired"):
         _write_module(tmp_path / "instructions" / f"{name}.md", name)
-    config = tmp_path / "agent-instructions.yaml"
-    _write_config(config, tmp_path, ("alpha", "retired"))
+    config = tmp_path / "eutaxis.yml"
+    _write_config(config, ("alpha", "retired"))
     home = tmp_path / "home"
     home.mkdir()
     first_apply = _skills(home, "sync", "-c", str(config), "--apply")
@@ -89,7 +88,7 @@ def test_skills_sync_applies_updates_and_owned_orphan_removals(
         "alpha",
         body="updated body\n",
     )
-    _write_config(config, tmp_path, ("alpha",))
+    _write_config(config, ("alpha",))
 
     preview = _skills(home, "sync", "-c", str(config))
     assert preview.exit_code == 0, preview.output
@@ -109,8 +108,8 @@ def test_skills_sync_applies_updates_and_owned_orphan_removals(
 
 def test_skills_sync_preserves_non_eutaxis_orphans(tmp_path: Path) -> None:
     _write_module(tmp_path / "instructions" / "alpha.md", "alpha")
-    config = tmp_path / "agent-instructions.yaml"
-    _write_config(config, tmp_path, ("alpha",))
+    config = tmp_path / "eutaxis.yml"
+    _write_config(config, ("alpha",))
     home = tmp_path / "home"
     foreign = home / ".claude" / "skills" / "foreign"
     foreign.mkdir(parents=True)
@@ -130,8 +129,8 @@ def test_skills_sync_preserves_artifacts_managed_by_another_config(
         _write_module(tmp_path / "instructions" / f"{name}.md", name)
     config_a = tmp_path / "config-a.yaml"
     config_b = tmp_path / "config-b.yaml"
-    _write_config(config_a, tmp_path, ("alpha",))
-    _write_config(config_b, tmp_path, ("beta",))
+    _write_config(config_a, ("alpha",))
+    _write_config(config_b, ("beta",))
     home = tmp_path / "home"
     home.mkdir()
 
@@ -143,7 +142,7 @@ def test_skills_sync_preserves_artifacts_managed_by_another_config(
     assert (home / ".claude" / "skills" / "alpha").is_dir()
     assert (home / ".claude" / "skills" / "beta").is_dir()
 
-    _write_config(config_a, tmp_path, ())
+    _write_config(config_a, ())
     retired = _skills(home, "sync", "-c", str(config_a), "--apply")
 
     assert retired.exit_code == 0, retired.output
@@ -157,8 +156,8 @@ def test_skills_sync_preserves_a_name_claimed_by_another_config(
     _write_module(tmp_path / "instructions" / "shared.md", "shared")
     config_a = tmp_path / "config-a.yaml"
     config_b = tmp_path / "config-b.yaml"
-    _write_config(config_a, tmp_path, ("shared",))
-    _write_config(config_b, tmp_path, ("shared",))
+    _write_config(config_a, ("shared",))
+    _write_config(config_b, ("shared",))
     home = tmp_path / "home"
     home.mkdir()
     assert _skills(
@@ -168,7 +167,7 @@ def test_skills_sync_preserves_a_name_claimed_by_another_config(
         home, "sync", "-c", str(config_b), "--apply"
     ).exit_code == 0
 
-    _write_config(config_a, tmp_path, ())
+    _write_config(config_a, ())
     first_retirement = _skills(
         home, "sync", "-c", str(config_a), "--apply"
     )
@@ -176,7 +175,7 @@ def test_skills_sync_preserves_a_name_claimed_by_another_config(
     assert first_retirement.exit_code == 0, first_retirement.output
     assert (home / ".claude" / "skills" / "shared").is_dir()
 
-    _write_config(config_b, tmp_path, ())
+    _write_config(config_b, ())
     final_retirement = _skills(
         home, "sync", "-c", str(config_b), "--apply"
     )
@@ -191,8 +190,8 @@ def test_skills_sync_preserves_owned_artifact_without_config_manifest(
     _write_module(tmp_path / "instructions" / "legacy.md", "legacy")
     legacy_config = tmp_path / "legacy.yaml"
     active_config = tmp_path / "active.yaml"
-    _write_config(legacy_config, tmp_path, ("legacy",))
-    _write_config(active_config, tmp_path, ())
+    _write_config(legacy_config, ("legacy",))
+    _write_config(active_config, ())
     home = tmp_path / "home"
     home.mkdir()
     installed = _skills(home, "install", "all", "-c", str(legacy_config))
@@ -206,8 +205,8 @@ def test_skills_sync_preserves_owned_artifact_without_config_manifest(
 
 def test_project_sync_tracks_each_project_root_independently(tmp_path: Path) -> None:
     _write_module(tmp_path / "instructions" / "alpha.md", "alpha")
-    config = tmp_path / "agent-instructions.yaml"
-    _write_config(config, tmp_path, ("alpha",))
+    config = tmp_path / "eutaxis.yml"
+    _write_config(config, ("alpha",))
     home = tmp_path / "home"
     home.mkdir()
     first = tmp_path / "first"
@@ -223,13 +222,13 @@ def test_project_sync_tracks_each_project_root_independently(tmp_path: Path) -> 
             str(config),
             "--scope",
             "project",
-            "--root",
+            "--target-project",
             str(project),
             "--apply",
         )
         assert result.exit_code == 0, result.output
 
-    _write_config(config, tmp_path, ())
+    _write_config(config, ())
     for retired, retained in ((first, second), (second, None)):
         result = _skills(
             home,
@@ -238,7 +237,7 @@ def test_project_sync_tracks_each_project_root_independently(tmp_path: Path) -> 
             str(config),
             "--scope",
             "project",
-            "--root",
+            "--target-project",
             str(retired),
             "--apply",
         )
@@ -253,8 +252,8 @@ def test_skills_sync_blocks_a_configured_non_eutaxis_target(
 ) -> None:
     for name in ("alpha", "blocked"):
         _write_module(tmp_path / "instructions" / f"{name}.md", name)
-    config = tmp_path / "agent-instructions.yaml"
-    _write_config(config, tmp_path, ("alpha", "blocked"))
+    config = tmp_path / "eutaxis.yml"
+    _write_config(config, ("alpha", "blocked"))
     home = tmp_path / "home"
     blocked = home / ".claude" / "skills" / "blocked"
     blocked.mkdir(parents=True)
@@ -269,8 +268,8 @@ def test_skills_sync_blocks_a_configured_non_eutaxis_target(
 
 def test_skills_sync_preflights_registry_before_writing(tmp_path: Path) -> None:
     _write_module(tmp_path / "instructions" / "alpha.md", "alpha")
-    config = tmp_path / "agent-instructions.yaml"
-    _write_config(config, tmp_path, ("alpha",))
+    config = tmp_path / "eutaxis.yml"
+    _write_config(config, ("alpha",))
     home = tmp_path / "home"
     registry = home / ".eutaxis" / "state" / "installed-commands.json"
     registry.parent.mkdir(parents=True)
@@ -278,15 +277,15 @@ def test_skills_sync_preflights_registry_before_writing(tmp_path: Path) -> None:
 
     result = _skills(home, "sync", "-c", str(config), "--apply")
 
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == 2, result.output
     assert "Registry" in result.output
     assert not (home / ".claude" / "skills" / "alpha").exists()
 
 
 def test_skills_sync_preflights_manifest_before_writing(tmp_path: Path) -> None:
     _write_module(tmp_path / "instructions" / "alpha.md", "alpha")
-    config = tmp_path / "agent-instructions.yaml"
-    _write_config(config, tmp_path, ("alpha",))
+    config = tmp_path / "eutaxis.yml"
+    _write_config(config, ("alpha",))
     home = tmp_path / "home"
     manifest = SkillSyncManifest(home / ".eutaxis" / "state", config)
     manifest.path.parent.mkdir(parents=True)
@@ -294,14 +293,14 @@ def test_skills_sync_preflights_manifest_before_writing(tmp_path: Path) -> None:
 
     result = _skills(home, "sync", "-c", str(config), "--apply")
 
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == 2, result.output
     assert "manifest" in result.output
     assert not (home / ".claude" / "skills" / "alpha").exists()
 
 
 def test_skills_sync_rejects_unsafe_name_in_manifest(tmp_path: Path) -> None:
-    config = tmp_path / "agent-instructions.yaml"
-    _write_config(config, tmp_path, ())
+    config = tmp_path / "eutaxis.yml"
+    _write_config(config, ())
     home = tmp_path / "home"
     manifest = SkillSyncManifest(home / ".eutaxis" / "state", config)
     manifest.path.parent.mkdir(parents=True)
@@ -314,5 +313,5 @@ def test_skills_sync_rejects_unsafe_name_in_manifest(tmp_path: Path) -> None:
 
     result = _skills(home, "sync", "-c", str(config), "--apply")
 
-    assert result.exit_code == 1, result.output
+    assert result.exit_code == 2, result.output
     assert "invalid deployments" in result.output

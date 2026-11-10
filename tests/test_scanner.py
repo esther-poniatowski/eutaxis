@@ -6,7 +6,7 @@ from eutaxis.instructions import load_config, scan_instructions
 
 
 def _write_config(tmp_path: Path, body: str) -> Path:
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(body.lstrip(), encoding="utf-8")
     return config
 
@@ -121,7 +121,7 @@ agents:
     assert report.frontmatter_errors[0][0].name == "broken.md"
 
 
-def test_scan_root_override(tmp_path: Path) -> None:
+def test_scan_directory_override(tmp_path: Path) -> None:
     (tmp_path / "other").mkdir()
     (tmp_path / "other" / "stray.md").write_text(
         "---\ndescription: stray\n---\n# stray\n", encoding="utf-8"
@@ -142,7 +142,7 @@ agents:
 """,
     )
 
-    report = scan_instructions(load_config(config), root=tmp_path / "other")
+    report = scan_instructions(load_config(config), directory=tmp_path / "other")
 
     unregistered = {p.name for p in report.unregistered_present}
     assert unregistered == {"stray.md"}

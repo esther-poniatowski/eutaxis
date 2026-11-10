@@ -1,14 +1,19 @@
 # Generic global agent-instructions config skeleton.
 #
-# Copy this file into the consumer project (e.g. <project>/config/agents/) and
-# fill in the placeholders below with that project's instruction modules and
-# output paths. Eutaxis does not ship any consumer-specific data; everything
-# project-specific belongs in the consumer's copy.
+# Copy this file into the consumer project as config/tools/eutaxis.yml (or
+# eutaxis.yml at its root) and fill in the placeholders below with that
+# project's instruction modules and output paths. Eutaxis does not ship any
+# consumer-specific data; everything project-specific belongs in the
+# consumer's copy.
 #
-# Wrap as a Jinja template (`.yaml.j2`) only if the consumer also runs a
+# Relative paths resolve against the root of the command: --root, then
+# EUTAXIS_ROOT, then the nearest folder above the current one that holds the
+# settings file, then the current folder. A copy kept elsewhere, such as a
+# rendered file passed with --config, therefore needs the command to run from
+# the consumer repository or to name it with --root.
+#
+# Wrap as a Jinja template (`.yml.j2`) only if the consumer also runs a
 # machine-inventory rendering pass before invoking `eutaxis generate`.
-
-root: .   # consumer repository root, relative to this config file
 
 common_sources:
   # Instruction modules always loaded for every task. Replace the entries below.

@@ -19,9 +19,8 @@ def _write_module(path: Path, *, name: str, body: str = "rule body\n", **fm) -> 
     path.write_text(f"---\nname: {name}\n{fm_text}---\n{body}", encoding="utf-8")
 
 
-def _write_config(path: Path, root: Path, modules: list[dict]) -> None:
+def _write_config(path: Path, modules: list[dict]) -> None:
     payload = {
-        "root": str(root),
         "common_sources": [],
         "task_modules": modules,
         "agents": [],
@@ -54,10 +53,9 @@ def test_skills_budget_reports_entrypoints_and_declared_loading_units(
         body="**alpha-rule**:\n\n✓ Apply alpha.\n",
         disclosure="progressive",
     )
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "alpha",
@@ -90,10 +88,9 @@ def test_skills_budget_exits_one_when_an_entrypoint_exceeds_its_limit(
         body="**alpha-rule**:\n\n✓ Apply alpha.\n",
         disclosure="progressive",
     )
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "alpha",
@@ -124,10 +121,9 @@ def test_skills_budget_exits_one_when_a_loading_unit_exceeds_its_limit(
         body="**alpha-rule**:\n\n✓ Apply alpha.\n",
         disclosure="progressive",
     )
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "alpha",
@@ -168,8 +164,8 @@ def test_skills_budget_fails_when_passing_batches_exceed_composite_route(
                 "trigger": f"on {name}",
             }
         )
-    config_path = tmp_path / "agent-instructions.yaml"
-    _write_config(config_path, root=root, modules=modules)
+    config_path = tmp_path / "eutaxis.yml"
+    _write_config(config_path, modules=modules)
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     payload["skill_entrypoint_max_bytes"] = 4096
     payload["skill_loading_units"] = [
@@ -210,10 +206,9 @@ def test_skills_budget_composes_loading_units_without_counting_a_file_twice(
         body="**alpha-rule**:\n\n✓ Apply alpha.\n",
         disclosure="progressive",
     )
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "alpha",
@@ -260,10 +255,9 @@ def test_skills_budget_rejects_a_loading_unit_composition_cycle(
 ) -> None:
     root = tmp_path
     _write_module(root / "instructions" / "rules" / "alpha.md", name="alpha")
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "alpha",
@@ -285,7 +279,7 @@ def test_skills_budget_rejects_a_loading_unit_composition_cycle(
         ["skills", "budget", "-c", str(config_path), "--agent", "codex"],
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "loading units form a cycle" in result.output
 
 
@@ -299,10 +293,9 @@ def test_skills_budget_rejects_a_rule_not_emitted_by_the_skill(
         body="**alpha-rule**:\n\n✓ Apply alpha.\n",
         disclosure="progressive",
     )
-    config_path = tmp_path / "agent-instructions.yaml"
+    config_path = tmp_path / "eutaxis.yml"
     _write_config(
         config_path,
-        root=root,
         modules=[
             {
                 "id": "alpha",
@@ -324,5 +317,5 @@ def test_skills_budget_rejects_a_rule_not_emitted_by_the_skill(
         ["skills", "budget", "-c", str(config_path), "--agent", "codex"],
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "missing-rule" in result.output
