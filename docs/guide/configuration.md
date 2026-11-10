@@ -9,7 +9,7 @@ index: ""
 
 The `generate` command reads a YAML file that declares shared sources, per-agent sources, and output targets. Relative paths resolve against the configured root. By default, the root is the config file's parent directory. A config can override this with the top-level `root` key, and the CLI can override it with `--root`.
 
-Default config file name: `agent-instructions.yaml`.
+Default config file name: `agent-instructions.yaml`. Without `--config`, a command looks for `config/tools/agent-instructions.yaml` below the root, then for `agent-instructions.yaml` at the root; see [Root and settings file](cli-reference.md#root-and-settings-file). A file stored in `config/tools/` declares `root: ../..`, so that its relative paths resolve against the project folder.
 
 ## Top-level keys
 

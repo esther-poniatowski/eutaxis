@@ -71,7 +71,7 @@ Eutaxis currently ships the checked features. The unchecked features remain plan
 
 ## Quick Start
 
-A project's instruction layout is declared in `agent-instructions.yaml` at the project root. The configuration below lists two shared Markdown sources and one cumulative-file target:
+A project's instruction layout is declared in `config/tools/agent-instructions.yaml`, or in `agent-instructions.yaml` at the project root. The configuration below lists two shared Markdown sources and one cumulative-file target:
 
 ```yaml
 # agent-instructions.yaml
@@ -85,10 +85,10 @@ agents:
       path: AGENTS.md
 ```
 
-Running the `generate` command against this configuration writes the cumulative instruction file at the declared target path:
+Running the `generate` command from the project root finds this configuration and writes the cumulative instruction file at the declared target path:
 
 ```sh
-eutaxis generate -c agent-instructions.yaml
+eutaxis generate
 ```
 
 The full first-time walkthrough — installation, scaffolding, on-demand Skill compilation — lives in [Usage: get started](docs/guide/usage.md).

@@ -12,13 +12,13 @@ index: ""
 Use `eutaxis init` inside a project repository to create a starter Codex instruction layout:
 
 ```sh
-eutaxis init --template codex-project --target .
+eutaxis init --template codex-project
 ```
 
 For a project that should synchronize shared instructions across Codex and Claude Code, use:
 
 ```sh
-eutaxis init --template multi-agent-project --target .
+eutaxis init --template multi-agent-project
 ```
 
 The default template creates:
@@ -31,6 +31,6 @@ docs/instructions/repository-layout.md
 docs/instructions/tasks/programming.md
 ```
 
-The command refuses to overwrite existing files unless `--force` is supplied.
+The scaffold is written to the current folder, or to the folder given with `--root`. The command refuses to overwrite existing files unless `--force` is supplied.
 
 Template ownership stays in `eutaxis`; project-specific content should be edited and maintained in the project repository after scaffolding.

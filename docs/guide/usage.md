@@ -26,7 +26,7 @@ eutaxis info
 The fastest path is the project scaffolder:
 
 ```sh
-eutaxis init --template codex-project --target .
+eutaxis init --template codex-project
 ```
 
 The command writes a starter `agent-instructions.yaml`, an `AGENTS.md` placeholder, and a `docs/instructions/` tree. Two templates are available; see [Project scaffolding](project-scaffolding.md) for the difference between them.
@@ -52,7 +52,7 @@ eutaxis generate -c agent-instructions.yaml
 
 The command writes the file declared under `agents[0].target.path` (the project `AGENTS.md` in the example above). The on-disk path is also reported by `eutaxis list -c agent-instructions.yaml`.
 
-Without the `-c` flag, `eutaxis generate` defaults to `agent-instructions.yaml` in the current directory.
+Without the `-c` flag, `eutaxis generate` looks for `config/tools/agent-instructions.yaml`, then for `agent-instructions.yaml`, below the current folder or below the folder given with `--root`. The same lookup serves `check`, `list`, `scan` and the `skills` subcommands.
 
 ### 4. Compile on-demand rule sets to Skills (optional)
 

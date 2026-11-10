@@ -14,6 +14,17 @@ index: ""
 | `--version` | `-v` | Print the package version and exit. |
 | `--help` | | Print top-level help and exit. |
 
+## Root and settings file
+
+The option `--root` (`-r`) names the project folder of a command. The commands `generate`, `check`, `list`, `scan` and `init`, every `skills` and `commands` subcommand, and `ops clean-memory` accept it. Without `--root`, the root is the current folder. The `commands` subcommands are the one exception: without `--root`, they read no project layer.
+
+Without `--config`, a command that reads the settings file looks for it below the root, in this order:
+
+1. `config/tools/agent-instructions.yaml`;
+2. `agent-instructions.yaml`.
+
+An explicit `--config` path is used as given, relative to the current folder. The relative paths inside the settings file resolve against its `root` key, or against its own folder when the key is absent. For `generate`, `check`, `list` and `scan`, an explicit `--root` replaces that key. A settings file stored in `config/tools/` therefore declares `root: ../..`.
+
 ## Commands
 
 ### `info`
@@ -33,13 +44,13 @@ Takes no arguments or options.
 Assemble agent instruction files from modular prompt sources.
 
 ```sh
-eutaxis generate -c <config-file>
+eutaxis generate [-c <config-file>] [--root <folder>]
 ```
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--config` | `-c` | `agent-instructions.yaml` | Path to the generation configuration file. |
-| `--root` | `-r` | config parent or config `root` | Root used to resolve relative source and target paths. |
+| `--config` | `-c` | [lookup below the root](#root-and-settings-file) | Settings file. |
+| `--root` | `-r` | current folder for the lookup; `root` key of the settings file for paths | Project folder in which the settings file is looked up and against which relative source and target paths resolve. |
 | `--agent` | `-a` | all enabled agents | Generate only one configured agent output. |
 | `--dry-run` | `-n` | `false` | Show output targets without writing files. |
 | `--plan` | | `false` | With `--dry-run`, summarize cumulative-file drift and budgets. |
@@ -64,13 +75,13 @@ Exit codes:
 Check whether generated instruction files match the current source modules.
 
 ```sh
-eutaxis check -c <config-file>
+eutaxis check [-c <config-file>] [--root <folder>]
 ```
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--config` | `-c` | `agent-instructions.yaml` | Path to the generation configuration file. |
-| `--root` | `-r` | config parent or config `root` | Root used to resolve relative source and target paths. |
+| `--config` | `-c` | [lookup below the root](#root-and-settings-file) | Settings file. |
+| `--root` | `-r` | current folder for the lookup; `root` key of the settings file for paths | Project folder in which the settings file is looked up and against which relative source and target paths resolve. |
 | `--agent` | `-a` | all enabled agents | Check only one configured agent output. |
 | `--diff` | | `false` | Print unified diffs for stale outputs. |
 | `--ignore-budget` | | `false` | Report budget overruns without making them fail the check. |
@@ -84,13 +95,13 @@ Exit code `0` means all selected outputs are current and within budget. Without 
 List configured outputs, source files, and resolved targets.
 
 ```sh
-eutaxis list -c <config-file>
+eutaxis list [-c <config-file>] [--root <folder>]
 ```
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--config` | `-c` | `agent-instructions.yaml` | Path to the generation configuration file. |
-| `--root` | `-r` | config parent or config `root` | Root used to resolve relative source and target paths. |
+| `--config` | `-c` | [lookup below the root](#root-and-settings-file) | Settings file. |
+| `--root` | `-r` | current folder for the lookup; `root` key of the settings file for paths | Project folder in which the settings file is looked up and against which relative source and target paths resolve. |
 
 ---
 
@@ -99,13 +110,13 @@ eutaxis list -c <config-file>
 Compare instruction files on disk against the files the config registers.
 
 ```sh
-eutaxis scan -c <config-file>
+eutaxis scan [-c <config-file>] [--root <folder>]
 ```
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--config` | `-c` | `agent-instructions.yaml` | Path to the generation configuration file. |
-| `--root` | `-r` | parent directories of registered files | Override the directory walked for instruction files. |
+| `--config` | `-c` | [lookup below the root](#root-and-settings-file) | Settings file. |
+| `--root` | `-r` | current folder for the lookup; parent folders of registered files for the walk | Project folder in which the settings file is looked up and the instruction files are walked. |
 | `--register` | | `false` | Print a YAML snippet registering any unregistered files. |
 
 The command emits three groups: registered-and-present, unregistered-and-present, and registered-but-missing. Files whose frontmatter sets `enabled: false` are excluded from the unregistered report. `--register` prints a paste-ready snippet to stdout; the on-disk config is never rewritten.
@@ -124,16 +135,18 @@ The configuration registers instruction files. The `skills` command compiles the
 Markdown files under `task_modules` are candidate sources. Their frontmatter must satisfy the source schema. Sources with a silent failure mode must also declare `required-visibility`.
 
 ```sh
-eutaxis skills list -c <config-file>
-eutaxis skills show <name> -c <config-file> [--agent claude|codex]
-eutaxis skills install <name|all> -c <config-file> [--agent <agent>] [--scope user|project]
-eutaxis skills uninstall <name> -c <config-file> [--agent <agent>] [--scope user|project]
-eutaxis skills diff [<name>] -c <config-file>
-eutaxis skills sync -c <config-file> [--agent <agent>] [--scope user|project] [--project <root>] [--apply]
-eutaxis skills budget -c <config-file> [--agent claude|codex]
-eutaxis skills loading-unit list -c <config-file> [--agent claude|codex]
-eutaxis skills loading-unit show <name> -c <config-file> [--agent claude|codex]
+eutaxis skills list [-c <config-file>] [--root <folder>]
+eutaxis skills show <name> [-c <config-file>] [--root <folder>] [--agent claude|codex]
+eutaxis skills install <name|all> [-c <config-file>] [--root <folder>] [--agent <agent>] [--scope user|project]
+eutaxis skills uninstall <name> [-c <config-file>] [--root <folder>] [--agent <agent>] [--scope user|project]
+eutaxis skills diff [<name>] [-c <config-file>] [--root <folder>]
+eutaxis skills sync [-c <config-file>] [--root <folder>] [--agent <agent>] [--scope user|project] [--apply]
+eutaxis skills budget [-c <config-file>] [--root <folder>] [--agent claude|codex]
+eutaxis skills loading-unit list [-c <config-file>] [--root <folder>] [--agent claude|codex]
+eutaxis skills loading-unit show <name> [-c <config-file>] [--root <folder>] [--agent claude|codex]
 ```
+
+The root is the project that receives a project-scope install and the value substituted for `{{ project_root }}`. Without `--config`, the settings file is [looked up below the root](#root-and-settings-file).
 
 | Subcommand | Use it to |
 |------------|-----------|
@@ -255,13 +268,13 @@ eutaxis validate <paths...>
 Scaffold a prompt-composition structure into a target project.
 
 ```sh
-eutaxis init --template codex-project --target <directory>
+eutaxis init --template codex-project --root <folder>
 ```
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--target` | `-t` | `.` | Target workspace directory. |
+| `--root` | `-r` | current folder | Project folder that receives the scaffold. |
 | `--template` | | `codex-project` | Template directory under `eutaxis/data/templates`. |
 | `--force` | | `false` | Overwrite existing scaffold files. |
 
-The command copies tracked starter files from the selected template into the target directory. Existing files are not overwritten unless `--force` is passed.
+The command copies tracked starter files from the selected template into the root. Existing files are not overwritten unless `--force` is passed.
