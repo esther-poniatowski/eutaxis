@@ -1,6 +1,8 @@
-"""Typer commands for structured declaration acquisition and lock generation."""
+"""Typer commands for structured declaration validation and acquisition."""
 
 from __future__ import annotations
+
+from typing import NoReturn
 
 import click
 import typer
@@ -14,18 +16,102 @@ from .exceptions import (
     AcquisitionContractError,
     ByteCarrierError,
     DeclarationError,
+    FacetRegistryError,
 )
 from .lock_publication import (
     _LockPublicationError,
     _check_candidate_bytes,
     _publish_candidate_bytes,
 )
+from .sarif import declaration_check_sarif
 
 declarations_app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Generate and inspect structured-declaration acquisition locks.",
+    help="Validate structured declarations and manage acquisition locks.",
 )
+
+
+@declarations_app.command("check")
+def cli_check(
+    workspace: str = typer.Option(
+        ...,
+        "--workspace",
+        help="Workspace root retained for manifest and source acquisition.",
+    ),
+    manifest: str = typer.Option(
+        ...,
+        "--manifest",
+        help="Workspace-relative acquisition manifest path.",
+    ),
+) -> None:
+    """Validate one manifest-defined corpus and write SARIF to standard output."""
+    try:
+        trusted = _trusted_directory_from_workspace_path(workspace)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        _exit_check(exc, code=2, execution_successful=False)
+
+    try:
+        _validated_workspace_candidate_bytes(trusted, manifest)
+    except (AcquisitionContractError, DeclarationError, FacetRegistryError) as exc:
+        cleanup_error = _check_cleanup_error(trusted)
+        if cleanup_error is not None:
+            _exit_check(
+                cleanup_error,
+                exc,
+                code=2,
+                execution_successful=False,
+            )
+        _exit_check(exc, code=1, execution_successful=True)
+    except (ByteCarrierError, OSError) as exc:
+        cleanup_error = _check_cleanup_error(trusted)
+        errors = (exc,) if cleanup_error is None else (exc, cleanup_error)
+        _exit_check(*errors, code=2, execution_successful=False)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        cleanup_error = _check_cleanup_error(trusted)
+        errors = (exc,) if cleanup_error is None else (exc, cleanup_error)
+        _exit_check(*errors, code=2, execution_successful=False)
+    except BaseException as exc:  # pylint: disable=broad-exception-caught
+        _close_workspace_after_failure(trusted, exc)
+        raise
+
+    cleanup_error = _check_cleanup_error(trusted)
+    if cleanup_error is not None:
+        _exit_check(cleanup_error, code=2, execution_successful=False)
+
+    _write_check_report(declaration_check_sarif())
+
+
+def _exit_check(
+    *errors: BaseException,
+    code: int,
+    execution_successful: bool,
+) -> NoReturn:
+    """Write one complete check report and exit with its declared status."""
+    _write_check_report(
+        declaration_check_sarif(
+            *errors,
+            execution_successful=execution_successful,
+        )
+    )
+    raise typer.Exit(code=code) from errors[0]
+
+
+def _write_check_report(content: bytes) -> None:
+    """Write one SARIF log, mapping every output failure to exit status 2."""
+    try:
+        _write_exact_stdout(content)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        raise typer.Exit(code=2) from exc
+
+
+def _check_cleanup_error(workspace: TrustedDirectory) -> Exception | None:
+    """Close one check workspace and return any operational cleanup failure."""
+    try:
+        workspace.close()
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        return exc
+    return None
 
 
 @declarations_app.command("lock")

@@ -570,7 +570,7 @@ prior bytes and metadata between the two collections is an acquisition-wide
 ABA attack and is outside the version 1 threat model; verified acquisition
 requires exclusive operational control of these files.
 
-## Validation and registry order
+## Validation and registry order ^validation-registry-order
 
 Acquisition validates one source completely before making any declaration from
 it visible. The full order is:
@@ -756,6 +756,36 @@ catalogs, while acquisition revisions differ where the transport contract
 differs. A known-failure test accompanies every checker or validator so the
 gate proves that each operation can reject its target class before a clean
 result is trusted.
+
+## Corpus check command
+
+The manifest names every source in the corpus. The named corpus follows
+[Validation and registry order](#^validation-registry-order). The corpus
+contains three source classes:
+
+- every packaged facet and declaration
+- every consumer-owned facet registry
+- every consumer declaration listed by the manifest
+
+The canonical command uses that boundary:
+
+```sh
+eutaxis declarations check \
+  --workspace <root> \
+  --manifest <workspace-relative-path>
+```
+
+The output uses the `sarif-2.1.0` format for interchanging static-analysis
+results. This output reports each error with its rule and available source
+coordinates. In parallel, the exit status distinguishes three outcomes:
+
+- `0`: the complete corpus is valid
+- `1`: the authored corpus violates its contract
+- `2`: the check cannot complete because an operational or internal failure occurred
+
+The command reads current source bytes without an existing lock. The same
+command also rejects independent file lists because the manifest defines the
+corpus closure.
 
 ## Lock generation command
 
