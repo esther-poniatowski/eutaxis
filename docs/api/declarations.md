@@ -102,6 +102,160 @@ Acquire external declarations through an exact workspace path.
 * **Return type:**
   [*ExternalAcquisitionResult*](#eutaxis.declarations.external_result.ExternalAcquisitionResult)
 
+<a id="module-eutaxis.declarations.external_resolution"></a>
+
+<a id="external-resolution"></a>
+
+## External resolution
+
+Resolve authenticated external corpora without exposing their registries.
+
+<a id="eutaxis.declarations.external_resolution.ExternalResolutionResult"></a>
+
+### *class* eutaxis.declarations.external_resolution.ExternalResolutionResult(\*\_args, \*\*\_kwargs)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Expose one resolved unit and trace without its private registry.
+
+* **Parameters:**
+  * **\_args** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+  * **\_kwargs** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+
+<a id="eutaxis.declarations.external_resolution.ExternalResolutionResult.unit"></a>
+
+#### *property* unit *: ResolvedCompilationUnit*
+
+Return the authenticated resolved compilation unit.
+
+<a id="eutaxis.declarations.external_resolution.ExternalResolutionResult.trace"></a>
+
+#### *property* trace *: ResolutionTrace*
+
+Return the authenticated semantic-resolution trace.
+
+<a id="eutaxis.declarations.external_resolution.resolve_external_compilation_unit"></a>
+
+### eutaxis.declarations.external_resolution.resolve_external_compilation_unit(acquisition, manifest_id, context)
+
+Resolve one manifest while retaining its exact acquisition authority.
+
+* **Parameters:**
+  * **acquisition** ([*ExternalAcquisitionResult*](#eutaxis.declarations.external_result.ExternalAcquisitionResult))
+  * **manifest_id** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **context** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*object*](https://docs.python.org/3/builtins/functions.html#object) *]*)
+* **Return type:**
+  [*ExternalResolutionResult*](#eutaxis.declarations.external_resolution.ExternalResolutionResult)
+
+<a id="module-eutaxis.declarations.external_composition"></a>
+
+<a id="external-cumulative-composition"></a>
+
+## External cumulative composition
+
+Compose authenticated external resolutions without exposing their registries.
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeCompositionPlan"></a>
+
+### *class* eutaxis.declarations.external_composition.ExternalCumulativeCompositionPlan(\*\_args, \*\*\_kwargs)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Expose an authenticated cumulative plan without its private registry.
+
+* **Parameters:**
+  * **\_args** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+  * **\_kwargs** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeCompositionPlan.manifest"></a>
+
+#### *property* manifest *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+Return the authenticated composition-manifest identifier.
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeCompositionPlan.scope"></a>
+
+#### *property* scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+Return the authenticated artifact scope.
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeCompositionPlan.target"></a>
+
+#### *property* target *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+Return the authenticated artifact target.
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeCompositionPlan.components"></a>
+
+#### *property* components *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[PlannedComponent, ...]*
+
+Return the authenticated component order.
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeArtifact"></a>
+
+### *class* eutaxis.declarations.external_composition.ExternalCumulativeArtifact(\*\_args, \*\*\_kwargs)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Expose cumulative bytes that remain bound to external authority.
+
+* **Parameters:**
+  * **\_args** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+  * **\_kwargs** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeArtifact.manifest"></a>
+
+#### *property* manifest *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+Return the authenticated composition-manifest identifier.
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeArtifact.scope"></a>
+
+#### *property* scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+Return the authenticated artifact scope.
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeArtifact.target"></a>
+
+#### *property* target *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+Return the authenticated artifact target.
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeArtifact.content"></a>
+
+#### *property* content *: [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)*
+
+Return the authenticated canonical artifact bytes.
+
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeArtifact.text"></a>
+
+#### *property* text *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+Decode the authenticated canonical bytes as strict UTF-8.
+
+<a id="eutaxis.declarations.external_composition.plan_external_cumulative_composition"></a>
+
+### eutaxis.declarations.external_composition.plan_external_cumulative_composition(resolution)
+
+Plan one external cumulative unit through its private registry.
+
+* **Parameters:**
+  **resolution** ([*ExternalResolutionResult*](#eutaxis.declarations.external_resolution.ExternalResolutionResult))
+* **Return type:**
+  [*ExternalCumulativeCompositionPlan*](#eutaxis.declarations.external_composition.ExternalCumulativeCompositionPlan)
+
+<a id="eutaxis.declarations.external_composition.assemble_external_cumulative_artifact"></a>
+
+### eutaxis.declarations.external_composition.assemble_external_cumulative_artifact(plan, fragments)
+
+Assemble one external plan while rechecking its complete authority.
+
+* **Parameters:**
+  * **plan** ([*ExternalCumulativeCompositionPlan*](#eutaxis.declarations.external_composition.ExternalCumulativeCompositionPlan))
+  * **fragments** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+* **Return type:**
+  [*ExternalCumulativeArtifact*](#eutaxis.declarations.external_composition.ExternalCumulativeArtifact)
+
 <a id="module-eutaxis.declarations.catalog"></a>
 
 <a id="declaration-catalog"></a>
@@ -348,7 +502,7 @@ A lossy static index row, not a semantic source declaration.
   * **id** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **kind** (*DeclarationKind*)
   * **owner** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **status** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **status** (*DeclarationStatus*)
   * **source_revision** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **schema_version** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
   * **applicability** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* *None* *|* [*bool*](https://docs.python.org/3/builtins/functions.html#bool) *|* [*int*](https://docs.python.org/3/builtins/functions.html#int) *|* [*float*](https://docs.python.org/3/builtins/functions.html#float) *|* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* [*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[**None* *|* [*bool*](https://docs.python.org/3/builtins/functions.html#bool) *|* [*int*](https://docs.python.org/3/builtins/functions.html#int) *|* [*float*](https://docs.python.org/3/builtins/functions.html#float) *|* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* [*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[**JsonValue* *,*  *...* *]*  *|* [*Mapping*](https://docs.python.org/3/library/typing.html#typing.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* *JsonValue* *]* *,*  *...* *]*  *|* [*Mapping*](https://docs.python.org/3/library/typing.html#typing.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* *None* *|* [*bool*](https://docs.python.org/3/builtins/functions.html#bool) *|* [*int*](https://docs.python.org/3/builtins/functions.html#int) *|* [*float*](https://docs.python.org/3/builtins/functions.html#float) *|* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* [*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[**JsonValue* *,*  *...* *]*  *|* [*Mapping*](https://docs.python.org/3/library/typing.html#typing.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* *JsonValue* *]* *]* *]*)
@@ -372,7 +526,7 @@ A lossy static index row, not a semantic source declaration.
 
 <a id="eutaxis.declarations.persisted_catalog.PersistedCatalogEntry.status"></a>
 
-#### status *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### status *: DeclarationStatus*
 
 <a id="eutaxis.declarations.persisted_catalog.PersistedCatalogEntry.source_revision"></a>
 

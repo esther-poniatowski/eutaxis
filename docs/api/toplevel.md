@@ -41,7 +41,7 @@ error. Under `strict_rule_labels`, such a line fails the command before
 any file is written.
 
 * **Parameters:**
-  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **agent** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **dry_run** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
@@ -60,7 +60,7 @@ Rejected label lines are reported as by `generate`, and they fail the
 check under `strict_rule_labels`.
 
 * **Parameters:**
-  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **agent** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **diff** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
@@ -75,20 +75,21 @@ check under `strict_rule_labels`.
 List configured instruction outputs and their source counts.
 
 * **Parameters:**
-  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
 * **Return type:**
   None
 
 <a id="eutaxis.cli.cli_scan"></a>
 
-### eutaxis.cli.cli_scan(config=<typer.models.OptionInfo object>, root=<typer.models.OptionInfo object>, register=<typer.models.OptionInfo object>)
+### eutaxis.cli.cli_scan(config=<typer.models.OptionInfo object>, root=<typer.models.OptionInfo object>, directory=<typer.models.OptionInfo object>, register=<typer.models.OptionInfo object>)
 
 Report instruction files that drift from the configured registry.
 
 * **Parameters:**
-  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+  * **directory** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **register** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
 * **Return type:**
   None
@@ -106,12 +107,12 @@ Validate prompt family layouts and configs (planned).
 
 <a id="eutaxis.cli.cli_init"></a>
 
-### eutaxis.cli.cli_init(target=<typer.models.OptionInfo object>, template=<typer.models.OptionInfo object>, force=<typer.models.OptionInfo object>)
+### eutaxis.cli.cli_init(root=<typer.models.OptionInfo object>, template=<typer.models.OptionInfo object>, force=<typer.models.OptionInfo object>)
 
 Scaffold prompt-composition structure into a project.
 
 * **Parameters:**
-  * **target** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
   * **template** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **force** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
 * **Return type:**
@@ -133,7 +134,7 @@ Prompt composition framework.
 ## Generate
 
 `eutaxis.generate` is a thin backward-compatibility shim that re-exports
-the public surface of `eutaxis.instructions`. Only the module's own
+the public surface of `eutaxis.instructions`. Only the module’s own
 entry point is documented here; the re-exported classes appear under
 [Instructions](instructions.md).
 
@@ -190,6 +191,13 @@ Prompt scaffolding helpers.
 Bases: [`RuntimeError`](https://docs.python.org/3/builtins/exceptions.html#RuntimeError)
 
 Raised when a scaffold operation cannot be completed safely.
+
+Every scaffold error is a usage error (exit status 2): an unknown
+template, or an existing file that only `--force` may overwrite.
+
+<a id="eutaxis.scaffold.ScaffoldError.exit_code"></a>
+
+#### exit_code *= 2*
 
 <a id="eutaxis.scaffold.template_root"></a>
 

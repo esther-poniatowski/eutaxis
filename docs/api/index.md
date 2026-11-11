@@ -13,6 +13,8 @@
   * [Exceptions](instructions.md#module-eutaxis.instructions.exceptions)
 * [Declarations](declarations.md)
   * [External acquisition result](declarations.md#module-eutaxis.declarations.external_result)
+  * [External resolution](declarations.md#module-eutaxis.declarations.external_resolution)
+  * [External cumulative composition](declarations.md#module-eutaxis.declarations.external_composition)
   * [Declaration catalog](declarations.md#module-eutaxis.declarations.catalog)
   * [Persisted catalog](declarations.md#module-eutaxis.declarations.persisted_catalog)
   * [Catalog schema](declarations.md#module-eutaxis.declarations.catalog_schema)

@@ -60,9 +60,13 @@ built-in, user, project.
 
 <a id="eutaxis.commands.loader.load_from_instruction_config"></a>
 
-### eutaxis.commands.loader.load_from_instruction_config(config_path)
+### eutaxis.commands.loader.load_from_instruction_config(config_path, root=None)
 
 Load Skill sources from an instruction-assembly configuration.
+
+The paths of the configuration resolve against `root`, or, when it is
+absent, against the root implied by the place of the file (see
+`eutaxis.instructions.settings_root`).
 
 Each `task_modules` entry names a Markdown file whose frontmatter
 must satisfy the Skill source schema (`name`, `description`,
@@ -74,7 +78,8 @@ The discovery layer is recorded as `"config"` on each returned
 source.
 
 * **Parameters:**
-  **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
   [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*CommandSource*](#eutaxis.commands.models.CommandSource)]
 
@@ -1548,9 +1553,14 @@ Bases: [`Exception`](https://docs.python.org/3/builtins/exceptions.html#Exceptio
 
 Base exception for the commands subsystem.
 
+The exit status follows the command-line conventions: 2 for an error
+that prevents the command from running as asked (an unknown name, an
+invalid source or state file, a target that requires `--force`), and
+1 for a source that a validation gate rejects.
+
 <a id="eutaxis.commands.exceptions.CommandError.exit_code"></a>
 
-#### exit_code *= 1*
+#### exit_code *= 2*
 
 <a id="eutaxis.commands.exceptions.CommandNotFoundError"></a>
 
@@ -1605,7 +1615,7 @@ skill either; it routes only to the always-on body. See the
 
 <a id="eutaxis.commands.exceptions.FailureModeError.exit_code"></a>
 
-#### exit_code *= 3*
+#### exit_code *= 1*
 
 <a id="agent-adapters"></a>
 

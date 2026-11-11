@@ -182,7 +182,7 @@ This module holds the file-system reads; parsing is delegated to
 
 <a id="eutaxis.rule_query.sources.catalog_from_config"></a>
 
-### eutaxis.rule_query.sources.catalog_from_config(config_path)
+### eutaxis.rule_query.sources.catalog_from_config(config_path, root=None)
 
 Collect the rules of every module that a configuration declares.
 
@@ -191,7 +191,9 @@ selections. An entry without `sections` or `exclude_sections`, and
 every `task_modules` entry, selects the whole module.
 
 * **Parameters:**
-  **config_path** (*Path*) – Instruction-assembly configuration.
+  * **config_path** (*Path*) – Instruction-assembly configuration.
+  * **root** (*Path* *,* *optional*) – Folder against which the paths of the configuration resolve.
+    Default: the root implied by the place of the file.
 * **Raises:**
   [**RuleSourceError**](#eutaxis.rule_query.exceptions.RuleSourceError) – When a declared module is missing on disk.
 * **Return type:**
@@ -225,11 +227,11 @@ Exceptions for the rule query.
 
 Bases: [`Exception`](https://docs.python.org/3/builtins/exceptions.html#Exception)
 
-Base exception for rule queries; carries the CLI exit code.
+Base exception for rule queries; every one is a usage error (exit status 2).
 
 <a id="eutaxis.rule_query.exceptions.RuleQueryError.exit_code"></a>
 
-#### exit_code *= 1*
+#### exit_code *= 2*
 
 <a id="eutaxis.rule_query.exceptions.RuleSourceError"></a>
 

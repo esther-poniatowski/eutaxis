@@ -20,6 +20,12 @@ Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Load and validate instruction assembly configuration.
 
+The configuration file declares its format in the key `_schema`, whose
+value must equal `CONFIG_SCHEMA` as a whole string. The relative paths of
+the configuration file resolve against `root`, or, when `root` is
+absent, against `settings_root(config_path)`. The retired key `root` is
+rejected.
+
 * **Parameters:**
   * **config_path** (*Path*)
   * **root** (*Path* *|* *None*)
@@ -33,6 +39,96 @@ Load a YAML configuration file.
 * **Return type:**
   [*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig)
 
+<a id="eutaxis.instructions.config.CONFIG_FILENAME"></a>
+
+### eutaxis.instructions.config.CONFIG_FILENAME *= 'eutaxis.yml'*
+
+File name of the configuration file of Eutaxis.
+
+<a id="eutaxis.instructions.config.SCHEMA_KEY"></a>
+
+### eutaxis.instructions.config.SCHEMA_KEY *= '_schema'*
+
+Key that declares the format of the configuration file.
+
+<a id="eutaxis.instructions.config.CONFIG_SCHEMA"></a>
+
+### eutaxis.instructions.config.CONFIG_SCHEMA *= 'eutaxis:configuration@1'*
+
+Format identifier that the configuration file declares in `_schema`.
+
+<a id="eutaxis.instructions.config.CONFIG_SEARCH_PATHS"></a>
+
+### eutaxis.instructions.config.CONFIG_SEARCH_PATHS *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path), ...]* *= (PosixPath('config/tools/eutaxis.yml'), PosixPath('eutaxis.yml'))*
+
+Places of the configuration file below the root. At most one of them may exist.
+
+<a id="eutaxis.instructions.config.ROOT_ENV_VAR"></a>
+
+### eutaxis.instructions.config.ROOT_ENV_VAR *= 'EUTAXIS_ROOT'*
+
+Environment variable that names the root when `--root` is absent.
+
+<a id="eutaxis.instructions.config.resolve_root"></a>
+
+### eutaxis.instructions.config.resolve_root(root=None, \*, cwd=None, environ=None)
+
+Return the root of a command, from the first source that gives one.
+
+The sources are tried in this order:
+
+1. `root`, the value of `--root`;
+2. the environment variable `EUTAXIS_ROOT`, when set and not empty;
+3. the nearest ancestor of the current folder, the folder itself
+   included, that holds a configuration file at one of `CONFIG_SEARCH_PATHS`;
+4. the current folder.
+
+* **Parameters:**
+  * **root** (*Path* *,* *optional*) – Root given on the command line, relative to the current folder.
+  * **cwd** (*Path* *,* *optional*) – Current folder. Default: the working directory of the process.
+  * **environ** (*Mapping* *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *,* *optional*) – Environment variables. Default: `os.environ`.
+* **Returns:**
+  Absolute root folder.
+* **Return type:**
+  Path
+
+<a id="eutaxis.instructions.config.settings_root"></a>
+
+### eutaxis.instructions.config.settings_root(config_path)
+
+Return the root implied by the place of a configuration file.
+
+A file in `config/tools/` implies the folder that holds `config/`;
+any other file implies its own folder. `load_config` uses this root
+when its caller gives none; the command line always passes the root
+that `resolve_root` returns.
+
+* **Parameters:**
+  **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
+
+<a id="eutaxis.instructions.config.find_config"></a>
+
+### eutaxis.instructions.config.find_config(config, root)
+
+Return the configuration file that a command reads.
+
+* **Parameters:**
+  * **config** (*Path* *,* *optional*) – Path given with `--config`. When set, it is returned resolved
+    against the current folder, without any lookup; `load_config`
+    reports it when it does not exist.
+  * **root** (*Path*) – Root folder of the project. Without `config`, the configuration file is
+    `config/tools/eutaxis.yml` or `eutaxis.yml` below this folder.
+* **Returns:**
+  Absolute path of the configuration file.
+* **Return type:**
+  Path
+* **Raises:**
+  [**ConfigurationError**](#eutaxis.instructions.exceptions.ConfigurationError) – When `config` is absent and either both places or no place below
+      `root` holds a configuration file. Eutaxis has no built-in defaults:
+      every source and every output is declared in the configuration file.
+
 <a id="eutaxis.instructions.config.load_config"></a>
 
 ### eutaxis.instructions.config.load_config(config_path, root=None)
@@ -40,8 +136,9 @@ Load a YAML configuration file.
 Load instruction configuration from disk.
 
 * **Parameters:**
-  * **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
-  * **root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
+  * **config_path** (*Path*) – Configuration file.
+  * **root** (*Path* *,* *optional*) – Folder against which the relative paths of the file resolve.
+    Default: `settings_root(config_path)`.
 * **Return type:**
   [*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig)
 
@@ -1371,9 +1468,14 @@ Bases: [`Exception`](https://docs.python.org/3/builtins/exceptions.html#Exceptio
 
 Base exception for instruction assembly errors.
 
+The exit status follows the command-line conventions: 2 for an error
+that prevents the command from running as asked, such as an invalid
+configuration file or a missing source, and 1 for a problem that a check or
+a validation finds in the declared files.
+
 <a id="eutaxis.instructions.exceptions.InstructionError.exit_code"></a>
 
-#### exit_code *= 1*
+#### exit_code *= 2*
 
 <a id="eutaxis.instructions.exceptions.ConfigurationError"></a>
 
@@ -1409,6 +1511,10 @@ Raised under `strict_rule_labels` when a module holds a rejected label line.
 * **Return type:**
   None
 
+<a id="eutaxis.instructions.exceptions.RejectedLabelError.exit_code"></a>
+
+#### exit_code *= 1*
+
 <a id="eutaxis.instructions.exceptions.BudgetExceededError"></a>
 
 ### *exception* eutaxis.instructions.exceptions.BudgetExceededError(agent_name, size, limit)
@@ -1426,7 +1532,7 @@ Raised when a rendered output exceeds its configured byte budget.
 
 <a id="eutaxis.instructions.exceptions.BudgetExceededError.exit_code"></a>
 
-#### exit_code *= 2*
+#### exit_code *= 1*
 
 <a id="eutaxis.instructions.exceptions.InstructionChainBudgetExceededError"></a>
 
@@ -1445,4 +1551,4 @@ Raised when a global-plus-project instruction chain exceeds its budget.
 
 <a id="eutaxis.instructions.exceptions.InstructionChainBudgetExceededError.exit_code"></a>
 
-#### exit_code *= 2*
+#### exit_code *= 1*
