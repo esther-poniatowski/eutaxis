@@ -10,7 +10,7 @@ class InstructionError(Exception):
 
     The exit status follows the command-line conventions: 2 for an error
     that prevents the command from running as asked, such as an invalid
-    settings file or a missing source, and 1 for a problem that a check or
+    configuration file or a missing source, and 1 for a problem that a check or
     a validation finds in the declared files.
     """
 

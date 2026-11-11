@@ -7,7 +7,7 @@ index: ""
 
 # Configuration
 
-The `generate` command reads a YAML settings file that declares shared sources, per-agent sources, and output targets. The settings file is named `eutaxis.yml` and lies at `config/tools/eutaxis.yml` or at `eutaxis.yml` below the project root. Relative paths written in the file resolve against the root of the command, never against the folder of the file, so the file moves between the two places without an edit. The resolution of the root and the lookup of the file are stated in [Root and settings file](cli-reference.md#root-and-settings-file).
+The `generate` command reads a YAML configuration file that declares shared sources, per-agent sources, and output targets. The configuration file is named `eutaxis.yml` and lies at `config/tools/eutaxis.yml` or at `eutaxis.yml` below the project root. Relative paths written in the file resolve against the root of the command, never against the folder of the file, so the file moves between the two places without an edit. The resolution of the root and the lookup of the file are stated in [Root and configuration file](cli-reference.md#root-and-configuration-file).
 
 ## Top-level keys
 

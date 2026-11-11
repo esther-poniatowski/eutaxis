@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import yaml
@@ -82,6 +83,10 @@ def test_skills_sync_applies_updates_and_owned_orphan_removals(
     home.mkdir()
     first_apply = _skills(home, "sync", "-c", str(config), "--apply")
     assert first_apply.exit_code == 0, first_apply.output
+    manifest = SkillSyncManifest(home / ".eutaxis" / "state", config)
+    payload = json.loads(manifest.path.read_text(encoding="utf-8"))
+    assert next(iter(payload)) == "_schema"
+    assert payload["_schema"] == "eutaxis:skill-sync-manifest@1"
 
     _write_module(
         tmp_path / "instructions" / "alpha.md",
@@ -298,6 +303,25 @@ def test_skills_sync_preflights_manifest_before_writing(tmp_path: Path) -> None:
     assert not (home / ".claude" / "skills" / "alpha").exists()
 
 
+def test_skills_sync_rejects_retired_manifest_schema_key(tmp_path: Path) -> None:
+    config = tmp_path / "eutaxis.yml"
+    _write_config(config, ())
+    home = tmp_path / "home"
+    manifest = SkillSyncManifest(home / ".eutaxis" / "state", config)
+    manifest.path.parent.mkdir(parents=True)
+    manifest.path.write_text(
+        '{"schema_version": 1, "config": "'
+        + str(config.resolve())
+        + '", "deployments": {}}\n',
+        encoding="utf-8",
+    )
+
+    result = _skills(home, "sync", "-c", str(config), "--apply")
+
+    assert result.exit_code == 2, result.output
+    assert "_schema: eutaxis:skill-sync-manifest@1" in result.output
+
+
 def test_skills_sync_rejects_unsafe_name_in_manifest(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     _write_config(config, ())
@@ -305,7 +329,7 @@ def test_skills_sync_rejects_unsafe_name_in_manifest(tmp_path: Path) -> None:
     manifest = SkillSyncManifest(home / ".eutaxis" / "state", config)
     manifest.path.parent.mkdir(parents=True)
     manifest.path.write_text(
-        '{"config": "'
+        '{"_schema": "eutaxis:skill-sync-manifest@1", "config": "'
         + str(config.resolve())
         + '", "deployments": {"user:claude": ["../../../escape"]}}\n',
         encoding="utf-8",

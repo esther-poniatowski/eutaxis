@@ -136,6 +136,8 @@ def test_sidecar_lists_all_files_with_hashes(tmp_path: Path) -> None:
     files = _files_by_path(artifact)
 
     sidecar = _json.loads(files[SIDECAR_FILENAME])
+    assert next(iter(sidecar)) == "_schema"
+    assert sidecar["_schema"] == "eutaxis:skill-ownership@1"
     paths = {entry["path"] for entry in sidecar["files"]}
     assert ENTRYPOINT_FILENAME in paths
     assert "agents/openai.yaml" in paths

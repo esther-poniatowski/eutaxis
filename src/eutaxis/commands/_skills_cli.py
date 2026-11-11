@@ -53,13 +53,13 @@ from ..instructions import InstructionConfig, InstructionError, load_config
 from ..instructions.loading_units import expand_loading_unit
 
 _CONFIG_HELP = (
-    "Settings file, relative to the current folder. Default: "
+    "Configuration file, relative to the current folder. Default: "
     "config/tools/eutaxis.yml or eutaxis.yml below the root."
 )
 _ROOT_HELP = (
-    "Folder below which the settings file is looked up and against which the "
-    "paths of the settings file resolve. Default: EUTAXIS_ROOT, then the "
-    "nearest folder above the current one that holds the settings file, then "
+    "Folder below which the configuration file is looked up and against which the "
+    "paths of the configuration file resolve. Default: EUTAXIS_ROOT, then the "
+    "nearest folder above the current one that holds the configuration file, then "
     "the current folder."
 )
 _TARGET_PROJECT_HELP = (
@@ -707,7 +707,7 @@ def _effective_adapter_names(source: CommandSource, registered: list[str]) -> li
 
 
 def _settings(config: str | None, root: str | None) -> tuple[Path, Path]:
-    """Return the settings file and the root of a command."""
+    """Return the configuration file and the root of a command."""
     from ..instructions import find_config
 
     base = command_root(root)

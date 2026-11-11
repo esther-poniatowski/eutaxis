@@ -4,7 +4,7 @@ The sub-app prints one rule, or one part of it, and lists the rules of a
 source. The source is chosen by the options:
 
 - ``-c <config>`` or ``-r <root>`` reads the authored modules that the
-  settings file declares;
+  configuration file declares;
 - ``--skills-dir <dir>`` reads the eutaxis-owned skills of a directory;
 - with neither option, the user-scope skills directory of ``--agent``
   (default ``claude``) is read, so that an agent can query the rules it was
@@ -38,10 +38,10 @@ _CONFIG_OPTION = typer.Option(
     None,
     "--config",
     "-c",
-    help="Settings file whose modules are queried, relative to the current folder.",
+    help="Configuration file whose modules are queried, relative to the current folder.",
 )
 _ROOT_OPTION = root_option(
-    "Folder below which the settings file is looked up and against which its "
+    "Folder below which the configuration file is looked up and against which its "
     "paths resolve; selects the authored modules."
 )
 _SKILLS_DIR_OPTION = typer.Option(

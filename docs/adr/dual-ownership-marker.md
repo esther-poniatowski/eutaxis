@@ -28,7 +28,7 @@ A single marker leaves one of these failure modes uncovered.
 
 Track ownership **twice**, with the sidecar as the canonical source of truth and the frontmatter key as a fallback.
 
-1. **`.eutaxis-owned.json`** — sidecar inside the artifact directory. Carries `{schema_version, name, adapter, content_hash, files: [{path, sha256}]}`. Lists every file the installer owns; drives uninstall.
+1. **`.eutaxis-owned.json`** — sidecar inside the artifact directory. Carries `{_schema: "eutaxis:skill-ownership@1", name, adapter, content_hash, files: [{path, sha256}]}`. Lists every file the installer owns; drives uninstall.
 2. **`x-eutaxis-owned: <hash>`** — extension key inside the rendered `SKILL.md` frontmatter. The `x-` prefix signals a vendor extension; both agents tolerate unknown frontmatter keys in practice.
 
 Both carry the **same canonical hash**, computed over the frontmatter dict (minus the marker key), the rendered body, and the sorted sibling files. The hash is injected after computation, so the marker bytes never participate in the hash they identify (no chicken-and-egg problem).

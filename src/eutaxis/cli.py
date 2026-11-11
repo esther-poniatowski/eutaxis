@@ -25,13 +25,13 @@ if TYPE_CHECKING:
     from .instructions import InstructionConfig, InstructionGenerator
 
 _CONFIG_HELP = (
-    "Settings file, relative to the current folder. Default: "
+    "Configuration file, relative to the current folder. Default: "
     "config/tools/eutaxis.yml or eutaxis.yml below the root."
 )
 _ROOT_HELP = (
-    "Folder below which the settings file is looked up and against which the "
-    "paths of the settings file resolve. Default: EUTAXIS_ROOT, then the "
-    "nearest folder above the current one that holds the settings file, then "
+    "Folder below which the configuration file is looked up and against which the "
+    "paths of the configuration file resolve. Default: EUTAXIS_ROOT, then the "
+    "nearest folder above the current one that holds the configuration file, then "
     "the current folder."
 )
 
@@ -272,11 +272,11 @@ def _echo_rejected_labels(generator: "InstructionGenerator") -> None:
 
 
 def _load_settings(config: str | None, root: str | None) -> "InstructionConfig":
-    """Find and load the settings file of a command.
+    """Find and load the configuration file of a command.
 
     The root comes from ``--root``, ``EUTAXIS_ROOT``, the nearest folder that
-    holds the settings file, or the current folder. Without ``--config``, the
-    settings file is looked up below the root. The paths written in the file
+    holds the configuration file, or the current folder. Without ``--config``, the
+    configuration file is looked up below the root. The paths written in the file
     resolve against the root.
     """
     from .instructions import find_config, load_config
@@ -392,7 +392,7 @@ def cli_validate(
 def cli_init(
     root: str | None = root_option(
         "Folder that receives the scaffold. Default: EUTAXIS_ROOT, then the "
-        "nearest folder above the current one that holds the settings file, "
+        "nearest folder above the current one that holds the configuration file, "
         "then the current folder."
     ),
     template: str = typer.Option(

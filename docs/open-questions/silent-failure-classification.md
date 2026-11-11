@@ -48,7 +48,7 @@ The candidate resolution has three parts that should land together:
 2. **A short author checklist** anchored to concrete failure modes:
    - Does violating this rule mutate filesystem, environment, git, or external-service state? → `silent`.
    - Does violating this rule widen permissions, install software, or send messages? → `silent`.
-   - Does violating this rule write to shared user files (`AGENTS.md`, `CLAUDE.md`, settings files) outside the compiler's ownership region? → `silent`.
+   - Does violating this rule write to shared user files (`AGENTS.md`, `CLAUDE.md`, configuration files) outside the compiler's ownership region? → `silent`.
    - Is the rule needed to decide whether a skill or procedure should be invoked? → `silent` with `required-visibility: pre-invocation`.
    - Does the rule govern only a procedure that the user explicitly invoked before any risky action occurs? → `silent` with `required-visibility: pre-action`; the rule may travel with that procedure.
    - Does violating this rule produce only a suboptimal artifact (weaker prose, missing comparison, unsorted output) whose defect is visible to the reviewer of the output? → `visible`.

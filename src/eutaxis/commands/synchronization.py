@@ -25,6 +25,8 @@ from .models import CommandSource
 from .names import is_skill_name
 from .registry import Registry
 
+SYNC_MANIFEST_SCHEMA = "eutaxis:skill-sync-manifest@1"
+
 
 class SkillSyncManifest:
     """Skill names recorded for one configuration, adapter, and scope."""
@@ -110,7 +112,7 @@ class SkillSyncManifest:
     def _load(self) -> dict[str, object]:
         if not self.path.is_file():
             return {
-                "schema_version": 1,
+                "_schema": SYNC_MANIFEST_SCHEMA,
                 "config": str(self.config_path),
                 "deployments": {},
             }
@@ -131,6 +133,11 @@ class SkillSyncManifest:
             ) from exc
         if not isinstance(payload, dict):
             raise CommandError(f"Skill sync manifest at {path} must be a JSON object.")
+        if payload.get("_schema") != SYNC_MANIFEST_SCHEMA:
+            raise CommandError(
+                f"Skill sync manifest at {path} must declare "
+                f"_schema: {SYNC_MANIFEST_SCHEMA}."
+            )
         deployments = payload.get("deployments")
         if not isinstance(deployments, dict) or any(
             not isinstance(key, str)

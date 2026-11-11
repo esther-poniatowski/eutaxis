@@ -31,7 +31,7 @@ def cli_clean_memory(
     root: str | None = root_option(
         "Project folder whose agent memory is deleted. Default: EUTAXIS_ROOT, "
         "then the nearest folder above the current one that holds the "
-        "settings file, then the current folder."
+        "configuration file, then the current folder."
     ),
     wipe_all: bool = typer.Option(
         False, "--all", help="Wipe all Claude project memories, not just the current one."

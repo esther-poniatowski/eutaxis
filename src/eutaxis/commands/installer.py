@@ -28,6 +28,7 @@ from .rendering import (
     ENTRYPOINT_FILENAME,
     OWNED_FRONTMATTER_KEY,
     SIDECAR_FILENAME,
+    SIDECAR_SCHEMA,
     render_command,
 )
 
@@ -304,6 +305,11 @@ def _read_existing(target_dir: Path) -> _ExistingArtifact:
         if not isinstance(payload, dict):
             raise OwnershipError(
                 f"Ownership sidecar at {sidecar_path} must contain a JSON object."
+            )
+        if payload.get("_schema") != SIDECAR_SCHEMA:
+            raise OwnershipError(
+                f"Ownership sidecar at {sidecar_path} must declare "
+                f"_schema: {SIDECAR_SCHEMA}."
             )
         files = payload.get("files") or []
         if not isinstance(files, list):

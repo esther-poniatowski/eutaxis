@@ -34,7 +34,7 @@ The field is **mandatory** on every source the Skills-compilation path consumes 
 
 1. Violation mutates filesystem, environment, git, or external-service state.
 2. Violation widens permissions, installs software, or sends messages to external systems.
-3. Violation writes to shared user files (`AGENTS.md`, `CLAUDE.md`, settings files) outside the compiler's ownership region.
+3. Violation writes to shared user files (`AGENTS.md`, `CLAUDE.md`, configuration files) outside the compiler's ownership region.
 4. The rule is needed to *decide* whether a skill or procedure is invoked — i.e. it gates routing, not output.
 5. When in doubt, classify as `silent`.
 

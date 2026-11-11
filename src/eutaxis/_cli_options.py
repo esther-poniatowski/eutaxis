@@ -4,7 +4,7 @@ The module applies the command-line conventions of the workspace:
 
 - the reserved option ``--root`` names the root, which ``resolve_root``
   completes from ``EUTAXIS_ROOT``, from the nearest folder that holds the
-  settings file, or from the current folder;
+  configuration file, or from the current folder;
 - every error of the package exits with the status that its exception
   carries: 2 for a usage or configuration error, 1 for a problem found by a
   check or a validation;

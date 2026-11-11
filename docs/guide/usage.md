@@ -29,7 +29,7 @@ The fastest path is the project scaffolder:
 eutaxis init --template codex-project
 ```
 
-The command writes a starter settings file `eutaxis.yml`, an `AGENTS.md` placeholder, and a `docs/instructions/` tree. Two templates are available; see [Project scaffolding](project-scaffolding.md) for the difference between them.
+The command writes a starter configuration file `eutaxis.yml`, an `AGENTS.md` placeholder, and a `docs/instructions/` tree. Two templates are available; see [Project scaffolding](project-scaffolding.md) for the difference between them.
 
 A configuration may also be written by hand, as `eutaxis.yml` at the project root or as `config/tools/eutaxis.yml`. The minimal configuration below declares two shared sources and one cumulative-file target:
 
@@ -54,7 +54,7 @@ eutaxis generate
 
 The command writes the file declared under `agents[0].target.path` (the project `AGENTS.md` in the example above). The on-disk path is also reported by `eutaxis list`.
 
-The command finds the project root as the nearest folder, from the current folder upward, that holds `eutaxis.yml` or `config/tools/eutaxis.yml`, and every path of the settings file resolves against that root. The root option `--root` and the environment variable `EUTAXIS_ROOT` name the root explicitly, and the settings option `-c` names a settings file kept elsewhere; see [Root and settings file](cli-reference.md#root-and-settings-file). The same resolution serves `check`, `list`, `scan`, `rule` and the `skills` subcommands.
+The command finds the project root as the nearest folder, from the current folder upward, that holds `eutaxis.yml` or `config/tools/eutaxis.yml`, and every path of the configuration file resolves against that root. The root option `--root` and the environment variable `EUTAXIS_ROOT` name the root explicitly, and the configuration option `-c` names a configuration file kept elsewhere; see [Root and configuration file](cli-reference.md#root-and-configuration-file). The same resolution serves `check`, `list`, `scan`, `rule` and the `skills` subcommands.
 
 ### 4. Compile on-demand rule sets to Skills (optional)
 

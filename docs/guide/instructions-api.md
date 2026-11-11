@@ -33,7 +33,7 @@ from eutaxis.instructions import load_config
 config = load_config(Path("config/tools/eutaxis.yml"))
 ```
 
-A settings file kept outside the folder against which its paths resolve takes that folder as `root`:
+A configuration file kept outside the folder against which its paths resolve takes that folder as `root`:
 
 ```python
 config = load_config(
@@ -42,7 +42,7 @@ config = load_config(
 )
 ```
 
-The command line resolves the root with `resolve_root` and finds the settings file below it with `find_config`, as described in [Root and settings file](cli-reference.md#root-and-settings-file).
+The command line resolves the root with `resolve_root` and finds the configuration file below it with `find_config`, as described in [Root and configuration file](cli-reference.md#root-and-configuration-file).
 
 ## Generation
 

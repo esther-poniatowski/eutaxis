@@ -31,6 +31,6 @@ docs/instructions/repository-layout.md
 docs/instructions/tasks/programming.md
 ```
 
-The scaffold is written to the [root](cli-reference.md#root-and-settings-file): the folder given with `--root`, or the current folder outside any project that already holds a settings file. The command refuses to overwrite existing files unless `--force` is supplied.
+The scaffold is written to the [root](cli-reference.md#root-and-configuration-file): the folder given with `--root`, or the current folder outside any project that already holds a configuration file. The command refuses to overwrite existing files unless `--force` is supplied.
 
 Template ownership stays in `eutaxis`; project-specific content should be edited and maintained in the project repository after scaffolding.

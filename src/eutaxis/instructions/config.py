@@ -29,7 +29,7 @@ from .models import (
 class ConfigLoader:
     """Load and validate instruction assembly configuration.
 
-    The relative paths of the settings file resolve against ``root``, or,
+    The relative paths of the configuration file resolve against ``root``, or,
     when ``root`` is absent, against ``settings_root(config_path)``. The
     retired key ``root`` is rejected.
     """
@@ -109,7 +109,7 @@ class ConfigLoader:
         if "root" in raw:
             raise ConfigurationError(
                 f"{self.config_path} declares the key 'root', which is retired. "
-                "The paths of the settings file resolve against the root of "
+                "The paths of the configuration file resolve against the root of "
                 "the command: --root, then EUTAXIS_ROOT, then the nearest "
                 "folder above the current one that holds config/tools/eutaxis.yml "
                 "or eutaxis.yml, then the current folder. Remove the key. To "
@@ -498,13 +498,13 @@ class ConfigLoader:
 
 
 CONFIG_FILENAME = "eutaxis.yml"
-"""File name of the settings file of Eutaxis."""
+"""File name of the configuration file of Eutaxis."""
 
 CONFIG_SEARCH_PATHS: tuple[Path, ...] = (
     Path("config") / "tools" / CONFIG_FILENAME,
     Path(CONFIG_FILENAME),
 )
-"""Places of the settings file below the root. At most one of them may exist."""
+"""Places of the configuration file below the root. At most one of them may exist."""
 
 ROOT_ENV_VAR = "EUTAXIS_ROOT"
 """Environment variable that names the root when ``--root`` is absent."""
@@ -523,7 +523,7 @@ def resolve_root(
     1. ``root``, the value of ``--root``;
     2. the environment variable ``EUTAXIS_ROOT``, when set and not empty;
     3. the nearest ancestor of the current folder, the folder itself
-       included, that holds a settings file at one of ``CONFIG_SEARCH_PATHS``;
+       included, that holds a configuration file at one of ``CONFIG_SEARCH_PATHS``;
     4. the current folder.
 
     Parameters
@@ -553,7 +553,7 @@ def resolve_root(
 
 
 def settings_root(config_path: Path) -> Path:
-    """Return the root implied by the place of a settings file.
+    """Return the root implied by the place of a configuration file.
 
     A file in ``config/tools/`` implies the folder that holds ``config/``;
     any other file implies its own folder. ``load_config`` uses this root
@@ -567,7 +567,7 @@ def settings_root(config_path: Path) -> Path:
 
 
 def find_config(config: Path | None, root: Path) -> Path:
-    """Return the settings file that a command reads.
+    """Return the configuration file that a command reads.
 
     Parameters
     ----------
@@ -576,20 +576,20 @@ def find_config(config: Path | None, root: Path) -> Path:
         against the current folder, without any lookup; ``load_config``
         reports it when it does not exist.
     root : Path
-        Root folder of the project. Without ``config``, the settings file is
+        Root folder of the project. Without ``config``, the configuration file is
         ``config/tools/eutaxis.yml`` or ``eutaxis.yml`` below this folder.
 
     Returns
     -------
     Path
-        Absolute path of the settings file.
+        Absolute path of the configuration file.
 
     Raises
     ------
     ConfigurationError
         When ``config`` is absent and either both places or no place below
-        ``root`` holds a settings file. Eutaxis has no built-in defaults:
-        every source and every output is declared in the settings file.
+        ``root`` holds a configuration file. Eutaxis has no built-in defaults:
+        every source and every output is declared in the configuration file.
     """
     if config is not None:
         return config.expanduser().resolve()
@@ -598,7 +598,7 @@ def find_config(config: Path | None, root: Path) -> Path:
     present = [candidate for candidate in candidates if candidate.is_file()]
     if len(present) > 1:
         raise ConfigurationError(
-            "Two settings files compete: "
+            "Two configuration files compete: "
             + " and ".join(str(path) for path in present)
             + ". Keep one of them."
         )
@@ -606,7 +606,7 @@ def find_config(config: Path | None, root: Path) -> Path:
         return present[0]
     searched = " or ".join(str(candidate) for candidate in candidates)
     raise ConfigurationError(
-        f"No settings file at {searched}. Eutaxis has no built-in defaults: "
+        f"No configuration file at {searched}. Eutaxis has no built-in defaults: "
         "create the file (eutaxis init scaffolds one), or pass --config or --root."
     )
 
@@ -617,7 +617,7 @@ def load_config(config_path: Path, root: Path | None = None) -> InstructionConfi
     Parameters
     ----------
     config_path : Path
-        Settings file.
+        Configuration file.
     root : Path, optional
         Folder against which the relative paths of the file resolve.
         Default: ``settings_root(config_path)``.

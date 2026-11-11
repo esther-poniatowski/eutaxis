@@ -13,7 +13,7 @@ Accepted.
 
 ## Context
 
-A cross-agent compiler that emits artifacts into `~/.claude/`, `~/.codex/`, project `CLAUDE.md` / `AGENTS.md`, and native settings files crosses two qualitatively different surfaces:
+A cross-agent compiler that emits artifacts into `~/.claude/`, `~/.codex/`, project `CLAUDE.md` / `AGENTS.md`, and native configuration files crosses two qualitatively different surfaces:
 
 - **Instruction content** — Markdown the agent reads as guidance. Authoring errors produce *behavioural drift*: the agent does the wrong thing, but no privilege is granted.
 - **Capability configuration** — MCP server bindings, permission rules, command policies. Authoring errors produce *privilege drift*: the agent acquires (or loses) tool reach. This is a security surface.

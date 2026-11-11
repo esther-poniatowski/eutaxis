@@ -1,4 +1,4 @@
-"""Tests of the command-line conventions: root, settings file, paths, exit
+"""Tests of the command-line conventions: root, configuration file, paths, exit
 statuses, confirmations and retired names."""
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from eutaxis.ops import encode_project_slug
 
 
 def _write_settings(path: Path, *, target: str, extra: str = "") -> Path:
-    """Write a settings file whose one agent copies ``rules.md`` to ``target``."""
+    """Write a configuration file whose one agent copies ``rules.md`` to ``target``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         f"{extra}"
@@ -112,7 +112,7 @@ def test_two_settings_files_fail_the_command_with_status_2(tmp_path: Path) -> No
     result = CliRunner().invoke(app, ["generate", "--root", str(project)])
 
     assert result.exit_code == 2
-    assert "Two settings files compete" in result.stderr
+    assert "Two configuration files compete" in result.stderr
     assert not (project / "A.md").exists()
     assert not (project / "B.md").exists()
 
@@ -248,7 +248,7 @@ def test_retired_root_key_is_a_configuration_error(tmp_path: Path) -> None:
 
 
 def _skills_project(tmp_path: Path) -> Path:
-    """Create a project whose settings file sits in ``config/tools/``."""
+    """Create a project whose configuration file sits in ``config/tools/``."""
     project = tmp_path / "project"
     module = project / "instructions" / "alpha.md"
     module.parent.mkdir(parents=True)

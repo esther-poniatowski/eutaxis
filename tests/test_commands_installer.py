@@ -349,6 +349,35 @@ def test_uninstall_rejects_sidecar_paths_outside_artifact(
     assert (installed.path / ENTRYPOINT_FILENAME).is_file()
 
 
+def test_uninstall_rejects_retired_sidecar_schema_key(isolated) -> None:
+    home, project, registry = isolated
+    src = _builtin_source(home, project)
+    adapter = get_adapter("claude")
+    installed = install_command(
+        src,
+        adapter,
+        scope="user",
+        project_root=project,
+        home=home,
+        registry=registry,
+    )
+    sidecar_path = installed.path / SIDECAR_FILENAME
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    sidecar.pop("_schema")
+    sidecar["schema_version"] = 1
+    sidecar_path.write_text(json.dumps(sidecar), encoding="utf-8")
+
+    with pytest.raises(OwnershipError, match="_schema: eutaxis:skill-ownership@1"):
+        uninstall_command(
+            name=src.name,
+            adapter=adapter,
+            scope="user",
+            project_root=project,
+            home=home,
+            registry=registry,
+        )
+
+
 def test_uninstall_rejects_sidecar_path_through_parent_symlink(isolated) -> None:
     home, project, registry = isolated
     src = _builtin_source(home, project)

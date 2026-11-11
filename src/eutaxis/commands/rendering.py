@@ -47,6 +47,7 @@ from .templating import render as render_template
 
 OWNED_FRONTMATTER_KEY = "x-eutaxis-owned"
 SIDECAR_FILENAME = ".eutaxis-owned.json"
+SIDECAR_SCHEMA = "eutaxis:skill-ownership@1"
 ENTRYPOINT_FILENAME = "SKILL.md"
 
 
@@ -333,7 +334,7 @@ def _format_sidecar(
     for sib in sorted(siblings, key=lambda f: f.relative_path):
         entries.append({"path": sib.relative_path, "sha256": _file_hash(sib.content)})
     payload = {
-        "schema_version": 1,
+        "_schema": SIDECAR_SCHEMA,
         "name": artifact_name,
         "adapter": adapter_name,
         "content_hash": content_hash,
