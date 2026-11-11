@@ -21,7 +21,7 @@ from .exceptions import (
     FacetRegistrySemanticError,
 )
 from .models import JsonValue, freeze_json
-from .schema import validate_facet_registry_document
+from .schema import FACET_SCHEMA_VERSION, validate_facet_registry_document
 from .source import (
     DocumentPath,
     SourceMap,
@@ -278,7 +278,7 @@ def _facet_registry_from_document(
             value_schema=cast(Mapping[str, JsonValue], freeze_json(value_schema)),
         )
     return FacetRegistry(
-        schema_version=cast(int, validated["schema-version"]),
+        schema_version=FACET_SCHEMA_VERSION,
         id=str(validated["id"]),
         owner=str(validated["owner"]),
         source_revision=str(validated["source-revision"]),

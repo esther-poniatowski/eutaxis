@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:declaration@1
 id: prose/unknown-decision
 kind: rule
 owner: eutaxis

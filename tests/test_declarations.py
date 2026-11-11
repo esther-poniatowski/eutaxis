@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping
 from dataclasses import FrozenInstanceError
 from pathlib import Path
@@ -98,14 +99,259 @@ def test_schema_is_packaged_and_meta_validated() -> None:
     assert schema_path().is_file()
     schema = declaration_schema()
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    assert schema["properties"]["_schema"]["const"] == "eutaxis:declaration@1"
     assert isinstance(schema["oneOf"], list)
-    assert len(schema["oneOf"]) == 7
 
 
 def test_schema_accessor_returns_an_isolated_copy() -> None:
     schema = declaration_schema()
     schema["title"] = "mutated by caller"
-    assert declaration_schema()["title"] == "Eutaxis declaration version 1"
+    assert declaration_schema()["title"] == "Eutaxis declaration contract version 1"
+
+
+def test_nested_rule_binding_uses_form_visible_composition() -> None:
+    schema = declaration_schema()
+    rule_set = schema["oneOf"][0]
+    rules = rule_set["allOf"][1]["properties"]["rules"]
+    assert rules["items"]["$ref"] == "#/$defs/bound-rule"
+    bound_rule = schema["$defs"]["bound-rule"]
+    binding = bound_rule["allOf"][1]
+    assert binding["required"] == ["_schema"]
+    assert binding["properties"]["_schema"]["const"] == "eutaxis:declaration@1"
+    assert "if" not in schema
+
+
+def test_bound_schema_requires_the_portable_contract_as_first_key(
+    tmp_path: Path,
+) -> None:
+    source = FIXTURES / "valid" / "rule.yaml"
+    for name, mutate in (
+        ("missing", lambda document: document.pop("_schema")),
+        ("wrong", lambda document: document.__setitem__("_schema", "other:rule@1")),
+        (
+            "late",
+            lambda document: document.__setitem__("_schema", document.pop("_schema")),
+        ),
+    ):
+        document = yaml.safe_load(source.read_text(encoding="utf-8"))
+        mutate(document)
+        path = tmp_path / f"{name}.yaml"
+        path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+        with pytest.raises(
+            DeclarationSchemaError,
+            match="_schema must be the first key and equal 'eutaxis:declaration@1'",
+        ):
+            load_declaration(path)
+
+
+def test_embedded_rule_requires_the_portable_contract_as_first_key(
+    tmp_path: Path,
+) -> None:
+    source = FIXTURES / "valid" / "rule-set.yaml"
+    for name, mutate in (
+        ("missing", lambda document: document.pop("_schema")),
+        ("wrong", lambda document: document.__setitem__("_schema", "other:rule@1")),
+        (
+            "late",
+            lambda document: document.__setitem__("_schema", document.pop("_schema")),
+        ),
+    ):
+        document = yaml.safe_load(source.read_text(encoding="utf-8"))
+        rule = document["rules"][0]
+        mutate(rule)
+        path = tmp_path / f"nested-{name}.yaml"
+        path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+        with pytest.raises(
+            DeclarationSchemaError,
+            match="_schema must be the first key and equal 'eutaxis:declaration@1'",
+        ):
+            load_declaration(path)
+
+
+def test_every_supported_editable_property_has_a_shape_compatible_x_kind() -> None:
+    admitted = {
+        "label",
+        "text",
+        "markdown-line",
+        "markdown",
+        "number",
+        "boolean",
+        "choice",
+        "choices",
+        "list",
+        "group",
+        "table",
+        "keyed-table",
+        "records",
+        "keyed-records",
+        "alternatives",
+    }
+    schema_files = (
+        schema_path(),
+        schema_path().with_name("declaration-v1.base.schema.json"),
+        schema_path().with_name("context-facets-v1.schema.json"),
+        schema_path().with_name("context-facets-v1.base.schema.json"),
+    )
+
+    excluded = {
+        "declaration-v1.base.schema.json.$defs.applicability.oneOf.3.value",
+        "declaration-v1.base.schema.json.$defs.applicability.oneOf.3.allOf.1.then.value",
+        "declaration-v1.base.schema.json.$defs.binding.oneOf.1.literal",
+        "declaration-v1.base.schema.json.$defs.closed-object-schema.properties",
+        "declaration-v1.base.schema.json.$defs.evaluator.allOf.1.evidence-schema",
+        "declaration-v1.base.schema.json.$defs.operation.allOf.1.outputs",
+        "context-facets-v1.base.schema.json.$defs.context-facet.value-schema",
+    }
+
+    def resolve(
+        schema: dict[str, object], root: dict[str, object]
+    ) -> dict[str, object]:
+        reference = schema.get("$ref")
+        if not isinstance(reference, str) or not reference.startswith("#/$defs/"):
+            return schema
+        target: object = root
+        for part in reference[2:].split("/"):
+            assert isinstance(target, dict)
+            target = target[part]
+        assert isinstance(target, dict)
+        return target
+
+    def compatible(
+        kind: str, schema: dict[str, object], root: dict[str, object]
+    ) -> bool:
+        effective = resolve(schema, root)
+        value_type = effective.get("type")
+        constant = effective.get("const")
+        if kind == "choice":
+            return "enum" in effective or "const" in effective
+        if kind in {"label", "text", "markdown-line", "markdown"}:
+            return value_type == "string" or isinstance(constant, str)
+        if kind == "number":
+            return value_type in {"integer", "number"}
+        if kind == "boolean":
+            return value_type == "boolean" or isinstance(constant, bool)
+        if kind in {"list", "choices", "records", "table"}:
+            sequence = value_type == "array" or "items" in effective
+            if not sequence:
+                return False
+            if kind == "choices":
+                items = effective.get("items")
+                if not isinstance(items, dict):
+                    return False
+                item = resolve(items, root)
+                return bool(effective.get("uniqueItems")) and (
+                    "enum" in item or "const" in item
+                )
+            if kind in {"records", "table"} and effective.get("maxItems") != 0:
+                items = effective.get("items")
+                if not isinstance(items, dict):
+                    return False
+                item = resolve(items, root)
+                return (
+                    item.get("type") == "object"
+                    or bool(item.get("oneOf"))
+                    or bool(item.get("allOf"))
+                )
+            return True
+        if kind == "alternatives":
+            alternatives = effective.get("oneOf")
+            return (
+                isinstance(alternatives, list)
+                and bool(alternatives)
+                and all(
+                    isinstance(alternative, dict)
+                    and (
+                        alternative.get("type") == "object"
+                        or "properties" in alternative
+                    )
+                    for alternative in alternatives
+                )
+            )
+        if kind == "group":
+            return value_type == "object" or "properties" in effective
+        if kind in {"keyed-table", "keyed-records"}:
+            entry = effective.get("additionalProperties")
+            if not isinstance(entry, dict):
+                return False
+            entry = resolve(entry, root)
+            alternatives = entry.get("oneOf")
+            return (
+                entry.get("type") == "object"
+                or "properties" in entry
+                or (
+                    isinstance(alternatives, list)
+                    and bool(alternatives)
+                    and all(
+                        isinstance(alternative, dict)
+                        and (
+                            alternative.get("type") == "object"
+                            or "properties" in alternative
+                        )
+                        for alternative in alternatives
+                    )
+                )
+            )
+        return False
+
+    schema_routes = {
+        "$defs",
+        "allOf",
+        "anyOf",
+        "oneOf",
+        "not",
+        "if",
+        "then",
+        "else",
+        "items",
+        "contains",
+        "additionalProperties",
+        "propertyNames",
+        "patternProperties",
+    }
+
+    def inspect(
+        schema: dict[str, object],
+        root: dict[str, object],
+        path: tuple[str, ...],
+        *,
+        require_kind: bool = True,
+    ) -> None:
+        properties = schema.get("properties")
+        if isinstance(properties, dict):
+            for name, field in properties.items():
+                assert isinstance(field, dict)
+                field_path = ".".join((*path, name))
+                kind = field.get("x-kind")
+                if field_path in excluded:
+                    assert kind is None, field_path
+                elif require_kind or kind is not None:
+                    assert kind in admitted, field_path
+                    assert isinstance(kind, str)
+                    assert compatible(kind, field, root), field_path
+                inspect(field, root, (*path, name))
+        for keyword in schema_routes:
+            child = schema.get(keyword)
+            if isinstance(child, dict):
+                if keyword in {"$defs", "patternProperties"}:
+                    for name, nested in child.items():
+                        assert isinstance(nested, dict)
+                        inspect(nested, root, (*path, keyword, str(name)))
+                else:
+                    inspect(
+                        child,
+                        root,
+                        (*path, keyword),
+                        require_kind=keyword not in {"if", "then", "else"},
+                    )
+            elif isinstance(child, list):
+                for index, nested in enumerate(child):
+                    assert isinstance(nested, dict)
+                    inspect(nested, root, (*path, keyword, str(index)))
+
+    for schema_file in schema_files:
+        root = json.loads(schema_file.read_text(encoding="utf-8"))
+        assert isinstance(root, dict)
+        inspect(root, root, (schema_file.name,))
 
 
 def test_rule_set_contains_typed_rules() -> None:

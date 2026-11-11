@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:declaration@1
 id: content/package
 kind: rule-set
 owner: registry
@@ -8,7 +8,7 @@ applicability: {facet: artifact.created, operator: equals, value: true}
 relations: []
 purpose: Supplies the base registry rule
 rules:
-  - schema-version: 1
+  - _schema: eutaxis:declaration@1
     id: content/base
     kind: rule
     owner: registry

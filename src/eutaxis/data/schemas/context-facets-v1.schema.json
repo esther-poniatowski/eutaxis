@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eutaxis.dev/schemas/context-facets-v1.schema.json",
+  "title": "Eutaxis context-facet registry contract version 1",
+  "type": "object",
+  "required": [
+    "_schema"
+  ],
+  "properties": {
+    "_schema": {
+      "const": "eutaxis:context-facets@1",
+      "x-kind": "label"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "https://eutaxis.dev/schemas/context-facets-v1.base.schema.json"
+    }
+  ],
+  "unevaluatedProperties": false
+}

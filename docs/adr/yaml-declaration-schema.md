@@ -9,7 +9,7 @@ index: "[Architecture decisions](_index.md)"
 
 ## Status
 
-Accepted. The [normative field contract](../../src/eutaxis/data/schemas/declaration-v1.schema.json) governs the models and fixtures for declaration schema version 1. The source boundary implements this contract. Eutaxis 0.0.0 has not released schema 1. Therefore, a contract change must migrate the closed repository corpus atomically. Eutaxis adds each registry check through a bounded gate. Eutaxis will construct catalogs after those gates pass.
+Accepted. The [bound declaration contract](../../src/eutaxis/data/schemas/declaration-v1.schema.json) and [bound context-facet contract](../../src/eutaxis/data/schemas/context-facets-v1.schema.json) govern author-editable YAML. Their base schemas define the reusable structures without binding a source document. Eutaxis 0.0.0 has not released schema 1. Therefore, this correction retains version 1 and migrates the closed repository corpus atomically.
 
 ## Purpose
 
@@ -19,7 +19,11 @@ The schema must let authors state rules and procedures once, validate their sema
 
 Pure YAML is the canonical authoring format. Markdown remains available inside YAML block scalars. A tagged-Markdown hybrid is the fallback only if a representative YAML pilot demonstrates a material authoring or round-trip defect.
 
-One versioned JSON Schema is the normative field, type, cardinality, conditional-requirement, and default contract. Python models are generated from that schema where the toolchain preserves its semantics; otherwise, the models must pass the same valid and invalid fixture corpus and may not introduce independent defaults. This ADR fixes the architecture and required semantics, but it is not an exhaustive substitute for that schema.
+Versioned JSON Schemas are the normative field, type, cardinality, conditional-requirement, and default contracts. Each authoring format has an unbound base schema and a bound source-document schema. The bound schema requires its logical identifier in the first `_schema` key. `_schema` selects the Eutaxis contract; JSON Schema `$id` identifies a schema resource and does not replace the source binding. Python models must pass the same valid and invalid fixture corpus and may not introduce independent defaults. This ADR fixes the architecture and required semantics, but it is not an exhaustive substitute for the schemas.
+
+Kleisis owns the schema-resource declaration in `specs/schema-resources.yml` and materializes `specs/schema-registry.yml`. That registry exports the declaration and context-facet contracts under stable logical identifiers. The Python loader resolves the same packaged resources offline.
+
+Every author-editable field with a matching Ekphrasis control carries a shape-compatible `x-kind` annotation. The annotation supplies a renderer hint from the admitted Eutaxis vocabulary; it does not alter validation. A free identifier sequence uses `list`, whereas `choices` is reserved for enumerated items. Record controls apply only to mapping items, and `alternatives` applies only to object alternatives. Arbitrary JSON values, embedded JSON Schemas, and unconstrained dynamic maps omit `x-kind`, because Ekphrasis has no typed control that can edit their complete value space. Their source remains valid YAML and their surrounding declared structure remains form-editable. Ekphrasis compiles the exported schemas with its Ajv configuration and ignores the annotations during validation as intended.
 
 ## Declaration kinds
 
@@ -53,7 +57,9 @@ Rules and procedures are the only effective-content kinds. They may declare rela
 
 ## Common envelope
 
-Every declaration has `schema-version`, stable `id`, `kind`, `owner`, lifecycle status, source revision, applicability, and relations. Classification, failure mode, visibility, rationale, title, and purpose appear only where the normative schema admits them. A required per-rule `description` is excluded because it normally paraphrases the norm. A rule set or procedure may carry one `purpose` for discovery.
+Every authored declaration begins with `_schema: eutaxis:declaration@1`, followed by its stable `id`, `kind`, `owner`, lifecycle status, source revision, applicability, and relations. Classification, failure mode, visibility, rationale, title, and purpose appear only where the normative schema admits them. A required per-rule `description` is excluded because it normally paraphrases the norm. A rule set or procedure may carry one `purpose` for discovery.
+
+The source loader enforces first-key placement because JSON Schema validates mappings without assigning significance to key order. Nested rule-set members are independently bound and begin with the same `_schema` key. Normalized Python models retain the internal integer `schema_version`; generated catalogs, acquisition records, evaluator-fixture descriptors, evidence records, and migration baselines retain their distinct `schema-version` fields. Those internal formats do not claim to be author-editable declaration documents.
 
 At this intrinsic source boundary, each identifier contains one or more non-whitespace characters. The schema leaves separators uninterpreted so internal sources remain independent of acquisition. The downstream [external-source boundary](external-declaration-identity-and-acquisition.md) applies the exact namespace grammar, owner constraint, and complete reference traversal before it constructs a combined registry. A versioned evaluator or operation reference uses separate `id` and positive-integer `version` fields.
 
@@ -65,10 +71,10 @@ A child does not replace its inherited predicate. The loader constructs `all: [<
 
 ## Context-facet registry
 
-One explicitly supplied YAML registry defines the context vocabulary for a typed load. The registry remains separate from the seven-kind declaration union. The registry owns all facet entries and records their owner and source revision:
+One explicitly supplied YAML registry defines the context vocabulary for a typed load. The registry remains separate from the seven-kind declaration union and binds to its own logical contract. The registry owns all facet entries and records their owner and source revision:
 
 ```yaml
-schema-version: 1
+_schema: eutaxis:context-facets@1
 id: eutaxis/context-facets
 owner: eutaxis
 source-revision: v1
@@ -173,7 +179,7 @@ The resolver evaluates each norm under its fully inherited applicability and app
 The following rule set demonstrates the common envelope, inherited applicability, modal norms, and a structured evaluator reference:
 
 ```yaml
-schema-version: 1
+_schema: eutaxis:declaration@1
 id: prose/reasoning-over-mechanics
 kind: rule-set
 owner: oikos
@@ -188,7 +194,7 @@ purpose: >-
   Directs agent attention to judgments that mechanical tools cannot make
 rules:
   - id: allocate-deliberation
-    schema-version: 1
+    _schema: eutaxis:declaration@1
     kind: rule
     owner: oikos
     status: active
@@ -311,7 +317,7 @@ Reviewed Python, rather than YAML, names executable callables. During the normat
 
 Packaged known-failure descriptors live under `src/eutaxis/data/evaluator-fixtures/v1/` as YAML and conform to the closed `evaluator-fixture-v1` schema. A descriptor contains `schema-version: 1`, a stable `id`, an exact `evaluator` reference, `input-revision: declaration-v1`, an `input` object, and `expected-state: violated`. The input object contains non-empty `sources` and one `facet-registry`. These resource paths use POSIX separators, are relative to the descriptor directory, contain no `..` segment, and must resolve within the packaged fixture root.
 
-The checker declares exactly one known failure in version 1: `eutaxis/declaration-registry/unresolved-exact-reference`. Its `known-failure-fixtures` field contains that identifier, and the descriptor with that identifier references `eutaxis/declaration-registry` version 1.
+The checker declares two known failures in version 1: `eutaxis/declaration-registry/unresolved-exact-reference` exercises semantic reference resolution, and `eutaxis/declaration-registry/wrong-schema-binding` exercises the bound source contract. Its `known-failure-fixtures` field contains both identifiers, and each descriptor references `eutaxis/declaration-registry` version 1.
 
 The fixture loader resolves descriptor paths canonically and visits their string forms in lexical order. Fixture identifiers are unique across that traversal; a duplicate fails at the later `id`. A malformed descriptor fails at its invalid field. An unresolved source or facet-registry resource fails at the corresponding path value. After the exact evaluator and its registered input operation resolve, the fixture input must satisfy that operation's input schema; a mismatch belongs to `input` at the deepest failing instance path. Every identifier in `known-failure-fixtures` must resolve to one descriptor, and a missing fixture belongs to the referring list item. The descriptor must point back to the same evaluator, or the descriptor's `evaluator` field fails. The loader issues the immutable index with a process-local private stamp; direct construction, copying, serialization, and reconstruction fail, and execution rejects an unstamped index before invoking a runner. The loaded index retains one immutable digest record for the descriptor and for each resolved resource field. Each record preserves its canonical path, lowercase SHA-256 value, fixture identifier, resource role, and descriptor document path. Known-failure execution checks these records before and after each invocation and once more before assurance issuance. This contract assumes no hostile concurrent change-and-restoration cycle while a path-based runner executes.
 
@@ -321,7 +327,7 @@ The `eutaxis/declaration-registry` evidence schema is closed and has three varia
 
 The execution gate requires the returned evaluator identity and input revision to match the invocation. It also requires the state to match the fixture expectation and the evidence to satisfy this schema. A missing runner belongs to the evaluator reference under execution. A returned identity, revision, state, or evidence defect belongs to that result field.
 
-The shipped checker wraps facet-registry loading and `load_declaration_registry`. It accepts the same `sources` and `facet-registry` input as its registered operation contract. Its valid packaged corpus must return `satisfied`. Its known-failure corpus contains one unresolved exact reference and must return `violated` with a located registry diagnostic. Separately, the packaged procedure and operation must pass the static procedure–operation checks. Planted tests cover malformed and duplicate fixture descriptors, invalid payloads, unresolved resources, missing runner and fixture bindings, result identity and revision mismatches, wrong states, invalid evidence, action bindings, outcome maps, and mutation footprints.
+The shipped checker wraps facet-registry loading and `load_declaration_registry`. It accepts the same `sources` and `facet-registry` input as its registered operation contract. Its valid packaged corpus must return `satisfied`. Its known-failure corpus contains an unresolved exact reference and a wrong declaration schema binding; both must return `violated` with located diagnostics. Separately, the packaged procedure and operation must pass the static procedure–operation checks. Planted tests cover malformed and duplicate fixture descriptors, invalid payloads, unresolved resources, missing runner and fixture bindings, result identity and revision mismatches, wrong states, invalid evidence, action bindings, outcome maps, and mutation footprints.
 
 ## Runtime boundary
 
@@ -338,4 +344,4 @@ The authored contract now passes four boundaries:
 - records satisfy every contract between records
 - checkers satisfy their declared result schemas
 
-The first compilation prerequisite can also call one exact reviewed callable and validate its returned value. The artifact fixture must compose its outputs deterministically. Eutaxis will build the catalog after that fixture passes. External sources cannot adopt the schema before the same fixture passes.
+The first compilation prerequisite can also call one exact reviewed callable and validate its returned value. The artifact fixture composes its outputs deterministically. Catalog construction and external-source acquisition consume the same validated declaration models; neither defines a competing source schema.

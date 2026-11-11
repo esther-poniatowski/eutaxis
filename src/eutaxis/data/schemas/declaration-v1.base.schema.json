@@ -1,0 +1,1400 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json",
+  "title": "Eutaxis declaration base version 1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/rule-set"
+    },
+    {
+      "$ref": "#/$defs/rule"
+    },
+    {
+      "$ref": "#/$defs/procedure"
+    },
+    {
+      "$ref": "#/$defs/resolution-policy"
+    },
+    {
+      "$ref": "#/$defs/composition-manifest"
+    },
+    {
+      "$ref": "#/$defs/evaluator"
+    },
+    {
+      "$ref": "#/$defs/operation"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!.*\\s)[\\s\\S]+$"
+    },
+    "versioned-reference": {
+      "type": "object",
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "x-kind": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "facet-id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[./-][a-z0-9]+)*$"
+    },
+    "applicability": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "all"
+          ],
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/applicability"
+              },
+              "x-kind": "records"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "any"
+          ],
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/applicability"
+              },
+              "x-kind": "records"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "not"
+          ],
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/applicability",
+              "x-kind": "alternatives"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "facet",
+            "operator"
+          ],
+          "properties": {
+            "facet": {
+              "$ref": "#/$defs/facet-id",
+              "x-kind": "label"
+            },
+            "operator": {
+              "enum": [
+                "equals",
+                "in",
+                "exists"
+              ],
+              "x-kind": "choice"
+            },
+            "value": {}
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "operator": {
+                    "const": "exists",
+                    "x-kind": "choice"
+                  }
+                },
+                "required": [
+                  "operator"
+                ]
+              },
+              "then": {
+                "not": {
+                  "required": [
+                    "value"
+                  ]
+                }
+              },
+              "else": {
+                "required": [
+                  "value"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "operator": {
+                    "const": "in",
+                    "x-kind": "choice"
+                  }
+                },
+                "required": [
+                  "operator"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "value": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                }
+              }
+            }
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "relation": {
+      "type": "object",
+      "required": [
+        "type",
+        "target"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "requires",
+            "refines",
+            "incompatible-with",
+            "supersedes"
+          ],
+          "x-kind": "choice"
+        },
+        "target": {
+          "$ref": "#/$defs/id",
+          "x-kind": "text"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "owner",
+        "status",
+        "source-revision",
+        "applicability",
+        "relations"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "kind": {
+          "enum": [
+            "rule-set",
+            "rule",
+            "procedure",
+            "resolution-policy",
+            "composition-manifest",
+            "evaluator",
+            "operation"
+          ],
+          "x-kind": "choice"
+        },
+        "owner": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "active",
+            "deprecated",
+            "retired"
+          ],
+          "x-kind": "choice"
+        },
+        "source-revision": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "text"
+        },
+        "applicability": {
+          "$ref": "#/$defs/applicability",
+          "x-kind": "alternatives"
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relation"
+          },
+          "x-kind": "records"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown-line"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown"
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": [
+        "verb",
+        "object"
+      ],
+      "properties": {
+        "verb": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "object": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown-line"
+        },
+        "timing": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown-line"
+        }
+      },
+      "additionalProperties": false
+    },
+    "norm": {
+      "type": "object",
+      "required": [
+        "id",
+        "modality",
+        "subject",
+        "action"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "modality": {
+          "enum": [
+            "must",
+            "must-not",
+            "should",
+            "should-not",
+            "may"
+          ],
+          "x-kind": "choice"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "text"
+        },
+        "action": {
+          "$ref": "#/$defs/action",
+          "x-kind": "group"
+        },
+        "applies-when": {
+          "$ref": "#/$defs/applicability",
+          "x-kind": "alternatives"
+        },
+        "guidance": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown"
+        },
+        "decision-criterion": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        }
+      },
+      "additionalProperties": false
+    },
+    "criterion": {
+      "type": "object",
+      "required": [
+        "id",
+        "norms",
+        "evaluator",
+        "statement"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "norms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "x-kind": "list"
+        },
+        "evaluator": {
+          "$ref": "#/$defs/versioned-reference",
+          "x-kind": "group"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown"
+        }
+      },
+      "additionalProperties": false
+    },
+    "exception": {
+      "type": "object",
+      "required": [
+        "id",
+        "when",
+        "disposition",
+        "affects"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "when": {
+          "$ref": "#/$defs/applicability",
+          "x-kind": "alternatives"
+        },
+        "disposition": {
+          "enum": [
+            "waive",
+            "substitute"
+          ],
+          "x-kind": "choice"
+        },
+        "affects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "x-kind": "list"
+        },
+        "substitutes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "x-kind": "list"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "substitute",
+                "x-kind": "choice"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "required": [
+              "substitutes"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "substitutes"
+              ]
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "rule-fields": {
+      "properties": {
+        "axis": {
+          "enum": [
+            "reasoning-target",
+            "output-structure",
+            "surface-style"
+          ],
+          "x-kind": "choice"
+        },
+        "failure-mode": {
+          "enum": [
+            "silent",
+            "visible"
+          ],
+          "x-kind": "choice"
+        },
+        "required-visibility": {
+          "enum": [
+            "pre-invocation",
+            "pre-action"
+          ],
+          "x-kind": "choice"
+        },
+        "norms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/norm"
+          },
+          "x-kind": "records"
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/criterion"
+          },
+          "x-kind": "records"
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exception"
+          },
+          "x-kind": "records"
+        }
+      },
+      "required": [
+        "axis",
+        "failure-mode",
+        "norms",
+        "criteria"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "failure-mode": {
+                "const": "silent",
+                "x-kind": "choice"
+              }
+            },
+            "required": [
+              "failure-mode"
+            ]
+          },
+          "then": {
+            "required": [
+              "required-visibility"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "required-visibility"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rule": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        },
+        {
+          "$ref": "#/$defs/rule-fields"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "rule",
+              "x-kind": "choice"
+            }
+          }
+        }
+      ]
+    },
+    "rule-set": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        },
+        {
+          "type": "object",
+          "required": [
+            "purpose",
+            "rules"
+          ],
+          "properties": {
+            "kind": {
+              "const": "rule-set",
+              "x-kind": "choice"
+            },
+            "relations": {
+              "type": "array",
+              "maxItems": 0,
+              "x-kind": "records"
+            },
+            "purpose": {
+              "type": "string",
+              "minLength": 1,
+              "x-kind": "markdown"
+            },
+            "rules": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/rule"
+              },
+              "x-kind": "records"
+            }
+          }
+        }
+      ]
+    },
+    "predicate": {
+      "type": "object",
+      "required": [
+        "id",
+        "class",
+        "expression"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "class": {
+          "enum": [
+            "guard",
+            "authorization",
+            "assumption",
+            "dependency",
+            "invariant",
+            "postcondition"
+          ],
+          "x-kind": "choice"
+        },
+        "expression": {
+          "$ref": "#/$defs/applicability",
+          "x-kind": "alternatives"
+        },
+        "evaluator": {
+          "$ref": "#/$defs/versioned-reference",
+          "x-kind": "group"
+        },
+        "observes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "x-kind": "list"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "class": {
+                "const": "invariant",
+                "x-kind": "choice"
+              }
+            },
+            "required": [
+              "class"
+            ]
+          },
+          "then": {
+            "required": [
+              "observes"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "observes"
+              ]
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "binding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "parameter"
+          ],
+          "properties": {
+            "parameter": {
+              "$ref": "#/$defs/id",
+              "x-kind": "label"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "literal"
+          ],
+          "properties": {
+            "literal": {}
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "closed-object-schema": {
+      "type": "object",
+      "required": [
+        "type",
+        "properties",
+        "additionalProperties"
+      ],
+      "properties": {
+        "type": {
+          "const": "object",
+          "x-kind": "choice"
+        },
+        "properties": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "required": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "x-kind": "list"
+        },
+        "additionalProperties": {
+          "const": false,
+          "x-kind": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "procedure-node": {
+      "type": "object",
+      "required": [
+        "id",
+        "operation",
+        "on-success",
+        "on-failure"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "operation": {
+          "$ref": "#/$defs/versioned-reference",
+          "x-kind": "group"
+        },
+        "with": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/binding"
+          },
+          "x-kind": "keyed-records"
+        },
+        "on-success": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "on-failure": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/id"
+          },
+          "x-kind": "group"
+        }
+      },
+      "additionalProperties": false
+    },
+    "procedure": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        },
+        {
+          "type": "object",
+          "required": [
+            "purpose",
+            "parameters",
+            "preconditions",
+            "actions",
+            "entry",
+            "invariants",
+            "effects",
+            "postconditions",
+            "failures"
+          ],
+          "properties": {
+            "kind": {
+              "const": "procedure",
+              "x-kind": "choice"
+            },
+            "purpose": {
+              "type": "string",
+              "minLength": 1,
+              "x-kind": "markdown"
+            },
+            "parameters": {
+              "$ref": "#/$defs/closed-object-schema",
+              "x-kind": "group"
+            },
+            "preconditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/predicate"
+              },
+              "x-kind": "records"
+            },
+            "actions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/procedure-node"
+              },
+              "x-kind": "records"
+            },
+            "entry": {
+              "$ref": "#/$defs/id",
+              "x-kind": "label"
+            },
+            "invariants": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/predicate"
+              },
+              "x-kind": "records"
+            },
+            "effects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "x-kind": "list"
+            },
+            "postconditions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/predicate"
+              },
+              "x-kind": "records"
+            },
+            "failures": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "x-kind": "list"
+            }
+          }
+        }
+      ]
+    },
+    "strategy": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "retain"
+          ],
+          "properties": {
+            "kind": {
+              "const": "retain",
+              "x-kind": "choice"
+            },
+            "retain": {
+              "$ref": "#/$defs/id",
+              "x-kind": "label"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "replace",
+            "with"
+          ],
+          "properties": {
+            "kind": {
+              "const": "substitute",
+              "x-kind": "choice"
+            },
+            "replace": {
+              "$ref": "#/$defs/id",
+              "x-kind": "label"
+            },
+            "with": {
+              "$ref": "#/$defs/id",
+              "x-kind": "label"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "result"
+          ],
+          "properties": {
+            "kind": {
+              "const": "combine",
+              "x-kind": "choice"
+            },
+            "result": {
+              "$ref": "#/$defs/id",
+              "x-kind": "label"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "error",
+              "x-kind": "choice"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "resolution-policy": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        },
+        {
+          "type": "object",
+          "required": [
+            "conflicts",
+            "when",
+            "order",
+            "strategy"
+          ],
+          "properties": {
+            "kind": {
+              "const": "resolution-policy",
+              "x-kind": "choice"
+            },
+            "conflicts": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "x-kind": "list"
+            },
+            "when": {
+              "$ref": "#/$defs/applicability",
+              "x-kind": "alternatives"
+            },
+            "order": {
+              "type": "integer",
+              "minimum": 0,
+              "x-kind": "number"
+            },
+            "strategy": {
+              "$ref": "#/$defs/strategy",
+              "x-kind": "alternatives"
+            }
+          }
+        }
+      ]
+    },
+    "section": {
+      "type": "object",
+      "required": [
+        "id",
+        "declarations"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "declarations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "x-kind": "list"
+        }
+      },
+      "additionalProperties": false
+    },
+    "composition-manifest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        },
+        {
+          "type": "object",
+          "required": [
+            "mechanism",
+            "scope",
+            "target",
+            "sections"
+          ],
+          "properties": {
+            "kind": {
+              "const": "composition-manifest",
+              "x-kind": "choice"
+            },
+            "mechanism": {
+              "enum": [
+                "cumulative",
+                "separate-directory",
+                "single-slot"
+              ],
+              "x-kind": "choice"
+            },
+            "scope": {
+              "enum": [
+                "personal",
+                "project"
+              ],
+              "x-kind": "choice"
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1,
+              "x-kind": "text"
+            },
+            "sections": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/section"
+              },
+              "x-kind": "records"
+            },
+            "policies": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "x-kind": "list"
+            }
+          }
+        }
+      ]
+    },
+    "evaluator": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        },
+        {
+          "type": "object",
+          "required": [
+            "version",
+            "evaluator-kind",
+            "coverage",
+            "adjudication",
+            "timing",
+            "input-revisions",
+            "evidence-schema",
+            "failure-behavior"
+          ],
+          "properties": {
+            "kind": {
+              "const": "evaluator",
+              "x-kind": "choice"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1,
+              "x-kind": "number"
+            },
+            "evaluator-kind": {
+              "enum": [
+                "checker",
+                "detector",
+                "manual"
+              ],
+              "x-kind": "choice"
+            },
+            "coverage": {
+              "enum": [
+                "total",
+                "partial",
+                "none"
+              ],
+              "x-kind": "choice"
+            },
+            "adjudication": {
+              "enum": [
+                "authoritative",
+                "candidate",
+                "manual"
+              ],
+              "x-kind": "choice"
+            },
+            "timing": {
+              "enum": [
+                "pre-design",
+                "pre-action",
+                "post-action",
+                "post-artifact"
+              ],
+              "x-kind": "choice"
+            },
+            "residual-question": {
+              "type": "string",
+              "minLength": 1,
+              "x-kind": "markdown"
+            },
+            "input-revisions": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "x-kind": "list"
+            },
+            "evidence-schema": {
+              "type": "object"
+            },
+            "failure-behavior": {
+              "enum": [
+                "block",
+                "candidate",
+                "record"
+              ],
+              "x-kind": "choice"
+            },
+            "known-failure-fixtures": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "x-kind": "list"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "evaluator-kind": {
+                    "const": "checker",
+                    "x-kind": "choice"
+                  }
+                },
+                "required": [
+                  "evaluator-kind"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "coverage": {
+                    "const": "total",
+                    "x-kind": "choice"
+                  },
+                  "adjudication": {
+                    "const": "authoritative",
+                    "x-kind": "choice"
+                  }
+                },
+                "required": [
+                  "known-failure-fixtures"
+                ]
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "known-failure-fixtures"
+                  ]
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "evaluator-kind": {
+                    "const": "detector",
+                    "x-kind": "choice"
+                  }
+                },
+                "required": [
+                  "evaluator-kind"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "coverage": {
+                    "const": "partial",
+                    "x-kind": "choice"
+                  },
+                  "adjudication": {
+                    "const": "candidate",
+                    "x-kind": "choice"
+                  },
+                  "failure-behavior": {
+                    "const": "block",
+                    "x-kind": "choice"
+                  }
+                },
+                "required": [
+                  "residual-question"
+                ]
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "residual-question"
+                  ]
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "evaluator-kind": {
+                    "const": "manual",
+                    "x-kind": "choice"
+                  }
+                },
+                "required": [
+                  "evaluator-kind"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "coverage": {
+                    "const": "none",
+                    "x-kind": "choice"
+                  },
+                  "adjudication": {
+                    "const": "manual",
+                    "x-kind": "choice"
+                  },
+                  "evidence-schema": {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "required",
+                      "properties"
+                    ],
+                    "properties": {
+                      "type": {
+                        "const": "object",
+                        "x-kind": "choice"
+                      },
+                      "required": {
+                        "type": "array",
+                        "contains": {
+                          "const": "conclusion"
+                        },
+                        "x-kind": "list"
+                      },
+                      "properties": {
+                        "type": "object",
+                        "required": [
+                          "conclusion"
+                        ],
+                        "properties": {
+                          "conclusion": {
+                            "type": "object",
+                            "required": [
+                              "enum"
+                            ],
+                            "properties": {
+                              "enum": {
+                                "type": "array",
+                                "minItems": 3,
+                                "maxItems": 3,
+                                "uniqueItems": true,
+                                "items": {
+                                  "enum": [
+                                    "satisfied",
+                                    "violated",
+                                    "blocked"
+                                  ]
+                                },
+                                "x-kind": "choices"
+                              }
+                            },
+                            "additionalProperties": false,
+                            "x-kind": "group"
+                          }
+                        },
+                        "x-kind": "group"
+                      }
+                    },
+                    "x-kind": "group"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "evaluator-kind": {
+                    "const": "checker",
+                    "x-kind": "choice"
+                  }
+                },
+                "required": [
+                  "evaluator-kind"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "known-failure-fixtures": {
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "operation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        },
+        {
+          "type": "object",
+          "required": [
+            "version",
+            "inputs",
+            "outputs",
+            "preconditions",
+            "effects",
+            "failure-outcomes",
+            "recovery"
+          ],
+          "properties": {
+            "kind": {
+              "const": "operation",
+              "x-kind": "choice"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1,
+              "x-kind": "number"
+            },
+            "inputs": {
+              "$ref": "#/$defs/closed-object-schema",
+              "x-kind": "group"
+            },
+            "outputs": {
+              "type": "object"
+            },
+            "preconditions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/predicate"
+              },
+              "x-kind": "records"
+            },
+            "effects": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "x-kind": "list"
+            },
+            "failure-outcomes": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              },
+              "x-kind": "list"
+            },
+            "recovery": {
+              "type": "string",
+              "minLength": 1,
+              "x-kind": "markdown"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -81,6 +81,31 @@ def test_packaged_facet_registry_is_canonical_yaml() -> None:
     assert registry.facets["registry.valid"].value_schema == {"type": "boolean"}
 
 
+def test_facet_registry_requires_its_portable_contract_as_first_key(
+    tmp_path: Path,
+) -> None:
+    source = FACET_FIXTURES / "valid" / "context-facets.yaml"
+    for name, mutate in (
+        ("missing", lambda document: document.pop("_schema")),
+        (
+            "wrong",
+            lambda document: document.__setitem__("_schema", "other:context-facets@1"),
+        ),
+        (
+            "late",
+            lambda document: document.__setitem__("_schema", document.pop("_schema")),
+        ),
+    ):
+        document = yaml.safe_load(source.read_text(encoding="utf-8"))
+        mutate(document)
+        path = _write_yaml(tmp_path, f"{name}-schema.yaml", document)
+        with pytest.raises(
+            FacetRegistrySchemaError,
+            match="_schema must be the first key and equal 'eutaxis:context-facets@1'",
+        ):
+            load_facet_registry(path)
+
+
 def test_facet_registry_models_are_immutable(facets) -> None:
     with pytest.raises(TypeError):
         facets.facets["new"] = facets.facets["a"]  # type: ignore[index]
@@ -380,7 +405,7 @@ def test_registry_rejects_non_self_contained_value_schemas(
     tmp_path: Path, schema: dict[str, object], message: str
 ) -> None:
     document = {
-        "schema-version": 1,
+        "_schema": "eutaxis:context-facets@1",
         "id": "tests/invalid-reference",
         "owner": "eutaxis",
         "source-revision": "fixture-1",
@@ -393,7 +418,7 @@ def test_registry_rejects_non_self_contained_value_schemas(
 
 def test_registry_accepts_resolved_local_json_pointers(tmp_path: Path) -> None:
     document = {
-        "schema-version": 1,
+        "_schema": "eutaxis:context-facets@1",
         "id": "tests/local-reference",
         "owner": "eutaxis",
         "source-revision": "fixture-1",
@@ -432,7 +457,7 @@ def test_schema_traversal_does_not_treat_literal_data_or_property_names_as_keywo
     tmp_path: Path, schema: dict[str, object], value: object
 ) -> None:
     document = {
-        "schema-version": 1,
+        "_schema": "eutaxis:context-facets@1",
         "id": "tests/schema-positions",
         "owner": "eutaxis",
         "source-revision": "fixture-1",
@@ -453,7 +478,7 @@ def test_registry_ignores_conditional_branches_without_if(
         "$ref": "#/$defs/node",
     }
     document = {
-        "schema-version": 1,
+        "_schema": "eutaxis:context-facets@1",
         "id": "tests/inert-conditional",
         "owner": "eutaxis",
         "source-revision": "fixture-1",
@@ -532,7 +557,7 @@ def test_registry_rejects_direct_and_indirect_local_reference_cycles(
     tmp_path: Path, schema: dict[str, object]
 ) -> None:
     document = {
-        "schema-version": 1,
+        "_schema": "eutaxis:context-facets@1",
         "id": "tests/reference-cycle",
         "owner": "eutaxis",
         "source-revision": "fixture-1",
@@ -550,7 +575,7 @@ def test_registry_rejects_direct_and_indirect_local_reference_cycles(
 def test_registry_yaml_cycle_uses_the_registry_error_boundary(tmp_path: Path) -> None:
     path = tmp_path / "cyclic.yaml"
     path.write_text(
-        "schema-version: 1\nid: tests/cycle\nowner: eutaxis\n"
+        "_schema: eutaxis:context-facets@1\nid: tests/cycle\nowner: eutaxis\n"
         "source-revision: fixture-1\nfacets: &facets [*facets]\n",
         encoding="utf-8",
     )
@@ -563,7 +588,7 @@ def test_registry_non_json_value_uses_the_registry_error_boundary(
 ) -> None:
     path = tmp_path / "non-json.yaml"
     path.write_text(
-        "schema-version: 1\nid: tests/non-json\nowner: eutaxis\n"
+        "_schema: eutaxis:context-facets@1\nid: tests/non-json\nowner: eutaxis\n"
         "source-revision: .nan\nfacets: []\n",
         encoding="utf-8",
     )

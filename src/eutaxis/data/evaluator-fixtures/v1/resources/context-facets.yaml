@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:context-facets@1
 id: eutaxis/fixture-context-facets
 owner: eutaxis
 source-revision: contract-v1

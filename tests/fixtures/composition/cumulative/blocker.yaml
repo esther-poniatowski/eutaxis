@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:declaration@1
 id: fixture/blocker
 kind: rule
 owner: eutaxis

@@ -1,0 +1,20 @@
+_schema: eutaxis:declaration@2
+id: eutaxis/wrong-schema-binding
+kind: rule
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: exists}
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: preserve-binding
+    modality: must
+    subject: source
+    action: {verb: declare, object: its portable schema contract}
+criteria:
+  - id: binding-valid
+    norms: [preserve-binding]
+    evaluator: {id: eutaxis/manual-judgment, version: 1}
+    statement: The source declares its supported contract

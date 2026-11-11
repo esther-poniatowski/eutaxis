@@ -1,0 +1,8 @@
+schema-version: 1
+id: eutaxis/declaration-registry/wrong-schema-binding
+evaluator: {id: eutaxis/declaration-registry, version: 1}
+input-revision: declaration-v1
+input:
+  sources: [resources/wrong-schema-binding.yaml]
+  facet-registry: resources/context-facets.yaml
+expected-state: violated

@@ -1,467 +1,74 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://eutaxis.dev/schemas/declaration-v1.schema.json",
-  "title": "Eutaxis declaration version 1",
+  "title": "Eutaxis declaration contract version 1",
+  "type": "object",
+  "required": [
+    "_schema"
+  ],
+  "properties": {
+    "_schema": {
+      "const": "eutaxis:declaration@1",
+      "x-kind": "label"
+    }
+  },
   "oneOf": [
-    {"$ref": "#/$defs/rule-set"},
-    {"$ref": "#/$defs/rule"},
-    {"$ref": "#/$defs/procedure"},
-    {"$ref": "#/$defs/resolution-policy"},
-    {"$ref": "#/$defs/composition-manifest"},
-    {"$ref": "#/$defs/evaluator"},
-    {"$ref": "#/$defs/operation"}
+    {
+      "allOf": [
+        {
+          "$ref": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json#/$defs/rule-set"
+        },
+        {
+          "properties": {
+            "rules": {
+              "items": {
+                "$ref": "#/$defs/bound-rule"
+              },
+              "x-kind": "records"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "$ref": "#/$defs/bound-rule"
+    },
+    {
+      "$ref": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json#/$defs/procedure"
+    },
+    {
+      "$ref": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json#/$defs/resolution-policy"
+    },
+    {
+      "$ref": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json#/$defs/composition-manifest"
+    },
+    {
+      "$ref": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json#/$defs/evaluator"
+    },
+    {
+      "$ref": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json#/$defs/operation"
+    }
   ],
   "$defs": {
-    "id": {"type": "string", "minLength": 1, "pattern": "^(?!.*\\s)[\\s\\S]+$"},
-    "versioned-reference": {
-      "type": "object",
-      "required": ["id", "version"],
-      "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "version": {"type": "integer", "minimum": 1}
-      },
-      "additionalProperties": false
-    },
-    "facet-id": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[./-][a-z0-9]+)*$"
-    },
-    "context-facet": {
-      "type": "object",
-      "required": ["id", "value-schema"],
-      "properties": {
-        "id": {"$ref": "#/$defs/facet-id"},
-        "value-schema": {"type": "object"}
-      },
-      "additionalProperties": false
-    },
-    "facet-registry": {
-      "type": "object",
-      "required": ["schema-version", "id", "owner", "source-revision", "facets"],
-      "properties": {
-        "schema-version": {"const": 1},
-        "id": {"$ref": "#/$defs/id"},
-        "owner": {"$ref": "#/$defs/id"},
-        "source-revision": {"type": "string", "minLength": 1},
-        "facets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/context-facet"}}
-      },
-      "additionalProperties": false
-    },
-    "applicability": {
-      "oneOf": [
+    "bound-rule": {
+      "allOf": [
         {
-          "type": "object",
-          "required": ["all"],
-          "properties": {"all": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/applicability"}}},
-          "additionalProperties": false
+          "$ref": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json#/$defs/rule"
         },
         {
-          "type": "object",
-          "required": ["any"],
-          "properties": {"any": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/applicability"}}},
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["not"],
-          "properties": {"not": {"$ref": "#/$defs/applicability"}},
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["facet", "operator"],
-          "properties": {
-            "facet": {"$ref": "#/$defs/facet-id"},
-            "operator": {"enum": ["equals", "in", "exists"]},
-            "value": {}
-          },
-          "allOf": [
-            {
-              "if": {"properties": {"operator": {"const": "exists"}}, "required": ["operator"]},
-              "then": {"not": {"required": ["value"]}},
-              "else": {"required": ["value"]}
-            },
-            {
-              "if": {"properties": {"operator": {"const": "in"}}, "required": ["operator"]},
-              "then": {"properties": {"value": {"type": "array", "minItems": 1, "uniqueItems": true}}}
-            }
+          "required": [
+            "_schema"
           ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "relation": {
-      "type": "object",
-      "required": ["type", "target"],
-      "properties": {
-        "type": {"enum": ["requires", "refines", "incompatible-with", "supersedes"]},
-        "target": {"$ref": "#/$defs/id"}
-      },
-      "additionalProperties": false
-    },
-    "common": {
-      "type": "object",
-      "required": ["schema-version", "id", "kind", "owner", "status", "source-revision", "applicability", "relations"],
-      "properties": {
-        "schema-version": {"const": 1},
-        "id": {"$ref": "#/$defs/id"},
-        "kind": {"enum": ["rule-set", "rule", "procedure", "resolution-policy", "composition-manifest", "evaluator", "operation"]},
-        "owner": {"$ref": "#/$defs/id"},
-        "status": {"enum": ["draft", "active", "deprecated", "retired"]},
-        "source-revision": {"type": "string", "minLength": 1},
-        "applicability": {"$ref": "#/$defs/applicability"},
-        "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}},
-        "title": {"type": "string", "minLength": 1},
-        "rationale": {"type": "string", "minLength": 1}
-      }
-    },
-    "action": {
-      "type": "object",
-      "required": ["verb", "object"],
-      "properties": {
-        "verb": {"$ref": "#/$defs/id"},
-        "object": {"type": "string", "minLength": 1},
-        "timing": {"type": "string", "minLength": 1}
-      },
-      "additionalProperties": false
-    },
-    "norm": {
-      "type": "object",
-      "required": ["id", "modality", "subject", "action"],
-      "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "modality": {"enum": ["must", "must-not", "should", "should-not", "may"]},
-        "subject": {"type": "string", "minLength": 1},
-        "action": {"$ref": "#/$defs/action"},
-        "applies-when": {"$ref": "#/$defs/applicability"},
-        "guidance": {"type": "string", "minLength": 1},
-        "rationale": {"type": "string", "minLength": 1},
-        "decision-criterion": {"$ref": "#/$defs/id"}
-      },
-      "additionalProperties": false
-    },
-    "criterion": {
-      "type": "object",
-      "required": ["id", "norms", "evaluator", "statement"],
-      "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "norms": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-        "evaluator": {"$ref": "#/$defs/versioned-reference"},
-        "statement": {"type": "string", "minLength": 1}
-      },
-      "additionalProperties": false
-    },
-    "exception": {
-      "type": "object",
-      "required": ["id", "when", "disposition", "affects"],
-      "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "when": {"$ref": "#/$defs/applicability"},
-        "disposition": {"enum": ["waive", "substitute"]},
-        "affects": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-        "substitutes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
-      },
-      "allOf": [{
-        "if": {"properties": {"disposition": {"const": "substitute"}}, "required": ["disposition"]},
-        "then": {"required": ["substitutes"]},
-        "else": {"not": {"required": ["substitutes"]}}
-      }],
-      "additionalProperties": false
-    },
-    "rule-fields": {
-      "properties": {
-        "axis": {"enum": ["reasoning-target", "output-structure", "surface-style"]},
-        "failure-mode": {"enum": ["silent", "visible"]},
-        "required-visibility": {"enum": ["pre-invocation", "pre-action"]},
-        "norms": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/norm"}},
-        "criteria": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/criterion"}},
-        "exceptions": {"type": "array", "items": {"$ref": "#/$defs/exception"}}
-      },
-      "required": ["axis", "failure-mode", "norms", "criteria"],
-      "allOf": [{
-        "if": {"properties": {"failure-mode": {"const": "silent"}}, "required": ["failure-mode"]},
-        "then": {"required": ["required-visibility"]},
-        "else": {"not": {"required": ["required-visibility"]}}
-      }]
-    },
-    "rule": {
-      "allOf": [
-        {"$ref": "#/$defs/common"},
-        {"$ref": "#/$defs/rule-fields"},
-        {"properties": {"kind": {"const": "rule"}}}
-      ],
-      "unevaluatedProperties": false
-    },
-    "rule-set": {
-      "allOf": [
-        {"$ref": "#/$defs/common"},
-        {
-          "type": "object",
-          "required": ["purpose", "rules"],
           "properties": {
-            "kind": {"const": "rule-set"},
-            "relations": {"type": "array", "maxItems": 0},
-            "purpose": {"type": "string", "minLength": 1},
-            "rules": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/rule"}}
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "predicate": {
-      "type": "object",
-      "required": ["id", "class", "expression"],
-      "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "class": {"enum": ["guard", "authorization", "assumption", "dependency", "invariant", "postcondition"]},
-        "expression": {"$ref": "#/$defs/applicability"},
-        "evaluator": {"$ref": "#/$defs/versioned-reference"},
-        "observes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
-      },
-      "allOf": [{
-        "if": {"properties": {"class": {"const": "invariant"}}, "required": ["class"]},
-        "then": {"required": ["observes"]},
-        "else": {"not": {"required": ["observes"]}}
-      }],
-      "additionalProperties": false
-    },
-    "binding": {
-      "oneOf": [
-        {
-          "type": "object",
-          "required": ["parameter"],
-          "properties": {"parameter": {"$ref": "#/$defs/id"}},
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["literal"],
-          "properties": {"literal": {}},
-          "additionalProperties": false
-        }
-      ]
-    },
-    "closed-object-schema": {
-      "type": "object",
-      "required": ["type", "properties", "additionalProperties"],
-      "properties": {
-        "type": {"const": "object"},
-        "properties": {
-          "type": "object",
-          "propertyNames": {"$ref": "#/$defs/id"},
-          "additionalProperties": {"type": "object"}
-        },
-        "required": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-        "additionalProperties": {"const": false}
-      },
-      "additionalProperties": false
-    },
-    "procedure-node": {
-      "type": "object",
-      "required": ["id", "operation", "on-success", "on-failure"],
-      "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "operation": {"$ref": "#/$defs/versioned-reference"},
-        "with": {
-          "type": "object",
-          "propertyNames": {"$ref": "#/$defs/id"},
-          "additionalProperties": {"$ref": "#/$defs/binding"}
-        },
-        "on-success": {"$ref": "#/$defs/id"},
-        "on-failure": {
-          "type": "object",
-          "minProperties": 1,
-          "propertyNames": {"$ref": "#/$defs/id"},
-          "additionalProperties": {"$ref": "#/$defs/id"}
-        }
-      },
-      "additionalProperties": false
-    },
-    "procedure": {
-      "allOf": [
-        {"$ref": "#/$defs/common"},
-        {
-          "type": "object",
-          "required": ["purpose", "parameters", "preconditions", "actions", "entry", "invariants", "effects", "postconditions", "failures"],
-          "properties": {
-            "kind": {"const": "procedure"},
-            "purpose": {"type": "string", "minLength": 1},
-            "parameters": {"$ref": "#/$defs/closed-object-schema"},
-            "preconditions": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
-            "actions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/procedure-node"}},
-            "entry": {"$ref": "#/$defs/id"},
-            "invariants": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
-            "effects": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-            "postconditions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/predicate"}},
-            "failures": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "strategy": {
-      "oneOf": [
-        {"type": "object", "required": ["kind", "retain"], "properties": {"kind": {"const": "retain"}, "retain": {"$ref": "#/$defs/id"}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "replace", "with"], "properties": {"kind": {"const": "substitute"}, "replace": {"$ref": "#/$defs/id"}, "with": {"$ref": "#/$defs/id"}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind", "result"], "properties": {"kind": {"const": "combine"}, "result": {"$ref": "#/$defs/id"}}, "additionalProperties": false},
-        {"type": "object", "required": ["kind"], "properties": {"kind": {"const": "error"}}, "additionalProperties": false}
-      ]
-    },
-    "resolution-policy": {
-      "allOf": [
-        {"$ref": "#/$defs/common"},
-        {
-          "type": "object",
-          "required": ["conflicts", "when", "order", "strategy"],
-          "properties": {
-            "kind": {"const": "resolution-policy"},
-            "conflicts": {"type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-            "when": {"$ref": "#/$defs/applicability"},
-            "order": {"type": "integer", "minimum": 0},
-            "strategy": {"$ref": "#/$defs/strategy"}
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "section": {
-      "type": "object",
-      "required": ["id", "declarations"],
-      "properties": {
-        "id": {"$ref": "#/$defs/id"},
-        "declarations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
-      },
-      "additionalProperties": false
-    },
-    "composition-manifest": {
-      "allOf": [
-        {"$ref": "#/$defs/common"},
-        {
-          "type": "object",
-          "required": ["mechanism", "scope", "target", "sections"],
-          "properties": {
-            "kind": {"const": "composition-manifest"},
-            "mechanism": {"enum": ["cumulative", "separate-directory", "single-slot"]},
-            "scope": {"enum": ["personal", "project"]},
-            "target": {"type": "string", "minLength": 1},
-            "sections": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/section"}},
-            "policies": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "evaluator": {
-      "allOf": [
-        {"$ref": "#/$defs/common"},
-        {
-          "type": "object",
-          "required": ["version", "evaluator-kind", "coverage", "adjudication", "timing", "input-revisions", "evidence-schema", "failure-behavior"],
-          "properties": {
-            "kind": {"const": "evaluator"},
-            "version": {"type": "integer", "minimum": 1},
-            "evaluator-kind": {"enum": ["checker", "detector", "manual"]},
-            "coverage": {"enum": ["total", "partial", "none"]},
-            "adjudication": {"enum": ["authoritative", "candidate", "manual"]},
-            "timing": {"enum": ["pre-design", "pre-action", "post-action", "post-artifact"]},
-            "residual-question": {"type": "string", "minLength": 1},
-            "input-revisions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-            "evidence-schema": {"type": "object"},
-            "failure-behavior": {"enum": ["block", "candidate", "record"]},
-            "known-failure-fixtures": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
-          },
-          "allOf": [
-            {
-              "if": {"properties": {"evaluator-kind": {"const": "checker"}}, "required": ["evaluator-kind"]},
-              "then": {
-                "properties": {
-                  "coverage": {"const": "total"},
-                  "adjudication": {"const": "authoritative"}
-                },
-                "required": ["known-failure-fixtures"]
-              },
-              "else": {"not": {"required": ["known-failure-fixtures"]}}
-            },
-            {
-              "if": {"properties": {"evaluator-kind": {"const": "detector"}}, "required": ["evaluator-kind"]},
-              "then": {
-                "properties": {
-                  "coverage": {"const": "partial"},
-                  "adjudication": {"const": "candidate"},
-                  "failure-behavior": {"const": "block"}
-                },
-                "required": ["residual-question"]
-              },
-              "else": {"not": {"required": ["residual-question"]}}
-            },
-            {
-              "if": {"properties": {"evaluator-kind": {"const": "manual"}}, "required": ["evaluator-kind"]},
-              "then": {
-                "properties": {
-                  "coverage": {"const": "none"},
-                  "adjudication": {"const": "manual"},
-                  "evidence-schema": {
-                    "type": "object",
-                    "required": ["type", "required", "properties"],
-                    "properties": {
-                      "type": {"const": "object"},
-                      "required": {
-                        "type": "array",
-                        "contains": {"const": "conclusion"}
-                      },
-                      "properties": {
-                        "type": "object",
-                        "required": ["conclusion"],
-                        "properties": {
-                          "conclusion": {
-                            "type": "object",
-                            "required": ["enum"],
-                            "properties": {
-                              "enum": {
-                                "type": "array",
-                                "minItems": 3,
-                                "maxItems": 3,
-                                "uniqueItems": true,
-                                "items": {"enum": ["satisfied", "violated", "blocked"]}
-                              }
-                            },
-                            "additionalProperties": false
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "if": {"properties": {"evaluator-kind": {"const": "checker"}}, "required": ["evaluator-kind"]},
-              "then": {"properties": {"known-failure-fixtures": {"minItems": 1}}}
+            "_schema": {
+              "const": "eutaxis:declaration@1",
+              "x-kind": "label"
             }
-          ]
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "operation": {
-      "allOf": [
-        {"$ref": "#/$defs/common"},
-        {
-          "type": "object",
-          "required": ["version", "inputs", "outputs", "preconditions", "effects", "failure-outcomes", "recovery"],
-          "properties": {
-            "kind": {"const": "operation"},
-            "version": {"type": "integer", "minimum": 1},
-            "inputs": {"$ref": "#/$defs/closed-object-schema"},
-            "outputs": {"type": "object"},
-            "preconditions": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
-            "effects": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-            "failure-outcomes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-            "recovery": {"type": "string", "minLength": 1}
           }
         }
       ],
       "unevaluatedProperties": false
     }
-  }
+  },
+  "unevaluatedProperties": false
 }

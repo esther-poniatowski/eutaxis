@@ -159,7 +159,8 @@ def test_packaged_known_failure_returns_located_registry_violation() -> None:
     results = execute_known_failure_fixtures(declarations, fixtures, runners)
 
     fixture_id = "eutaxis/declaration-registry/unresolved-exact-reference"
-    assert set(results) == {fixture_id}
+    binding_fixture_id = "eutaxis/declaration-registry/wrong-schema-binding"
+    assert set(results) == {fixture_id, binding_fixture_id}
     result = results[fixture_id]
     assert result.state is EvaluationState.VIOLATED
     assert result.evidence["outcome"] == "invalid"
@@ -170,6 +171,10 @@ def test_packaged_known_failure_returns_located_registry_violation() -> None:
     )
     assert cast(int, result.evidence["line"]) > 0
     assert cast(int, result.evidence["column"]) > 0
+    binding_result = results[binding_fixture_id]
+    assert binding_result.state is EvaluationState.VIOLATED
+    assert binding_result.evidence["error-class"] == "declaration-schema"
+    assert binding_result.evidence["location"] == "$._schema"
 
 
 def test_packaged_procedure_and_operation_match_without_effects() -> None:

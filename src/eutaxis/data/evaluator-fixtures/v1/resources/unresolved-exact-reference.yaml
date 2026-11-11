@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:declaration@1
 id: eutaxis/fixture-unresolved-exact-reference
 kind: rule
 owner: eutaxis

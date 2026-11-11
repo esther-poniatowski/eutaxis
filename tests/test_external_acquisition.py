@@ -89,7 +89,7 @@ def _git_document(git: GitLock) -> dict[str, str]:
 
 def _facet_source(namespace: str) -> bytes:
     return (
-        "schema-version: 1\n"
+        "_schema: eutaxis:context-facets@1\n"
         f"id: {namespace}/context-facets\n"
         f"owner: {namespace}\n"
         "source-revision: fixture-1\n"
@@ -102,7 +102,7 @@ def _facet_source(namespace: str) -> bytes:
 def _declaration_source(namespace: str, *, facet: str | None = None) -> bytes:
     facet_id = facet or f"{namespace}.enabled"
     return (
-        "schema-version: 1\n"
+        "_schema: eutaxis:declaration@1\n"
         f"id: {namespace}/reader-purpose\n"
         "kind: rule\n"
         f"owner: {namespace}\n"

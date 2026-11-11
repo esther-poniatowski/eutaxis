@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:declaration@1
 id: prose/core
 kind: rule-set
 owner: eutaxis
@@ -10,7 +10,7 @@ applicability:
 relations: []
 purpose: Tests a coherent rule set with inherited applicability
 rules:
-  - schema-version: 1
+  - _schema: eutaxis:declaration@1
     id: prose/exact-claims
     kind: rule
     owner: eutaxis

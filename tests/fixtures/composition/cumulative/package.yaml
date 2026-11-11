@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:declaration@1
 id: fixture/package
 kind: rule-set
 owner: eutaxis
@@ -8,7 +8,7 @@ applicability: {facet: context.available, operator: exists}
 relations: []
 purpose: Groups one member used by the composition fixture
 rules:
-  - schema-version: 1
+  - _schema: eutaxis:declaration@1
     id: fixture/member
     kind: rule
     owner: eutaxis

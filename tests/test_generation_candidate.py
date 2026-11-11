@@ -30,7 +30,7 @@ def _write_candidate_workspace(
     (declarations / "context-facets.yaml").write_text(
         "\n".join(
             (
-                "schema-version: 1",
+                "_schema: eutaxis:context-facets@1",
                 "id: oikos/context-facets",
                 "owner: oikos",
                 "source-revision: v1",
@@ -41,7 +41,33 @@ def _write_candidate_workspace(
             )
         )
     )
-    (declarations / "process-core.yaml").write_text(f"kind: rule\nid: {rule_id}\n")
+    (declarations / "process-core.yaml").write_text(
+        "\n".join(
+            (
+                "_schema: eutaxis:declaration@1",
+                f"id: {rule_id}",
+                "kind: rule",
+                "owner: oikos",
+                "status: active",
+                "source-revision: fixture-1",
+                "applicability: {facet: oikos.reviewed, operator: equals, value: true}",
+                "relations: []",
+                "axis: reasoning-target",
+                "failure-mode: visible",
+                "norms:",
+                "  - id: state-purpose",
+                "    modality: must",
+                "    subject: agent",
+                "    action: {verb: state, object: the reader-facing purpose}",
+                "criteria:",
+                "  - id: purpose-is-explicit",
+                "    norms: [state-purpose]",
+                "    evaluator: {id: eutaxis/manual-judgment, version: 1}",
+                "    statement: The artifact states a reader-facing purpose",
+                "",
+            )
+        )
+    )
     manifest_path = "declarations/acquisition.yaml"
     (root / manifest_path).write_text(
         "\n".join(

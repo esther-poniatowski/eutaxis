@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:declaration@1
 id: eutaxis/declaration-registry
 kind: evaluator
 owner: eutaxis
@@ -49,3 +49,4 @@ evidence-schema:
 failure-behavior: block
 known-failure-fixtures:
   - eutaxis/declaration-registry/unresolved-exact-reference
+  - eutaxis/declaration-registry/wrong-schema-binding

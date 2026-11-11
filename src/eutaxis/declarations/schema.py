@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable
 from copy import deepcopy
 from functools import lru_cache
@@ -14,6 +15,7 @@ from jsonschema.exceptions import (  # type: ignore[import-untyped]
     ValidationError,
     best_match,
 )
+from referencing import Registry, Resource
 
 from .. import data_path
 from .embedded_schema import (
@@ -29,6 +31,63 @@ from .source import (
 )
 
 SCHEMA_FILENAME = "declaration-v1.schema.json"
+BASE_SCHEMA_FILENAME = "declaration-v1.base.schema.json"
+FACET_SCHEMA_FILENAME = "context-facets-v1.schema.json"
+FACET_BASE_SCHEMA_FILENAME = "context-facets-v1.base.schema.json"
+
+
+def _contract_metadata(bound_filename: str) -> tuple[str, int, str]:
+    """Read one logical binding and its base resource from packaged schemas."""
+    bound_path = data_path() / "schemas" / bound_filename
+    bound = json.loads(bound_path.read_text(encoding="utf-8"))
+    try:
+        logical_id = bound["properties"]["_schema"]["const"]
+    except (KeyError, TypeError) as error:
+        raise RuntimeError(f"invalid bound schema metadata in {bound_path}") from error
+    if not isinstance(logical_id, str):
+        raise RuntimeError(f"invalid bound schema metadata in {bound_path}")
+    match = re.fullmatch(r"[a-z][a-z0-9-]*:[a-z][a-z0-9-]*@([1-9][0-9]*)", logical_id)
+    if match is None:
+        raise RuntimeError(f"invalid logical schema identifier {logical_id!r}")
+
+    references: set[str] = set()
+
+    def collect_references(value: object) -> None:
+        if isinstance(value, dict):
+            reference = value.get("$ref")
+            if isinstance(reference, str) and ".base.schema.json" in reference:
+                references.add(reference.partition("#")[0])
+            for child in value.values():
+                collect_references(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect_references(child)
+
+    collect_references(bound)
+    if len(references) != 1:
+        raise RuntimeError(
+            f"bound schema must reference one base resource in {bound_path}"
+        )
+    base_resource_id = references.pop()
+    base_filename = Path(base_resource_id).name
+    base_path = data_path() / "schemas" / base_filename
+    base = json.loads(base_path.read_text(encoding="utf-8"))
+    if base.get("$id") != base_resource_id:
+        raise RuntimeError(
+            f"bound schema base reference {base_resource_id!r} does not match "
+            f"the packaged resource in {base_path}"
+        )
+    return logical_id, int(match.group(1)), base_resource_id
+
+
+(
+    DECLARATION_SCHEMA_ID,
+    DECLARATION_SCHEMA_VERSION,
+    DECLARATION_BASE_RESOURCE_ID,
+) = _contract_metadata(SCHEMA_FILENAME)
+FACET_SCHEMA_ID, FACET_SCHEMA_VERSION, FACET_BASE_RESOURCE_ID = _contract_metadata(
+    FACET_SCHEMA_FILENAME
+)
 DECLARATION_KINDS = frozenset(
     {
         "rule-set",
@@ -47,6 +106,21 @@ def schema_path() -> Path:
     return data_path() / "schemas" / SCHEMA_FILENAME
 
 
+def base_schema_path() -> Path:
+    """Return the packaged path of the unbound declaration base schema."""
+    return data_path() / "schemas" / BASE_SCHEMA_FILENAME
+
+
+def facet_schema_path() -> Path:
+    """Return the packaged path of the bound context-facet contract."""
+    return data_path() / "schemas" / FACET_SCHEMA_FILENAME
+
+
+def facet_base_schema_path() -> Path:
+    """Return the packaged path of the unbound context-facet base schema."""
+    return data_path() / "schemas" / FACET_BASE_SCHEMA_FILENAME
+
+
 @lru_cache(maxsize=1)
 def _declaration_schema() -> dict[str, object]:
     """Load and meta-validate the private schema used by validators."""
@@ -57,6 +131,45 @@ def _declaration_schema() -> dict[str, object]:
     return schema
 
 
+def _load_schema(path: Path) -> dict[str, object]:
+    """Load and meta-validate one packaged Draft 2020-12 schema."""
+    schema = cast(dict[str, object], json.loads(path.read_text(encoding="utf-8")))
+    Draft202012Validator.check_schema(schema)
+    return schema
+
+
+@lru_cache(maxsize=1)
+def _declaration_base_schema() -> dict[str, object]:
+    """Load the unbound declaration base schema."""
+    return _load_schema(base_schema_path())
+
+
+@lru_cache(maxsize=1)
+def _facet_schema() -> dict[str, object]:
+    """Load the bound context-facet registry contract."""
+    return _load_schema(facet_schema_path())
+
+
+@lru_cache(maxsize=1)
+def _facet_base_schema() -> dict[str, object]:
+    """Load the unbound context-facet registry base schema."""
+    return _load_schema(facet_base_schema_path())
+
+
+@lru_cache(maxsize=1)
+def _schema_registry() -> Registry[object]:
+    """Return the offline resource registry shared by source validators."""
+    schemas = (
+        _declaration_base_schema(),
+        _declaration_schema(),
+        _facet_base_schema(),
+        _facet_schema(),
+    )
+    return Registry().with_resources(
+        (cast(str, schema["$id"]), Resource.from_contents(schema)) for schema in schemas
+    )
+
+
 def declaration_schema() -> dict[str, object]:
     """Return an isolated copy of declaration schema version 1."""
     return deepcopy(_declaration_schema())
@@ -65,25 +178,30 @@ def declaration_schema() -> dict[str, object]:
 @lru_cache(maxsize=7)
 def _validator_for_kind(kind: str) -> Draft202012Validator:
     """Return a discriminator-specific validator retaining shared definitions."""
-    root = _declaration_schema()
+    root = deepcopy(_declaration_schema())
+    all_of: list[dict[str, object]] = [
+        {"$ref": f"{DECLARATION_BASE_RESOURCE_ID}#/$defs/{kind}"}
+    ]
+    if kind == "rule-set":
+        alternatives = cast(list[dict[str, object]], root["oneOf"])
+        rule_set_layers = cast(list[dict[str, object]], alternatives[0]["allOf"])
+        all_of.append(rule_set_layers[1])
     schema = {
         "$schema": root["$schema"],
+        "type": root["type"],
+        "required": root["required"],
+        "properties": root["properties"],
+        "allOf": all_of,
         "$defs": root["$defs"],
-        "$ref": f"#/$defs/{kind}",
+        "unevaluatedProperties": root["unevaluatedProperties"],
     }
-    return Draft202012Validator(schema)
+    return Draft202012Validator(schema, registry=_schema_registry())
 
 
 @lru_cache(maxsize=1)
 def _facet_registry_validator() -> Draft202012Validator:
     """Return the validator for the separate context-facet registry source."""
-    root = _declaration_schema()
-    schema = {
-        "$schema": root["$schema"],
-        "$defs": root["$defs"],
-        "$ref": "#/$defs/facet-registry",
-    }
-    return Draft202012Validator(schema)
+    return Draft202012Validator(_facet_schema(), registry=_schema_registry())
 
 
 @lru_cache(maxsize=2)
@@ -91,7 +209,7 @@ def _validator_for_definition(name: str) -> Draft202012Validator:
     """Return one validator for a retained normative declaration fragment."""
     if name not in {"applicability", "closed-object-schema"}:
         raise ValueError(f"unsupported declaration definition: {name!r}")
-    root = _declaration_schema()
+    root = _declaration_base_schema()
     return Draft202012Validator(
         {
             "$schema": root["$schema"],
@@ -135,6 +253,13 @@ def validate_document(
     source_map = locations or {}
     if not isinstance(document, dict):
         _raise_schema_error(path, (), "declaration must be a mapping", source_map)
+    _require_first_schema_key(
+        document,
+        path=path,
+        locations=source_map,
+        expected=DECLARATION_SCHEMA_ID,
+        facet_registry=False,
+    )
     kind = document.get("kind")
     if not isinstance(kind, str) or kind not in DECLARATION_KINDS:
         _raise_schema_error(
@@ -143,6 +268,19 @@ def validate_document(
             f"kind must be one of {sorted(DECLARATION_KINDS)!r}",
             source_map,
         )
+    if kind == "rule-set":
+        rules = document.get("rules")
+        if isinstance(rules, list):
+            for index, rule in enumerate(rules):
+                if isinstance(rule, dict):
+                    _require_first_schema_key(
+                        rule,
+                        path=path,
+                        locations=source_map,
+                        expected=DECLARATION_SCHEMA_ID,
+                        facet_registry=False,
+                        root=("rules", index),
+                    )
 
     error = _actionable_schema_error(_validator_for_kind(kind).iter_errors(document))
     if error is not None:
@@ -165,11 +303,39 @@ def validate_facet_registry_document(
         If the document violates the normative registry schema.
     """
     source_map = locations or {}
+    if isinstance(document, dict):
+        _require_first_schema_key(
+            document,
+            path=path,
+            locations=source_map,
+            expected=FACET_SCHEMA_ID,
+            facet_registry=True,
+        )
     error = _actionable_schema_error(_facet_registry_validator().iter_errors(document))
     if error is not None:
         parts = _schema_error_parts(error, source_map)
         _raise_facet_registry_error(path, parts, error.message, source_map)
     return cast(Mapping[str, object], document)
+
+
+def _require_first_schema_key(
+    document: Mapping[str, object],
+    *,
+    path: Path,
+    locations: SourceMap,
+    expected: str,
+    facet_registry: bool,
+    root: DocumentPath = (),
+) -> None:
+    """Require the portable contract binding as the first authored key."""
+    first = next(iter(document), None)
+    if first == "_schema" and document.get("_schema") == expected:
+        return
+    message = f"_schema must be the first key and equal {expected!r}"
+    parts = root + (("_schema",) if "_schema" in document else ())
+    if facet_registry:
+        _raise_facet_registry_error(path, parts, message, locations)
+    _raise_schema_error(path, parts, message, locations)
 
 
 def _schema_error_parts(error: ValidationError, locations: SourceMap) -> DocumentPath:
@@ -218,7 +384,7 @@ def _unexpected_property(
         return None
     if not isinstance(error.instance, Mapping):
         return None
-    admitted = _declared_properties(error.schema, _declaration_schema())
+    admitted = _declared_properties(error.schema, _declaration_base_schema())
     names = [
         name
         for name in error.instance
@@ -271,7 +437,18 @@ def _declared_properties(
 def _resolve_local_reference(
     reference: str, root: Mapping[str, object]
 ) -> object | None:
-    """Resolve a local JSON Pointer without interpreting external references."""
+    """Resolve a local pointer or one reference to a packaged base schema."""
+    if reference.startswith(f"{DECLARATION_BASE_RESOURCE_ID}#/"):
+        root = _declaration_base_schema()
+        reference = reference.removeprefix(DECLARATION_BASE_RESOURCE_ID)
+    facet_base_id = cast(str, _facet_base_schema()["$id"])
+    if reference.startswith(f"{facet_base_id}#/"):
+        root = _facet_base_schema()
+        reference = reference.removeprefix(facet_base_id)
+    if reference == DECLARATION_BASE_RESOURCE_ID:
+        return _declaration_base_schema()
+    if reference == facet_base_id:
+        return _facet_base_schema()
     if not reference.startswith("#/"):
         return None
     current: object = root

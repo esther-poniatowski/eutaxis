@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:declaration@1
 id: eutaxis/load-declaration-registry
 kind: operation
 owner: eutaxis

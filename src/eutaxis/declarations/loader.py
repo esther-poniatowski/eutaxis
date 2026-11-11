@@ -38,7 +38,11 @@ from .models import (
     VersionedReference,
     freeze_json,
 )
-from .schema import validate_document, validate_embedded_schema
+from .schema import (
+    DECLARATION_SCHEMA_VERSION,
+    validate_document,
+    validate_embedded_schema,
+)
 from .source import (
     DocumentPath,
     SourceMap,
@@ -200,7 +204,7 @@ def _base(
 ) -> _BaseFields:
     """Build fields shared by every declaration model."""
     return {
-        "schema_version": cast(int, document["schema-version"]),
+        "schema_version": DECLARATION_SCHEMA_VERSION,
         "id": str(document["id"]),
         "kind": DeclarationKind(str(document["kind"])),
         "owner": str(document["owner"]),

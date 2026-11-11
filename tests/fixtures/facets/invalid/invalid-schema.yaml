@@ -1,4 +1,4 @@
-schema-version: 1
+_schema: eutaxis:context-facets@1
 id: tests/invalid-schema
 owner: eutaxis
 source-revision: fixture-1

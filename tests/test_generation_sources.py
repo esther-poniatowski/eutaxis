@@ -49,7 +49,7 @@ def _write_workspace(
     facet.write_text(
         "\n".join(
             (
-                "schema-version: 1",
+                "_schema: eutaxis:context-facets@1",
                 "id: oikos/context-facets",
                 "owner: oikos",
                 "source-revision: v1",
@@ -61,7 +61,33 @@ def _write_workspace(
         )
     )
     declaration = declarations / "process-core.yaml"
-    declaration.write_text("kind: rule\nid: oikos/process-core\n")
+    declaration.write_text(
+        "\n".join(
+            (
+                "_schema: eutaxis:declaration@1",
+                "id: oikos/process-core",
+                "kind: rule",
+                "owner: oikos",
+                "status: active",
+                "source-revision: fixture-1",
+                "applicability: {facet: oikos.reviewed, operator: equals, value: true}",
+                "relations: []",
+                "axis: reasoning-target",
+                "failure-mode: visible",
+                "norms:",
+                "  - id: state-purpose",
+                "    modality: must",
+                "    subject: agent",
+                "    action: {verb: state, object: the reader-facing purpose}",
+                "criteria:",
+                "  - id: purpose-is-explicit",
+                "    norms: [state-purpose]",
+                "    evaluator: {id: eutaxis/manual-judgment, version: 1}",
+                "    statement: The artifact states a reader-facing purpose",
+                "",
+            )
+        )
+    )
     manifest = parse_acquisition_manifest(
         {
             "schema-version": 1,
