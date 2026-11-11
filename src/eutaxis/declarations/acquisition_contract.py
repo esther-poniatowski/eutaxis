@@ -30,6 +30,9 @@ _IDENTIFIER = re.compile(
 )
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 _OID = {"sha1": re.compile(r"^[0-9a-f]{40}$"), "sha256": re.compile(r"^[0-9a-f]{64}$")}
+_RESOURCE_SEGMENT = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
+_DEVICE_STEM = re.compile(r"^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$")
+_PYTHON_MEDIA_TYPE = "text/x-python; charset=utf-8"
 
 PACKAGED_FACET_PATH = f"registries/{FACET_REGISTRY_FILENAME}"
 PACKAGED_DECLARATION_PATHS = (
@@ -67,6 +70,16 @@ class ExternalSourceManifest:
     kind: AcquisitionKind
     root: str
     files: tuple[str, ...]
+    resources: tuple[ResourceManifest, ...] = ()
+
+
+@dataclass(frozen=True)
+class ResourceManifest:
+    """Name one authenticated UTF-8 resource below an external source root."""
+
+    id: str
+    path: str
+    media_type: str
 
 
 @dataclass(frozen=True)
@@ -83,6 +96,16 @@ class LockedFile:
     """Bind one logical source path to exact retained bytes."""
 
     path: str
+    sha256: str
+
+
+@dataclass(frozen=True)
+class LockedResource:
+    """Bind one resource identity and media type to exact retained bytes."""
+
+    id: str
+    path: str
+    media_type: str
     sha256: str
 
 
@@ -144,6 +167,7 @@ class ExternalSourceLock:
     kind: AcquisitionKind
     namespace: str
     git: GitLock | None
+    resources: tuple[LockedResource, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -176,6 +200,23 @@ def parse_acquisition_manifest(document: object) -> AcquisitionManifest:
                 f"$.sources[{index}].namespace",
                 "the reserved namespace 'eutaxis' is packaged only",
             )
+    resources = tuple(resource for source in sources for resource in source.resources)
+    _unique(
+        (item.id for item in resources),
+        "$.sources",
+        "resource identifier",
+        field="resources.id",
+    )
+    _unique(
+        (
+            source.namespace + "\0" + resource.path
+            for source in sources
+            for resource in source.resources
+        ),
+        "$.sources",
+        "resource coordinate",
+        field="resources.path",
+    )
 
     extensions = tuple(
         _facet_extension(item, index)
@@ -199,6 +240,8 @@ def parse_acquisition_manifest(document: object) -> AcquisitionManifest:
             _fail(location + ".root", "root must match its source entry")
         if extension.path in owner.files:
             _fail(location + ".path", "facet path must differ from declaration files")
+        if extension.path in {resource.path for resource in owner.resources}:
+            _fail(location + ".path", "facet path must differ from resource files")
     return AcquisitionManifest(1, extensions, sources)
 
 
@@ -327,18 +370,32 @@ def validate_acquisition_contract(
     )
 
 
-def source_content_revision(namespace: str, files: tuple[LockedFile, ...]) -> str:
+def source_content_revision(
+    namespace: str,
+    files: tuple[LockedFile, ...],
+    resources: tuple[LockedResource, ...] = (),
+) -> str:
     """Return one transport-independent ordered source revision."""
     _namespace_value(namespace, "$.namespace")
     _require_locked_files(files, "$.files")
+    _require_locked_resources(resources, "$.resources")
     if not files:
         _fail("$.files", "source file sequence must be non-empty")
-    return _revision(
-        {
-            "namespace": namespace,
-            "files": [{"path": item.path, "sha256": item.sha256} for item in files],
-        }
-    )
+    payload: dict[str, object] = {
+        "namespace": namespace,
+        "files": [{"path": item.path, "sha256": item.sha256} for item in files],
+    }
+    if resources:
+        payload["resources"] = [
+            {
+                "id": item.id,
+                "path": item.path,
+                "media-type": item.media_type,
+                "sha256": item.sha256,
+            }
+            for item in resources
+        ]
+    return _revision(payload)
 
 
 def facet_content_revision(
@@ -428,6 +485,8 @@ def _external_source_acquisition_revision(
         _fail("$.source.kind", "source kind has the wrong exact type")
     if type(manifest.files) is not tuple:
         _fail("$.source.files", "source files must be an exact tuple")
+    if type(manifest.resources) is not tuple:
+        _fail("$.source.resources", "source resources must be an exact tuple")
     detached_manifest = parse_acquisition_manifest(
         {
             "schema-version": 1,
@@ -439,6 +498,20 @@ def _external_source_acquisition_revision(
                     "kind": manifest.kind.value,
                     "root": manifest.root,
                     "files": list(manifest.files),
+                    **(
+                        {
+                            "resources": [
+                                {
+                                    "id": item.id,
+                                    "path": item.path,
+                                    "media-type": item.media_type,
+                                }
+                                for item in manifest.resources
+                            ]
+                        }
+                        if manifest.resources
+                        else {}
+                    ),
                 }
             ],
         }
@@ -539,7 +612,46 @@ def _manifest_source(value: object, index: int) -> ExternalSourceManifest:
         for offset, item in enumerate(cast(list[object], source["files"]))
     )
     _unique(files, location + ".files", "path")
-    return ExternalSourceManifest(namespace, kind, root, files)
+    resources = tuple(
+        _manifest_resource(item, f"{location}.resources[{offset}]")
+        for offset, item in enumerate(cast(list[object], source.get("resources", [])))
+    )
+    _unique(
+        (item.id for item in resources),
+        location + ".resources",
+        "resource identifier",
+        field="id",
+    )
+    _unique(
+        (item.path for item in resources),
+        location + ".resources",
+        "resource path",
+        field="path",
+    )
+    for offset, resource in enumerate(resources):
+        if resource.id.split("/", 1)[0] != namespace:
+            _fail(
+                f"{location}.resources[{offset}].id",
+                "resource identifier namespace differs from source namespace",
+            )
+        if resource.path in files:
+            _fail(
+                f"{location}.resources[{offset}].path",
+                "resource path duplicates a declaration file path",
+            )
+    return ExternalSourceManifest(namespace, kind, root, files, resources)
+
+
+def _manifest_resource(value: object, location: str) -> ResourceManifest:
+    source = _mapping(value, location)
+    media_type = _text(source["media-type"], location + ".media-type")
+    if media_type != _PYTHON_MEDIA_TYPE:
+        _fail(location + ".media-type", "unsupported resource media type")
+    return ResourceManifest(
+        _identifier_value(source["id"], location + ".id"),
+        _resource_path(source["path"], location + ".path"),
+        media_type,
+    )
 
 
 def _facet_extension(value: object, index: int) -> FacetExtensionManifest:
@@ -601,6 +713,7 @@ def _external_lock(value: object, index: int) -> ExternalSourceLock:
         kind,
         _namespace_value(source["namespace"], location + ".namespace"),
         git,
+        _locked_resources(source.get("resources", []), location + ".resources"),
     )
 
 
@@ -650,6 +763,28 @@ def _locked_files(value: object, location: str) -> tuple[LockedFile, ...]:
     )
     _unique((item.path for item in files), location, "path", field="path")
     return files
+
+
+def _locked_resources(value: object, location: str) -> tuple[LockedResource, ...]:
+    resources: list[LockedResource] = []
+    for index, item in enumerate(cast(list[object], value)):
+        item_location = f"{location}[{index}]"
+        source = _mapping(item, item_location)
+        media_type = _text(source["media-type"], item_location + ".media-type")
+        if media_type != _PYTHON_MEDIA_TYPE:
+            _fail(item_location + ".media-type", "unsupported resource media type")
+        resources.append(
+            LockedResource(
+                _identifier_value(source["id"], item_location + ".id"),
+                _resource_path(source["path"], item_location + ".path"),
+                media_type,
+                _digest_value(source["sha256"], item_location + ".sha256"),
+            )
+        )
+    result = tuple(resources)
+    _unique((item.id for item in result), location, "resource identifier", field="id")
+    _unique((item.path for item in result), location, "resource path", field="path")
+    return result
 
 
 def _validate_base_facets(
@@ -735,13 +870,34 @@ def _validate_external_source(
                 f"{location}.files[{offset}].path",
                 "logical path or order differs from manifest",
             )
+    if len(manifest.resources) != len(lock.resources):
+        _fail(location + ".resources", "resource count differs from manifest")
+    for offset, (manifest_resource, locked_resource) in enumerate(
+        zip(manifest.resources, lock.resources, strict=True)
+    ):
+        resource_location = f"{location}.resources[{offset}]"
+        if manifest_resource.id != locked_resource.id:
+            _fail(
+                resource_location + ".id",
+                "resource identifier or order differs from manifest",
+            )
+        if manifest_resource.path != locked_resource.path:
+            _fail(
+                resource_location + ".path",
+                "resource path differs from manifest",
+            )
+        if manifest_resource.media_type != locked_resource.media_type:
+            _fail(
+                resource_location + ".media-type",
+                "resource media type differs from manifest",
+            )
     if (manifest.kind is AcquisitionKind.GIT_SUBMODULE) != (lock.git is not None):
         _fail(location + ".git", "Git state presence differs from transport kind")
     if lock.git is not None and lock.git.registered_path != manifest.root:
         _fail(location + ".git.registered-path", "registered path differs from root")
     if lock.git is not None:
         _validate_git_lock(lock.git, location + ".git")
-    content = source_content_revision(lock.namespace, lock.files)
+    content = source_content_revision(lock.namespace, lock.files, lock.resources)
     _require_revision(lock.content_revision, content, location + ".content-revision")
     _require_revision(
         lock.acquisition_revision,
@@ -831,6 +987,14 @@ def _require_manifest_state(manifest: AcquisitionManifest) -> None:
             _fail(f"$.sources[{index}].kind", "kind has the wrong type")
         if type(source.files) is not tuple:
             _fail(f"$.sources[{index}].files", "files must be an exact tuple")
+        if type(source.resources) is not tuple:
+            _fail(f"$.sources[{index}].resources", "resources must be an exact tuple")
+        for resource_index, resource in enumerate(source.resources):
+            if type(resource) is not ResourceManifest:
+                _fail(
+                    f"$.sources[{index}].resources[{resource_index}]",
+                    "resource has the wrong exact type",
+                )
     parse_acquisition_manifest(_manifest_document(manifest))
 
 
@@ -862,6 +1026,7 @@ def _require_lock_state(lock: AcquisitionLock) -> None:
         if type(source.kind) is not AcquisitionKind:
             _fail(f"$.sources[{index}].kind", "kind has the wrong type")
         _require_locked_files(source.files, f"$.sources[{index}].files")
+        _require_locked_resources(source.resources, f"$.sources[{index}].resources")
         if source.git is not None and type(source.git) is not GitLock:
             _fail(f"$.sources[{index}].git", "Git lock has the wrong exact type")
     _parse_acquisition_lock_document(_lock_document(lock))
@@ -886,6 +1051,20 @@ def _manifest_document(manifest: AcquisitionManifest) -> dict[str, object]:
                 "kind": item.kind.value,
                 "root": item.root,
                 "files": list(item.files),
+                **(
+                    {
+                        "resources": [
+                            {
+                                "id": resource.id,
+                                "path": resource.path,
+                                "media-type": resource.media_type,
+                            }
+                            for resource in item.resources
+                        ]
+                    }
+                    if item.resources
+                    else {}
+                ),
             }
             for item in manifest.sources
         ],
@@ -945,6 +1124,11 @@ def _source_lock_document(lock: ExternalSourceLock, location: str) -> dict[str, 
     }
     if lock.git is not None:
         document["git"] = _git_payload(lock.git)
+    if lock.resources:
+        document["resources"] = [
+            _locked_resource_document(item, f"{location}.resources[{index}]")
+            for index, item in enumerate(lock.resources)
+        ]
     return document
 
 
@@ -952,6 +1136,19 @@ def _locked_file_document(file: LockedFile, location: str) -> dict[str, object]:
     if type(file) is not LockedFile:
         _fail(location, "file has the wrong exact type")
     return {"path": file.path, "sha256": file.sha256}
+
+
+def _locked_resource_document(
+    resource: LockedResource, location: str
+) -> dict[str, object]:
+    if type(resource) is not LockedResource:
+        _fail(location, "resource has the wrong exact type")
+    return {
+        "id": resource.id,
+        "path": resource.path,
+        "media-type": resource.media_type,
+        "sha256": resource.sha256,
+    }
 
 
 def _require_locked_files(files: tuple[LockedFile, ...], location: str) -> None:
@@ -965,6 +1162,26 @@ def _require_locked_files(files: tuple[LockedFile, ...], location: str) -> None:
         )
         _digest_value(item.sha256, f"{location}[{index}].sha256")
     _unique((item.path for item in files), location, "path", field="path")
+
+
+def _require_locked_resources(
+    resources: tuple[LockedResource, ...], location: str
+) -> None:
+    if type(resources) is not tuple:
+        _fail(location, "resources must be an exact tuple")
+    for index, item in enumerate(resources):
+        item_location = f"{location}[{index}]"
+        if type(item) is not LockedResource:
+            _fail(item_location, "resource has the wrong exact type")
+        _identifier_value(item.id, item_location + ".id")
+        _resource_path(item.path, item_location + ".path")
+        if item.media_type != _PYTHON_MEDIA_TYPE:
+            _fail(item_location + ".media-type", "unsupported resource media type")
+        _digest_value(item.sha256, item_location + ".sha256")
+    _unique(
+        (item.id for item in resources), location, "resource identifier", field="id"
+    )
+    _unique((item.path for item in resources), location, "resource path", field="path")
 
 
 def _mapping(value: object, location: str) -> dict[str, object]:
@@ -1013,6 +1230,17 @@ def _normalized_path(value: object, *, allow_dot: bool, location: str) -> str:
         return normalized_relative_path(value, allow_dot=allow_dot)
     except AcquisitionPathError as exc:
         _fail(location, str(exc))
+
+
+def _resource_path(value: object, location: str) -> str:
+    path = _normalized_path(value, allow_dot=False, location=location)
+    for segment in path.split("/"):
+        if _RESOURCE_SEGMENT.fullmatch(segment) is None:
+            _fail(location, "resource path segment is not portable lowercase ASCII")
+        stem = segment.split(".", 1)[0]
+        if _DEVICE_STEM.fullmatch(stem) is not None:
+            _fail(location, "resource path segment uses a reserved device stem")
+    return path
 
 
 def _exact_version(value: object, location: str) -> None:

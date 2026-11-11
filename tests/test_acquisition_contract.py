@@ -17,6 +17,8 @@ from eutaxis.declarations.acquisition_contract import (
     FacetExtensionManifest,
     GitLock,
     LockedFile,
+    LockedResource,
+    ResourceManifest,
     _external_source_acquisition_revision,
     _facet_extension_acquisition_revision,
     acquisition_lock_json_bytes,
@@ -45,6 +47,11 @@ class _Text(str):
 
 class _Integer(int):
     pass
+
+
+def test_resource_contract_types_are_public() -> None:
+    assert declarations_api.LockedResource is LockedResource
+    assert declarations_api.ResourceManifest is ResourceManifest
 
 
 def _digest(label: str) -> str:
@@ -206,6 +213,42 @@ def _lock(*, kind: str = "workspace", root: str = ".") -> dict[str, object]:
         "schema-version": 1,
         "sources": [source],
     }
+
+
+def _contract_with_resource() -> tuple[dict[str, object], dict[str, object]]:
+    manifest = _manifest()
+    lock = _lock()
+    manifest_resource = {
+        "id": "oikos/publish-index",
+        "path": "declarations/resources/publish-index.py",
+        "media-type": "text/x-python; charset=utf-8",
+    }
+    locked_resource = {
+        **manifest_resource,
+        "sha256": _digest("publish-index"),
+    }
+    manifest_source = manifest["sources"][0]  # type: ignore[index]
+    manifest_source["resources"] = [manifest_resource]
+    lock_source = lock["sources"][0]  # type: ignore[index]
+    lock_source["resources"] = [locked_resource]
+    content = _revision(
+        {
+            "namespace": "oikos",
+            "files": lock_source["files"],
+            "resources": [locked_resource],
+        }
+    )
+    lock_source["content-revision"] = content
+    lock_source["acquisition-revision"] = _revision(
+        {
+            "schema-version": 1,
+            "namespace": "oikos",
+            "kind": "workspace",
+            "root": ".",
+            "content-revision": content,
+        }
+    )
+    return manifest, lock
 
 
 def _append_second_contract(
@@ -996,3 +1039,158 @@ def test_public_revision_apis_reject_surrogate_paths_with_acquisition_errors() -
             "oikos/context-facets", "oikos", "oikos", bad_path, digest
         )
     assert facet_error.value.location == "$.path"
+
+
+def test_resource_contract_round_trips_and_changes_source_revision() -> None:
+    manifest_document, lock_document = _contract_with_resource()
+    manifest = parse_acquisition_manifest(manifest_document)
+    lock = parse_acquisition_lock(lock_document)
+
+    validate_acquisition_contract(manifest, lock)
+    encoded = acquisition_lock_json_bytes(manifest, lock)
+
+    assert parse_acquisition_lock_bytes(encoded) == lock
+    assert manifest.sources[0].resources[0].id == "oikos/publish-index"
+    assert lock.sources[0].resources[0].sha256 == _digest("publish-index")
+    assert (
+        lock.sources[0].content_revision
+        != _lock()["sources"][0]["content-revision"]  # type: ignore[index]
+    )
+
+
+@pytest.mark.parametrize(
+    ("factory", "parser"),
+    [
+        (_manifest, parse_acquisition_manifest),
+        (_lock, parse_acquisition_lock),
+    ],
+)
+def test_resource_contract_rejects_explicit_empty_lists(factory, parser) -> None:
+    document = factory()
+    document["sources"][0]["resources"] = []
+
+    with pytest.raises(AcquisitionContractError) as error:
+        parser(document)
+
+    assert error.value.location == "$.sources[0].resources"
+
+
+def test_absent_resources_preserve_canonical_lock_bytes() -> None:
+    manifest = parse_acquisition_manifest(_manifest())
+    lock_document = _lock()
+    lock = parse_acquisition_lock(lock_document)
+
+    assert acquisition_lock_json_bytes(manifest, lock) == jcs_bytes(lock_document)
+
+
+def test_resource_revision_binds_identity_path_media_type_and_digest() -> None:
+    file = LockedFile("declarations/process-core.yaml", _digest("source"))
+    resource = LockedResource(
+        "oikos/publish-index",
+        "declarations/resources/publish-index.py",
+        "text/x-python; charset=utf-8",
+        _digest("publish-index"),
+    )
+    baseline = source_content_revision("oikos", (file,), (resource,))
+
+    replacements = (
+        replace(resource, id="oikos/other"),
+        replace(resource, path="declarations/resources/other.py"),
+        replace(resource, sha256=_digest("other")),
+    )
+
+    assert all(
+        source_content_revision("oikos", (file,), (candidate,)) != baseline
+        for candidate in replacements
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "scripts/con.py",
+        "scripts/com1.txt",
+        "scripts/name.",
+        "scripts/Upper.py",
+        "scripts/../publish-index.py",
+    ],
+)
+def test_manifest_rejects_nonportable_resource_paths(path: str) -> None:
+    manifest, _lock_document = _contract_with_resource()
+    manifest["sources"][0]["resources"][0]["path"] = path  # type: ignore[index]
+
+    with pytest.raises(AcquisitionContractError) as error:
+        parse_acquisition_manifest(manifest)
+
+    assert error.value.location == "$.sources[0].resources[0].path"
+
+
+def test_manifest_rejects_resource_identity_and_path_conflicts() -> None:
+    wrong_namespace, _lock_document = _contract_with_resource()
+    wrong_namespace["sources"][0]["resources"][0]["id"] = (  # type: ignore[index]
+        "other/publish-index"
+    )
+    with pytest.raises(AcquisitionContractError, match="namespace differs"):
+        parse_acquisition_manifest(wrong_namespace)
+
+    declaration_collision, _lock_document = _contract_with_resource()
+    declaration_collision["sources"][0]["resources"][0]["path"] = (  # type: ignore[index]
+        "declarations/process-core.yaml"
+    )
+    with pytest.raises(AcquisitionContractError, match="declaration file"):
+        parse_acquisition_manifest(declaration_collision)
+
+    duplicate, _lock_document = _contract_with_resource()
+    resources = duplicate["sources"][0]["resources"]  # type: ignore[index]
+    resources.append(deepcopy(resources[0]))
+    with pytest.raises(AcquisitionContractError) as duplicate_error:
+        parse_acquisition_manifest(duplicate)
+    assert duplicate_error.value.location == "$.sources[0].resources[1].id"
+
+
+def test_manifest_rejects_facet_resource_path_collision() -> None:
+    manifest, _lock_document = _contract_with_resource()
+    manifest["sources"][0]["resources"][0]["path"] = (  # type: ignore[index]
+        "declarations/context-facets.yaml"
+    )
+
+    with pytest.raises(AcquisitionContractError, match="resource files"):
+        parse_acquisition_manifest(manifest)
+
+
+@pytest.mark.parametrize("field", ["id", "path", "media-type"])
+def test_contract_rejects_resource_lock_drift(field: str) -> None:
+    manifest_document, lock_document = _contract_with_resource()
+    locked = lock_document["sources"][0]["resources"][0]  # type: ignore[index]
+    if field == "id":
+        locked[field] = "oikos/other"
+    elif field == "path":
+        locked[field] = "declarations/resources/other.py"
+    else:
+        locked[field] = "text/plain; charset=utf-8"
+
+    manifest = parse_acquisition_manifest(manifest_document)
+    if field == "media-type":
+        with pytest.raises(AcquisitionContractError) as error:
+            parse_acquisition_lock(lock_document)
+    else:
+        lock = parse_acquisition_lock(lock_document)
+        with pytest.raises(AcquisitionContractError) as error:
+            validate_acquisition_contract(manifest, lock)
+
+    assert error.value.location == f"$.sources[0].resources[0].{field}"
+
+
+def test_contract_rejects_missing_or_additional_locked_resource() -> None:
+    manifest_document, lock_document = _contract_with_resource()
+    lock_document["sources"][0].pop("resources")  # type: ignore[index]
+    manifest = parse_acquisition_manifest(manifest_document)
+    lock = parse_acquisition_lock(lock_document)
+    with pytest.raises(AcquisitionContractError, match="resource count differs"):
+        validate_acquisition_contract(manifest, lock)
+
+    plain_manifest = parse_acquisition_manifest(_manifest())
+    _resource_manifest, resource_lock_document = _contract_with_resource()
+    resource_lock = parse_acquisition_lock(resource_lock_document)
+    with pytest.raises(AcquisitionContractError, match="resource count differs"):
+        validate_acquisition_contract(plain_manifest, resource_lock)

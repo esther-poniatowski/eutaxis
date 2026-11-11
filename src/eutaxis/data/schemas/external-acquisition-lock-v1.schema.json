@@ -41,6 +41,17 @@
         "sha256": {"$ref": "#/$defs/digest"}
       }
     },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "media-type", "sha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "path": {"$ref": "#/$defs/path"},
+        "media-type": {"const": "text/x-python; charset=utf-8"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
     "facet-constituent": {
       "type": "object",
       "additionalProperties": false,
@@ -128,6 +139,11 @@
           "type": "array",
           "minItems": 1,
           "items": {"$ref": "#/$defs/file"}
+        },
+        "resources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/resource"}
         },
         "git": {"$ref": "#/$defs/git"},
         "kind": {"enum": ["workspace", "vendored", "git-submodule"]},

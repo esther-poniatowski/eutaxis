@@ -35,6 +35,20 @@
       "type": "string",
       "minLength": 1
     },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "media-type"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "path": {"$ref": "#/$defs/path"},
+        "media-type": {"const": "text/x-python; charset=utf-8"}
+      }
+    },
     "kind": {
       "enum": ["workspace", "vendored", "git-submodule"]
     },
@@ -61,6 +75,11 @@
           "type": "array",
           "minItems": 1,
           "items": {"$ref": "#/$defs/path"}
+        },
+        "resources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/resource"}
         }
       }
     }
