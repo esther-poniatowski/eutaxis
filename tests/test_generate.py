@@ -25,6 +25,7 @@ def test_load_config_supports_existing_agent_instructions_shape(tmp_path: Path) 
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - path: docs/rules.md
 agents:
@@ -55,6 +56,7 @@ def test_explicit_root_supports_global_instruction_outputs(tmp_path: Path) -> No
     config = tmp_path / "global-instructions.yml"
     config.write_text(
         f"""
+_schema: eutaxis:configuration@1
 common_sources:
   - shared.md
 agents:
@@ -136,6 +138,7 @@ def test_diff_report_detects_stale_output(tmp_path: Path) -> None:
     (tmp_path / "AGENTS.md").write_text("# Rules\n\nOld.\n", encoding="utf-8")
     (tmp_path / "eutaxis.yml").write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 agents:
@@ -156,6 +159,7 @@ agents:
 def test_missing_source_raises(tmp_path: Path) -> None:
     (tmp_path / "eutaxis.yml").write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - missing.md
 agents:
@@ -175,6 +179,7 @@ def test_duplicate_agent_names_raise(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 agents:
   - name: codex
     target: AGENTS.md
@@ -192,6 +197,7 @@ def test_string_boolean_values_raise(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 agents:
   - name: codex
     enabled: "false"
@@ -209,6 +215,7 @@ def test_task_modules_router_section_is_appended(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 task_modules_intro: |
@@ -251,6 +258,7 @@ def test_task_modules_router_omitted_when_empty(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 agents:
@@ -270,6 +278,7 @@ def test_task_modules_router_disabled_by_flag(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 task_modules_router_enabled: false
@@ -299,6 +308,7 @@ def test_duplicate_task_module_id_raises(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 task_modules:
   - id: programming
     title: Programming
@@ -322,6 +332,7 @@ def test_reference_docs_section_is_appended(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 reference_docs_intro: |
@@ -366,6 +377,7 @@ def test_reference_docs_section_omitted_when_empty(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 agents:
@@ -383,6 +395,7 @@ def test_duplicate_reference_doc_id_raises(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 reference_docs:
   - id: vitruv
     title: Vitruv
@@ -407,6 +420,7 @@ def test_reference_doc_missing_required_field_raises(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 reference_docs:
   - id: vitruv
     title: Vitruv
@@ -436,6 +450,7 @@ def test_rule_index_scans_labels_and_groups_by_file(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - globals.md
 task_modules:
@@ -469,6 +484,7 @@ def test_rule_index_omitted_when_disabled(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - globals.md
 agents:
@@ -490,6 +506,7 @@ def test_rule_index_omitted_when_no_labels_found(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - globals.md
 rule_index_enabled: true
@@ -516,6 +533,7 @@ def test_rule_index_externalized_when_target_set(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - globals.md
 task_modules:
@@ -575,6 +593,7 @@ def test_rule_index_inline_when_no_target(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - globals.md
 rule_index_enabled: true
@@ -609,6 +628,7 @@ def test_task_module_description_falls_back_to_frontmatter(
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 task_modules:
   - id: programming
     title: Programming
@@ -638,6 +658,7 @@ def test_config_description_overrides_frontmatter(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 task_modules:
   - id: programming
     title: Programming
@@ -667,6 +688,7 @@ def test_task_module_description_missing_everywhere_raises(
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 task_modules:
   - id: programming
     title: Programming
@@ -687,6 +709,7 @@ def test_negative_heading_offset_raises(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - path: docs/rules.md
     heading_offset: -1
@@ -708,6 +731,7 @@ def _rejected_label_workspace(tmp_path: Path, *, strict: bool | None) -> Path:
     strict_line = "" if strict is None else f"strict_rule_labels: {str(strict).lower()}\n"
     config = tmp_path / "eutaxis.yml"
     config.write_text(
+        "_schema: eutaxis:configuration@1\n"
         f"common_sources:\n  - rules.md\n{strict_line}"
         "agents:\n  - name: codex\n    target: AGENTS.md\n",
         encoding="utf-8",
@@ -751,6 +775,7 @@ def test_generate_plan_reports_drift_and_cumulative_budgets(tmp_path: Path) -> N
     index_target.write_text("# Old index\n", encoding="utf-8")
     config = tmp_path / "eutaxis.yml"
     config.write_text(
+        "_schema: eutaxis:configuration@1\n"
         "common_sources:\n  - rules.md\n"
         "instruction_chains:\n"
         "  - name: codex-project\n"
@@ -787,6 +812,7 @@ def test_check_fails_for_stale_standalone_rule_index(tmp_path: Path) -> None:
     )
     config = tmp_path / "agent-instructions.yaml"
     config.write_text(
+        "_schema: eutaxis:configuration@1\n"
         "common_sources:\n  - rules.md\n"
         "rule_index_enabled: true\n"
         "rule_index_target:\n"
@@ -814,6 +840,7 @@ def test_check_reports_current_standalone_rule_index(tmp_path: Path) -> None:
     )
     config = tmp_path / "agent-instructions.yaml"
     config.write_text(
+        "_schema: eutaxis:configuration@1\n"
         "common_sources:\n  - rules.md\n"
         "rule_index_enabled: true\n"
         "rule_index_target:\n"
@@ -860,7 +887,10 @@ def test_strict_rule_labels_fails_check(tmp_path: Path) -> None:
 
 def test_strict_rule_labels_must_be_boolean(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
-    config.write_text('strict_rule_labels: "yes"\nagents: []\n', encoding="utf-8")
+    config.write_text(
+        '_schema: eutaxis:configuration@1\nstrict_rule_labels: "yes"\nagents: []\n',
+        encoding="utf-8",
+    )
 
     with pytest.raises(ConfigurationError, match="strict_rule_labels"):
         load_config(config)

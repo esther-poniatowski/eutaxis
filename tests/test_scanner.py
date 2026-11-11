@@ -23,6 +23,7 @@ def test_scan_reports_unregistered_files(tmp_path: Path) -> None:
     config = _write_config(
         tmp_path,
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - instructions/registered.md
 agents:
@@ -54,6 +55,7 @@ def test_scan_honors_enabled_false_frontmatter(tmp_path: Path) -> None:
     config = _write_config(
         tmp_path,
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - instructions/registered.md
 agents:
@@ -77,6 +79,7 @@ def test_scan_reports_registered_missing(tmp_path: Path) -> None:
     config = _write_config(
         tmp_path,
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - instructions/exists.md
   - instructions/missing.md
@@ -107,6 +110,7 @@ def test_scan_reports_malformed_frontmatter(tmp_path: Path) -> None:
     config = _write_config(
         tmp_path,
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - instructions/registered.md
 agents:
@@ -134,6 +138,7 @@ def test_scan_directory_override(tmp_path: Path) -> None:
     config = _write_config(
         tmp_path,
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - instructions/registered.md
 agents:
@@ -160,6 +165,7 @@ def test_scan_clean_on_fully_registered_config(tmp_path: Path) -> None:
     config = _write_config(
         tmp_path,
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - instructions/a.md
   - instructions/b.md

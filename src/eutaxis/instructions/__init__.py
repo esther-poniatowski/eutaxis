@@ -2,6 +2,7 @@
 
 from .config import (
     CONFIG_FILENAME,
+    CONFIG_SCHEMA,
     CONFIG_SEARCH_PATHS,
     ROOT_ENV_VAR,
     ConfigLoader,
@@ -51,6 +52,7 @@ from .scanner import (
 
 __all__ = [
     "CONFIG_FILENAME",
+    "CONFIG_SCHEMA",
     "CONFIG_SEARCH_PATHS",
     "LABEL_PATTERN",
     "ROOT_ENV_VAR",

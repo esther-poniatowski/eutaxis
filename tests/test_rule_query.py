@@ -67,6 +67,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path
     config.write_text(
         yaml.safe_dump(
             {
+                "_schema": "eutaxis:configuration@1",
                 "common_sources": [{"path": "global/verification.md"}],
                 "task_modules": [
                     {
@@ -273,7 +274,11 @@ def _section_config(workspace, entry: dict) -> Path:
     config = workspace["config"].with_name("sections.yaml")
     config.write_text(
         yaml.safe_dump(
-            {"common_sources": [entry], "agents": []}
+            {
+                "_schema": "eutaxis:configuration@1",
+                "common_sources": [entry],
+                "agents": [],
+            }
         ),
         encoding="utf-8",
     )
@@ -315,6 +320,7 @@ def test_config_whole_module_entry_overrides_a_section_selection(workspace) -> N
     config.write_text(
         yaml.safe_dump(
             {
+                "_schema": "eutaxis:configuration@1",
                 "common_sources": [{"path": "tasks/style.md", "sections": ["Topic"]}],
                 "agents": [
                     {

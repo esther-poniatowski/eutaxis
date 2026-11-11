@@ -27,7 +27,7 @@ The ancestor search of step 3 lets a command run from any subfolder of a project
 
 The configuration file is named `eutaxis.yml`. Without the configuration option `--config` (`-c`), a command reads `config/tools/eutaxis.yml` or `eutaxis.yml` below the root. The command stops with an error that names both files when both exist, and with an error that names both places when neither exists: Eutaxis declares every source and every output in the configuration file, so it has no built-in defaults.
 
-A path given on the command line, including the value of `--config`, is relative to the current folder. A path written in the configuration file is relative to the root, so the file moves between the root and `config/tools/` without an edit. A configuration file that declares the retired key `root` is a configuration error.
+A path given on the command line, including the value of `--config`, is relative to the current folder. A path written in the configuration file is relative to the root, so the file moves between the root and `config/tools/` without an edit. A configuration file that declares the retired key `root` is a configuration error. A configuration file whose key `_schema` is absent or differs from `eutaxis:configuration@1` is a configuration error too, and the message names the value to write; see [Configuration: format identifier](configuration.md#format-identifier).
 
 ## Exit statuses
 
@@ -35,7 +35,7 @@ Every command exits with one of three statuses:
 
 - `0` -- the command succeeded, and its check, if any, found no problem;
 - `1` -- a check or a validation found a problem: an outdated output, a drifted artifact, an exceeded budget, a rejected label under `strict_rule_labels`, or a source that the [failure-mode gate](../adr/failure-mode-as-source-field.md) rejects;
-- `2` -- a usage or configuration error prevented the command from running as asked: an unknown option or name, an invalid or missing configuration file, a declared source that is missing or malformed, a corrupted state file, a file that only `--force` may replace, or a missing confirmation.
+- `2` -- a usage or configuration error prevented the command from running as asked: an unknown option or name, an invalid or missing configuration file, a configuration file without the identifier `eutaxis:configuration@1`, a declared source that is missing or malformed, a corrupted state file, a file that only `--force` may replace, or a missing confirmation.
 
 ## Files and confirmations
 
@@ -300,7 +300,7 @@ eutaxis init --template codex-project --root <folder>
 | `--template` | | `codex-project` | Template directory under `eutaxis/data/templates`. |
 | `--force` | | `false` | Overwrite existing scaffold files. |
 
-The command copies tracked starter files from the selected template into the root, including the configuration file `eutaxis.yml`. A scaffold file may hold edits, so an existing file is overwritten only under `--force`; without it, the command stops with status `2` and names the file.
+The command copies tracked starter files from the selected template into the root, including the configuration file `eutaxis.yml`, whose first key is `_schema: eutaxis:configuration@1`. A scaffold file may hold edits, so an existing file is overwritten only under `--force`; without it, the command stops with status `2` and names the file.
 
 ---
 

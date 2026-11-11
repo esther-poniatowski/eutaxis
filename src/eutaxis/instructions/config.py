@@ -29,9 +29,11 @@ from .models import (
 class ConfigLoader:
     """Load and validate instruction assembly configuration.
 
-    The relative paths of the configuration file resolve against ``root``, or,
-    when ``root`` is absent, against ``settings_root(config_path)``. The
-    retired key ``root`` is rejected.
+    The configuration file declares its format in the key ``_schema``, whose
+    value must equal ``CONFIG_SCHEMA`` as a whole string. The relative paths of
+    the configuration file resolve against ``root``, or, when ``root`` is
+    absent, against ``settings_root(config_path)``. The retired key ``root`` is
+    rejected.
     """
 
     def __init__(self, config_path: Path, root: Path | None = None) -> None:
@@ -54,6 +56,7 @@ class ConfigLoader:
 
         if not isinstance(raw, dict):
             raise ConfigurationError("Configuration must be a YAML mapping")
+        self._check_schema(raw)
 
         config = InstructionConfig(
             root=self._resolve_root(raw),
@@ -104,6 +107,21 @@ class ConfigLoader:
         )
         self._validate_instruction_chains(config)
         return config
+
+    def _check_schema(self, raw: dict[str, Any]) -> None:
+        """Reject a file whose ``_schema`` is absent or differs from ``CONFIG_SCHEMA``."""
+        if SCHEMA_KEY not in raw:
+            raise ConfigurationError(
+                f"{self.config_path} declares no key '{SCHEMA_KEY}'. Write "
+                f"'{SCHEMA_KEY}: {CONFIG_SCHEMA}' as the first key of the file."
+            )
+        value = raw[SCHEMA_KEY]
+        if value != CONFIG_SCHEMA:
+            raise ConfigurationError(
+                f"{self.config_path} declares {SCHEMA_KEY}: {value}, which is "
+                "not the format of an Eutaxis configuration file. Write "
+                f"'{SCHEMA_KEY}: {CONFIG_SCHEMA}' as the first key of the file."
+            )
 
     def _resolve_root(self, raw: dict[str, Any]) -> Path:
         if "root" in raw:
@@ -499,6 +517,12 @@ class ConfigLoader:
 
 CONFIG_FILENAME = "eutaxis.yml"
 """File name of the configuration file of Eutaxis."""
+
+SCHEMA_KEY = "_schema"
+"""Key that declares the format of the configuration file."""
+
+CONFIG_SCHEMA = "eutaxis:configuration@1"
+"""Format identifier that the configuration file declares in ``_schema``."""
 
 CONFIG_SEARCH_PATHS: tuple[Path, ...] = (
     Path("config") / "tools" / CONFIG_FILENAME,

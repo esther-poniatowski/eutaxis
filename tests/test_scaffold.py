@@ -3,8 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
-from eutaxis.scaffold import ScaffoldError, scaffold_workspace
+from eutaxis.scaffold import ScaffoldError, available_templates, scaffold_workspace
 
 
 def test_scaffold_workspace_copies_codex_project_template(tmp_path: Path) -> None:
@@ -48,3 +49,15 @@ def test_scaffold_workspace_copies_multi_agent_template(tmp_path: Path) -> None:
 
     assert "path: AGENTS.md" in config
     assert "path: .claude/CLAUDE.md" in config
+
+
+@pytest.mark.parametrize("template", available_templates())
+def test_scaffolded_configuration_declares_its_format_first(
+    tmp_path: Path, template: str
+) -> None:
+    scaffold_workspace(tmp_path, template=template)
+
+    raw = yaml.safe_load((tmp_path / "eutaxis.yml").read_text(encoding="utf-8"))
+
+    assert list(raw)[0] == "_schema"
+    assert raw["_schema"] == "eutaxis:configuration@1"

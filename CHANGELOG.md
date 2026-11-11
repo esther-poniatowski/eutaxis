@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Changed
 
+- **Breaking.** The configuration file declares its format in the key `_schema`, written first: `_schema: eutaxis:configuration@1`. Eutaxis compares the whole value with this identifier, and a configuration file without the key or with another value is a configuration error (status `2`) whose message names the value to write. Every configuration file gains the line `_schema: eutaxis:configuration@1` as its first key. The scaffold templates write the key, and the public API exports the identifier as `CONFIG_SCHEMA`.
 - README and `docs/guide/usage.md` carry a "Common tasks" entry-point table listing the everyday `eutaxis` commands. `docs/guide/cli-reference.md` documents the `scan` subcommand.
 - `clean-memory` built-in source migrated to the new schema: `invocation: [user]`, `failure-mode: silent`, `required-visibility: pre-action` (explicit user invocation loads the skill body before the action runs).
 - The project folder of a command is named by the reserved option `--root` (`-r`) on every command: `commands` and `skills` subcommands and `ops clean-memory` (formerly `--project`), and `init` (formerly `--target` / `-t`). The `clean-memory` built-in source passes `--root`.

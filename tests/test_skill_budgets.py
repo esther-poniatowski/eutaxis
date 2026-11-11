@@ -21,6 +21,7 @@ def _write_module(path: Path, *, name: str, body: str = "rule body\n", **fm) -> 
 
 def _write_config(path: Path, modules: list[dict]) -> None:
     payload = {
+        "_schema": "eutaxis:configuration@1",
         "common_sources": [],
         "task_modules": modules,
         "agents": [],

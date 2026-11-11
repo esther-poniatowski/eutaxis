@@ -1,3 +1,5 @@
+_schema: eutaxis:configuration@1
+
 common_sources:
   - docs/instructions/project-overview.md
   - docs/instructions/repository-layout.md

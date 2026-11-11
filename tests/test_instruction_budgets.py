@@ -23,6 +23,7 @@ def test_budget_exceeded_blocks_generation(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 agents:
@@ -47,6 +48,7 @@ def test_budget_enforced_per_agent_default_applies(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 max_bytes: 80
 common_sources:
   - rules.md
@@ -76,6 +78,7 @@ def test_budget_report_yields_size_and_limit(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 agents:
@@ -101,6 +104,7 @@ def test_budget_can_be_disabled(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 agents:
@@ -121,6 +125,7 @@ def _write_instruction_chain_config(tmp_path: Path, limit: int) -> Path:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         f"""
+_schema: eutaxis:configuration@1
 common_sources:
   - rules.md
 instruction_chains:
@@ -201,6 +206,7 @@ def test_non_positive_max_bytes_raises(tmp_path: Path) -> None:
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         """
+_schema: eutaxis:configuration@1
 agents:
   - name: codex
     max_bytes: 0

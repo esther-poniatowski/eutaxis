@@ -39,6 +39,7 @@ def _write_config(path: Path, names: tuple[str, ...]) -> None:
     path.write_text(
         yaml.safe_dump(
             {
+                "_schema": "eutaxis:configuration@1",
                 "common_sources": [],
                 "task_modules": modules,
                 "agents": [],

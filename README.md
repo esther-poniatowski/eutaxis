@@ -71,10 +71,12 @@ Eutaxis currently ships the checked features. The unchecked features remain plan
 
 ## Quick Start
 
-A project's instruction layout is declared in the configuration file `config/tools/eutaxis.yml`, or in `eutaxis.yml` at the project root. The configuration below lists two shared Markdown sources and one cumulative-file target:
+A project's instruction layout is declared in the configuration file `config/tools/eutaxis.yml`, or in `eutaxis.yml` at the project root. The file declares its format in the first key `_schema`. The configuration below lists two shared Markdown sources and one cumulative-file target:
 
 ```yaml
 # eutaxis.yml
+_schema: eutaxis:configuration@1
+
 common_sources:
   - path: docs/instructions/file-authority.md
   - path: docs/instructions/verification.md

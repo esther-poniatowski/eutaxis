@@ -68,15 +68,16 @@ Rule blocks serve two surfaces: the [rule query](cli-reference.md#rule) and the 
 
 ## Configuration shape
 
-The configuration carries four top-level lists, each tied to one role:
+The configuration declares its format in the key `_schema`, and carries three top-level lists, each tied to one role:
 
 ```yaml
+_schema: eutaxis:configuration@1
 common_sources: [ ... ]    # feeds the cumulative file (always-on)
 task_modules:  [ ... ]     # feeds the Skill compiler (on-demand)
 agents:        [ ... ]     # one entry per cumulative-file target
 ```
 
-- **`root`** anchors relative paths. When absent, the configuration file's parent directory is used. The CLI flag `--root` overrides both.
+- **`_schema`** names the format of the file, `eutaxis:configuration@1`; a file without this exact value is rejected (see [Configuration: format identifier](configuration.md#format-identifier)).
 - **`common_sources`** lists Markdown source modules included in every cumulative-file output. Source entries follow the schema above.
 - **`task_modules`** lists Markdown source modules eligible for compilation as Skill artifacts. Each entry names the source file and declares enough metadata for the Skill compiler to resolve it.
 - **`agents`** lists the cumulative-file targets. Each agent entry declares its output path, optional header and footer, and optional per-agent extra sources.
@@ -84,6 +85,8 @@ agents:        [ ... ]     # one entry per cumulative-file target
 The configuration below exercises both compilation surfaces — `common_sources` feeds the cumulative file, `task_modules` feeds the Skill compiler:
 
 ```yaml
+_schema: eutaxis:configuration@1
+
 common_sources:
   - path: docs/instructions/globals/file-authority.md
   - path: docs/instructions/globals/verification.md

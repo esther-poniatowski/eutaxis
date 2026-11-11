@@ -13,6 +13,7 @@ from eutaxis import _cli_options
 from eutaxis.cli import app
 from eutaxis.commands.cli_errors import exit_with_error
 from eutaxis.instructions import (
+    CONFIG_SCHEMA,
     ConfigurationError,
     find_config,
     load_config,
@@ -26,6 +27,7 @@ def _write_settings(path: Path, *, target: str, extra: str = "") -> Path:
     """Write a configuration file whose one agent copies ``rules.md`` to ``target``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
+        "_schema: eutaxis:configuration@1\n"
         f"{extra}"
         "common_sources:\n"
         "  - rules.md\n"
@@ -244,6 +246,82 @@ def test_retired_root_key_is_a_configuration_error(tmp_path: Path) -> None:
         load_config(settings)
 
 
+# Format identifier --------------------------------------------------------
+
+
+def _write_without_schema(path: Path, *, first: str = "") -> Path:
+    """Write the configuration of ``_write_settings`` with ``first`` in place of ``_schema``."""
+    _write_settings(path, target="AGENTS.md")
+    body = path.read_text(encoding="utf-8").split("\n", 1)[1]
+    path.write_text(first + body, encoding="utf-8")
+    return path
+
+
+def test_configuration_declaring_its_identifier_loads(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    first = _write_settings(project / "eutaxis.yml", target="AGENTS.md")
+    later = _write_without_schema(project / "later.yml")
+    later.write_text(
+        later.read_text(encoding="utf-8") + "_schema: eutaxis:configuration@1\n",
+        encoding="utf-8",
+    )
+
+    assert CONFIG_SCHEMA == "eutaxis:configuration@1"
+    assert [agent.name for agent in load_config(first).agents] == ["codex"]
+    assert [agent.name for agent in load_config(later, root=project).agents] == [
+        "codex"
+    ]
+
+
+def test_configuration_without_identifier_is_a_configuration_error(
+    tmp_path: Path,
+) -> None:
+    settings = _write_without_schema(_project(tmp_path) / "eutaxis.yml")
+
+    with pytest.raises(ConfigurationError) as excinfo:
+        load_config(settings)
+
+    assert "declares no key '_schema'" in str(excinfo.value)
+    assert "_schema: eutaxis:configuration@1" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "eutaxis:configuration@2",
+        "eutaxis:configuration@10",
+        "ktisma:configuration@1",
+        "eutaxis:skill-sync-manifest@1",
+        "1",
+    ],
+)
+def test_configuration_with_other_identifier_is_a_configuration_error(
+    tmp_path: Path, value: str
+) -> None:
+    settings = _write_without_schema(
+        _project(tmp_path) / "eutaxis.yml", first=f"_schema: {value}\n"
+    )
+
+    with pytest.raises(ConfigurationError) as excinfo:
+        load_config(settings)
+
+    assert f"declares _schema: {value}" in str(excinfo.value)
+    assert "_schema: eutaxis:configuration@1" in str(excinfo.value)
+
+
+def test_generate_without_identifier_exits_2_naming_the_value(
+    tmp_path: Path,
+) -> None:
+    project = _project(tmp_path)
+    _write_without_schema(project / "eutaxis.yml")
+
+    result = CliRunner().invoke(app, ["generate", "--root", str(project)])
+
+    assert result.exit_code == 2
+    assert "_schema: eutaxis:configuration@1" in result.stderr
+    assert not (project / "AGENTS.md").exists()
+
+
 # Skills: root and target project -------------------------------------------
 
 
@@ -260,6 +338,7 @@ def _skills_project(tmp_path: Path) -> Path:
     settings = project / "config" / "tools" / "eutaxis.yml"
     settings.parent.mkdir(parents=True)
     settings.write_text(
+        "_schema: eutaxis:configuration@1\n"
         "common_sources: []\nagents: []\ntask_modules:\n"
         "  - id: alpha\n    title: Alpha\n    path: instructions/alpha.md\n"
         "    trigger: on alpha\n",
@@ -458,7 +537,9 @@ def test_generate_budget_overflow_exits_1_and_dry_run_exits_0(tmp_path: Path) ->
 
 
 def test_invalid_settings_file_exits_2(tmp_path: Path) -> None:
-    (tmp_path / "eutaxis.yml").write_text("agents: 3\n", encoding="utf-8")
+    (tmp_path / "eutaxis.yml").write_text(
+        "_schema: eutaxis:configuration@1\nagents: 3\n", encoding="utf-8"
+    )
 
     result = CliRunner().invoke(app, ["generate", "--dry-run"])
 

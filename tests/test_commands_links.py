@@ -59,6 +59,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         config.write_text(
             yaml.safe_dump(
                 {
+                    "_schema": "eutaxis:configuration@1",
                     "task_modules": [
                         {"id": n, "title": n, "path": f"tasks/{n}.md", "trigger": "t"}
                         for n in ("alpha", "beta")

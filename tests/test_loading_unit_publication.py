@@ -84,6 +84,7 @@ def _workspace(tmp_path: Path, *, publish: bool = True) -> Path:
     config.write_text(
         yaml.safe_dump(
             {
+                "_schema": "eutaxis:configuration@1",
                 "common_sources": [],
                 "task_modules": [
                     {

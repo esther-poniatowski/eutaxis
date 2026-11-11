@@ -12,6 +12,7 @@ The `generate` command reads a YAML configuration file that declares shared sour
 ## Top-level keys
 
 ```yaml
+_schema: eutaxis:configuration@1 # required; the format of the file
 common_sources:                  # source entries shared across all agents
 task_modules:                    # source entries compiled to Skill artifacts
 task_modules_router_enabled:     # default true; set false to suppress the pointer section
@@ -22,9 +23,13 @@ strict_rule_labels:              # default false; set true to fail generate and 
 agents:                          # cumulative-file targets
 ```
 
-All keys are optional. An empty `common_sources` list (or omitted key) means no shared content. An empty `agents` list produces no output. Absolute target paths and paths beginning with `~` can target files outside the root, such as `~/.codex/AGENTS.md`.
+The key `_schema` is required, and every other key is optional. An empty `common_sources` list (or omitted key) means no shared content. An empty `agents` list produces no output. Absolute target paths and paths beginning with `~` can target files outside the root, such as `~/.codex/AGENTS.md`.
 
 The `common_sources` list feeds the cumulative-file surface (`eutaxis generate`). The `task_modules` list feeds the on-demand Skill surface (`eutaxis skills install`). The two lists are independent. See [Concepts: two compilation surfaces](concepts.md) for the mental model.
+
+## Format identifier
+
+The key `_schema` declares the format of the file, and its value is `eutaxis:configuration@1`. The key is written first, so that a reader identifies the format before reading any other key. Eutaxis reads the key at any position, and compares its whole value with this identifier. A file that lacks the key, or that holds another value such as `eutaxis:configuration@2` or the identifier of another tool, is a configuration error: the command stops with status `2`, and the message names `_schema: eutaxis:configuration@1` as the value to write. The number after `@` rises only when a valid configuration file becomes invalid or is read differently.
 
 ## Source entries
 
@@ -174,6 +179,8 @@ Parts are joined with double newlines. The output file ends with a single traili
 ## Full example
 
 ```yaml
+_schema: eutaxis:configuration@1
+
 common_sources:
   - path: docs/instructions/style-rules.md
     sections:
@@ -208,6 +215,8 @@ Running `eutaxis generate` with this config writes `.claude/CLAUDE.md` (the clau
 A global config can write an absolute target path while sourcing shared modules from a separate agent-config repository. The configuration below lies at `~/agent-config/config/tools/eutaxis.yml`, so its source paths resolve against `~/agent-config`:
 
 ```yaml
+_schema: eutaxis:configuration@1
+
 common_sources:
   - modules/global/file-authority.md
   - modules/global/git-safety.md
