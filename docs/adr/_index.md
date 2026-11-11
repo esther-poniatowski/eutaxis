@@ -36,6 +36,7 @@ live under [`docs/open-questions/`](../open-questions/_index.md).
 - [External declaration identity and acquisition](external-declaration-identity-and-acquisition.md): preserves semantic identity while verifying offline source bytes and provenance
 - [Resolution evidence and failure contract](resolution-evidence-and-failures.md): fixes the evidence required to audit one resolver result
 - [Queryable declaration catalog](queryable-declaration-catalog.md)
+- [Cumulative Markdown projection](cumulative-markdown-projection.md): supplies complete resolved instructions to hosts that accept one Markdown file
 - [Enforcement-directed agent attention](enforcement-directed-agent-attention.md)
 - [Three rule axes and the procedure kind](three-rule-axes-and-procedure-kind.md)
 - [Three-layer composition and precedence](three-layer-composition-and-precedence.md)

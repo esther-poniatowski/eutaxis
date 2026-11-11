@@ -6,6 +6,11 @@ from collections.abc import Mapping
 from typing import NamedTuple, NoReturn
 
 from ._authority import IdentityAuthorityStore, identity_value_state
+from .catalog import (
+    DeclarationCatalog,
+    _issued_catalog_state,
+    build_declaration_catalog,
+)
 from .composition import (
     CumulativeArtifact,
     CumulativeCompositionPlan,
@@ -19,6 +24,7 @@ from .external_resolution import (
     _ExternalResolutionState,
     _issued_external_resolution_state,
 )
+from .markdown_projection import _render_cumulative_markdown
 
 
 class _ExternalPlanState(NamedTuple):
@@ -186,6 +192,35 @@ def assemble_external_cumulative_artifact(
         raise
 
 
+def render_external_cumulative_markdown(
+    plan: ExternalCumulativeCompositionPlan,
+) -> ExternalCumulativeArtifact:
+    """Render one external cumulative plan from its authenticated catalog."""
+    plan_state = _issued_external_plan_state(plan)
+    acquisition = plan_state.resolution_state.acquisition
+    catalog = build_declaration_catalog(acquisition)
+    catalog_state = _issued_catalog_state(catalog)
+    artifact: CumulativeArtifact | None = None
+    try:
+        artifact = _render_cumulative_markdown(
+            catalog,
+            plan_state.resolution_state.resolution.unit,
+            plan_state.plan,
+        )
+    except BaseException as error:
+        _raise_changed_plan(plan, plan_state, error)
+        _raise_changed_catalog(catalog, catalog_state, error)
+        raise
+    try:
+        _require_same_plan(plan, plan_state)
+        _require_same_catalog(catalog, catalog_state)
+        return _issue_external_artifact(plan, plan_state, artifact)
+    except BaseException as error:
+        _raise_changed_plan(plan, plan_state, error)
+        _raise_changed_catalog(catalog, catalog_state, error)
+        raise
+
+
 def _issue_external_plan(
     resolution: ExternalResolutionResult,
     resolution_state: _ExternalResolutionState,
@@ -292,6 +327,11 @@ def _require_same_plan(
         _fail("$", "external composition authority state changed")
 
 
+def _require_same_catalog(catalog: DeclarationCatalog, expected: object) -> None:
+    if _issued_catalog_state(catalog) is not expected:
+        _fail("$", "declaration catalog authority state changed")
+
+
 def _raise_changed_resolution(
     resolution: ExternalResolutionResult,
     expected: _ExternalResolutionState,
@@ -310,6 +350,17 @@ def _raise_changed_plan(
 ) -> None:
     try:
         _require_same_plan(plan, expected)
+    except BaseException as authority_error:
+        raise authority_error from error
+
+
+def _raise_changed_catalog(
+    catalog: DeclarationCatalog,
+    expected: object,
+    error: BaseException,
+) -> None:
+    try:
+        _require_same_catalog(catalog, expected)
     except BaseException as authority_error:
         raise authority_error from error
 

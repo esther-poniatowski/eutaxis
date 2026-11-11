@@ -19,6 +19,7 @@ from eutaxis.declarations import (
     acquire_external_declarations_from_path,
     assemble_external_cumulative_artifact,
     plan_external_cumulative_composition,
+    render_external_cumulative_markdown,
     resolve_external_compilation_unit,
 )
 from eutaxis.declarations.external_result import _retire_external_result_tree
@@ -207,6 +208,38 @@ def test_external_composition_stays_bound_through_artifact(
     ):
         with pytest.raises(AcquisitionContractError, match="not issued"):
             operation()
+
+
+def test_renders_external_cumulative_markdown_from_catalog(tmp_path: Path) -> None:
+    acquisition = _acquire(tmp_path)
+    resolution = resolve_external_compilation_unit(
+        acquisition, "resolution/manifest", _context()
+    )
+    plan = plan_external_cumulative_composition(resolution)
+
+    artifact = render_external_cumulative_markdown(plan)
+
+    assert artifact.text == (
+        "**resolution/purpose**:\n\n"
+        "✓ `state-purpose`: Agent MUST state the reader-facing purpose.\n\n"
+        "*Success criteria.*\n"
+        "- `purpose-is-explicit` [eutaxis/manual-judgment@1]: "
+        "The artifact states a reader-facing purpose\n"
+    )
+
+
+def test_rendered_markdown_remains_bound_to_acquisition(tmp_path: Path) -> None:
+    acquisition = _acquire(tmp_path)
+    resolution = resolve_external_compilation_unit(
+        acquisition, "resolution/manifest", _context()
+    )
+    plan = plan_external_cumulative_composition(resolution)
+    artifact = render_external_cumulative_markdown(plan)
+
+    _retire_external_result_tree(acquisition)
+
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        _ = artifact.text
 
 
 def test_external_capabilities_reject_copy_and_serialization(tmp_path: Path) -> None:

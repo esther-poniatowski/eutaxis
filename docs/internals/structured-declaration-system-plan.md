@@ -286,7 +286,8 @@ This phase has turned the validated registry into a static query boundary, resol
 
 ### Projections and compatibility
 
-- [ ] Render cumulative Markdown and compact Skill entrypoints from catalog records.
+- [x] Render authenticated cumulative Markdown from live catalog records, with complete effective rule and procedure contracts and reviewed golden bytes.
+- [ ] Render compact Skill entrypoints from catalog records.
 - [ ] Emit normalized YAML or JSON query packets with context, trace, registry versions, hashes, and source revisions.
 - [ ] Bundle rendered fallbacks for Skills whose deployment cannot guarantee catalog access.
 - [ ] Extend `plan`, `check`, and `explain` with resolution and completion evidence.

@@ -394,6 +394,7 @@ from .external_composition import (
     ExternalCumulativeCompositionPlan,
     assemble_external_cumulative_artifact,
     plan_external_cumulative_composition,
+    render_external_cumulative_markdown,
 )
 from .runners import (
     CheckerRunner,
@@ -743,6 +744,7 @@ __all__ = [
     "resolve_external_compilation_unit",
     "plan_external_cumulative_composition",
     "assemble_external_cumulative_artifact",
+    "render_external_cumulative_markdown",
     "select_migration_baselines",
     "schema_path",
     "compare_external_declarations",
