@@ -12,6 +12,7 @@ from .acquisition_contract import (
     AcquisitionKind,
     AcquisitionLock,
     AcquisitionManifest,
+    _require_strict_utf8_resource,
     _parse_acquisition_manifest_bytes,
     parse_acquisition_lock_bytes,
     validate_acquisition_contract,
@@ -51,7 +52,7 @@ from ._external_evidence import (
     _issue_provisional_evidence,
     _issued_external_facet_state,
     _retire_external_evidence,
-    _validate_final_declaration_evidence,
+    _validate_final_source_evidence,
 )
 
 
@@ -212,6 +213,7 @@ def _acquire_external_stage_contract(
                 parsing_facets = _provisional_composite_view(composite)
                 packaged_reads = packaged_session.read_declarations()
                 external_authoritative = _read_external_declarations(sources)
+                resource_authoritative = _read_external_resources(sources)
                 packaged_session.parse_declarations()
                 declarations = _parse_all_declarations(
                     packaged_reads.authoritative,
@@ -229,6 +231,7 @@ def _acquire_external_stage_contract(
                     git_sessions,
                     extensions,
                     external_authoritative,
+                    resource_authoritative,
                 )
                 git_evidence = _finish_git_sessions(git_sessions)
                 manifest_evidence = workspace_root.verify(manifest_authoritative)
@@ -250,6 +253,14 @@ def _acquire_external_stage_contract(
                         strict=True,
                     )
                 )
+                resource_evidence = tuple(
+                    tuple(source.root.verify(carrier) for carrier in source_carriers)
+                    for source, source_carriers in zip(
+                        sources,
+                        resource_authoritative,
+                        strict=True,
+                    )
+                )
                 _finalize_evidence(
                     evidence,
                     manifest_evidence,
@@ -259,6 +270,7 @@ def _acquire_external_stage_contract(
                     extensions,
                     extension_evidence,
                     declaration_evidence,
+                    resource_evidence,
                     declarations[len(packaged_reads.authoritative) :],
                     git_evidence,
                 )
@@ -357,6 +369,7 @@ def _bind_git_carriers(
     sessions: tuple[_GitSubmoduleSession | None, ...],
     extensions: tuple[_FacetExtensionRead, ...],
     declarations: tuple[tuple[AuthoritativeByteCarrier, ...], ...],
+    resources: tuple[tuple[AuthoritativeByteCarrier, ...], ...],
 ) -> None:
     """Bind each Git proof to the exact carriers consumed by parsing."""
     extensions_by_source: list[list[AuthoritativeByteCarrier]] = [
@@ -364,12 +377,14 @@ def _bind_git_carriers(
     ]
     for extension in extensions:
         extensions_by_source[extension.source_index].append(extension.authoritative)
-    for source_index, (session, source_declarations) in enumerate(
-        zip(sessions, declarations, strict=True)
+    for source_index, (session, source_declarations, source_resources) in enumerate(
+        zip(sessions, declarations, resources, strict=True)
     ):
         if session is not None:
             session.bind_worktree_carriers(
-                tuple(extensions_by_source[source_index]) + source_declarations
+                tuple(extensions_by_source[source_index])
+                + source_declarations
+                + source_resources
             )
 
 
@@ -443,6 +458,31 @@ def _read_external_declarations(
                 locked_file.sha256,
                 f"$.sources[{source.position}].files[{file_index}].sha256",
             )
+            carriers.append(carrier)
+        result.append(tuple(carriers))
+    return tuple(result)
+
+
+def _read_external_resources(
+    sources: tuple[_OpenExternalSource, ...],
+) -> tuple[tuple[AuthoritativeByteCarrier, ...], ...]:
+    """Read and validate external text resources without parsing them as rules."""
+    result: list[tuple[AuthoritativeByteCarrier, ...]] = []
+    for source in sources:
+        carriers: list[AuthoritativeByteCarrier] = []
+        for resource_index, (manifest_resource, locked_resource) in enumerate(
+            zip(source.manifest.resources, source.lock.resources, strict=True)
+        ):
+            location = f"$.sources[{source.position}].resources[{resource_index}]"
+            carrier = source.root.read_authoritative(locked_resource.path)
+            _require_digest(
+                carrier.sha256,
+                locked_resource.sha256,
+                location + ".sha256",
+            )
+            if carrier.path != manifest_resource.path:
+                _fail(location + ".path", "resource carrier path differs from manifest")
+            _require_strict_utf8_resource(carrier.data, location + ".path")
             carriers.append(carrier)
         result.append(tuple(carriers))
     return tuple(result)
@@ -536,7 +576,7 @@ def _issued_external_stage_state(
         _fail("$", "external acquisition stage is not issued here")
     _issued_external_facet_state(state.evidence)
     state.composite.require_authority()
-    _validate_final_declaration_evidence(state.evidence)
+    _validate_final_source_evidence(state.evidence)
     if identity_value_state(state.declarations) != state.declaration_state:
         _fail("$.declarations", "parsed declaration state changed")
     return state

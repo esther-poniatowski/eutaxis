@@ -11,7 +11,11 @@ from ._external_evidence import (
     _FinalEvidenceState,
 )
 from .acquisition_contract import AcquisitionLock, AcquisitionManifest
-from .byte_carriers import TrustedDirectory
+from .byte_carriers import (
+    TrustedDirectory,
+    VerifiedByteCarrier,
+    _verified_carrier_context,
+)
 from .composite_facets import CompositeFacetRegistry
 from .exceptions import AcquisitionContractError
 from .external_acquisition import (
@@ -42,6 +46,18 @@ class AcquisitionSourceCoordinate:
     sha256: str
 
 
+@dataclass(frozen=True)
+class AcquiredResource:
+    """Expose one exact authenticated external text resource."""
+
+    namespace: str
+    id: str
+    path: str
+    media_type: str
+    sha256: str
+    data: bytes
+
+
 class _ExternalAcquisitionResultState(NamedTuple):
     """Retain the exact private authority graph behind one public result."""
 
@@ -53,6 +69,9 @@ class _ExternalAcquisitionResultState(NamedTuple):
     source_coordinates: tuple[AcquisitionSourceCoordinate, ...]
     coordinate_state: object
     source_map: tuple[tuple[LoadedDeclarationSource, AcquisitionSourceCoordinate], ...]
+    resources: tuple[AcquiredResource, ...]
+    resource_state: object
+    resource_map: tuple[tuple[AcquiredResource, VerifiedByteCarrier], ...]
 
 
 class ExternalAcquisitionResult:
@@ -90,6 +109,11 @@ class ExternalAcquisitionResult:
     def source_coordinates(self) -> tuple[AcquisitionSourceCoordinate, ...]:
         """Return portable declaration coordinates in acquisition order."""
         return _issued_external_result_state(self).source_coordinates
+
+    @property
+    def resources(self) -> tuple[AcquiredResource, ...]:
+        """Return exact acquired resource bytes in source and manifest order."""
+        return _issued_external_result_state(self).resources
 
     def __copy__(self) -> NoReturn:
         raise TypeError("external acquisition results cannot be copied")
@@ -171,6 +195,7 @@ def _issue_external_result(
         stage_state,
         evidence_state,
     )
+    resources, resource_map = _derive_resources(evidence_state)
     result = object.__new__(ExternalAcquisitionResult)
     state = _ExternalAcquisitionResultState(
         stage=stage,
@@ -181,6 +206,9 @@ def _issue_external_result(
         source_coordinates=source_coordinates,
         coordinate_state=identity_value_state(source_coordinates),
         source_map=source_map,
+        resources=resources,
+        resource_state=identity_value_state(resources),
+        resource_map=resource_map,
     )
     try:
         _RESULT_AUTHORITIES.issue(result, state)
@@ -239,6 +267,7 @@ def _authenticate_external_result_state(
     _validate_registry_sources(registry_state.registry, stage_state.declarations)
     expected = _coordinate_inputs(stage_state, state.evidence_state)
     _validate_source_coordinates(state, expected)
+    _validate_resources(state)
     return state
 
 
@@ -360,6 +389,85 @@ def _validate_source_coordinates(
                 f"$.source-coordinates[{index}]",
                 "source coordinate differs from acquired evidence",
             )
+
+
+def _derive_resources(
+    evidence_state: _FinalEvidenceState,
+) -> tuple[
+    tuple[AcquiredResource, ...],
+    tuple[tuple[AcquiredResource, VerifiedByteCarrier], ...],
+]:
+    """Derive public values while retaining each private verified carrier."""
+    resources: list[AcquiredResource] = []
+    resource_map: list[tuple[AcquiredResource, VerifiedByteCarrier]] = []
+    for source in evidence_state.sources:
+        for locked, carrier in zip(
+            source.lock.resources,
+            source.resource_evidence,
+            strict=True,
+        ):
+            _root, _identity, snapshot = _verified_carrier_context(carrier)
+            resource = AcquiredResource(
+                source.manifest.namespace,
+                locked.id,
+                locked.path,
+                locked.media_type,
+                locked.sha256,
+                snapshot[1],
+            )
+            resources.append(resource)
+            resource_map.append((resource, carrier))
+    return tuple(resources), tuple(resource_map)
+
+
+def _validate_resources(state: _ExternalAcquisitionResultState) -> None:
+    """Match public resource values with exact retained contract carriers."""
+    if identity_value_state(state.resources) != state.resource_state:
+        _fail("$.resources", "acquired resource state changed")
+    expected_count = sum(
+        len(source.lock.resources) for source in state.evidence_state.sources
+    )
+    if (
+        len(state.resources) != expected_count
+        or len(state.resource_map) != expected_count
+    ):
+        _fail("$.resources", "acquired resource count changed")
+    offset = 0
+    for source in state.evidence_state.sources:
+        for resource_index, (manifest, locked, carrier) in enumerate(
+            zip(
+                source.manifest.resources,
+                source.lock.resources,
+                source.resource_evidence,
+                strict=True,
+            )
+        ):
+            resource = state.resources[offset]
+            mapped_resource, mapped_carrier = state.resource_map[offset]
+            root_path, root_identity, snapshot = _verified_carrier_context(carrier)
+            if (
+                type(resource) is not AcquiredResource
+                or mapped_resource is not resource
+                or mapped_carrier is not carrier
+                or root_path != source.root_path
+                or root_identity != source.root_identity
+                or resource.namespace != source.manifest.namespace
+                or resource.id != manifest.id
+                or resource.id != locked.id
+                or resource.path != manifest.path
+                or resource.path != locked.path
+                or resource.media_type != manifest.media_type
+                or resource.media_type != locked.media_type
+                or resource.sha256 != locked.sha256
+                or resource.data != snapshot[1]
+                or resource.path != snapshot[0]
+                or resource.sha256 != snapshot[2]
+            ):
+                _fail(
+                    f"$.sources[{source.position}].resources[{resource_index}]",
+                    "acquired resource differs from retained evidence",
+                )
+            offset += 1
 
 
 def _retire_external_result_tree(result: object) -> None:

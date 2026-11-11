@@ -39,6 +39,7 @@ from .acquisition_contract import (
     FacetExtensionManifest,
     GitLock,
     LockedFile,
+    LockedResource,
     validate_acquisition_contract,
 )
 from .acquisition_paths import AcquisitionPathError, normalized_relative_path
@@ -1086,9 +1087,20 @@ def _validate_source_contract(
         _fail("$.source", "source lock has the wrong exact type")
     if type(source_manifest.files) is not tuple or type(source_lock.files) is not tuple:
         _fail("$.source.files", "source files must be exact tuples")
+    if (
+        type(source_manifest.resources) is not tuple
+        or type(source_lock.resources) is not tuple
+    ):
+        _fail("$.source.resources", "source resources must be exact tuples")
     for index, locked_file in enumerate(source_lock.files):
         if type(locked_file) is not LockedFile:
             _fail(f"$.source.files[{index}]", "locked file has the wrong exact type")
+    for index, locked_resource in enumerate(source_lock.resources):
+        if type(locked_resource) is not LockedResource:
+            _fail(
+                f"$.source.resources[{index}]",
+                "locked resource has the wrong exact type",
+            )
     if (
         source_manifest.kind is not AcquisitionKind.GIT_SUBMODULE
         or source_lock.kind is not AcquisitionKind.GIT_SUBMODULE
@@ -1099,6 +1111,12 @@ def _validate_source_contract(
         source_manifest.namespace != source_lock.namespace
         or source_manifest.root != source_lock.git.registered_path
         or source_manifest.files != tuple(item.path for item in source_lock.files)
+        or tuple(
+            (item.id, item.path, item.media_type) for item in source_manifest.resources
+        )
+        != tuple(
+            (item.id, item.path, item.media_type) for item in source_lock.resources
+        )
     ):
         _fail("$.source", "source manifest and lock differ")
 
@@ -1139,8 +1157,10 @@ def _validate_source_contract(
         sorted(item.position for item in owned)
     ):
         _fail("$.facet-extensions", "extension positions are not ordered")
-    files = tuple((item.lock.path, item.lock.sha256) for item in owned) + tuple(
-        (item.path, item.sha256) for item in source_lock.files
+    files = (
+        tuple((item.lock.path, item.lock.sha256) for item in owned)
+        + tuple((item.path, item.sha256) for item in source_lock.files)
+        + tuple((item.path, item.sha256) for item in source_lock.resources)
     )
     return tuple(owned), files
 

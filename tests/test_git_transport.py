@@ -27,6 +27,8 @@ from eutaxis.declarations.acquisition_contract import (
     GitLock,
     InternalSourceLock,
     LockedFile,
+    LockedResource,
+    ResourceManifest,
     composite_facet_content_revision,
     facet_content_revision,
     source_content_revision,
@@ -146,11 +148,15 @@ def _acquire(
     workspace: Path,
     lock: GitLock,
     files: tuple[tuple[str, str], ...],
+    resources: tuple[tuple[str, str, str, str], ...] = (),
 ) -> _GitTransportEvidence:
-    manifest, acquisition_lock = _contracts(lock, files)
+    manifest, acquisition_lock = _contracts(lock, files, resources)
     for trusted in _trusted(workspace):
         with trusted.retain_directory(lock.registered_path) as source:
-            carriers = tuple(source.read_authoritative(path) for path, _digest in files)
+            paths = tuple(path for path, _digest in files) + tuple(
+                path for _identifier, path, _media_type, _digest in resources
+            )
+            carriers = tuple(source.read_authoritative(path) for path in paths)
             session = _open_git_submodule_session(
                 trusted, manifest, acquisition_lock, 0
             )
@@ -162,6 +168,7 @@ def _acquire(
 def _contracts(
     git: GitLock,
     files: tuple[tuple[str, str], ...],
+    resources: tuple[tuple[str, str, str, str], ...] = (),
 ) -> tuple[AcquisitionManifest, AcquisitionLock]:
     extensions = tuple(item for item in files if item[0].startswith("facets/"))
     declarations = tuple(item for item in files if item not in extensions)
@@ -171,6 +178,10 @@ def _contracts(
         AcquisitionKind.GIT_SUBMODULE,
         git.registered_path,
         tuple(path for path, _digest_value in declarations),
+        tuple(
+            ResourceManifest(identifier, path, media_type)
+            for identifier, path, media_type, _digest_value in resources
+        ),
     )
     extension_manifests = tuple(
         FacetExtensionManifest(
@@ -184,7 +195,15 @@ def _contracts(
     manifest = AcquisitionManifest(1, extension_manifests, (source_manifest,))
 
     locked_files = tuple(LockedFile(path, digest) for path, digest in declarations)
-    source_content = source_content_revision(namespace, locked_files)
+    locked_resources = tuple(
+        LockedResource(identifier, path, media_type, digest)
+        for identifier, path, media_type, digest in resources
+    )
+    source_content = source_content_revision(
+        namespace,
+        locked_files,
+        locked_resources,
+    )
     source_acquisition = _revision(
         {
             "schema-version": 1,
@@ -202,6 +221,7 @@ def _contracts(
         AcquisitionKind.GIT_SUBMODULE,
         namespace,
         git,
+        locked_resources,
     )
     extension_locks: list[FacetConstituentLock] = []
     for index, (path, digest) in enumerate(extensions):
@@ -337,6 +357,38 @@ def test_session_issues_verified_evidence_after_symbolic_head_and_cleanup(
     )
     assert len(state.worktree) == len(files)
     assert _fd_count() == baseline
+
+
+def test_session_binds_resource_carrier_to_commit_blob(tmp_path: Path) -> None:
+    workspace, old_lock, files = _build_workspace(tmp_path, "sha1")
+    source = workspace / old_lock.registered_path
+    resource_path = "scripts/publish-index.py"
+    resource_bytes = b"print('resource')\n"
+    (source / "scripts").mkdir()
+    (source / resource_path).write_bytes(resource_bytes)
+    _git(source, "add", resource_path)
+    _git(source, "commit", "-m", "add resource")
+    commit = _git(source, "rev-parse", "HEAD").decode().strip()
+    _git(workspace, "add", old_lock.registered_path)
+    lock = replace(
+        old_lock,
+        commit=commit,
+        parent_index_gitlink=commit,
+    )
+    resources = (
+        (
+            "library/publish-index",
+            resource_path,
+            "text/x-python; charset=utf-8",
+            _digest(resource_bytes),
+        ),
+    )
+
+    evidence = _acquire(workspace, lock, files, resources)
+
+    state = _issued_git_transport_state(evidence)
+    assert state.observation.blobs[-1].path == resource_path
+    assert state.worktree[-1].authoritative.data == resource_bytes
 
 
 def test_linked_parent_worktree_is_rejected_before_git_queries(

@@ -26,6 +26,7 @@ from eutaxis.declarations.acquisition_contract import (
     FacetRegistryLock,
     GitLock,
     LockedFile,
+    LockedResource,
     _lock_document,
     composite_facet_content_revision,
     facet_content_revision,
@@ -134,6 +135,7 @@ def _write_contract(
     git: GitLock | None = None,
     declaration_bytes: bytes | None = None,
     declaration_files: tuple[tuple[str, bytes], ...] | None = None,
+    resource_files: tuple[tuple[str, str, str, bytes], ...] = (),
     facet_bytes: bytes | None = None,
 ) -> tuple[str, str]:
     source_root = workspace if root == "." else workspace / root
@@ -155,6 +157,9 @@ def _write_contract(
     for declaration_path, source in declaration_files:
         (source_root / declaration_path).parent.mkdir(parents=True, exist_ok=True)
         (source_root / declaration_path).write_bytes(source)
+    for _resource_id, resource_path, _media_type, source in resource_files:
+        (source_root / resource_path).parent.mkdir(parents=True, exist_ok=True)
+        (source_root / resource_path).write_bytes(source)
 
     facet_sha = _digest(facet_bytes)
     facet_content = facet_content_revision(
@@ -189,7 +194,15 @@ def _write_contract(
         LockedFile(declaration_path, _digest(source))
         for declaration_path, source in declaration_files
     )
-    source_content = source_content_revision(namespace, locked_files)
+    locked_resources = tuple(
+        LockedResource(resource_id, path, media_type, _digest(source))
+        for resource_id, path, media_type, source in resource_files
+    )
+    source_content = source_content_revision(
+        namespace,
+        locked_files,
+        locked_resources,
+    )
     source_payload: dict[str, object] = {
         "schema-version": 1,
         "namespace": namespace,
@@ -207,6 +220,7 @@ def _write_contract(
         kind,
         namespace,
         git,
+        locked_resources,
     )
     packaged = _valid_lock(data_path())
     lock = AcquisitionLock(
@@ -239,6 +253,20 @@ def _write_contract(
                 "kind": kind.value,
                 "root": root,
                 "files": [path for path, _source in declaration_files],
+                **(
+                    {
+                        "resources": [
+                            {
+                                "id": resource_id,
+                                "path": path,
+                                "media-type": media_type,
+                            }
+                            for resource_id, path, media_type, _source in resource_files
+                        ]
+                    }
+                    if resource_files
+                    else {}
+                ),
             }
         ],
     }
@@ -728,6 +756,79 @@ def test_manifest_mutation_during_later_reads_fails_final_verification(
         _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
 
 
+def test_resource_digest_drift_fails_before_publication(tmp_path: Path) -> None:
+    path = "declarations/resources/publish-index.py"
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        resource_files=(
+            (
+                "oikos/publish-index",
+                path,
+                "text/x-python; charset=utf-8",
+                b"print('locked')\n",
+            ),
+        ),
+    )
+    (tmp_path / path).write_bytes(b"print('drifted')\n")
+
+    with pytest.raises(AcquisitionContractError, match="digest differs") as raised:
+        _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
+
+    assert raised.value.location == "$.sources[0].resources[0].sha256"
+
+
+def test_resource_mutation_after_read_fails_final_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = "declarations/resources/publish-index.py"
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        resource_files=(
+            (
+                "oikos/publish-index",
+                path,
+                "text/x-python; charset=utf-8",
+                b"print('locked')\n",
+            ),
+        ),
+    )
+    original_read = RetainedDirectory.read_authoritative
+    mutated = False
+
+    def mutating_read(self: RetainedDirectory, requested: str):
+        nonlocal mutated
+        carrier = original_read(self, requested)
+        if requested == path and not mutated:
+            mutated = True
+            (tmp_path / path).write_bytes(b"print('changed after read')\n")
+        return carrier
+
+    monkeypatch.setattr(RetainedDirectory, "read_authoritative", mutating_read)
+
+    with pytest.raises(ByteCarrierError, match="verification"):
+        _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
+
+
+def test_resource_must_be_strict_utf8(tmp_path: Path) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        resource_files=(
+            (
+                "oikos/publish-index",
+                "declarations/resources/publish-index.py",
+                "text/x-python; charset=utf-8",
+                b"\xff",
+            ),
+        ),
+    )
+
+    with pytest.raises(AcquisitionContractError, match="not strict UTF-8") as raised:
+        _acquire_external_stage_from_path(str(tmp_path), manifest_path, lock_path)
+
+    assert raised.value.location == "$.sources[0].resources[0].path"
+
+
 def test_replacing_vendored_root_during_reads_fails_final_verification(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -958,7 +1059,7 @@ def test_git_carrier_splicing_fails_and_closes_every_descriptor(
         git=git_locks["oikos"],
     )
 
-    def splice(sessions, extensions, declarations):
+    def splice(sessions, extensions, declarations, resources):
         sessions[0].bind_worktree_carriers(
             (declarations[0][0], extensions[0].authoritative)
         )

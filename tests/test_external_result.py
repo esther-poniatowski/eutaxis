@@ -15,6 +15,7 @@ import eutaxis.declarations as declarations_api
 import eutaxis.declarations.composite_facets as composite_module
 import eutaxis.declarations.external_result as result_module
 from eutaxis.declarations import (
+    AcquiredResource,
     AcquisitionKind,
     AcquisitionSourceCoordinate,
     ExternalAcquisitionResult,
@@ -94,6 +95,77 @@ def test_public_result_retains_exact_contract_and_portable_coordinates(
     assert tuple(source for source, _coordinate in state.source_map) == (
         state.stage_state.declarations
     )
+    assert result.resources == ()
+
+
+@pytest.mark.parametrize(
+    ("kind", "root"),
+    (
+        (AcquisitionKind.WORKSPACE, "."),
+        (AcquisitionKind.VENDORED, "vendor/oikos"),
+    ),
+)
+def test_result_retains_exact_resource_bytes_without_reopening_source(
+    tmp_path: Path,
+    kind: AcquisitionKind,
+    root: str,
+) -> None:
+    source = b"print('retained')\n"
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        kind=kind,
+        root=root,
+        resource_files=(
+            (
+                "oikos/publish-index",
+                "declarations/resources/publish-index.py",
+                "text/x-python; charset=utf-8",
+                source,
+            ),
+        ),
+    )
+    result = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    resource_path = (
+        tmp_path
+        / ("" if root == "." else root)
+        / "declarations/resources/publish-index.py"
+    )
+    resource_path.write_bytes(b"print('changed after acquisition')\n")
+
+    assert result.resources == (
+        AcquiredResource(
+            "oikos",
+            "oikos/publish-index",
+            "declarations/resources/publish-index.py",
+            "text/x-python; charset=utf-8",
+            result.lock.sources[0].resources[0].sha256,
+            source,
+        ),
+    )
+    state = _issued_external_result_state(result)
+    assert state.resource_map[0][0] is result.resources[0]
+    assert state.resource_map[0][1].authoritative.data == source
+
+
+def test_result_rejects_acquired_resource_mutation(tmp_path: Path) -> None:
+    paths = _write_contract(
+        tmp_path,
+        resource_files=(
+            (
+                "oikos/publish-index",
+                "declarations/resources/publish-index.py",
+                "text/x-python; charset=utf-8",
+                b"print('retained')\n",
+            ),
+        ),
+    )
+    result = acquire_external_declarations_from_path(str(tmp_path), *paths)
+    object.__setattr__(result.resources[0], "path", "forged.py")
+
+    with pytest.raises(AcquisitionContractError, match="resource state changed"):
+        _issued_external_result_state(result)
 
 
 def test_capability_entrypoint_leaves_the_caller_workspace_open(
@@ -231,6 +303,7 @@ def test_portable_coordinates_are_transport_independent(tmp_path: Path) -> None:
 
 def test_public_boundary_exports_only_the_result_surface() -> None:
     for name in (
+        "AcquiredResource",
         "AcquisitionSourceCoordinate",
         "ExternalAcquisitionResult",
         "acquire_external_declarations",

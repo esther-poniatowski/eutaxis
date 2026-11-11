@@ -82,6 +82,22 @@ class ResourceManifest:
     media_type: str
 
 
+def _require_strict_utf8_resource(data: bytes, location: str) -> None:
+    """Require exact UTF-8 resource bytes without applying normalization."""
+    try:
+        text = data.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise AcquisitionContractError(
+            location,
+            f"resource is not strict UTF-8: {exc}",
+        ) from exc
+    if text.encode("utf-8", errors="strict") != data:
+        raise AcquisitionContractError(
+            location,
+            "resource UTF-8 round-trip changed bytes",
+        )
+
+
 @dataclass(frozen=True)
 class AcquisitionManifest:
     """Retain the closed version 1 acquisition manifest."""

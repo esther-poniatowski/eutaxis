@@ -68,6 +68,7 @@ from .packaged_source import (
     acquire_packaged_internal_source,
 )
 from .external_result import (
+    AcquiredResource,
     AcquisitionSourceCoordinate,
     ExternalAcquisitionResult,
     acquire_external_declarations,
@@ -419,6 +420,7 @@ __all__ = [
     "AcquisitionManifest",
     "acquisition_lock_json_bytes",
     "AcquisitionSourceCoordinate",
+    "AcquiredResource",
     "AuthoritativeByteCarrier",
     "ByteCarrierError",
     "DirectoryIdentity",

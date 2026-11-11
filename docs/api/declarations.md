@@ -2,7 +2,7 @@
 
 # Declarations
 
-External declaration acquisition: verify one external corpus and expose its portable source coordinates through an authenticated result.
+External declaration acquisition: verifies one external corpus and exposes its portable source coordinates and exact support resources through an authenticated result.
 
 <a id="module-eutaxis.declarations.external_result"></a>
 
@@ -36,6 +36,46 @@ Identify one acquired declaration file without transport-specific paths.
 <a id="eutaxis.declarations.external_result.AcquisitionSourceCoordinate.sha256"></a>
 
 #### sha256 *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.declarations.external_result.AcquiredResource"></a>
+
+### *class* eutaxis.declarations.external_result.AcquiredResource(namespace, id, path, media_type, sha256, data)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Expose one exact authenticated external text resource.
+
+* **Parameters:**
+  * **namespace** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **id** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **media_type** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **sha256** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **data** ([*bytes*](https://docs.python.org/3/builtins/stdtypes.html#bytes))
+
+<a id="eutaxis.declarations.external_result.AcquiredResource.namespace"></a>
+
+#### namespace *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.declarations.external_result.AcquiredResource.id"></a>
+
+#### id *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.declarations.external_result.AcquiredResource.path"></a>
+
+#### path *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.declarations.external_result.AcquiredResource.media_type"></a>
+
+#### media_type *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.declarations.external_result.AcquiredResource.sha256"></a>
+
+#### sha256 *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.declarations.external_result.AcquiredResource.data"></a>
+
+#### data *: [bytes](https://docs.python.org/3/builtins/stdtypes.html#bytes)*
 
 <a id="eutaxis.declarations.external_result.ExternalAcquisitionResult"></a>
 
@@ -75,6 +115,12 @@ Return the issued composite facet registry used for parsing.
 #### *property* source_coordinates *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[AcquisitionSourceCoordinate](#eutaxis.declarations.external_result.AcquisitionSourceCoordinate), ...]*
 
 Return portable declaration coordinates in acquisition order.
+
+<a id="eutaxis.declarations.external_result.ExternalAcquisitionResult.resources"></a>
+
+#### *property* resources *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[AcquiredResource](#eutaxis.declarations.external_result.AcquiredResource), ...]*
+
+Return exact acquired resource bytes in source and manifest order.
 
 <a id="eutaxis.declarations.external_result.acquire_external_declarations"></a>
 

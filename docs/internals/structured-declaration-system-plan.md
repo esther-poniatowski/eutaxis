@@ -292,12 +292,12 @@ This phase gives each host the smallest artifact that preserves the complete res
 
 - [x] Render authenticated cumulative Markdown from live catalog records, with complete effective rule and procedure contracts and reviewed golden bytes.
 - [ ] Render the first compact structured procedure Skill under the [separate-directory contract](../adr/structured-procedure-skill-projection.md):
-  - acquire locked UTF-8 support resources separately from declaration YAML;
-  - derive and authenticate the operation-owned resource closure from the resolved procedure and live catalog in the structured-Skill planner;
-  - emit a bounded `SKILL.md`, the complete contract reference and the authenticated resource closure through the existing multi-file artifact model;
-  - reject missing methods, unresolved resources, unsafe or colliding paths, stale authority and budget overflow;
-  - preserve cumulative Markdown as a single-file projection;
-  - activate the Oikos batch procedure only after cross-agent golden, rollback and adversarial gates pass.
+  - [x] Acquire locked UTF-8 support resources separately from declaration YAML and retain their verified carriers in the issued external result.
+  - [ ] Derive and authenticate the operation-owned resource closure from the resolved procedure and live catalog in the structured-Skill planner.
+  - [ ] Emit a bounded `SKILL.md`, the complete contract reference and the authenticated resource closure through the existing multi-file artifact model.
+  - [ ] Reject missing methods, unresolved resources, unsafe or colliding paths, stale authority and budget overflow.
+  - [x] Preserve cumulative Markdown as a single-file projection.
+  - [ ] Activate the Oikos batch procedure only after cross-agent golden, rollback and adversarial gates pass.
 - [ ] Generalize compact Skill entrypoints from the first procedure consumer to other catalog records only after a second use case exposes the required variation.
 - [ ] Emit normalized YAML or JSON query packets with context, trace, registry versions, hashes, and source revisions.
 - [ ] Bundle rendered fallbacks for Skills whose deployment cannot guarantee catalog access.

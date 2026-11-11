@@ -13,6 +13,7 @@ from .acquisition_contract import (
     ExternalSourceManifest,
     FacetConstituentLock,
     FacetExtensionManifest,
+    _require_strict_utf8_resource,
     validate_acquisition_contract,
 )
 from .byte_carriers import (
@@ -59,7 +60,7 @@ class _FacetExtensionRead(NamedTuple):
 
 
 class _FinalExternalSource(NamedTuple):
-    """Retain verified declarations for one external source."""
+    """Retain verified declarations and resources for one external source."""
 
     position: int
     manifest: ExternalSourceManifest
@@ -67,6 +68,7 @@ class _FinalExternalSource(NamedTuple):
     root_path: str
     root_identity: DirectoryIdentity
     evidence: tuple[VerifiedByteCarrier, ...]
+    resource_evidence: tuple[VerifiedByteCarrier, ...]
     declarations: tuple[LoadedDeclarationSource, ...]
     git_evidence: _GitTransportEvidence | None
 
@@ -190,6 +192,7 @@ def _finalize_evidence(
     extensions: tuple[_FacetExtensionRead, ...],
     extension_evidence: tuple[VerifiedByteCarrier, ...],
     declaration_evidence: tuple[tuple[VerifiedByteCarrier, ...], ...],
+    resource_evidence: tuple[tuple[VerifiedByteCarrier, ...], ...],
     external_declarations: tuple[LoadedDeclarationSource, ...],
     git_evidence: tuple[_GitTransportEvidence | None, ...],
 ) -> None:
@@ -199,8 +202,8 @@ def _finalize_evidence(
         _fail("$", "external acquisition evidence is not provisional")
     declaration_offset = 0
     final_sources: list[_FinalExternalSource] = []
-    for source, verified, git_proof in zip(
-        sources, declaration_evidence, git_evidence, strict=True
+    for source, verified, resources, git_proof in zip(
+        sources, declaration_evidence, resource_evidence, git_evidence, strict=True
     ):
         count = len(verified)
         loaded = external_declarations[declaration_offset : declaration_offset + count]
@@ -213,6 +216,7 @@ def _finalize_evidence(
                 source.root_path,
                 source.root_identity,
                 verified,
+                resources,
                 loaded,
                 git_proof,
             )
@@ -534,10 +538,10 @@ def _validate_contract_state(
     validate_acquisition_contract(manifest, lock)
 
 
-def _validate_final_declaration_evidence(
+def _validate_final_source_evidence(
     evidence: _ExternalAcquisitionEvidence,
 ) -> None:
-    """Authenticate every declaration carrier retained by final evidence."""
+    """Authenticate every declaration and resource carrier in final evidence."""
     state = _EVIDENCE_AUTHORITIES.state(evidence)
     if type(state) is not _FinalEvidenceState:
         _fail("$", "external acquisition evidence is not final")
@@ -589,6 +593,27 @@ def _validate_final_declaration_evidence(
                     f"$.sources[{source.position}].files[{file_index}]",
                     "parsed declaration digest differs from lock",
                 )
+        if len(source.resource_evidence) != len(source.lock.resources):
+            _fail(f"$.sources[{source.position}].resources", "evidence count differs")
+        for resource_index, (carrier, manifest_resource, locked_resource) in enumerate(
+            zip(
+                source.resource_evidence,
+                source.manifest.resources,
+                source.lock.resources,
+                strict=True,
+            )
+        ):
+            location = f"$.sources[{source.position}].resources[{resource_index}]"
+            root_path, root_identity, snapshot = _verified_carrier_context(carrier)
+            if root_path != source.root_path or root_identity != source.root_identity:
+                _fail(location, "resource carrier belongs to another source root")
+            if (
+                snapshot[0] != manifest_resource.path
+                or snapshot[0] != locked_resource.path
+                or snapshot[2] != locked_resource.sha256
+            ):
+                _fail(location, "resource evidence differs from the contract")
+            _require_strict_utf8_resource(snapshot[1], location + ".path")
 
 
 def _fail(location: str, message: str) -> NoReturn:

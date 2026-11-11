@@ -17,6 +17,7 @@ from .acquisition_contract import (
     LockedFile,
     LockedResource,
     ResourceManifest,
+    _require_strict_utf8_resource,
     _external_source_acquisition_revision,
     _facet_extension_acquisition_revision,
     _require_manifest_state,
@@ -432,19 +433,9 @@ def _validate_resource_bytes(
     location: str,
 ) -> None:
     """Require one acquired Python resource to round-trip as strict UTF-8."""
-    _require_strict_utf8(carrier.data, location + ".path")
+    _require_strict_utf8_resource(carrier.data, location + ".path")
     if carrier.path != manifest.path:
         _fail(location + ".path", "resource carrier path differs from manifest")
-
-
-def _require_strict_utf8(data: bytes, location: str) -> None:
-    """Require exact UTF-8 bytes without applying text normalization."""
-    try:
-        text = data.decode("utf-8", errors="strict")
-    except UnicodeDecodeError as exc:
-        _fail(location, f"resource is not strict UTF-8: {exc}")
-    if text.encode("utf-8", errors="strict") != data:
-        _fail(location, "resource UTF-8 round-trip changed bytes")
 
 
 def _extension_registry(
@@ -590,7 +581,7 @@ def _validate_verified_resource_bytes(
     data: bytes,
     location: str,
 ) -> None:
-    _require_strict_utf8(data, location + ".path")
+    _require_strict_utf8_resource(data, location + ".path")
 
 
 def _authenticate_extension(
