@@ -3,7 +3,8 @@
 The sub-app prints one rule, or one part of it, and lists the rules of a
 source. The source is chosen by the options:
 
-- ``-c <config>`` reads the authored modules that the configuration declares;
+- ``-c <config>`` or ``-r <root>`` reads the authored modules that the
+  settings file declares;
 - ``--skills-dir <dir>`` reads the eutaxis-owned skills of a directory;
 - with neither option, the user-scope skills directory of ``--agent``
   (default ``claude``) is read, so that an agent can query the rules it was
@@ -17,8 +18,9 @@ from typing import NoReturn
 
 import typer
 
+from .._cli_options import command_path, command_root, root_option
 from ..commands import CommandError, get_adapter
-from ..instructions import InstructionError, load_config
+from ..instructions import InstructionError, find_config, load_config
 from ..instructions.loading_units import expand_loading_unit
 from .catalog import RuleCatalog, resolve_rule, select_parts
 from .exceptions import RuleQueryError, RuleSourceError
@@ -36,7 +38,11 @@ _CONFIG_OPTION = typer.Option(
     None,
     "--config",
     "-c",
-    help="Instruction-assembly configuration whose modules are queried.",
+    help="Settings file whose modules are queried, relative to the current folder.",
+)
+_ROOT_OPTION = root_option(
+    "Folder below which the settings file is looked up and against which its "
+    "paths resolve; selects the authored modules."
 )
 _SKILLS_DIR_OPTION = typer.Option(
     None,
@@ -48,8 +54,8 @@ _AGENT_OPTION = typer.Option(
     "--agent",
     "-a",
     help=(
-        "Adapter whose user-scope skills directory is queried when neither "
-        f"--config nor --skills-dir is given. Default: {DEFAULT_AGENT}."
+        "Adapter whose user-scope skills directory is queried when none of "
+        f"--config, --root and --skills-dir is given. Default: {DEFAULT_AGENT}."
     ),
 )
 _MODULE_OPTION = typer.Option(
@@ -76,12 +82,13 @@ def cli_show(
     ),
     module: str | None = _MODULE_OPTION,
     config: str | None = _CONFIG_OPTION,
+    root: str | None = _ROOT_OPTION,
     skills_dir: str | None = _SKILLS_DIR_OPTION,
     agent: str | None = _AGENT_OPTION,
 ) -> None:
     """Print one rule, or one part of it, with its location."""
     try:
-        catalog = _catalog(config, skills_dir, agent)
+        catalog = _catalog(config, root, skills_dir, agent)
         located = resolve_rule(catalog, label, module=module)
         rule = located.rule
         trail = " > ".join((rule.module, *rule.heading_path, rule.label))
@@ -108,6 +115,7 @@ def cli_list(
     module: str | None = _MODULE_OPTION,
     loading_unit: str | None = _LOADING_UNIT_OPTION,
     config: str | None = _CONFIG_OPTION,
+    root: str | None = _ROOT_OPTION,
     skills_dir: str | None = _SKILLS_DIR_OPTION,
     agent: str | None = _AGENT_OPTION,
 ) -> None:
@@ -121,10 +129,11 @@ def cli_list(
             loading_unit,
             module=module,
             config=config,
+            root=root,
             skills_dir=skills_dir,
             agent=agent,
         )
-        catalog = _catalog(config, skills_dir, agent)
+        catalog = _catalog(config, root, skills_dir, agent)
         if module is not None and module not in catalog.modules:
             raise RuleQueryError(
                 f"Unknown module {module!r} in {catalog.origin}. "
@@ -161,18 +170,25 @@ def cli_list(
 
 
 def _catalog(
-    config: str | None, skills_dir: str | None, agent: str | None
+    config: str | None,
+    root: str | None,
+    skills_dir: str | None,
+    agent: str | None,
 ) -> RuleCatalog:
     """Build the catalog of the source that the options select."""
-    if config is not None and (skills_dir is not None or agent is not None):
+    if (config is not None or root is not None) and (
+        skills_dir is not None or agent is not None
+    ):
         raise RuleSourceError(
-            "--config reads the authored modules; it cannot be combined with "
-            "--skills-dir or --agent, which select deployed skills."
+            "--config and --root read authored modules; they cannot be combined "
+            "with --skills-dir or --agent, which select deployed skills."
         )
     if skills_dir is not None and agent is not None:
         raise RuleSourceError("--skills-dir names the directory to read; drop --agent.")
-    if config is not None:
-        return catalog_from_config(Path(config).expanduser().resolve())
+    if config is not None or root is not None:
+        base = command_root(root)
+        config_path = find_config(command_path(config), base)
+        return catalog_from_config(config_path, root=base)
     if skills_dir is not None:
         return catalog_from_skills_dir(Path(skills_dir).expanduser().resolve())
     return catalog_from_skills_dir(_user_skills_dir(agent or DEFAULT_AGENT))
@@ -183,20 +199,23 @@ def _loading_unit_modules(
     *,
     module: str | None,
     config: str | None,
+    root: str | None,
     skills_dir: str | None,
     agent: str | None,
 ) -> frozenset[str] | None:
     """Resolve one loading unit to the authored module names in its config."""
     if loading_unit is None:
         return None
-    if config is None:
-        raise RuleSourceError("--loading-unit requires --config.")
+    if config is None and root is None:
+        raise RuleSourceError("--loading-unit requires --config or --root.")
     if module is not None or skills_dir is not None or agent is not None:
         raise RuleSourceError(
             "--loading-unit cannot be combined with --module, --skills-dir, "
             "or --agent."
         )
-    loaded = load_config(Path(config).expanduser().resolve())
+    base = command_root(root)
+    config_path = find_config(command_path(config), base)
+    loaded = load_config(config_path, root=base)
     unit = next(
         (
             candidate

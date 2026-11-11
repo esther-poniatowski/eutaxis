@@ -12,4 +12,4 @@ def exit_with_error(exc: BaseException) -> NoReturn:
     typer.echo(f"Error: {exc}", err=True)
     for note in getattr(exc, "__notes__", ()):
         typer.echo(note, err=True)
-    raise typer.Exit(code=getattr(exc, "exit_code", 1)) from exc
+    raise typer.Exit(code=getattr(exc, "exit_code", 3)) from exc

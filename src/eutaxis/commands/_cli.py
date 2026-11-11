@@ -10,7 +10,7 @@ from pathlib import Path
 
 import typer
 
-from .._cli_options import explicit_root, former_root_option, root_option
+from .._cli_options import command_root, reports_errors, root_option
 from . import (
     CommandError,
     CommandNotFoundError,
@@ -42,12 +42,12 @@ commands_app = typer.Typer(
 
 
 @commands_app.command("list")
+@reports_errors
 def cli_list(
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
 ) -> None:
     """List all discovered command sources and their targets."""
-    project_root = explicit_root(root, former_project, "--project")
+    project_root = command_root(root)
     sources = _load(project_root)
     if not sources:
         typer.echo("No commands found.")
@@ -61,20 +61,20 @@ def cli_list(
 
 
 @commands_app.command("show")
+@reports_errors
 def cli_show(
     name: str,
     agent: str = typer.Option("claude", "--agent", "-a", help="Adapter to render for."),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
 ) -> None:
     """Render and print one skill artifact for one adapter."""
-    project_root = explicit_root(root, former_project, "--project")
+    project_root = command_root(root)
     source = _require_source(name, project_root)
     adapter = get_adapter(agent)
     rendered = render_command(
         source,
         adapter,
-        project_root=_resolve_project(project_root),
+        project_root=project_root,
         home=Path.home(),
     )
     for artifact_file in rendered.files:
@@ -83,6 +83,7 @@ def cli_show(
 
 
 @commands_app.command("install")
+@reports_errors
 def cli_install(
     name: str,
     scope: str = typer.Option(
@@ -92,19 +93,18 @@ def cli_install(
     ),
     agent: str = typer.Option("all", "--agent", "-a", help="Adapter name or 'all'."),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
     force: bool = typer.Option(
         False, "--force", help="Overwrite non-eutaxis directories at the target."
     ),
 ) -> None:
     """Install one skill artifact into the selected adapters."""
-    project_root = explicit_root(root, former_project, "--project")
+    project_root = command_root(root)
     try:
         source = _require_source(name, project_root)
         chosen_scope = scope or source.scope_default
         validate_scope(chosen_scope)
         registry = Registry(default_state_dir())
-        project = _resolve_project(project_root)
+        project = project_root
         adapters = _select_adapters(source, agent, scope=chosen_scope)
     except CommandError as exc:
         exit_with_error(exc)
@@ -143,22 +143,22 @@ def cli_install(
 
 
 @commands_app.command("uninstall")
+@reports_errors
 def cli_uninstall(
     name: str,
     scope: str = typer.Option("user", "--scope", help="user|project"),
     agent: str = typer.Option("all", "--agent", "-a"),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
     force: bool = typer.Option(
         False, "--force", help="Delete non-eutaxis directories at the target."
     ),
 ) -> None:
     """Remove one installed skill artifact from the selected adapters."""
-    project_root = explicit_root(root, former_project, "--project")
+    project_root = command_root(root)
     try:
         validate_scope(scope)
         registry = Registry(default_state_dir())
-        project = _resolve_project(project_root)
+        project = project_root
         source = _maybe_source(name, project_root)
         adapter_names = (
             [adapter.name for adapter in all_adapters()] if agent == "all" else [agent]
@@ -204,15 +204,15 @@ def cli_uninstall(
 
 
 @commands_app.command("diff")
+@reports_errors
 def cli_diff(
     name: str | None = typer.Argument(None, help="Command name (omit for all)."),
     scope: str = typer.Option("user", "--scope"),
     agent: str = typer.Option("all", "--agent", "-a"),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
 ) -> None:
     """Show drift between rendered output and installed artifacts."""
-    project_root = explicit_root(root, former_project, "--project")
+    project_root = command_root(root)
     try:
         validate_scope(scope)
         sources = (
@@ -220,7 +220,7 @@ def cli_diff(
             if name is not None
             else _load(project_root)
         )
-        project = _resolve_project(project_root)
+        project = project_root
     except CommandError as exc:
         exit_with_error(exc)
 
@@ -265,25 +265,19 @@ def _effective_adapter_names(source: CommandSource, registered: list[str]) -> li
     return [name for name in base if name in registered and name not in excluded]
 
 
-def _load(project_root: str | None) -> list:
-    return load_sources(
-        project_root=_resolve_project(project_root) if project_root else None
-    )
+def _load(project_root: Path) -> list:
+    return load_sources(project_root=project_root)
 
 
-def _require_source(name: str, project_root: str | None) -> CommandSource:
+def _require_source(name: str, project_root: Path) -> CommandSource:
     source = _maybe_source(name, project_root)
     if source is None:
         raise CommandNotFoundError(f"Unknown command: {name!r}")
     return source
 
 
-def _maybe_source(name: str, project_root: str | None) -> CommandSource | None:
+def _maybe_source(name: str, project_root: Path) -> CommandSource | None:
     for source in _load(project_root):
         if source.name == name:
             return source
     return None
-
-
-def _resolve_project(project_root: str | None) -> Path:
-    return Path(project_root).expanduser().resolve() if project_root else Path.cwd()

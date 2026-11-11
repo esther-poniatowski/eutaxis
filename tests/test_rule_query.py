@@ -198,8 +198,8 @@ def test_loading_unit_filter_requires_config(workspace) -> None:
         "--loading-unit",
         "style-route",
     )
-    assert result.exit_code == 1
-    assert "--loading-unit requires --config" in result.stderr
+    assert result.exit_code == 2
+    assert "--loading-unit requires --config or --root" in result.stderr
 
 
 @pytest.mark.parametrize("disclosure", ["", "disclosure: progressive\n"])

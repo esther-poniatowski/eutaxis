@@ -80,11 +80,10 @@ def _workspace(tmp_path: Path, *, publish: bool = True) -> Path:
             **({"publish_to": "workflow"} if publish else {}),
         },
     ]
-    config = tmp_path / "agent-instructions.yaml"
+    config = tmp_path / "eutaxis.yml"
     config.write_text(
         yaml.safe_dump(
             {
-                "root": str(tmp_path),
                 "common_sources": [],
                 "task_modules": [
                     {
@@ -353,7 +352,7 @@ def test_project_scope_routes_resolve_from_an_unrelated_working_directory(
         adapter,
         "--scope",
         "project",
-        "--project",
+        "--target-project",
         str(project),
         "--apply",
     )
@@ -495,7 +494,7 @@ def test_direct_owner_install_uses_one_scope_for_the_complete_route(
         str(config),
         "--agent",
         "claude",
-        "--project",
+        "--target-project",
         str(project),
     )
 
@@ -558,7 +557,7 @@ def test_shared_member_refreshes_each_owner_in_that_owners_default_scope(
         str(config),
         "--agent",
         "codex",
-        "--project",
+        "--target-project",
         str(project),
     )
 
@@ -587,7 +586,7 @@ def test_nested_owner_scopes_propagate_to_every_manifest_target(
         str(config),
         "--agent",
         "codex",
-        "--project",
+        "--target-project",
         str(project),
     )
 
@@ -617,7 +616,7 @@ def test_installed_manifest_blocks_uninstall_after_config_evolves(
 
     result = _run(home, "uninstall", "style", "-c", str(config), "--agent", "claude")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "installed published route owner(s) require it" in result.output
     assert (home / ".claude" / "skills" / "style" / "SKILL.md").is_file()
 
@@ -631,7 +630,7 @@ def test_direct_uninstall_refuses_to_leave_a_dangling_route(tmp_path: Path) -> N
 
     result = _run(home, "uninstall", "style", "-c", str(config), "--agent", "codex")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "installed published route owner(s) require it" in result.output
     assert (home / ".agents" / "skills" / "style" / "SKILL.md").is_file()
 
@@ -671,7 +670,7 @@ def test_sync_rolls_back_the_complete_route_after_a_late_write_failure(
 
     result = _run(home, "sync", "-c", str(config), "--agent", "claude", "--apply")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "injected late failure" in result.output
     assert (skills / "workflow" / "SKILL.md").read_text(
         encoding="utf-8"
@@ -725,7 +724,7 @@ def test_sync_manifest_failure_rolls_back_artifacts_registry_and_manifest(
     if failure_type is KeyboardInterrupt:
         assert result.exit_code != 0
     else:
-        assert result.exit_code == 1
+        assert result.exit_code == 3
         assert "injected manifest failure" in result.output
 
     assert (skills / "workflow" / "SKILL.md").read_bytes() == workflow_before
@@ -767,7 +766,7 @@ def test_direct_install_rolls_back_the_complete_route_after_a_late_failure(
 
     result = _run(home, "install", "style", "-c", str(config), "--agent", "codex")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "injected direct-install failure" in result.output
     assert not re.search(r"^\[", result.output, flags=re.MULTILINE)
     assert (skills / "workflow" / "SKILL.md").read_text(
@@ -796,7 +795,7 @@ def test_direct_install_reports_a_concise_filesystem_failure_after_rollback(
 
     result = _run(home, "install", "all", "-c", str(config), "--agent", "codex")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 3
     assert "Error: injected filesystem failure" in result.output
     assert "Traceback" not in result.output
     assert not re.search(r"^\[", result.output, flags=re.MULTILINE)
@@ -848,7 +847,7 @@ def test_direct_mutators_reject_invalid_scope_without_writes(
         for path in home.rglob("*")
         if path.is_file()
     }
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert (
         "Error: Invalid scope 'invalid'; expected 'user' or 'project'." in result.output
     )
@@ -890,7 +889,7 @@ def test_direct_install_reports_rollback_cleanup_failure_without_hiding_primary(
 
     result = _run(home, "install", "all", "-c", str(config), "--agent", "codex")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert result.output.startswith("Error: primary install failure\n")
     assert "Rollback cleanup also failed:" in result.output
     assert "injected restoration failure" in result.output
@@ -1026,7 +1025,7 @@ def test_publication_fails_before_writing_when_a_member_excludes_the_adapter(
         "--apply",
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "does not target adapter 'codex'" in result.output
     assert not (home / ".agents").exists()
 
@@ -1104,7 +1103,7 @@ def test_generated_route_rejects_an_authored_file_collision(tmp_path: Path) -> N
         "--apply",
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "collide with authored files" in result.output
     assert not (home / ".agents").exists()
 
@@ -1136,7 +1135,7 @@ def test_generated_route_rejects_a_case_variant_authored_collision(
         "--apply",
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "collide with authored files" in result.output
     assert "Section-Route.md" in result.output
     assert not (home / ".agents").exists()
@@ -1234,7 +1233,7 @@ def test_shared_batch_reports_every_owner_and_gates_the_largest_variant(
         str(config),
         "--agent",
         "codex",
-        "--project",
+        "--target-project",
         str(project),
     )
     assert installed.exit_code == 0, installed.output
@@ -1248,7 +1247,7 @@ def test_shared_batch_reports_every_owner_and_gates_the_largest_variant(
         str(config),
         "--agent",
         "codex",
-        "--project",
+        "--target-project",
         str(project),
     )
     listed = _run(
@@ -1259,7 +1258,7 @@ def test_shared_batch_reports_every_owner_and_gates_the_largest_variant(
         str(config),
         "--agent",
         "codex",
-        "--project",
+        "--target-project",
         str(project),
     )
 
@@ -1464,6 +1463,6 @@ def test_unknown_skill_is_a_concise_error(tmp_path: Path) -> None:
         "codex",
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "Error: Unknown skill: 'missing'" in result.output
     assert "Traceback" not in result.output

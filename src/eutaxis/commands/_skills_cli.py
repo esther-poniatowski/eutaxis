@@ -16,10 +16,11 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from pathlib import Path
+from typing import Any
 
 import typer
 
-from .._cli_options import explicit_root, former_root_option, root_option
+from .._cli_options import command_path, command_root, reports_errors, root_option
 from . import (
     CommandError,
     CommandNotFoundError,
@@ -52,14 +53,24 @@ from ..instructions import InstructionConfig, InstructionError, load_config
 from ..instructions.loading_units import expand_loading_unit
 
 _CONFIG_HELP = (
-    "Instruction-assembly settings file. Default: "
-    "config/tools/agent-instructions.yaml below the root, then "
-    "agent-instructions.yaml at the root."
+    "Settings file, relative to the current folder. Default: "
+    "config/tools/eutaxis.yml or eutaxis.yml below the root."
 )
 _ROOT_HELP = (
-    "Project folder in which the settings file is looked up, used for "
-    "project scope and path substitutions. Default: current folder."
+    "Folder below which the settings file is looked up and against which the "
+    "paths of the settings file resolve. Default: EUTAXIS_ROOT, then the "
+    "nearest folder above the current one that holds the settings file, then "
+    "the current folder."
 )
+_TARGET_PROJECT_HELP = (
+    "Project that receives project-scope artifacts and fills "
+    "{{ project_root }}, relative to the current folder. Default: the root."
+)
+
+
+def _target_project_option() -> Any:
+    return typer.Option(None, "--target-project", help=_TARGET_PROJECT_HELP)
+
 
 skills_app = typer.Typer(
     add_completion=False,
@@ -75,18 +86,20 @@ skills_app.add_typer(loading_unit_app, name="loading-unit")
 
 
 @loading_unit_app.command("list")
+@reports_errors
 def cli_loading_unit_list(
     config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
     agent: str = typer.Option("all", "--agent", "-a"),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
+    target_project: str | None = _target_project_option(),
 ) -> None:
     """List loading units, measured sizes, and publication owners."""
     try:
-        project = _resolve_project(explicit_root(root, former_project, "--project"))
-        config_path = _config_path(config, project)
-        loaded = load_config(config_path)
-        sources = load_from_instruction_config(config_path)
+        settings = _settings(config, root)
+        config_path, base = settings
+        project = _target_project(target_project, settings)
+        loaded = load_config(config_path, root=base)
+        sources = load_from_instruction_config(config_path, root=base)
         adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
         reports = [
             measurement
@@ -115,22 +128,28 @@ def cli_loading_unit_list(
 
 
 @loading_unit_app.command("show")
+@reports_errors
 def cli_loading_unit_show(
     name: str,
     config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
     agent: str = typer.Option("codex", "--agent", "-a"),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
+    target_project: str | None = _target_project_option(),
 ) -> None:
     """Show one loading unit's exact files and generated manifest identity."""
     try:
         adapter = get_adapter(agent)
-        project = _resolve_project(explicit_root(root, former_project, "--project"))
-        config_path = _config_path(config, project)
+        settings = _settings(config, root)
+        config_path, base = settings
+        project = _target_project(target_project, settings)
         loaded, _, publications = _prepared(
-            config_path, [adapter], project_root=project, home=Path.home()
+            config_path,
+            base,
+            [adapter],
+            project_root=project,
+            home=Path.home(),
         )
-        raw_sources = load_from_instruction_config(config_path)
+        raw_sources = load_from_instruction_config(config_path, root=base)
         measurement = next(
             (
                 item
@@ -186,13 +205,13 @@ def cli_loading_unit_show(
 
 
 @skills_app.command("list")
+@reports_errors
 def cli_list(
     config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
     root: str | None = root_option(_ROOT_HELP),
 ) -> None:
     """List Skill sources registered in the configuration."""
-    project = _resolve_project(explicit_root(root, None, "--root"))
-    sources = _load(_config_path(config, project))
+    sources = _load(*_settings(config, root))
     if not sources:
         typer.echo("No skill sources found in the configuration.")
         return
@@ -212,20 +231,26 @@ def cli_list(
 
 
 @skills_app.command("show")
+@reports_errors
 def cli_show(
     name: str,
     config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
     agent: str = typer.Option("claude", "--agent", "-a", help="Adapter to render for."),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
+    target_project: str | None = _target_project_option(),
 ) -> None:
     """Render and print one skill artifact for one adapter."""
     try:
         adapter = get_adapter(agent)
-        project = _resolve_project(explicit_root(root, former_project, "--project"))
-        config_path = _config_path(config, project)
+        settings = _settings(config, root)
+        config_path, base = settings
+        project = _target_project(target_project, settings)
         _, sources, _ = _prepared(
-            config_path, [adapter], project_root=project, home=Path.home()
+            config_path,
+            base,
+            [adapter],
+            project_root=project,
+            home=Path.home(),
         )
         source = _require_source_in(name, sources)
         rendered = render_command(
@@ -243,6 +268,7 @@ def cli_show(
 
 
 @skills_app.command("install")
+@reports_errors
 def cli_install(
     name: str = typer.Argument(
         ..., help="Skill name or 'all' to install every config-registered source."
@@ -255,7 +281,7 @@ def cli_install(
     ),
     agent: str = typer.Option("all", "--agent", "-a", help="Adapter name or 'all'."),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
+    target_project: str | None = _target_project_option(),
     force: bool = typer.Option(
         False, "--force", help="Overwrite non-eutaxis directories at the target."
     ),
@@ -265,11 +291,16 @@ def cli_install(
         if scope:
             validate_scope(scope)
         registry = Registry(default_state_dir())
-        project = _resolve_project(explicit_root(root, former_project, "--project"))
-        config_path = _config_path(config, project)
+        settings = _settings(config, root)
+        config_path, base = settings
+        project = _target_project(target_project, settings)
         adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
         loaded, prepared, _ = _prepared(
-            config_path, adapters, project_root=project, home=Path.home()
+            config_path,
+            base,
+            adapters,
+            project_root=project,
+            home=Path.home(),
         )
         requested = None if name == "all" else _require_source_in(name, prepared)
         operations: list[tuple[CommandSource, AgentAdapter, str]] = []
@@ -346,13 +377,14 @@ def cli_install(
 
 
 @skills_app.command("uninstall")
+@reports_errors
 def cli_uninstall(
     name: str,
     config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
     scope: str = typer.Option("user", "--scope", help="user|project"),
     agent: str = typer.Option("all", "--agent", "-a"),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
+    target_project: str | None = _target_project_option(),
     force: bool = typer.Option(
         False, "--force", help="Delete non-eutaxis directories at the target."
     ),
@@ -363,10 +395,11 @@ def cli_uninstall(
         home = Path.home()
         registry = Registry(default_state_dir())
         registry.load()
-        project = _resolve_project(explicit_root(root, former_project, "--project"))
-        config_path = _config_path(config, project)
-        loaded = load_config(config_path)
-        sources = load_from_instruction_config(config_path)
+        settings = _settings(config, root)
+        config_path, base = settings
+        project = _target_project(target_project, settings)
+        loaded = load_config(config_path, root=base)
+        sources = load_from_instruction_config(config_path, root=base)
         source = next((item for item in sources if item.name == name), None)
         adapter_names = (
             [adapter.name for adapter in all_adapters()] if agent == "all" else [agent]
@@ -428,6 +461,7 @@ def cli_uninstall(
 
 
 @skills_app.command("diff")
+@reports_errors
 def cli_diff(
     name: str | None = typer.Argument(
         None, help="Skill name (omit for all config-registered sources)."
@@ -436,7 +470,7 @@ def cli_diff(
     scope: str = typer.Option("user", "--scope"),
     agent: str = typer.Option("all", "--agent", "-a"),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
+    target_project: str | None = _target_project_option(),
 ) -> None:
     """Show drift between rendered output and installed artifacts.
 
@@ -444,13 +478,16 @@ def cli_diff(
     outdated, edited by hand, missing on disk, or left over from a removed
     rule. Exits with code 0 when every artifact is current.
     """
-    project = _resolve_project(explicit_root(root, former_project, "--project"))
+    settings = _settings(config, root)
+    config_path, base = settings
+    project = _target_project(target_project, settings)
 
     try:
         validate_scope(scope)
         adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
         _, prepared, _ = _prepared(
-            _config_path(config, project),
+            config_path,
+            base,
             adapters,
             project_root=project,
             home=Path.home(),
@@ -481,12 +518,13 @@ def cli_diff(
 
 
 @skills_app.command("sync")
+@reports_errors
 def cli_sync(
     config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
     scope: str = typer.Option("user", "--scope", help="user|project"),
     agent: str = typer.Option("all", "--agent", "-a"),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
+    target_project: str | None = _target_project_option(),
     apply: bool = typer.Option(
         False,
         "--apply",
@@ -496,10 +534,11 @@ def cli_sync(
     """Preview or apply the complete set of managed Skills."""
     try:
         validate_scope(scope)
-        project = _resolve_project(explicit_root(root, former_project, "--project"))
-        config_path = _config_path(config, project)
-        loaded = load_config(config_path)
-        raw_sources = _load(config_path)
+        settings = _settings(config, root)
+        config_path, base = settings
+        project = _target_project(target_project, settings)
+        loaded = load_config(config_path, root=base)
+        raw_sources = _load(config_path, base)
         adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
         home = Path.home()
         sources, _ = prepare_published_loading_units(
@@ -577,18 +616,20 @@ def cli_sync(
 
 
 @skills_app.command("budget")
+@reports_errors
 def cli_budget(
     config: str | None = typer.Option(None, "--config", "-c", help=_CONFIG_HELP),
     agent: str = typer.Option("all", "--agent", "-a", help="Adapter name or 'all'."),
     root: str | None = root_option(_ROOT_HELP),
-    former_project: str | None = former_root_option("--project"),
+    target_project: str | None = _target_project_option(),
 ) -> None:
     """Report and validate Skill entrypoints and loading units."""
     try:
-        project = _resolve_project(explicit_root(root, former_project, "--project"))
-        config_path = _config_path(config, project)
-        loaded = load_config(config_path)
-        sources = load_from_instruction_config(config_path)
+        settings = _settings(config, root)
+        config_path, base = settings
+        project = _target_project(target_project, settings)
+        loaded = load_config(config_path, root=base)
+        sources = load_from_instruction_config(config_path, root=base)
         adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
         reports = [
             measurement
@@ -665,19 +706,25 @@ def _effective_adapter_names(source: CommandSource, registered: list[str]) -> li
     return [name for name in base if name in registered and source.targets.admits(name)]
 
 
-def _config_path(config: str | None, project: Path) -> Path:
-    """Return the settings file named by ``--config`` or found below the root."""
+def _settings(config: str | None, root: str | None) -> tuple[Path, Path]:
+    """Return the settings file and the root of a command."""
     from ..instructions import find_config
 
-    return find_config(Path(config) if config else None, project)
+    base = command_root(root)
+    return find_config(command_path(config), base), base
 
 
-def _load(config: Path) -> list[CommandSource]:
-    return load_from_instruction_config(config)
+def _target_project(target_project: str | None, settings: tuple[Path, Path]) -> Path:
+    """Return the project named by ``--target-project``, or the root."""
+    return command_path(target_project) or settings[1]
 
 
-def _require_source(name: str, config: Path) -> CommandSource:
-    source = _maybe_source(name, config)
+def _load(config: Path, root: Path) -> list[CommandSource]:
+    return load_from_instruction_config(config, root=root)
+
+
+def _require_source(name: str, settings: tuple[Path, Path]) -> CommandSource:
+    source = _maybe_source(name, settings)
     if source is None:
         raise CommandNotFoundError(f"Unknown skill: {name!r}")
     return source
@@ -692,6 +739,7 @@ def _require_source_in(name: str, sources: list[CommandSource]) -> CommandSource
 
 def _prepared(
     config: Path,
+    root: Path,
     adapters: list,
     *,
     project_root: Path,
@@ -701,8 +749,8 @@ def _prepared(
     list[CommandSource],
     tuple[LoadingUnitPublication, ...],
 ]:
-    loaded = load_config(config)
-    sources = load_from_instruction_config(config)
+    loaded = load_config(config, root=root)
+    sources = load_from_instruction_config(config, root=root)
     prepared, publications = prepare_published_loading_units(
         loaded,
         sources,
@@ -877,12 +925,8 @@ def _installed_publication_owners(
     return sorted(set(blockers))
 
 
-def _maybe_source(name: str, config: Path) -> CommandSource | None:
-    for source in _load(config):
+def _maybe_source(name: str, settings: tuple[Path, Path]) -> CommandSource | None:
+    for source in _load(*settings):
         if source.name == name:
             return source
     return None
-
-
-def _resolve_project(project_root: Path | None) -> Path:
-    return project_root if project_root is not None else Path.cwd()

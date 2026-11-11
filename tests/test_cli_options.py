@@ -6,10 +6,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import typer
 from typer.testing import CliRunner
 
 from eutaxis import _cli_options
 from eutaxis.cli import app
+from eutaxis.commands.cli_errors import exit_with_error
 from eutaxis.instructions import (
     ConfigurationError,
     find_config,
@@ -462,6 +464,14 @@ def test_invalid_settings_file_exits_2(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "agents must be a list" in result.stderr
+
+
+def test_environment_failure_exits_3(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(typer.Exit) as excinfo:
+        exit_with_error(OSError("filesystem unavailable"))
+
+    assert excinfo.value.exit_code == 3
+    assert "filesystem unavailable" in capsys.readouterr().err
 
 
 def test_init_scaffolds_the_settings_file_into_the_root(tmp_path: Path) -> None:
