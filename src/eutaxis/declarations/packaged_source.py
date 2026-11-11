@@ -10,9 +10,16 @@ from typing import Callable, Iterator, NamedTuple, NoReturn, SupportsIndex, Type
 
 from ._authority import IdentityAuthorityStore, identity_value_state
 from .acquisition_contract import (
+    PACKAGED_DECLARATION_PATHS,
+    PACKAGED_FACET_PATH,
     AcquisitionLock,
     FacetConstituentLock,
     InternalSourceLock,
+    LockedFile,
+    _packaged_facet_acquisition_revision,
+    _packaged_source_acquisition_revision,
+    facet_content_revision,
+    source_content_revision,
     validated_packaged_lock,
 )
 from .byte_carriers import (
@@ -20,6 +27,7 @@ from .byte_carriers import (
     RetainedDirectory,
     TrustedDirectory,
     VerifiedByteCarrier,
+    _verified_carrier_context,
 )
 from .exceptions import AcquisitionContractError
 from .facets import FacetRegistry, load_facet_registry_bytes
@@ -63,6 +71,124 @@ class _PackagedParsedDeclarations(NamedTuple):
 
 
 _PACKAGED_AUTHORITIES: IdentityAuthorityStore[object] = IdentityAuthorityStore()
+
+
+class _PackagedGenerationState(NamedTuple):
+    """Bind generated lock components to independently verified package bytes."""
+
+    facet_evidence: VerifiedByteCarrier
+    declaration_evidence: tuple[VerifiedByteCarrier, ...]
+    facet_lock: FacetConstituentLock
+    facet_lock_state: object
+    source_lock: InternalSourceLock
+    source_lock_state: object
+    facet_root_path: str
+    facet_root_device: int
+    facet_root_inode: int
+    declaration_root_path: str
+    declaration_root_device: int
+    declaration_root_inode: int
+
+
+_PACKAGED_GENERATION_AUTHORITIES: IdentityAuthorityStore[object] = (
+    IdentityAuthorityStore()
+)
+_PACKAGED_TEST_GENERATION_AUTHORITIES: IdentityAuthorityStore[object] = (
+    IdentityAuthorityStore()
+)
+
+
+class _PackagedGenerationObservation:
+    """Represent one authenticated bootstrap observation of packaged resources."""
+
+    __slots__ = ("__weakref__",)
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        raise TypeError(
+            "_PackagedGenerationObservation instances must be issued by observation"
+        )
+
+    def __copy__(self) -> NoReturn:
+        raise TypeError("packaged generation observations cannot be copied")
+
+    def __deepcopy__(self, _memo: object) -> NoReturn:
+        raise TypeError("packaged generation observations cannot be copied")
+
+    def __reduce__(self) -> NoReturn:
+        raise TypeError("packaged generation observations cannot be serialized")
+
+    def __reduce_ex__(self, _protocol: SupportsIndex) -> NoReturn:
+        raise TypeError("packaged generation observations cannot be serialized")
+
+
+def _issued_packaged_generation_state(
+    value: object,
+    authority: IdentityAuthorityStore[object] = _PACKAGED_GENERATION_AUTHORITIES,
+) -> _PackagedGenerationState:
+    """Authenticate one live observation and recheck every bound relation."""
+    state = authority.state(value)
+    if not isinstance(state, _PackagedGenerationState):
+        _fail("$.internal-source", "packaged generation observation is not issued here")
+    if identity_value_state(state.facet_lock) != state.facet_lock_state:
+        _fail("$.facet-registry.base", "observed packaged facet lock state changed")
+    if identity_value_state(state.source_lock) != state.source_lock_state:
+        _fail("$.internal-source", "observed packaged source lock state changed")
+    facet_root_path, facet_root_identity, facet_snapshot = _verified_carrier_context(
+        state.facet_evidence
+    )
+    if (
+        facet_root_path != state.facet_root_path
+        or facet_root_identity.device != state.facet_root_device
+        or facet_root_identity.inode != state.facet_root_inode
+    ):
+        _fail(
+            "$.facet-registry.base",
+            "observed packaged facet root context changed",
+        )
+    if (
+        facet_snapshot[0] != state.facet_lock.path
+        or facet_snapshot[2] != state.facet_lock.sha256
+    ):
+        _fail(
+            "$.facet-registry.base",
+            "observed packaged facet evidence differs from lock",
+        )
+    if len(state.declaration_evidence) != len(state.source_lock.files):
+        _fail("$.internal-source.files", "observed packaged evidence count changed")
+    for index, (evidence, locked_file) in enumerate(
+        zip(state.declaration_evidence, state.source_lock.files, strict=True)
+    ):
+        root_path, root_identity, snapshot = _verified_carrier_context(evidence)
+        if (
+            root_path != state.declaration_root_path
+            or root_identity.device != state.declaration_root_device
+            or root_identity.inode != state.declaration_root_inode
+        ):
+            _fail(
+                f"$.internal-source.files[{index}]",
+                "observed packaged declaration root context changed",
+            )
+        if snapshot[0] != locked_file.path or snapshot[2] != locked_file.sha256:
+            _fail(
+                f"$.internal-source.files[{index}]",
+                "observed packaged declaration evidence differs from lock",
+            )
+    return state
+
+
+def _packaged_generation_components(
+    value: object,
+) -> tuple[FacetConstituentLock, InternalSourceLock]:
+    """Return lock components only from one live authenticated observation."""
+    state = _issued_packaged_generation_state(value)
+    return state.facet_lock, state.source_lock
+
+
+def _retire_packaged_generation_observation(value: object) -> None:
+    """Retire one exact live observation and reject foreign or repeated use."""
+    state = _PACKAGED_GENERATION_AUTHORITIES.retire(value)
+    if not isinstance(state, _PackagedGenerationState):
+        _fail("$.internal-source", "packaged generation observation is not issued here")
 
 
 def _issued_state(
@@ -600,6 +726,126 @@ def _acquire_packaged_internal_source_from_root(
     )
 
 
+def _observe_packaged_generation_from_retained_roots(
+    facet_root: RetainedDirectory,
+    declaration_root: RetainedDirectory,
+    dependencies: _PackagedDependencies,
+) -> _PackagedGenerationState:
+    """Derive unissued lock material from one complete verified observation."""
+    facet_authoritative = facet_root.read_authoritative(PACKAGED_FACET_PATH)
+    declaration_authoritative = tuple(
+        declaration_root.read_authoritative(path) for path in PACKAGED_DECLARATION_PATHS
+    )
+
+    facet_registry = dependencies.load_facet_registry(
+        facet_authoritative.data,
+        path=dependencies.path(PACKAGED_FACET_PATH),
+    )
+    if facet_registry.id != "eutaxis/context-facets":
+        dependencies.fail("$.facet-registry.base.id", "packaged facet id differs")
+    if facet_registry.owner != "eutaxis":
+        dependencies.fail("$.facet-registry.base.owner", "packaged facet owner differs")
+
+    facet_content = facet_content_revision(
+        facet_registry.id,
+        "eutaxis",
+        facet_registry.owner,
+        PACKAGED_FACET_PATH,
+        facet_authoritative.sha256,
+    )
+    facet_lock = FacetConstituentLock(
+        _packaged_facet_acquisition_revision(facet_content),
+        facet_content,
+        facet_registry.id,
+        "packaged",
+        "eutaxis",
+        facet_registry.owner,
+        PACKAGED_FACET_PATH,
+        facet_authoritative.sha256,
+    )
+    locked_files = tuple(
+        LockedFile(path, carrier.sha256)
+        for path, carrier in zip(
+            PACKAGED_DECLARATION_PATHS,
+            declaration_authoritative,
+            strict=True,
+        )
+    )
+    source_content = source_content_revision("eutaxis", locked_files)
+    source_lock = InternalSourceLock(
+        _packaged_source_acquisition_revision(source_content),
+        source_content,
+        locked_files,
+        "packaged",
+        "eutaxis",
+    )
+
+    facet_verified = facet_root.verify(facet_authoritative)
+    declaration_verified = tuple(
+        declaration_root.verify(carrier) for carrier in declaration_authoritative
+    )
+    facet_root_path, facet_root_identity, _facet_snapshot = _verified_carrier_context(
+        facet_verified
+    )
+    declaration_contexts = tuple(
+        _verified_carrier_context(evidence) for evidence in declaration_verified
+    )
+    if not declaration_contexts:
+        dependencies.fail(
+            "$.internal-source.files",
+            "packaged declaration evidence must be non-empty",
+        )
+    declaration_root_path = declaration_contexts[0][0]
+    declaration_root_identity = declaration_contexts[0][1]
+    if any(
+        root_path != declaration_root_path or identity != declaration_root_identity
+        for root_path, identity, _snapshot in declaration_contexts[1:]
+    ):
+        dependencies.fail(
+            "$.internal-source.files",
+            "packaged declaration root contexts differ",
+        )
+    return _PackagedGenerationState(
+        facet_evidence=facet_verified,
+        declaration_evidence=declaration_verified,
+        facet_lock=facet_lock,
+        facet_lock_state=identity_value_state(facet_lock),
+        source_lock=source_lock,
+        source_lock_state=identity_value_state(source_lock),
+        facet_root_path=facet_root_path,
+        facet_root_device=facet_root_identity.device,
+        facet_root_inode=facet_root_identity.inode,
+        declaration_root_path=declaration_root_path,
+        declaration_root_device=declaration_root_identity.device,
+        declaration_root_inode=declaration_root_identity.inode,
+    )
+
+
+def _observe_packaged_generation_from_root(
+    root_path: Path,
+    dependencies: _PackagedDependencies = _SYSTEM_DEPENDENCIES,
+) -> _PackagedGenerationObservation:
+    """Observe packaged generation inputs below an explicit boundary-test root."""
+    trusted = _trusted_directory_from_path(root_path, dependencies)
+    with trusted:
+        with (
+            trusted.retain_directory(".") as facet_root,
+            trusted.retain_directory("declarations/v1") as declaration_root,
+        ):
+            state = _observe_packaged_generation_from_retained_roots(
+                facet_root,
+                declaration_root,
+                dependencies,
+            )
+    result = object.__new__(_PackagedGenerationObservation)
+    try:
+        _PACKAGED_TEST_GENERATION_AUTHORITIES.issue(result, state)
+        return result
+    except BaseException:
+        _PACKAGED_TEST_GENERATION_AUTHORITIES.retire(result)
+        raise
+
+
 def _build_packaged_source_acquirer(
     distribution: TrustedDirectory,
     retained_implementation: Callable[
@@ -688,17 +934,16 @@ def _build_running_distribution_acquirer(
     )
 
 
-def _build_running_distribution_boundaries(
-    module_file: str,
-    dependencies: _PackagedDependencies,
-) -> tuple[
+def _bootstrap_running_distribution_boundaries() -> tuple[
     Callable[[AcquisitionLock], PackagedInternalSource],
     Callable[
         [AcquisitionLock],
         AbstractContextManager[_PackagedAcquisitionSession],
     ],
+    Callable[[], _PackagedGenerationObservation],
 ]:
-    """Retain one distribution for atomic and phased acquisition routes."""
+    """Bind all running-package routes without accepting a caller-owned root."""
+    dependencies = _SYSTEM_DEPENDENCIES
     if dependencies.nofollow is None or dependencies.root_flags is None:
 
         def unsupported(_lock: AcquisitionLock) -> NoReturn:
@@ -715,11 +960,36 @@ def _build_running_distribution_boundaries(
             raise AssertionError("unreachable")
             yield
 
-        return unsupported, unsupported_session
+        def unsupported_observer() -> NoReturn:
+            dependencies.fail(
+                "$.internal-source",
+                "platform lacks required descriptor support",
+            )
+
+        return unsupported, unsupported_session, unsupported_observer
     distribution = _trusted_directory_from_path(
-        dependencies.path(module_file).resolve().parent.parent,
+        Path(__file__).resolve().parent.parent,
         dependencies,
     )
+
+    def observe() -> _PackagedGenerationObservation:
+        with (
+            distribution.retain_directory("data") as facet_root,
+            distribution.retain_directory("data/declarations/v1") as declaration_root,
+        ):
+            state = _observe_packaged_generation_from_retained_roots(
+                facet_root,
+                declaration_root,
+                dependencies,
+            )
+        result = object.__new__(_PackagedGenerationObservation)
+        try:
+            _PACKAGED_GENERATION_AUTHORITIES.issue(result, state)
+            return result
+        except BaseException:
+            _PACKAGED_GENERATION_AUTHORITIES.retire(result)
+            raise
+
     return (
         _build_packaged_source_acquirer(
             distribution,
@@ -727,13 +997,12 @@ def _build_running_distribution_boundaries(
             dependencies,
         ),
         _build_packaged_session_opener(distribution, dependencies),
+        observe,
     )
 
 
 (
     acquire_packaged_internal_source,
     _open_running_packaged_session,
-) = _build_running_distribution_boundaries(
-    __file__,
-    _SYSTEM_DEPENDENCIES,
-)
+    _observe_running_packaged_generation,
+) = _bootstrap_running_distribution_boundaries()

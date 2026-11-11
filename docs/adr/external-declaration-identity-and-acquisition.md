@@ -757,6 +757,101 @@ differs. A known-failure test accompanies every checker or validator so the
 gate proves that each operation can reject its target class before a clean
 result is trusted.
 
+## Lock generation command
+
+The canonical command is:
+
+```sh
+eutaxis declarations lock \
+  --workspace <root> \
+  --manifest <workspace-relative-path>
+```
+
+The three modes have closed output contracts:
+
+- With neither mode option, standard output contains the exact canonical lock bytes and nothing else. Diagnostics use standard error. A failed or partial standard-output write makes the command fail.
+- `--check <workspace-relative-lock-path>` writes nothing to standard output. It exits zero only when an authoritative and independently verified read of that path equals the candidate bytes exactly. Drift is reported without repairing the checked file.
+- `--output <workspace-relative-new-path>` writes nothing to standard output. It creates an absent file through the create-only publication boundary below and exits zero only after publication.
+
+`--check` and `--output` are mutually exclusive. Their combination is a usage error detected before acquisition begins.
+
+The generator never overwrites an active lock. A changed lock is an authorization change: it admits new source bytes or transport state. The later semantic-diff and rollback commands therefore own promotion of a reviewed candidate. Shell redirection is outside the create-only guarantee and is not the documented update route.
+
+### Generated-candidate authority
+
+One private exact-type generated-candidate carrier bridges observation and semantic acquisition. A process-local authority store issues it only after one complete generation observation. The carrier binds:
+
+- the retained manifest carrier and workspace identity;
+- every packaged and external authoritative and verification byte carrier;
+- both bootstrap Git observations and their retained metadata;
+- the exact equality state that relates each byte-carrier pair and each Git-observation pair;
+- the exact canonical byte buffer;
+- the parsed lock represented by that buffer; and
+- the immutable snapshots used to compute every digest and revision.
+
+No public constructor, parser or acquisition API accepts this carrier. Candidate authentication rechecks every retained carrier, observation, equality relation, manifest value, workspace identity, canonical byte and parsed-lock binding before semantic validation starts. A sealed internal acquisition route accepts either the existing verified workspace-lock carrier or the generator-issued carrier. The generated-candidate branch consumes the exact retained byte buffer rather than reconstructing a lock value.
+
+The sealed candidate-validation transaction owns the ordinary locked packaged and Git sessions as internal phases. It opens, binds, finishes and retires them itself. The command layer, the bootstrap observers and callers can supply neither session nor session evidence. The same transaction runs complete semantic acquisition, but it cannot issue a reusable public `ExternalAcquisitionResult`. Success produces only a private validation receipt. The command retires the candidate and the receipt before it writes standard output, checks a lock, or publishes an output file. Every failure retires the candidate authority.
+
+### Bootstrap observers
+
+Lock generation uses private, non-authoritative observers for the two components that ordinary acquisition can observe only after a lock exists.
+
+The packaged observer reads the fixed facet-base path and packaged declaration paths through retained package-directory descriptors. It derives the base and internal-source locks from those exact observations. After the complete candidate exists, the ordinary locked packaged session observes and verifies those components again.
+
+The Git observer does not infer omitted fields from an acquisition verifier. It applies the existing descriptor, environment, object-store, output-size and timeout boundaries while it:
+
+1. reads the fixed `.gitmodules` carrier;
+2. selects exactly one registration whose normalized path equals the manifest source root;
+3. derives that registration's normalized name;
+4. validates the parent and nested repository configurations;
+5. derives the common object format;
+6. reads the matching stage-zero parent gitlink and nested commit;
+7. binds the parent-index `.gitmodules` blob and the worktree carrier;
+8. reads every listed declaration and owned facet-extension blob from the commit tree; and
+9. repeats the complete observation after source parsing.
+
+The two Git observations must match. After the candidate exists, the ordinary locked Git session runs again against it. Generation retains no public evidence from the bootstrap observer.
+
+Workspace and vendored generation share the descriptor reader and differ only by the transport kind recorded in the acquisition revision. Positive generation fixtures cover the packaged source, workspace, vendored and Git-submodule sources, the facet base, and facet extensions.
+
+### Generation sequence
+
+Generation applies the acquisition boundary in this order:
+
+1. retain the workspace directory and read the manifest through the no-follow descriptor boundary;
+2. open every declared source root before reading any source file;
+3. collect the packaged facet base and packaged declaration corpus through the private packaged observer;
+4. read each external facet and listed declaration in manifest order;
+5. collect and repeat the bootstrap Git observation for each Git-submodule source;
+6. compute file digests, content revisions, transport revisions and the composite facet revision;
+7. parse and validate the candidate lock against the retained manifest;
+8. perform independent verification reads for every non-Git carrier;
+9. issue the private generated-candidate carrier from the complete matching observation;
+10. consume the candidate through the sealed validation transaction, which owns every ordinary locked packaged and Git session and the complete semantic acquisition;
+11. retire every candidate and validation authority; and
+12. emit, compare, or publish the exact retained bytes only after all preceding steps succeed.
+
+The command discovers no directory content and accepts no glob. The manifest supplies every admitted path and its order. Workspace and vendored sources use the same descriptor boundary and retain distinct transport kinds in their acquisition revisions. Git-submodule generation disables ambient configuration, network fallback, lazy fetching, external helpers and inherited `GIT_*` variables under the existing Git contract.
+
+### Check and create-only publication
+
+The checked lock path is normalized below the retained workspace. The command reaches its parent and file without following symbolic links, reads the file authoritatively, verifies it through a second read, and reports equality only while the parent and file identities remain unchanged. A difference is command drift rather than an acquisition mutation.
+
+The output path is also normalized below the retained workspace. The command retains the destination parent and its identity through no-follow descriptor traversal. It writes the complete candidate to a sibling temporary regular file opened with exclusive creation. The command retains that file's identity, then reopens it to verify its exact bytes and metadata. Immediately before publication, it revalidates the parent identity. It creates the final name with a descriptor-relative hard link that fails when the destination exists; it never calls `os.replace`.
+
+After linking, the command verifies that the final name identifies the retained temporary inode and contains the exact candidate bytes. This successful final-name verification is the publication commit point. On a mismatch before that point, the command removes the final name only if that name still identifies the inode created by this command. If removal fails, the command returns non-zero and reports explicitly that the destination may exist.
+
+Two command instances that target an initially absent name yield one success and one existing-target failure. The command never links its inode before completing and verifying its own write. An independent writer can nevertheless mutate the retained inode before or after the link and expose transient external state. Final verification detects such a mutation before success, subject to the acquisition-wide ABA limit. Observer-level atomicity against concurrent mutation requires the operator to exclude every other writer.
+
+A failure before this command's link attempt leaves destination state unchanged by this command. It removes its temporary name when execution continues far enough to do so. Before the publication commit point, a cleanup failure is reported after, and never instead of, the primary diagnostic.
+
+After the commit point, failure to remove the temporary name cannot roll back or convert publication into failure. The command returns success and prints a cleanup warning with the exact temporary path. A crash may also leave that temporary name because the guarantee covers create-only publication rather than crash cleanup.
+
+The create-only guarantee covers atomic visibility, not survival of an immediate system crash. The later reviewed promotion and rollback transaction owns durable release publication.
+
+Lock generation establishes what bytes and transport state the operator proposes to authorize. It does not establish that a change is semantically equivalent to the reviewed release. The semantic-diff command owns that decision. A successful generation therefore cannot promote its own output or change the active release.
+
 ## Failure ownership
 
 An acquisition failure names the source entry and deepest manifest, lock, path,
@@ -775,6 +870,18 @@ The following failures are distinct:
 - declaration schema or intrinsic semantic failure
 - identifier namespace, owner, or reference-grammar mismatch
 - combined-registry collision or cross-record contract failure
+
+Generation and publication add the following owners:
+
+- malformed manifest or source bytes belong to the deepest manifest or source location;
+- ambiguous or invalid Git bootstrap state belongs to the source entry and derived Git field;
+- a candidate that fails its own structural or revision validation is an internal generator failure, not an input-lock failure;
+- semantic acquisition retains the existing declaration or cross-record location;
+- checked-lock drift belongs to the checked path and never triggers repair;
+- an existing output destination belongs to the output path;
+- output traversal, temporary-file or hard-link failure belongs to output I/O;
+- conflicting mode options belong to command usage; and
+- cleanup failure remains secondary to the failure that initiated cleanup.
 
 ## Discarded alternatives
 

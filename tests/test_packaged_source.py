@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -586,3 +587,271 @@ def test_packaged_source_keeps_unvalidated_declarations_as_json_values(
     acquired = _acquire_packaged_internal_source_from_root(lock, root)
 
     assert acquired.declaration_documents[0] == "unvalidated-scalar"
+
+
+def test_packaged_generation_observer_binds_expected_lock_and_evidence() -> None:
+    observation = packaged_module._observe_running_packaged_generation()
+    try:
+        facet_lock, source_lock = packaged_module._packaged_generation_components(
+            observation
+        )
+        expected = _valid_lock(data_path())
+        state = packaged_module._issued_packaged_generation_state(observation)
+
+        assert facet_lock == expected.facet_registry.base
+        assert source_lock == expected.internal_source
+        assert state.facet_evidence.authoritative.path == PACKAGED_FACET_PATH
+        assert (
+            tuple(
+                evidence.authoritative.path for evidence in state.declaration_evidence
+            )
+            == PACKAGED_DECLARATION_PATHS
+        )
+        assert state.facet_evidence.authoritative.data == (
+            state.facet_evidence.verification.data
+        )
+        assert all(
+            evidence.authoritative.data == evidence.verification.data
+            for evidence in state.declaration_evidence
+        )
+    finally:
+        packaged_module._retire_packaged_generation_observation(observation)
+
+
+def test_packaged_generation_observer_reads_every_resource_before_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, str]] = []
+    original_read = RetainedDirectory.read_authoritative
+    original_verify = RetainedDirectory.verify
+
+    def recording_read(self: RetainedDirectory, path: str):
+        events.append(("read", path))
+        return original_read(self, path)
+
+    def recording_verify(self: RetainedDirectory, carrier):
+        events.append(("verify", carrier.path))
+        return original_verify(self, carrier)
+
+    monkeypatch.setattr(RetainedDirectory, "read_authoritative", recording_read)
+    monkeypatch.setattr(RetainedDirectory, "verify", recording_verify)
+
+    observation = packaged_module._observe_running_packaged_generation()
+    packaged_module._retire_packaged_generation_observation(observation)
+
+    paths = (PACKAGED_FACET_PATH, *PACKAGED_DECLARATION_PATHS)
+    assert events == [("read", path) for path in paths] + [
+        ("verify", path) for path in paths
+    ]
+
+
+def test_packaged_generation_observer_rejects_change_before_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _copy_resources(tmp_path)
+    facet_path = root / PACKAGED_FACET_PATH
+    original_read = RetainedDirectory.read_authoritative
+    mutated = False
+
+    def mutating_read(self: RetainedDirectory, path: str):
+        nonlocal mutated
+        carrier = original_read(self, path)
+        if self.path == "declarations/v1" and not mutated:
+            mutated = True
+            facet_path.write_bytes(facet_path.read_bytes() + b"\n")
+        return carrier
+
+    monkeypatch.setattr(RetainedDirectory, "read_authoritative", mutating_read)
+
+    with pytest.raises(ByteCarrierError, match="verification"):
+        packaged_module._observe_packaged_generation_from_root(root)
+
+
+@pytest.mark.parametrize(
+    ("field", "old", "new", "location"),
+    [
+        ("id", "eutaxis/context-facets", "other/facets", "base.id"),
+        ("owner", "owner: eutaxis", "owner: other", "base.owner"),
+    ],
+)
+def test_packaged_generation_observer_rejects_wrong_facet_identity(
+    tmp_path: Path,
+    field: str,
+    old: str,
+    new: str,
+    location: str,
+) -> None:
+    root = _copy_resources(tmp_path)
+    target = root / PACKAGED_FACET_PATH
+    target.write_text(target.read_text().replace(old, new, 1))
+
+    with pytest.raises(
+        AcquisitionContractError, match=f"facet {field} differs"
+    ) as raised:
+        packaged_module._observe_packaged_generation_from_root(root)
+    assert location in raised.value.location
+
+
+def test_packaged_generation_observer_rejects_missing_declaration(
+    tmp_path: Path,
+) -> None:
+    root = _copy_resources(tmp_path)
+    (root / "declarations" / "v1" / PACKAGED_DECLARATION_PATHS[-1]).unlink()
+
+    with pytest.raises(ByteCarrierError):
+        packaged_module._observe_packaged_generation_from_root(root)
+
+
+def test_arbitrary_root_observation_cannot_cross_production_authority(
+    tmp_path: Path,
+) -> None:
+    root = _copy_resources(tmp_path)
+    observation = packaged_module._observe_packaged_generation_from_root(root)
+    try:
+        assert (
+            packaged_module._PACKAGED_TEST_GENERATION_AUTHORITIES.state(observation)
+            is not None
+        )
+        assert (
+            packaged_module._PACKAGED_GENERATION_AUTHORITIES.state(observation) is None
+        )
+        with pytest.raises(AcquisitionContractError, match="not issued here"):
+            packaged_module._packaged_generation_components(observation)
+    finally:
+        packaged_module._PACKAGED_TEST_GENERATION_AUTHORITIES.retire(observation)
+
+
+def test_arbitrary_retained_roots_produce_only_unissued_material(
+    tmp_path: Path,
+) -> None:
+    root = _copy_resources(tmp_path)
+    trusted = packaged_module._trusted_directory_from_path(
+        root,
+        packaged_module._SYSTEM_DEPENDENCIES,
+    )
+    with trusted:
+        with (
+            trusted.retain_directory(".") as facet_root,
+            trusted.retain_directory("declarations/v1") as declaration_root,
+        ):
+            material = packaged_module._observe_packaged_generation_from_retained_roots(
+                facet_root,
+                declaration_root,
+                packaged_module._SYSTEM_DEPENDENCIES,
+            )
+
+    assert type(material) is packaged_module._PackagedGenerationState
+    with pytest.raises(AcquisitionContractError, match="not issued here"):
+        packaged_module._packaged_generation_components(material)
+
+
+def test_packaged_generation_observer_fails_closed_without_descriptor_support() -> None:
+    dependencies = packaged_module._SYSTEM_DEPENDENCIES._replace(
+        nofollow=None,
+        root_flags=None,
+    )
+
+    with pytest.raises(AcquisitionContractError, match="descriptor support"):
+        packaged_module._observe_packaged_generation_from_root(
+            data_path(),
+            dependencies,
+        )
+
+
+def test_packaged_generation_observation_rejects_forgery_copy_and_serialization() -> (
+    None
+):
+    observation = packaged_module._observe_running_packaged_generation()
+    try:
+        with pytest.raises(TypeError, match="must be issued"):
+            packaged_module._PackagedGenerationObservation()
+        with pytest.raises(TypeError, match="cannot be copied"):
+            copy.copy(observation)
+        with pytest.raises(TypeError, match="cannot be copied"):
+            copy.deepcopy(observation)
+        with pytest.raises(TypeError, match="cannot be serialized"):
+            pickle.dumps(observation)
+
+        forged = object.__new__(packaged_module._PackagedGenerationObservation)
+        with pytest.raises(AcquisitionContractError, match="not issued here"):
+            packaged_module._packaged_generation_components(forged)
+        with pytest.raises(AcquisitionContractError, match="not issued here"):
+            packaged_module._packaged_generation_components(object())
+    finally:
+        packaged_module._retire_packaged_generation_observation(observation)
+
+
+def test_packaged_generation_observation_rejects_mutated_and_retired_state() -> None:
+    observation = packaged_module._observe_running_packaged_generation()
+    facet_lock, _source_lock = packaged_module._packaged_generation_components(
+        observation
+    )
+    object.__setattr__(facet_lock, "sha256", "sha256:" + "0" * 64)
+
+    with pytest.raises(AcquisitionContractError, match="lock state changed"):
+        packaged_module._packaged_generation_components(observation)
+
+    packaged_module._retire_packaged_generation_observation(observation)
+    with pytest.raises(AcquisitionContractError, match="not issued here"):
+        packaged_module._packaged_generation_components(observation)
+    with pytest.raises(AcquisitionContractError, match="not issued here"):
+        packaged_module._retire_packaged_generation_observation(observation)
+
+
+def test_packaged_generation_observation_reauthenticates_verified_evidence() -> None:
+    observation = packaged_module._observe_running_packaged_generation()
+    state = packaged_module._issued_packaged_generation_state(observation)
+    evidence = state.facet_evidence
+    verified_state = carrier_module._VERIFIED_AUTHORITIES.retire(evidence)
+    assert verified_state is not None
+    verification_snapshot = cast(
+        tuple[str, bytes, str, object, object],
+        verified_state[6],
+    )
+    corrupted_snapshot = (
+        verification_snapshot[0],
+        verification_snapshot[1],
+        "sha256:" + "0" * 64,
+        verification_snapshot[3],
+        verification_snapshot[4],
+    )
+    carrier_module._VERIFIED_AUTHORITIES.issue(
+        evidence,
+        (*verified_state[:6], corrupted_snapshot),
+    )
+
+    try:
+        with pytest.raises(ByteCarrierError, match="verified carrier state is invalid"):
+            packaged_module._packaged_generation_components(observation)
+    finally:
+        packaged_module._retire_packaged_generation_observation(observation)
+
+
+def test_packaged_generation_publication_interruption_retires_provisional_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_issue = packaged_module._PACKAGED_GENERATION_AUTHORITIES.issue
+    issued: list[packaged_module._PackagedGenerationObservation] = []
+
+    def interrupt_after_issue(
+        value: packaged_module._PackagedGenerationObservation,
+        state: object,
+    ) -> object:
+        token = original_issue(value, state)  # type: ignore[arg-type]
+        issued.append(value)
+        raise KeyboardInterrupt("injected observation publication interruption")
+
+    monkeypatch.setattr(
+        packaged_module._PACKAGED_GENERATION_AUTHORITIES,
+        "issue",
+        interrupt_after_issue,
+    )
+
+    with pytest.raises(KeyboardInterrupt, match="publication interruption"):
+        packaged_module._observe_running_packaged_generation()
+
+    provisional = issued[0]
+    assert packaged_module._PACKAGED_GENERATION_AUTHORITIES.state(provisional) is None
+    with pytest.raises(AcquisitionContractError, match="not issued here"):
+        packaged_module._packaged_generation_components(provisional)

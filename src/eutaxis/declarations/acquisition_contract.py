@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 from collections.abc import Iterable
+from pathlib import Path
 from typing import NoReturn, cast
 
 from .acquisition_schema import (
@@ -19,8 +20,9 @@ from .canonical_json import (
     jcs_bytes,
     parse_canonical_json_bytes,
 )
-from .exceptions import AcquisitionContractError
+from .exceptions import AcquisitionContractError, DeclarationSchemaError
 from .facets import FACET_REGISTRY_FILENAME
+from .source import load_yaml_bytes
 
 _NAMESPACE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 _IDENTIFIER = re.compile(
@@ -246,6 +248,22 @@ def parse_acquisition_lock_bytes(source: bytes) -> AcquisitionLock:
     return _parse_acquisition_lock_document(document)
 
 
+def _parse_acquisition_manifest_bytes(
+    source: bytes,
+    *,
+    path: Path,
+) -> AcquisitionManifest:
+    """Parse a manifest only from already-retained YAML bytes."""
+    try:
+        document, _locations, _digest = load_yaml_bytes(source, path=path)
+    except DeclarationSchemaError as exc:
+        raise AcquisitionContractError(
+            "$.manifest" + exc.location.removeprefix("$"),
+            str(exc),
+        ) from exc
+    return parse_acquisition_manifest(document)
+
+
 def validated_packaged_lock(
     lock: AcquisitionLock,
 ) -> tuple[FacetConstituentLock, InternalSourceLock]:
@@ -351,6 +369,163 @@ def composite_facet_content_revision(base: str, extensions: tuple[str, ...]) -> 
     for index, revision in enumerate(extensions):
         _digest_value(revision, f"$.extensions[{index}]")
     return _revision({"base": base, "extensions": list(extensions)})
+
+
+def acquisition_lock_json_bytes(
+    manifest: AcquisitionManifest,
+    lock: AcquisitionLock,
+) -> bytes:
+    """Validate one manifest-lock pair and serialize the lock canonically."""
+    validate_acquisition_contract(manifest, lock)
+    return jcs_bytes(_lock_document(lock))
+
+
+def _packaged_facet_acquisition_revision(
+    content_revision: str,
+    *,
+    path: str = PACKAGED_FACET_PATH,
+) -> str:
+    """Compute the code-owned facet-base transport revision."""
+    _digest_value(content_revision, "$.content-revision")
+    normalized_path = _normalized_path(path, allow_dot=False, location="$.path")
+    return _revision(
+        {
+            "schema-version": 1,
+            "namespace": "eutaxis",
+            "kind": "packaged",
+            "distribution": "eutaxis",
+            "resource-root": "data",
+            "path": normalized_path,
+            "content-revision": content_revision,
+        }
+    )
+
+
+def _packaged_source_acquisition_revision(content_revision: str) -> str:
+    """Compute the code-owned declaration-corpus transport revision."""
+    _digest_value(content_revision, "$.content-revision")
+    return _revision(
+        {
+            "schema-version": 1,
+            "namespace": "eutaxis",
+            "kind": "packaged",
+            "distribution": "eutaxis",
+            "resource-root": "data/declarations/v1",
+            "content-revision": content_revision,
+        }
+    )
+
+
+def _external_source_acquisition_revision(
+    manifest: ExternalSourceManifest,
+    content_revision: str,
+    git: GitLock | None,
+) -> str:
+    """Compute one external declaration-source transport revision."""
+    if type(manifest) is not ExternalSourceManifest:
+        _fail("$.source", "source manifest has the wrong exact type")
+    if type(manifest.kind) is not AcquisitionKind:
+        _fail("$.source.kind", "source kind has the wrong exact type")
+    if type(manifest.files) is not tuple:
+        _fail("$.source.files", "source files must be an exact tuple")
+    detached_manifest = parse_acquisition_manifest(
+        {
+            "schema-version": 1,
+            "facet-extensions": [],
+            "internal-source": {"namespace": "eutaxis", "kind": "packaged"},
+            "sources": [
+                {
+                    "namespace": manifest.namespace,
+                    "kind": manifest.kind.value,
+                    "root": manifest.root,
+                    "files": list(manifest.files),
+                }
+            ],
+        }
+    ).sources[0]
+    _digest_value(content_revision, "$.content-revision")
+    expects_git = detached_manifest.kind is AcquisitionKind.GIT_SUBMODULE
+    if expects_git != (git is not None):
+        _fail("$.git", "Git state presence differs from transport kind")
+    payload: dict[str, object] = {
+        "schema-version": 1,
+        "namespace": detached_manifest.namespace,
+        "kind": detached_manifest.kind.value,
+        "root": detached_manifest.root,
+        "content-revision": content_revision,
+    }
+    if git is not None:
+        if type(git) is not GitLock:
+            _fail("$.git", "Git lock has the wrong exact type")
+        if type(git.object_format) is not str or git.object_format not in _OID:
+            _fail("$.git.object-format", "unsupported Git object format")
+        detached_git = _git_lock(_git_payload(git), "$.git")
+        _validate_git_lock(detached_git, "$.git")
+        if detached_git.registered_path != detached_manifest.root:
+            _fail("$.git.registered-path", "registered path differs from root")
+        payload["git"] = _git_payload(detached_git)
+    return _revision(payload)
+
+
+def _facet_extension_acquisition_revision(
+    manifest: FacetExtensionManifest,
+    content_revision: str,
+    git: GitLock | None,
+) -> str:
+    """Compute one external facet-extension transport revision."""
+    if type(manifest) is not FacetExtensionManifest:
+        _fail("$.facet-extension", "facet extension has the wrong exact type")
+    if type(manifest.kind) is not AcquisitionKind:
+        _fail("$.facet-extension.kind", "facet kind has the wrong exact type")
+    placeholder_path = "declarations/.revision-input.yaml"
+    if manifest.path == placeholder_path:
+        placeholder_path = "declarations/.revision-input-alternate.yaml"
+    detached_contract = parse_acquisition_manifest(
+        {
+            "schema-version": 1,
+            "facet-extensions": [
+                {
+                    "namespace": manifest.namespace,
+                    "kind": manifest.kind.value,
+                    "root": manifest.root,
+                    "path": manifest.path,
+                }
+            ],
+            "internal-source": {"namespace": "eutaxis", "kind": "packaged"},
+            "sources": [
+                {
+                    "namespace": manifest.namespace,
+                    "kind": manifest.kind.value,
+                    "root": manifest.root,
+                    "files": [placeholder_path],
+                }
+            ],
+        }
+    )
+    detached_manifest = detached_contract.facet_extensions[0]
+    _digest_value(content_revision, "$.content-revision")
+    expects_git = detached_manifest.kind is AcquisitionKind.GIT_SUBMODULE
+    if expects_git != (git is not None):
+        _fail("$.git", "Git state presence differs from transport kind")
+    payload: dict[str, object] = {
+        "schema-version": 1,
+        "namespace": detached_manifest.namespace,
+        "kind": detached_manifest.kind.value,
+        "root": detached_manifest.root,
+        "path": detached_manifest.path,
+        "content-revision": content_revision,
+    }
+    if git is not None:
+        if type(git) is not GitLock:
+            _fail("$.git", "Git lock has the wrong exact type")
+        if type(git.object_format) is not str or git.object_format not in _OID:
+            _fail("$.git.object-format", "unsupported Git object format")
+        detached_git = _git_lock(_git_payload(git), "$.git")
+        _validate_git_lock(detached_git, "$.git")
+        if detached_git.registered_path != detached_manifest.root:
+            _fail("$.git.registered-path", "registered path differs from root")
+        payload["git"] = _git_payload(detached_git)
+    return _revision(payload)
 
 
 def _manifest_source(value: object, index: int) -> ExternalSourceManifest:
@@ -498,16 +673,9 @@ def _validate_base_facets(
         base.id, base.namespace, base.owner, base.path, base.sha256
     )
     _require_revision(base.content_revision, content, location + ".content-revision")
-    acquisition = _revision(
-        {
-            "schema-version": 1,
-            "namespace": "eutaxis",
-            "kind": "packaged",
-            "distribution": "eutaxis",
-            "resource-root": "data",
-            "path": packaged_path,
-            "content-revision": content,
-        }
+    acquisition = _packaged_facet_acquisition_revision(
+        content,
+        path=packaged_path,
     )
     _require_revision(
         base.acquisition_revision,
@@ -541,16 +709,7 @@ def _validate_internal_source(
             )
     content = source_content_revision("eutaxis", source.files)
     _require_revision(source.content_revision, content, location + ".content-revision")
-    acquisition = _revision(
-        {
-            "schema-version": 1,
-            "namespace": "eutaxis",
-            "kind": "packaged",
-            "distribution": "eutaxis",
-            "resource-root": "data/declarations/v1",
-            "content-revision": content,
-        }
-    )
+    acquisition = _packaged_source_acquisition_revision(content)
     _require_revision(
         source.acquisition_revision,
         acquisition,
@@ -584,18 +743,9 @@ def _validate_external_source(
         _validate_git_lock(lock.git, location + ".git")
     content = source_content_revision(lock.namespace, lock.files)
     _require_revision(lock.content_revision, content, location + ".content-revision")
-    payload: dict[str, object] = {
-        "schema-version": 1,
-        "namespace": manifest.namespace,
-        "kind": manifest.kind.value,
-        "root": manifest.root,
-        "content-revision": content,
-    }
-    if lock.git is not None:
-        payload["git"] = _git_payload(lock.git)
     _require_revision(
         lock.acquisition_revision,
-        _revision(payload),
+        _external_source_acquisition_revision(manifest, content, lock.git),
         location + ".acquisition-revision",
     )
 
@@ -621,19 +771,13 @@ def _validate_facet_extension(
         lock.id, lock.namespace, lock.owner, lock.path, lock.sha256
     )
     _require_revision(lock.content_revision, content, location + ".content-revision")
-    payload: dict[str, object] = {
-        "schema-version": 1,
-        "namespace": manifest.namespace,
-        "kind": manifest.kind.value,
-        "root": manifest.root,
-        "path": manifest.path,
-        "content-revision": content,
-    }
-    if source.git is not None:
-        payload["git"] = _git_payload(source.git)
     _require_revision(
         lock.acquisition_revision,
-        _revision(payload),
+        _facet_extension_acquisition_revision(
+            manifest,
+            content,
+            source.git,
+        ),
         location + ".acquisition-revision",
     )
 

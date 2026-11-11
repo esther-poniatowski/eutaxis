@@ -12,8 +12,8 @@ from .acquisition_contract import (
     AcquisitionKind,
     AcquisitionLock,
     AcquisitionManifest,
+    _parse_acquisition_manifest_bytes,
     parse_acquisition_lock_bytes,
-    parse_acquisition_manifest,
     validate_acquisition_contract,
 )
 from .acquisition_paths import AcquisitionPathError, normalized_relative_path
@@ -24,7 +24,7 @@ from .byte_carriers import (
     _issued_retained_context,
     _trusted_directory_from_workspace_path,
 )
-from .exceptions import AcquisitionContractError, DeclarationSchemaError
+from .exceptions import AcquisitionContractError
 from .facets import FacetRegistryView, load_facet_registry_bytes
 from .composite_facets import (
     _issue_external_composite,
@@ -41,7 +41,6 @@ from .packaged_source import (
     _PackagedAcquisitionSession,
     _open_running_packaged_session,
 )
-from .source import load_yaml_bytes
 from ._external_evidence import (
     _EVIDENCE_AUTHORITIES,
     _FacetExtensionRead,
@@ -133,7 +132,7 @@ def _acquire_external_stage(
             workspace_root = stack.enter_context(workspace.retain_directory("."))
             manifest_authoritative = workspace_root.read_authoritative(manifest_path)
             lock_authoritative = workspace_root.read_authoritative(lock_path)
-            manifest = _parse_manifest_bytes(
+            manifest = _parse_acquisition_manifest_bytes(
                 manifest_authoritative.data,
                 path=Path(manifest_path),
             )
@@ -230,18 +229,6 @@ def _retire_stage_tree(stage: object) -> None:
         return
     _retire_composite_tree(state.composite)
     _retire_external_evidence(state.evidence)
-
-
-def _parse_manifest_bytes(source: bytes, *, path: Path) -> AcquisitionManifest:
-    """Parse a manifest only from retained YAML bytes."""
-    try:
-        document, _locations, _digest = load_yaml_bytes(source, path=path)
-    except DeclarationSchemaError as exc:
-        raise AcquisitionContractError(
-            "$.manifest" + exc.location.removeprefix("$"),
-            str(exc),
-        ) from exc
-    return parse_acquisition_manifest(document)
 
 
 def _normalized_file_path(value: object, location: str) -> str:

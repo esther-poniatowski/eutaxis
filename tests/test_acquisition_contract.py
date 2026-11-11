@@ -13,7 +13,13 @@ import eutaxis.declarations as declarations_api
 from eutaxis.declarations.acquisition_contract import (
     PACKAGED_DECLARATION_PATHS,
     AcquisitionKind,
+    ExternalSourceManifest,
+    FacetExtensionManifest,
+    GitLock,
     LockedFile,
+    _external_source_acquisition_revision,
+    _facet_extension_acquisition_revision,
+    acquisition_lock_json_bytes,
     _parse_acquisition_lock_document,
     composite_facet_content_revision,
     facet_content_revision,
@@ -301,6 +307,117 @@ def test_manifest_and_lock_form_one_valid_immutable_contract(
     manifest_document["sources"] = []
     assert manifest.sources
     assert parse_acquisition_lock_bytes(jcs_bytes(lock_document)) == lock
+    assert acquisition_lock_json_bytes(manifest, lock) == jcs_bytes(lock_document)
+    assert (
+        parse_acquisition_lock_bytes(acquisition_lock_json_bytes(manifest, lock))
+        == lock
+    )
+
+
+def test_lock_serialization_rejects_a_forged_lock_value() -> None:
+    manifest = parse_acquisition_manifest(_manifest())
+    lock = parse_acquisition_lock(_lock())
+    forged = replace(lock, schema_version=True)
+    with pytest.raises(AcquisitionContractError, match="schema version"):
+        acquisition_lock_json_bytes(manifest, forged)
+
+
+def test_lock_serialization_rejects_revision_inconsistency() -> None:
+    manifest = parse_acquisition_manifest(_manifest())
+    lock = parse_acquisition_lock(_lock())
+    forged_source = replace(lock.sources[0], acquisition_revision=ZERO)
+    forged = replace(lock, sources=(forged_source,))
+    with pytest.raises(AcquisitionContractError) as raised:
+        acquisition_lock_json_bytes(manifest, forged)
+    assert raised.value.location == "$.sources[0].acquisition-revision"
+
+
+def test_source_revision_rejects_forged_manifest_collection_state() -> None:
+    source = parse_acquisition_manifest(_manifest()).sources[0]
+    forged = replace(source, files=[*source.files])  # type: ignore[arg-type]
+    with pytest.raises(AcquisitionContractError, match="exact tuple"):
+        _external_source_acquisition_revision(forged, _digest("content"), None)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        ExternalSourceManifest(
+            "oikos",
+            AcquisitionKind.WORKSPACE,
+            ".",
+            (),
+        ),
+        ExternalSourceManifest(
+            "eutaxis",
+            AcquisitionKind.WORKSPACE,
+            ".",
+            ("declarations/process-core.yaml",),
+        ),
+    ],
+)
+def test_source_revision_rejects_manifest_semantic_invalidity(
+    source: ExternalSourceManifest,
+) -> None:
+    with pytest.raises(AcquisitionContractError):
+        _external_source_acquisition_revision(source, _digest("content"), None)
+
+
+def test_facet_revision_sentinel_does_not_collide_with_valid_facet_path() -> None:
+    manifest = FacetExtensionManifest(
+        "oikos",
+        AcquisitionKind.WORKSPACE,
+        ".",
+        "declarations/.revision-input.yaml",
+    )
+    revision = _facet_extension_acquisition_revision(
+        manifest,
+        _digest("content"),
+        None,
+    )
+    assert revision.startswith("sha256:")
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "location"),
+    [
+        ("object_format", "md5", "$.git.object-format"),
+        ("object_format", [], "$.git.object-format"),
+        ("commit", "a" * 39, "$.git.commit"),
+        ("gitmodules_path", "modules", "$.git.gitmodules-path"),
+        ("gitmodules_sha256", "sha256:ABC", "$.git.gitmodules-sha256"),
+        ("registered_name", "../oikos", "$.git.registered-name"),
+        ("registered_path", "vendor/other", "$.git.registered-path"),
+        ("parent_index_mode", "100644", "$.git.parent-index-mode"),
+        ("parent_index_gitlink", "b" * 40, "$.git.parent-index-gitlink"),
+    ],
+)
+def test_source_revision_rejects_incomplete_direct_git_state(
+    field: str,
+    value: object,
+    location: str,
+) -> None:
+    source = ExternalSourceManifest(
+        "oikos",
+        AcquisitionKind.GIT_SUBMODULE,
+        "vendor/oikos",
+        ("declarations/process-core.yaml",),
+    )
+    document = _git("vendor/oikos")
+    git = GitLock(
+        document["object-format"],
+        document["commit"],
+        document["gitmodules-path"],
+        document["gitmodules-sha256"],
+        document["registered-name"],
+        document["registered-path"],
+        document["parent-index-mode"],
+        document["parent-index-gitlink"],
+    )
+    forged = replace(git, **{field: value})
+    with pytest.raises(AcquisitionContractError) as raised:
+        _external_source_acquisition_revision(source, _digest("content"), forged)
+    assert raised.value.location == location
 
 
 @pytest.mark.parametrize(
