@@ -18,6 +18,7 @@ from . import info as pkg_info, __version__
 from ._cli_options import command_path, command_root, root_option
 from .commands._cli import commands_app
 from .commands._skills_cli import skills_app
+from .declarations._cli import declarations_app
 from .ops._cli import ops_app
 from .rule_query._cli import rule_app
 
@@ -37,6 +38,7 @@ _ROOT_HELP = (
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 app.add_typer(commands_app, name="commands")
+app.add_typer(declarations_app, name="declarations")
 app.add_typer(skills_app, name="skills")
 app.add_typer(ops_app, name="ops")
 app.add_typer(rule_app, name="rule")

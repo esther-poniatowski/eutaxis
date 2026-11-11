@@ -237,6 +237,15 @@ def _retire_generated_candidate(candidate: object) -> None:
     _retire_nested_observations(state.packaged, state.external)
 
 
+def _retire_generated_candidate_if_issued(candidate: object) -> None:
+    """Retire one candidate only when this process still owns its authority."""
+    if (
+        type(_GENERATED_CANDIDATE_AUTHORITIES.state(candidate))
+        is _GeneratedCandidateState
+    ):
+        _retire_generated_candidate(candidate)
+
+
 def _candidate_lock(
     packaged: _PackagedGenerationObservation,
     external: _WorkspaceGenerationObservation,

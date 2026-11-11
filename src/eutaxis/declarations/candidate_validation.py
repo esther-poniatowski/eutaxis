@@ -20,9 +20,12 @@ from .external_registry import (
 from .generation_candidate import (
     _GeneratedCandidate,
     _GeneratedCandidateState,
+    _generate_workspace_candidate,
     _issued_generated_candidate_state,
     _retire_generated_candidate,
+    _retire_generated_candidate_if_issued,
 )
+from .byte_carriers import TrustedDirectory
 
 
 class _CandidateValidationReceiptState(NamedTuple):
@@ -57,6 +60,33 @@ class _CandidateValidationReceipt:
 _VALIDATION_RECEIPT_AUTHORITIES: IdentityAuthorityStore[object] = (
     IdentityAuthorityStore()
 )
+
+
+def _validated_workspace_candidate_bytes(
+    workspace: TrustedDirectory,
+    manifest_path: str,
+) -> bytes:
+    """Own generation and validation until only retired candidate bytes remain."""
+    candidate = _generate_workspace_candidate(workspace, manifest_path)
+    receipt: _CandidateValidationReceipt | None = None
+    try:
+        receipt = _validate_generated_candidate(candidate)
+        return _consume_validated_candidate(candidate, receipt)
+    except BaseException as primary_error:
+        cleanup_error: BaseException | None = None
+        if receipt is not None:
+            try:
+                _retire_validation_receipt(receipt)
+            except BaseException as exc:
+                cleanup_error = exc
+        try:
+            _retire_generated_candidate_if_issued(candidate)
+        except BaseException as exc:
+            if cleanup_error is None:
+                cleanup_error = exc
+        if cleanup_error is not None:
+            _attach_cleanup_cause(primary_error, cleanup_error)
+        raise
 
 
 def _validate_generated_candidate(
