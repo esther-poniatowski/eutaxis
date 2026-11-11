@@ -1,10 +1,9 @@
 # Inputs of the local schema closure; generated files remain outside this record.
-format_version: 1
+_schema: kleisis:schema-resources@2
 
 paths:
   owned_schemas: src/eutaxis/data/schemas
   registry: specs/schema-registry.yml
-  resources: .schema-resources
 
 exports:
   - eutaxis:context-facets@1

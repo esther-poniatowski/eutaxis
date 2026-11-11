@@ -28,7 +28,7 @@ htmlcov/
 ## Tool Caches
 .pytest_cache/
 .mypy_cache/
-.schema-resources/
+.kleisis/
 
 ## Jupyter Notebook
 .ipynb_checkpoints/
