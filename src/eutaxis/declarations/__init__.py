@@ -385,6 +385,16 @@ from .resolution import (
     ResolvedRuleProjection,
     resolve_compilation_unit,
 )
+from .external_resolution import (
+    ExternalResolutionResult,
+    resolve_external_compilation_unit,
+)
+from .external_composition import (
+    ExternalCumulativeArtifact,
+    ExternalCumulativeCompositionPlan,
+    assemble_external_cumulative_artifact,
+    plan_external_cumulative_composition,
+)
 from .runners import (
     CheckerRunner,
     CheckerRunnerBinding,
@@ -643,6 +653,9 @@ __all__ = [
     "ResolutionEventKind",
     "ResolutionPolicyDeclaration",
     "ResolutionResult",
+    "ExternalResolutionResult",
+    "ExternalCumulativeArtifact",
+    "ExternalCumulativeCompositionPlan",
     "ResolutionSource",
     "ResolutionStrategy",
     "ResolutionTrace",
@@ -727,6 +740,9 @@ __all__ = [
     "observe_procedure_preconditions",
     "prepare_procedure_run",
     "resolve_compilation_unit",
+    "resolve_external_compilation_unit",
+    "plan_external_cumulative_composition",
+    "assemble_external_cumulative_artifact",
     "select_migration_baselines",
     "schema_path",
     "compare_external_declarations",

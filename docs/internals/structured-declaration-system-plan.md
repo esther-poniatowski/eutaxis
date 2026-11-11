@@ -683,10 +683,29 @@ The revision-2 catalog checks report:
 - the revision-1 and revision-2 golden indexes both pass
 - `git diff --check` passes
 
+The public external-resolution route now consumes an authenticated acquisition
+result without exposing its private declaration registry. Opaque resolution,
+cumulative-plan and artifact capabilities retain the exact upstream authority
+through artifact access. Each operation authenticates its input before and
+after work. Exact store tokens reject reconstructed, equal-state and
+cross-result substitutions. Cleanup follows a nested resolution only through a
+token-authenticated primary or owner record, with identity agreement when both
+records are authenticated. Therefore, rejecting one forged wrapper cannot
+invalidate a different valid result. The internal registry resolver and
+cumulative planner remain separate APIs for Eutaxis-owned registries.
+
+The external resolution and composition checks report:
+
+- 24 focused authority and failure-path tests pass
+- 209 resolution, composition, acquisition-result and catalog tests pass
+- Black accepts the four changed Python and test files
+- Sphinx regenerates the API reference with zero warnings
+- `git diff --check` passes
+
 The workspace-only pilot now must produce its accountability ledger and
-consumer projections. Its reviewed Git commit retains the current output as
-the golden baseline and rollback target. General capsule commands remain
-parallel release-system debt.
+consumer projections. Its reviewed Git commit retains the current output as the
+golden baseline and rollback target. General capsule commands remain parallel
+release-system debt.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 

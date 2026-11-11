@@ -10,6 +10,22 @@ External declaration acquisition: verify one external corpus and expose its port
    :show-inheritance:
 ```
 
+## External resolution
+
+```{eval-rst}
+.. automodule:: eutaxis.declarations.external_resolution
+   :members: ExternalResolutionResult, resolve_external_compilation_unit
+   :show-inheritance:
+```
+
+## External cumulative composition
+
+```{eval-rst}
+.. automodule:: eutaxis.declarations.external_composition
+   :members: ExternalCumulativeArtifact, ExternalCumulativeCompositionPlan, assemble_external_cumulative_artifact, plan_external_cumulative_composition
+   :show-inheritance:
+```
+
 ## Declaration catalog
 
 ```{eval-rst}
