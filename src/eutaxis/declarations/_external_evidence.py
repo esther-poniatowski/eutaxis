@@ -87,7 +87,8 @@ class _ProvisionalEvidenceState(NamedTuple):
     """Bind the complete contract and every facet read before declarations."""
 
     manifest_authoritative: AuthoritativeByteCarrier
-    lock_authoritative: AuthoritativeByteCarrier
+    lock_authoritative: AuthoritativeByteCarrier | None
+    generated_candidate: object | None
     manifest: AcquisitionManifest
     manifest_state: object
     lock: AcquisitionLock
@@ -104,7 +105,8 @@ class _FinalEvidenceState(NamedTuple):
     """Bind the complete verified non-Git source set."""
 
     manifest_evidence: VerifiedByteCarrier
-    lock_evidence: VerifiedByteCarrier
+    lock_evidence: VerifiedByteCarrier | None
+    generated_candidate: object | None
     manifest: AcquisitionManifest
     manifest_state: object
     lock: AcquisitionLock
@@ -142,7 +144,7 @@ _EVIDENCE_AUTHORITIES: IdentityAuthorityStore[object] = IdentityAuthorityStore()
 
 def _issue_provisional_evidence(
     manifest_authoritative: AuthoritativeByteCarrier,
-    lock_authoritative: AuthoritativeByteCarrier,
+    lock_authoritative: AuthoritativeByteCarrier | None,
     manifest: AcquisitionManifest,
     lock: AcquisitionLock,
     workspace_root_path: str,
@@ -150,12 +152,15 @@ def _issue_provisional_evidence(
     packaged_facet: _PackagedFacetRead,
     sources: tuple[_OpenExternalSource, ...],
     extensions: tuple[_FacetExtensionRead, ...],
+    *,
+    generated_candidate: object | None = None,
 ) -> _ExternalAcquisitionEvidence:
     """Issue the complete correlated source record used by the composite."""
     result = object.__new__(_ExternalAcquisitionEvidence)
     state = _ProvisionalEvidenceState(
         manifest_authoritative,
         lock_authoritative,
+        generated_candidate,
         manifest,
         identity_value_state(manifest),
         lock,
@@ -179,7 +184,7 @@ def _issue_provisional_evidence(
 def _finalize_evidence(
     evidence: _ExternalAcquisitionEvidence,
     manifest_evidence: VerifiedByteCarrier,
-    lock_evidence: VerifiedByteCarrier,
+    lock_evidence: VerifiedByteCarrier | None,
     packaged: PackagedInternalSource,
     sources: tuple[_OpenExternalSource, ...],
     extensions: tuple[_FacetExtensionRead, ...],
@@ -227,6 +232,7 @@ def _finalize_evidence(
     final = _FinalEvidenceState(
         manifest_evidence,
         lock_evidence,
+        provisional.generated_candidate,
         provisional.manifest,
         provisional.manifest_state,
         provisional.lock,
@@ -283,16 +289,12 @@ def _provisional_external_facet_state(
         manifest_root, manifest_identity, _manifest = _authoritative_carrier_context(
             state.manifest_authoritative
         )
-        lock_root, lock_identity, _lock = _authoritative_carrier_context(
-            state.lock_authoritative
-        )
         if (
             manifest_root != state.workspace_root_path
             or manifest_identity != state.workspace_root_identity
-            or lock_root != state.workspace_root_path
-            or lock_identity != state.workspace_root_identity
         ):
-            _fail("$", "manifest or lock belongs to another workspace root")
+            _fail("$", "manifest belongs to another workspace root")
+        _validate_provisional_lock_evidence(state)
         base_registry = state.packaged_facet.registry
         base_lock = state.lock.facet_registry.base
         if identity_value_state(base_registry) != state.packaged_facet_state:
@@ -313,19 +315,71 @@ def _provisional_external_facet_state(
         manifest_root, manifest_identity, _manifest = _verified_carrier_context(
             state.manifest_evidence
         )
-        lock_root, lock_identity, _lock = _verified_carrier_context(state.lock_evidence)
         if (
             manifest_root != state.workspace_root_path
             or manifest_identity != state.workspace_root_identity
-            or lock_root != state.workspace_root_path
-            or lock_identity != state.workspace_root_identity
         ):
-            _fail("$", "manifest or lock belongs to another workspace root")
+            _fail("$", "manifest belongs to another workspace root")
+        _validate_final_lock_evidence(state)
         _base_evidence, base_lock, base_registry = _issued_packaged_facet_state(
             state.packaged
         )
         return _final_facet_values(state, base_registry, base_lock)
     _fail("$.facet-registry", "external acquisition evidence is not issued here")
+
+
+def _validate_provisional_lock_evidence(state: _ProvisionalEvidenceState) -> None:
+    """Authenticate exactly one persisted or generated lock source."""
+    if state.generated_candidate is None:
+        if state.lock_authoritative is None:
+            _fail("$.lock", "persisted lock evidence is missing")
+        lock_root, lock_identity, _lock = _authoritative_carrier_context(
+            state.lock_authoritative
+        )
+        if (
+            lock_root != state.workspace_root_path
+            or lock_identity != state.workspace_root_identity
+        ):
+            _fail("$.lock", "lock belongs to another workspace root")
+        return
+    if state.lock_authoritative is not None:
+        _fail("$.lock", "generated acquisition also retained a persisted lock")
+    _validate_generated_candidate_contract(state)
+
+
+def _validate_final_lock_evidence(state: _FinalEvidenceState) -> None:
+    """Reauthenticate the selected lock source after declaration validation."""
+    if state.generated_candidate is None:
+        if state.lock_evidence is None:
+            _fail("$.lock", "persisted lock verification is missing")
+        lock_root, lock_identity, _lock = _verified_carrier_context(state.lock_evidence)
+        if (
+            lock_root != state.workspace_root_path
+            or lock_identity != state.workspace_root_identity
+        ):
+            _fail("$.lock", "lock belongs to another workspace root")
+        return
+    if state.lock_evidence is not None:
+        _fail("$.lock", "generated acquisition also retained persisted verification")
+    _validate_generated_candidate_contract(state)
+
+
+def _validate_generated_candidate_contract(
+    state: _ProvisionalEvidenceState | _FinalEvidenceState,
+) -> None:
+    """Bind generated bytes and values to the exact acquired contract."""
+    from .generation_candidate import _issued_generated_candidate_state
+
+    candidate = state.generated_candidate
+    candidate_state = _issued_generated_candidate_state(candidate)
+    if (
+        candidate_state.workspace_root_path != state.workspace_root_path
+        or candidate_state.workspace_root_device != state.workspace_root_identity.device
+        or candidate_state.workspace_root_inode != state.workspace_root_identity.inode
+        or candidate_state.manifest != state.manifest
+        or candidate_state.parsed_lock != state.lock
+    ):
+        _fail("$.lock", "generated candidate differs from acquired contract")
 
 
 def _validate_provisional_correlations(state: _ProvisionalEvidenceState) -> None:

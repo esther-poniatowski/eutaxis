@@ -137,6 +137,7 @@ def _publish_external_result(
     """Build the combined registry and transfer stage ownership to one result."""
     external_registry: _ExternalRegistryResult | None = None
     try:
+        _require_publishable_stage(stage)
         external_registry = _issue_external_declaration_registry(stage)
         return _issue_external_result(stage, external_registry)
     except BaseException:
@@ -151,7 +152,12 @@ def _issue_external_result(
     external_registry: _ExternalRegistryResult,
 ) -> ExternalAcquisitionResult:
     """Issue a result only from one authenticated stage and its exact registry."""
-    stage_state = _issued_external_stage_state(stage)
+    try:
+        stage_state = _require_publishable_stage(stage)
+    except BaseException:
+        _retire_external_registry(external_registry)
+        _retire_stage_tree(stage)
+        raise
     registry_state = _issued_external_registry_state(external_registry)
     if (
         registry_state.stage is not stage
@@ -183,6 +189,20 @@ def _issue_external_result(
     except BaseException:
         _RESULT_AUTHORITIES.retire(result)
         raise
+
+
+def _require_publishable_stage(
+    stage: _ExternalAcquisitionStage,
+) -> _ExternalAcquisitionStageState:
+    """Reject generated-validation stages at the lowest result boundary."""
+    stage_state = _issued_external_stage_state(stage)
+    evidence_state = _EVIDENCE_AUTHORITIES.state(stage_state.evidence)
+    if (
+        type(evidence_state) is _FinalEvidenceState
+        and evidence_state.generated_candidate is not None
+    ):
+        _fail("$", "generated validation cannot publish an acquisition result")
+    return stage_state
 
 
 def _issued_external_result_state(

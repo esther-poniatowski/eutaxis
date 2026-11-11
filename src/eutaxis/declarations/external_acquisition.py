@@ -122,8 +122,42 @@ def _acquire_external_stage(
     lock_path: str,
 ) -> _ExternalAcquisitionStage:
     """Acquire one external contract through a retained workspace capability."""
+    return _acquire_external_stage_contract(
+        workspace,
+        manifest_path,
+        lock_path=lock_path,
+        generated_candidate=None,
+    )
+
+
+def _acquire_external_stage_from_candidate(
+    candidate: object,
+) -> _ExternalAcquisitionStage:
+    """Acquire one generated contract without exposing its lock as a file."""
+    from .generation_candidate import _issued_generated_candidate_state
+
+    candidate_state = _issued_generated_candidate_state(candidate)
+    return _acquire_external_stage_contract(
+        candidate_state.workspace,
+        candidate_state.manifest_path,
+        lock_path=None,
+        generated_candidate=candidate,
+    )
+
+
+def _acquire_external_stage_contract(
+    workspace: TrustedDirectory,
+    manifest_path: str,
+    *,
+    lock_path: str | None,
+    generated_candidate: object | None,
+) -> _ExternalAcquisitionStage:
+    """Run ordinary acquisition against one persisted or generated lock."""
     manifest_path = _normalized_file_path(manifest_path, "$.manifest-path")
-    lock_path = _normalized_file_path(lock_path, "$.lock-path")
+    if generated_candidate is None:
+        lock_path = _normalized_file_path(lock_path, "$.lock-path")
+    elif lock_path is not None:
+        _fail("$.lock-path", "generated acquisition cannot accept a lock path")
     evidence: _ExternalAcquisitionEvidence | None = None
     composite: FacetRegistryView | None = None
     stage: _ExternalAcquisitionStage | None = None
@@ -131,12 +165,28 @@ def _acquire_external_stage(
         with ExitStack() as stack:
             workspace_root = stack.enter_context(workspace.retain_directory("."))
             manifest_authoritative = workspace_root.read_authoritative(manifest_path)
-            lock_authoritative = workspace_root.read_authoritative(lock_path)
             manifest = _parse_acquisition_manifest_bytes(
                 manifest_authoritative.data,
                 path=Path(manifest_path),
             )
-            lock = parse_acquisition_lock_bytes(lock_authoritative.data)
+            lock_authoritative: AuthoritativeByteCarrier | None = None
+            if generated_candidate is None:
+                assert lock_path is not None
+                lock_authoritative = workspace_root.read_authoritative(lock_path)
+                lock = parse_acquisition_lock_bytes(lock_authoritative.data)
+            else:
+                from .generation_candidate import _issued_generated_candidate_state
+
+                candidate_state = _issued_generated_candidate_state(generated_candidate)
+                if (
+                    candidate_state.workspace is not workspace
+                    or candidate_state.manifest_path != manifest_path
+                    or candidate_state.manifest != manifest
+                ):
+                    _fail("$.lock", "generated candidate differs from workspace input")
+                lock = parse_acquisition_lock_bytes(candidate_state.canonical_bytes)
+                if lock != candidate_state.parsed_lock:
+                    _fail("$.lock", "generated candidate lock bytes changed")
             validate_acquisition_contract(manifest, lock)
             workspace_root_path, workspace_root_identity = _issued_retained_context(
                 workspace_root
@@ -156,6 +206,7 @@ def _acquire_external_stage(
                     packaged_facet,
                     sources,
                     extensions,
+                    generated_candidate=generated_candidate,
                 )
                 composite = _issue_external_composite(evidence)
                 parsing_facets = _provisional_composite_view(composite)
@@ -181,7 +232,11 @@ def _acquire_external_stage(
                 )
                 git_evidence = _finish_git_sessions(git_sessions)
                 manifest_evidence = workspace_root.verify(manifest_authoritative)
-                lock_evidence = workspace_root.verify(lock_authoritative)
+                lock_evidence = (
+                    workspace_root.verify(lock_authoritative)
+                    if lock_authoritative is not None
+                    else None
+                )
                 packaged = packaged_session.verify_and_issue()
                 extension_evidence = tuple(
                     sources[item.source_index].root.verify(item.authoritative)
@@ -224,11 +279,22 @@ def _acquire_external_stage(
 
 def _retire_stage_tree(stage: object) -> None:
     """Retire a stage and both nested authority layers."""
-    state = _STAGE_AUTHORITIES.retire(stage)
+    state = _STAGE_AUTHORITIES.state(stage)
     if type(state) is not _ExternalAcquisitionStageState:
         return
-    _retire_composite_tree(state.composite)
-    _retire_external_evidence(state.evidence)
+    first_error: BaseException | None = None
+    try:
+        _retire_composite_tree(state.composite)
+    except BaseException as exc:
+        first_error = exc
+    try:
+        _retire_external_evidence(state.evidence)
+    except BaseException as exc:
+        if first_error is None:
+            first_error = exc
+    if first_error is not None:
+        raise first_error
+    _STAGE_AUTHORITIES.retire(stage)
 
 
 def _normalized_file_path(value: object, location: str) -> str:
