@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Mapping, NoReturn, TypedDict, cast
 
 from .applicability import conjoin_applicability
+from .acquisition_paths import AcquisitionPathError, portable_resource_path
 from .exceptions import DeclarationSemanticError
 from .facets import FacetRegistryView, validate_declaration_facets
 from .models import (
@@ -40,6 +41,7 @@ from .models import (
     RuleAxis,
     RuleDeclaration,
     RuleSetDeclaration,
+    SupportResourceReference,
     VersionedReference,
     freeze_json,
 )
@@ -393,6 +395,9 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
             mechanism=CompositionMechanism(str(document["mechanism"])),
             scope=str(document["scope"]),
             target=str(document["target"]),
+            invocation=tuple(
+                str(item) for item in cast(list[object], document.get("invocation", []))
+            ),
             sections=tuple(
                 ManifestSection(
                     id=str(item["id"]),
@@ -443,6 +448,16 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
                 for item in cast(list[object], document["preconditions"])
             ),
             method=str(document["method"]) if "method" in document else None,
+            support_resources=tuple(
+                SupportResourceReference(
+                    resource=str(item["resource"]),
+                    destination=str(item["destination"]),
+                )
+                for item in map(
+                    _mapping,
+                    cast(list[object], document.get("support-resources", [])),
+                )
+            ),
             effects=tuple(
                 str(item) for item in cast(list[object], document["effects"])
             ),
@@ -543,6 +558,18 @@ def _validate_semantics(
             path=path,
             locations=locations,
         )
+        for index, support in enumerate(
+            cast(list[object], document.get("support-resources", []))
+        ):
+            try:
+                portable_resource_path(_mapping(support)["destination"])
+            except AcquisitionPathError as error:
+                _semantic_error(
+                    path,
+                    locations,
+                    ("support-resources", index, "destination"),
+                    str(error),
+                )
     elif kind == "decision":
         drivers = [
             _mapping(driver) for driver in cast(list[object], document["drivers"])

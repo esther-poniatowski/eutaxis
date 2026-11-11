@@ -8,6 +8,7 @@ import pytest
 
 import eutaxis.declarations.external_composition as external_composition_module
 from eutaxis.declarations import (
+    CompositionError,
     DeclarationCatalogError,
     acquire_external_declarations_from_path,
     plan_external_cumulative_composition,
@@ -264,6 +265,35 @@ def _plan(tmp_path: Path):
     return acquisition, plan_external_cumulative_composition(resolution)
 
 
+def _plan_with_operation(tmp_path: Path, operation: bytes):
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="projection",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/operation.yaml", operation),
+            ("declarations/procedure.yaml", PROCEDURE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+        facet_bytes=FACETS,
+    )
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    resolution = resolve_external_compilation_unit(
+        acquisition,
+        "projection/manifest",
+        {
+            "context.available": True,
+            "projection.enabled": True,
+            "projection.optional": False,
+            "projection.stable": True,
+            "projection.done": False,
+        },
+    )
+    return plan_external_cumulative_composition(resolution)
+
+
 def test_complete_projection_matches_reviewed_golden(tmp_path: Path) -> None:
     _acquisition, plan = _plan(tmp_path)
 
@@ -276,6 +306,22 @@ def test_complete_projection_matches_reviewed_golden(tmp_path: Path) -> None:
     assert "1. `finalize`" not in first.text
     assert "*Entry.* `choose`" in first.text
     assert '````"value ``` with backticks"````' in first.text
+
+
+def test_cumulative_projection_rejects_operation_support_resources(
+    tmp_path: Path,
+) -> None:
+    operation = OPERATION.replace(
+        b"effects: [projection/artifact]",
+        b"support-resources:\n"
+        b"  - resource: projection/helper\n"
+        b"    destination: scripts/helper.py\n"
+        b"effects: [projection/artifact]",
+    )
+    plan = _plan_with_operation(tmp_path, operation)
+
+    with pytest.raises(CompositionError, match="cumulative Markdown cannot carry"):
+        render_external_cumulative_markdown(plan)
 
 
 def test_catalog_retirement_after_projection_blocks_publication(

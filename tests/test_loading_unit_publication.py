@@ -1153,6 +1153,17 @@ def test_loading_unit_names_must_be_safe_path_slugs(tmp_path: Path, name: str) -
         load_config(config)
 
 
+@pytest.mark.parametrize("name", ("con", "a" * 65))
+def test_loading_unit_names_retain_slug_contract(tmp_path: Path, name: str) -> None:
+    config = _workspace(tmp_path)
+    payload = yaml.safe_load(config.read_text(encoding="utf-8"))
+    payload["skill_loading_units"][0]["name"] = name
+    payload["skill_loading_units"][2]["includes"][0] = name
+    config.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+    assert load_config(config).skill_loading_units[0].name == name
+
+
 def test_loading_unit_names_are_casefold_unique(tmp_path: Path) -> None:
     config = _workspace(tmp_path)
     payload = yaml.safe_load(config.read_text(encoding="utf-8"))

@@ -278,6 +278,14 @@ def _render_operation(
             f"catalog has no operation {reference.id!r}@{reference.version}",
         )
     operation = record.declaration
+    if operation.support_resources:
+        raise CompositionError(
+            "$.operation-contracts",
+            (
+                f"operation {reference.id!r}@{reference.version} requires "
+                "support resources that cumulative Markdown cannot carry"
+            ),
+        )
     blocks = [f"**`{operation.id}@{operation.version}`.**"]
     if operation.rationale is not None:
         blocks.append(f"*Why.* {operation.rationale}")

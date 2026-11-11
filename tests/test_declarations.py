@@ -767,6 +767,8 @@ def test_composition_manifest_preserves_each_typed_mechanism(
 ) -> None:
     def mutate(document: dict[str, object]) -> None:
         document["mechanism"] = mechanism.value
+        if mechanism is CompositionMechanism.SEPARATE_DIRECTORY:
+            document["invocation"] = ["model", "user"]
 
     declaration = load_declaration(
         _write_variant(tmp_path, "composition-manifest.yaml", mutate)
@@ -774,6 +776,11 @@ def test_composition_manifest_preserves_each_typed_mechanism(
 
     assert isinstance(declaration, CompositionManifestDeclaration)
     assert declaration.mechanism is mechanism
+    assert declaration.invocation == (
+        ("model", "user")
+        if mechanism is CompositionMechanism.SEPARATE_DIRECTORY
+        else ()
+    )
 
 
 @pytest.mark.parametrize(

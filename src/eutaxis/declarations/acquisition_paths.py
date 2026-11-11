@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 from .canonical_json import CanonicalJsonError, require_unicode_scalar_text
+
+_RESOURCE_SEGMENT = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
+_DEVICE_STEM = re.compile(r"^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$")
 
 
 class AcquisitionPathError(ValueError):
@@ -36,3 +41,19 @@ def normalized_path_components(value: object, *, allow_dot: bool) -> tuple[str, 
     """Return the validated path components used for descriptor traversal."""
     path = normalized_relative_path(value, allow_dot=allow_dot)
     return () if path == "." else tuple(path.split("/"))
+
+
+def portable_resource_path(value: object) -> str:
+    """Return one normalized resource path in the portable ASCII subset."""
+    path = normalized_relative_path(value, allow_dot=False)
+    for segment in path.split("/"):
+        if _RESOURCE_SEGMENT.fullmatch(segment) is None:
+            raise AcquisitionPathError(
+                "resource path segment is not portable lowercase ASCII"
+            )
+        stem = segment.split(".", 1)[0]
+        if _DEVICE_STEM.fullmatch(stem) is not None:
+            raise AcquisitionPathError(
+                "resource path segment uses a reserved device stem"
+            )
+    return path

@@ -23,7 +23,10 @@ def test_loads_builtin_clean_memory_source(tmp_path: Path) -> None:
     assert "{{ agent }}" in src.action.template
     assert src.argument_hint == "[--all] [--backup] [--dry-run]"
     assert "claude" in src.adapters
-    assert src.adapters["claude"].frontmatter["allowed-tools"] == "Bash(eutaxis ops clean-memory*)"
+    assert (
+        src.adapters["claude"].frontmatter["allowed-tools"]
+        == "Bash(eutaxis ops clean-memory*)"
+    )
     assert "codex" in src.adapters
     assert "agents/openai.yaml" in src.adapters["codex"].files
 
@@ -68,6 +71,19 @@ def test_unsafe_skill_name_raises(tmp_path: Path, name: str) -> None:
 
     with pytest.raises(CommandRenderError, match="lowercase hyphen-separated slug"):
         load_sources(home=tmp_path, project_root=tmp_path)
+
+
+@pytest.mark.parametrize("name", ("con", "a" * 65))
+def test_legacy_command_names_retain_slug_contract(tmp_path: Path, name: str) -> None:
+    _write_source(
+        tmp_path / ".eutaxis" / "commands" / "legacy.md",
+        f"---\nname: {name}\ndescription: x\ninvocation: [user]\n"
+        "failure-mode: visible\n---\nbody\n",
+    )
+
+    assert name in {
+        source.name for source in load_sources(home=tmp_path, project_root=tmp_path)
+    }
 
 
 def test_unsupported_invocation_value_raises(tmp_path: Path) -> None:
@@ -174,7 +190,7 @@ def test_adapters_passthrough_parses(tmp_path: Path) -> None:
         "      allowed-tools: Bash(foo*)\n"
         "  codex:\n"
         "    files:\n"
-        "      \"agents/openai.yaml\": \"policy:\\n  allow_implicit_invocation: false\\n\"\n"
+        '      "agents/openai.yaml": "policy:\\n  allow_implicit_invocation: false\\n"\n'
         "---\nbody\n",
     )
     sources = load_sources(home=tmp_path, project_root=tmp_path)
@@ -192,7 +208,7 @@ def test_adapters_files_value_must_be_string(tmp_path: Path) -> None:
         "adapters:\n"
         "  codex:\n"
         "    files:\n"
-        "      \"agents/openai.yaml\": 42\n"
+        '      "agents/openai.yaml": 42\n'
         "---\nbody\n",
     )
     with pytest.raises(CommandRenderError):

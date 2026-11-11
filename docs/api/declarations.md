@@ -313,6 +313,124 @@ Render one external cumulative plan from its authenticated catalog.
 * **Return type:**
   [*ExternalCumulativeArtifact*](#eutaxis.declarations.external_composition.ExternalCumulativeArtifact)
 
+<a id="structured-procedure-skill-planning"></a>
+
+## Structured procedure Skill planning
+
+<a id="eutaxis.declarations.models.SupportResourceReference"></a>
+
+### *class* eutaxis.declarations.models.SupportResourceReference(resource, destination)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Place one acquired resource inside an operation’s Skill artifact.
+
+* **Parameters:**
+  * **resource** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **destination** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+
+<a id="eutaxis.declarations.models.SupportResourceReference.resource"></a>
+
+#### resource *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.declarations.models.SupportResourceReference.destination"></a>
+
+#### destination *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="module-eutaxis.declarations.structured_skill"></a>
+
+Plan one authenticated structured procedure Skill and its resource closure.
+
+<a id="eutaxis.declarations.structured_skill.PlannedSupportResource"></a>
+
+### *class* eutaxis.declarations.structured_skill.PlannedSupportResource(operation, resource, destination)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Bind one operation dependency to exact acquired bytes and a destination.
+
+* **Parameters:**
+  * **operation** (*VersionedReference*)
+  * **resource** ([*AcquiredResource*](#eutaxis.declarations.external_result.AcquiredResource))
+  * **destination** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+
+<a id="eutaxis.declarations.structured_skill.PlannedSupportResource.operation"></a>
+
+#### operation *: VersionedReference*
+
+<a id="eutaxis.declarations.structured_skill.PlannedSupportResource.resource"></a>
+
+#### resource *: [AcquiredResource](#eutaxis.declarations.external_result.AcquiredResource)*
+
+<a id="eutaxis.declarations.structured_skill.PlannedSupportResource.destination"></a>
+
+#### destination *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.declarations.structured_skill.StructuredSkillPlan"></a>
+
+### *class* eutaxis.declarations.structured_skill.StructuredSkillPlan(\*\_args, \*\*\_kwargs)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Expose an authenticated structured procedure and resource closure.
+
+* **Parameters:**
+  * **\_args** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+  * **\_kwargs** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+
+<a id="eutaxis.declarations.structured_skill.StructuredSkillPlan.manifest"></a>
+
+#### *property* manifest *: CompositionManifestDeclaration*
+
+Return the exact separate-directory manifest.
+
+<a id="eutaxis.declarations.structured_skill.StructuredSkillPlan.name"></a>
+
+#### *property* name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+Return the authenticated Skill name.
+
+<a id="eutaxis.declarations.structured_skill.StructuredSkillPlan.scope"></a>
+
+#### *property* scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+Return the authenticated installation scope.
+
+<a id="eutaxis.declarations.structured_skill.StructuredSkillPlan.invocation"></a>
+
+#### *property* invocation *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+
+Return the authenticated invocation routes.
+
+<a id="eutaxis.declarations.structured_skill.StructuredSkillPlan.procedure"></a>
+
+#### *property* procedure *: ProcedureDeclaration*
+
+Return the exact selected root procedure.
+
+<a id="eutaxis.declarations.structured_skill.StructuredSkillPlan.operations"></a>
+
+#### *property* operations *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[OperationDeclaration, ...]*
+
+Return exact operations in first action-reference order.
+
+<a id="eutaxis.declarations.structured_skill.StructuredSkillPlan.support_resources"></a>
+
+#### *property* support_resources *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[PlannedSupportResource](#eutaxis.declarations.structured_skill.PlannedSupportResource), ...]*
+
+Return the authenticated operation-owned resource closure.
+
+<a id="eutaxis.declarations.structured_skill.plan_structured_skill"></a>
+
+### eutaxis.declarations.structured_skill.plan_structured_skill(resolution)
+
+Close one resolved procedure over exact operations and support resources.
+
+* **Parameters:**
+  **resolution** ([*ExternalResolutionResult*](#eutaxis.declarations.external_resolution.ExternalResolutionResult))
+* **Return type:**
+  [*StructuredSkillPlan*](#eutaxis.declarations.structured_skill.StructuredSkillPlan)
+
 <a id="module-eutaxis.declarations.catalog"></a>
 
 <a id="declaration-catalog"></a>

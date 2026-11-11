@@ -209,6 +209,7 @@ from .models import (
     ResolutionStrategy,
     RuleDeclaration,
     RuleSetDeclaration,
+    SupportResourceReference,
     VersionedReference,
 )
 from .operations import (
@@ -398,6 +399,11 @@ from .external_composition import (
     assemble_external_cumulative_artifact,
     plan_external_cumulative_composition,
     render_external_cumulative_markdown,
+)
+from .structured_skill import (
+    PlannedSupportResource,
+    StructuredSkillPlan,
+    plan_structured_skill,
 )
 from .runners import (
     CheckerRunner,
@@ -687,6 +693,9 @@ __all__ = [
     "RuleResidualJudgmentRequest",
     "RuleResidualJudgmentSubmission",
     "RuleSetDeclaration",
+    "SupportResourceReference",
+    "PlannedSupportResource",
+    "StructuredSkillPlan",
     "SemanticChangeKind",
     "SemanticComparison",
     "SemanticDifference",
@@ -749,6 +758,7 @@ __all__ = [
     "resolve_compilation_unit",
     "resolve_external_compilation_unit",
     "plan_external_cumulative_composition",
+    "plan_structured_skill",
     "assemble_external_cumulative_artifact",
     "render_external_cumulative_markdown",
     "select_migration_baselines",

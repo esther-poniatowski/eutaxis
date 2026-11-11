@@ -79,6 +79,12 @@ def _validate_declaration(
             location,
             root + ("preconditions",),
         )
+        for index, support in enumerate(declaration.support_resources):
+            _validate_identifier(
+                support.resource,
+                location,
+                root + ("support-resources", index, "resource"),
+            )
     elif isinstance(declaration, ResolutionPolicyDeclaration):
         _validate_policy(declaration, location, root)
     elif isinstance(declaration, CompositionManifestDeclaration):

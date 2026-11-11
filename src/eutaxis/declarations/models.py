@@ -315,6 +315,7 @@ class CompositionManifestDeclaration(Declaration):
     mechanism: CompositionMechanism
     scope: str
     target: str
+    invocation: tuple[str, ...]
     sections: tuple[ManifestSection, ...]
     policies: tuple[str, ...]
 
@@ -336,6 +337,14 @@ class EvaluatorDeclaration(Declaration):
 
 
 @dataclass(frozen=True)
+class SupportResourceReference:
+    """Place one acquired resource inside an operation's Skill artifact."""
+
+    resource: str
+    destination: str
+
+
+@dataclass(frozen=True)
 class OperationDeclaration(Declaration):
     """A versioned operation contract referenced by procedures."""
 
@@ -344,6 +353,7 @@ class OperationDeclaration(Declaration):
     outputs: Mapping[str, JsonValue]
     preconditions: tuple[Predicate, ...]
     method: str | None
+    support_resources: tuple[SupportResourceReference, ...]
     effects: tuple[str, ...]
     failure_outcomes: tuple[str, ...]
     recovery: str

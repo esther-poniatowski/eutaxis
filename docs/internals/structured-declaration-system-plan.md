@@ -293,9 +293,10 @@ This phase gives each host the smallest artifact that preserves the complete res
 - [x] Render authenticated cumulative Markdown from live catalog records, with complete effective rule and procedure contracts and reviewed golden bytes.
 - [ ] Render the first compact structured procedure Skill under the [separate-directory contract](../adr/structured-procedure-skill-projection.md):
   - [x] Acquire locked UTF-8 support resources separately from declaration YAML and retain their verified carriers in the issued external result.
-  - [ ] Derive and authenticate the operation-owned resource closure from the resolved procedure and live catalog in the structured-Skill planner.
+  - [x] Derive and authenticate the operation-owned resource closure from the resolved procedure and live catalog in the structured-Skill planner.
   - [ ] Emit a bounded `SKILL.md`, the complete contract reference and the authenticated resource closure through the existing multi-file artifact model.
-  - [ ] Reject missing methods, unresolved resources, unsafe or colliding paths, stale authority and budget overflow.
+  - [x] Reject missing methods, unresolved resources, unsafe or colliding paths and stale planner authority.
+  - [ ] Reject entrypoint and complete-artifact budget overflow during rendering.
   - [x] Preserve cumulative Markdown as a single-file projection.
   - [ ] Activate the Oikos batch procedure only after cross-agent golden, rollback and adversarial gates pass.
 - [ ] Generalize compact Skill entrypoints from the first procedure consumer to other catalog records only after a second use case exposes the required variation.

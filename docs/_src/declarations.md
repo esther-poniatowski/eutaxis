@@ -26,6 +26,17 @@ External declaration acquisition: verifies one external corpus and exposes its p
    :show-inheritance:
 ```
 
+## Structured procedure Skill planning
+
+```{eval-rst}
+.. autoclass:: eutaxis.declarations.models.SupportResourceReference
+   :members:
+
+.. automodule:: eutaxis.declarations.structured_skill
+   :members: PlannedSupportResource, StructuredSkillPlan, plan_structured_skill
+   :show-inheritance:
+```
+
 ## Declaration catalog
 
 ```{eval-rst}

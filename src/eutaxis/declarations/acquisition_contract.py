@@ -14,7 +14,11 @@ from .acquisition_schema import (
     validate_acquisition_lock_document,
     validate_acquisition_manifest_document,
 )
-from .acquisition_paths import AcquisitionPathError, normalized_relative_path
+from .acquisition_paths import (
+    AcquisitionPathError,
+    normalized_relative_path,
+    portable_resource_path,
+)
 from .canonical_json import (
     CanonicalJsonError,
     jcs_bytes,
@@ -30,8 +34,6 @@ _IDENTIFIER = re.compile(
 )
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 _OID = {"sha1": re.compile(r"^[0-9a-f]{40}$"), "sha256": re.compile(r"^[0-9a-f]{64}$")}
-_RESOURCE_SEGMENT = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
-_DEVICE_STEM = re.compile(r"^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$")
 _PYTHON_MEDIA_TYPE = "text/x-python; charset=utf-8"
 
 PACKAGED_FACET_PATH = f"registries/{FACET_REGISTRY_FILENAME}"
@@ -1249,14 +1251,10 @@ def _normalized_path(value: object, *, allow_dot: bool, location: str) -> str:
 
 
 def _resource_path(value: object, location: str) -> str:
-    path = _normalized_path(value, allow_dot=False, location=location)
-    for segment in path.split("/"):
-        if _RESOURCE_SEGMENT.fullmatch(segment) is None:
-            _fail(location, "resource path segment is not portable lowercase ASCII")
-        stem = segment.split(".", 1)[0]
-        if _DEVICE_STEM.fullmatch(stem) is not None:
-            _fail(location, "resource path segment uses a reserved device stem")
-    return path
+    try:
+        return portable_resource_path(value)
+    except AcquisitionPathError as exc:
+        _fail(location, str(exc))
 
 
 def _exact_version(value: object, location: str) -> None:
