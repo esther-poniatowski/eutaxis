@@ -206,6 +206,8 @@ class RenderedArtifact:
 
     name: str
     adapter: str
+    scope: str
+    """Host publication scope: ``"user"`` or ``"project"``."""
     files: tuple[ArtifactFile, ...]
     content_hash: str
     warnings: tuple[str, ...] = ()

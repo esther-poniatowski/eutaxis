@@ -15,13 +15,14 @@ user-owned and refused unless ``force=True``.
 from __future__ import annotations
 
 import difflib
+import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 
 from .adapters import AgentAdapter
-from .exceptions import OwnershipError
+from .exceptions import CommandRenderError, OwnershipError
 from .models import ArtifactFile, CommandSource, InstallRecord, RenderedArtifact
 from .registry import Registry, utcnow_iso
 from .rendering import (
@@ -63,11 +64,64 @@ def install_command(
     rendered = render_command(
         source, adapter, project_root=project_root, home=home
     )
-    target_dir = adapter.artifact_dir(
-        source.name, scope, home=home, project_root=project_root
+    rendered = replace(rendered, scope=scope)
+    return _install_artifact(
+        rendered,
+        adapter,
+        scope=scope,
+        project_root=project_root,
+        home=home,
+        registry=registry,
+        force=force,
     )
-    for artifact_file in rendered.files:
-        _owned_path(target_dir, artifact_file.relative_path)
+
+
+def install_artifact(
+    rendered: RenderedArtifact,
+    adapter: AgentAdapter,
+    *,
+    scope: str,
+    project_root: Path,
+    home: Path,
+    registry: Registry,
+    force: bool = False,
+) -> InstallOutcome:
+    """Publish one rendered Skill under the deployment lock with rollback."""
+    target_dir = adapter.artifact_dir(
+        rendered.name, scope, home=home, project_root=project_root
+    )
+    # Local import avoids the module cycle: synchronization composes the legacy
+    # command operations from this module, while this public direct-artifact API
+    # owns its single-target transaction.
+    from .synchronization import skill_write_transaction
+
+    with skill_write_transaction((target_dir,), registry):
+        return _install_artifact(
+            rendered,
+            adapter,
+            scope=scope,
+            project_root=project_root,
+            home=home,
+            registry=registry,
+            force=force,
+        )
+
+
+def _install_artifact(
+    rendered: RenderedArtifact,
+    adapter: AgentAdapter,
+    *,
+    scope: str,
+    project_root: Path,
+    home: Path,
+    registry: Registry,
+    force: bool = False,
+) -> InstallOutcome:
+    """Apply one rendered artifact inside its caller's write transaction."""
+    target_dir = adapter.artifact_dir(
+        rendered.name, scope, home=home, project_root=project_root
+    )
+    _validated_artifact_paths(rendered, adapter, scope, target_dir)
 
     if target_dir.is_symlink():
         raise OwnershipError(
@@ -83,14 +137,14 @@ def install_command(
         if existing.matches(rendered, target_dir):
             _reconcile_registry(
                 registry,
-                source=source,
+                name=rendered.name,
                 adapter=adapter,
                 scope=scope,
                 target_dir=target_dir,
                 content_hash=rendered.content_hash,
             )
             return InstallOutcome(
-                name=source.name,
+                name=rendered.name,
                 adapter=adapter.name,
                 scope=scope,
                 path=target_dir,
@@ -108,7 +162,7 @@ def install_command(
 
     _reconcile_registry(
         registry,
-        source=source,
+        name=rendered.name,
         adapter=adapter,
         scope=scope,
         target_dir=target_dir,
@@ -116,7 +170,7 @@ def install_command(
     )
 
     return InstallOutcome(
-        name=source.name,
+        name=rendered.name,
         adapter=adapter.name,
         scope=scope,
         path=target_dir,
@@ -135,7 +189,35 @@ def uninstall_command(
     registry: Registry,
     force: bool = False,
 ) -> InstallOutcome:
-    """Remove one installed artifact and drop its registry row."""
+    """Remove one artifact under the deployment lock with rollback."""
+    target_dir = adapter.artifact_dir(
+        name, scope, home=home, project_root=project_root
+    )
+    from .synchronization import skill_write_transaction
+
+    with skill_write_transaction((target_dir,), registry):
+        return _uninstall_command(
+            name=name,
+            adapter=adapter,
+            scope=scope,
+            project_root=project_root,
+            home=home,
+            registry=registry,
+            force=force,
+        )
+
+
+def _uninstall_command(
+    *,
+    name: str,
+    adapter: AgentAdapter,
+    scope: str,
+    project_root: Path,
+    home: Path,
+    registry: Registry,
+    force: bool = False,
+) -> InstallOutcome:
+    """Remove one artifact inside its caller's write transaction."""
     target_dir = adapter.artifact_dir(
         name, scope, home=home, project_root=project_root
     )
@@ -196,32 +278,53 @@ def diff_command(
     rendered = render_command(
         source, adapter, project_root=project_root, home=home
     )
+    rendered = replace(rendered, scope=scope)
+    return diff_artifact(
+        rendered,
+        adapter,
+        scope=scope,
+        project_root=project_root,
+        home=home,
+    )
+
+
+def diff_artifact(
+    rendered: RenderedArtifact,
+    adapter: AgentAdapter,
+    *,
+    scope: str,
+    project_root: Path,
+    home: Path,
+) -> tuple[RenderedArtifact, Path, str]:
+    """Return one rendered artifact, its directory, and its diff from disk."""
     target_dir = adapter.artifact_dir(
-        source.name, scope, home=home, project_root=project_root
+        rendered.name, scope, home=home, project_root=project_root
+    )
+    validated_paths = _validated_artifact_paths(
+        rendered, adapter, scope, target_dir
     )
 
     diff_chunks: list[str] = []
     rendered_files = {
-        f.relative_path: f.content
-        for f in rendered.files
-        if f.relative_path != SIDECAR_FILENAME
+        artifact.relative_path: (artifact.content, path)
+        for artifact, path in validated_paths
+        if artifact.relative_path != SIDECAR_FILENAME
     }
     paths = sorted(rendered_files)
     for rel in paths:
-        on_disk_path = target_dir / rel
+        rendered_content, on_disk_path = rendered_files[rel]
         existing = on_disk_path.read_text(encoding="utf-8") if on_disk_path.is_file() else ""
         chunk = "".join(
             difflib.unified_diff(
                 existing.splitlines(keepends=True),
-                rendered_files[rel].splitlines(keepends=True),
+                rendered_content.splitlines(keepends=True),
                 fromfile=str(on_disk_path),
                 tofile=f"{on_disk_path} (rendered)",
             )
         )
         if chunk:
             diff_chunks.append(chunk)
-    for rel in _stale_owned_paths(target_dir, rendered):
-        stale_path = target_dir / rel
+    for rel, stale_path in _stale_owned_paths(target_dir, rendered):
         diff_chunks.append(
             "".join(
                 difflib.unified_diff(
@@ -250,17 +353,23 @@ def is_eutaxis_owned(target_dir: Path) -> bool:
         return False
 
 
-def _stale_owned_paths(target_dir: Path, rendered: RenderedArtifact) -> list[str]:
-    """Return owned paths on disk that the rendered artifact no longer holds."""
+def _stale_owned_paths(
+    target_dir: Path, rendered: RenderedArtifact
+) -> list[tuple[str, Path]]:
+    """Return validated owned paths absent from the rendered artifact."""
     if not (target_dir / SIDECAR_FILENAME).is_file():
         return []
     existing = _read_existing(target_dir)
     rendered_paths = {f.relative_path for f in rendered.files}
-    return sorted(
-        rel
-        for rel in existing.owned_paths
-        if rel not in rendered_paths and (target_dir / rel).is_file()
-    )
+    stale: list[tuple[str, Path]] = []
+    for rel in existing.owned_paths:
+        if rel in rendered_paths:
+            continue
+        path = _owned_path(target_dir, rel)
+        _reject_symlink_route(target_dir, path)
+        if path.is_file():
+            stale.append((rel, path))
+    return sorted(stale, key=lambda item: item[0])
 
 
 @dataclass(frozen=True)
@@ -428,7 +537,7 @@ def _owned_path(
 def _reconcile_registry(
     registry: Registry,
     *,
-    source: CommandSource,
+    name: str,
     adapter: AgentAdapter,
     scope: str,
     target_dir: Path,
@@ -436,7 +545,7 @@ def _reconcile_registry(
 ) -> None:
     """Ensure the registry describes the artifact currently on disk."""
     current = registry.find(
-        name=source.name,
+        name=name,
         adapter=adapter.name,
         scope=scope,
         path=target_dir,
@@ -449,7 +558,7 @@ def _reconcile_registry(
         return
     registry.upsert(
         InstallRecord(
-            name=source.name,
+            name=name,
             adapter=adapter.name,
             scope=scope,
             path=target_dir,
@@ -457,3 +566,147 @@ def _reconcile_registry(
             installed_at=utcnow_iso(),
         )
     )
+
+
+def _validated_artifact_paths(
+    rendered: RenderedArtifact,
+    adapter: AgentAdapter,
+    scope: str,
+    target_dir: Path,
+) -> tuple[tuple[ArtifactFile, Path], ...]:
+    """Validate one complete artifact before any file is read or changed."""
+    if rendered.adapter != adapter.name:
+        raise CommandRenderError(
+            f"Rendered artifact {rendered.name!r} targets adapter "
+            f"{rendered.adapter!r}, not {adapter.name!r}."
+        )
+    if rendered.scope != scope:
+        raise CommandRenderError(
+            f"Rendered artifact {rendered.name!r} targets scope "
+            f"{rendered.scope!r}, not {scope!r}."
+        )
+    if target_dir.is_symlink():
+        raise OwnershipError(
+            f"Refusing to access symbolic-link target: {target_dir}."
+        )
+
+    validated: list[tuple[ArtifactFile, Path]] = []
+    parts_by_path: dict[str, tuple[str, ...]] = {}
+    for artifact_file in rendered.files:
+        if not isinstance(artifact_file.content, str):
+            raise CommandRenderError(
+                f"Rendered artifact file {artifact_file.relative_path!r} "
+                "must contain text."
+            )
+        path = _owned_path(target_dir, artifact_file.relative_path)
+        candidate_parts = PurePosixPath(artifact_file.relative_path).parts
+        for prior_path, prior_parts in parts_by_path.items():
+            common = min(len(prior_parts), len(candidate_parts))
+            if prior_parts[:common] == candidate_parts[:common]:
+                raise CommandRenderError(
+                    f"Rendered artifact paths {prior_path!r} and "
+                    f"{artifact_file.relative_path!r} collide."
+                )
+        _reject_symlink_route(target_dir, path)
+        parts_by_path[artifact_file.relative_path] = candidate_parts
+        validated.append((artifact_file, path))
+
+    files_by_path = {item.relative_path: item for item, _path in validated}
+    missing = {
+        ENTRYPOINT_FILENAME,
+        SIDECAR_FILENAME,
+    }.difference(files_by_path)
+    if missing:
+        raise CommandRenderError(
+            f"Rendered artifact {rendered.name!r} is missing required file(s): "
+            + ", ".join(sorted(missing))
+            + "."
+        )
+    _validate_rendered_sidecar(rendered, files_by_path)
+    return tuple(validated)
+
+
+def _reject_symlink_route(target_dir: Path, path: Path) -> None:
+    """Reject a final or intermediate symbolic link below one artifact root."""
+    current = path
+    while current != target_dir:
+        if current.is_symlink():
+            raise OwnershipError(
+                f"Refusing to access artifact path through symbolic link: {current}."
+            )
+        current = current.parent
+
+
+def _validate_rendered_sidecar(
+    rendered: RenderedArtifact,
+    files_by_path: dict[str, ArtifactFile],
+) -> None:
+    """Bind the ownership record to every file of the rendered artifact."""
+    sidecar = files_by_path[SIDECAR_FILENAME]
+    try:
+        payload = json.loads(sidecar.content)
+    except json.JSONDecodeError as exc:
+        raise CommandRenderError(
+            f"Rendered ownership sidecar is invalid JSON: {exc}."
+        ) from exc
+    if not isinstance(payload, dict):
+        raise CommandRenderError("Rendered ownership sidecar must be an object.")
+    expected_header = {
+        "_schema": SIDECAR_SCHEMA,
+        "name": rendered.name,
+        "adapter": rendered.adapter,
+        "content_hash": rendered.content_hash,
+    }
+    for key, expected_value in expected_header.items():
+        if payload.get(key) != expected_value:
+            raise CommandRenderError(
+                f"Rendered ownership sidecar field {key!r} does not match "
+                "the artifact."
+            )
+
+    entries = payload.get("files")
+    if not isinstance(entries, list):
+        raise CommandRenderError(
+            "Rendered ownership sidecar field 'files' must be a list."
+        )
+    observed: dict[str, str] = {}
+    for entry in entries:
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("path"), str)
+            or not isinstance(entry.get("sha256"), str)
+        ):
+            raise CommandRenderError(
+                "Rendered ownership sidecar contains an invalid file entry."
+            )
+        entry_path = entry["path"]
+        if entry_path in observed:
+            raise CommandRenderError(
+                f"Rendered ownership sidecar repeats path {entry_path!r}."
+            )
+        observed[entry_path] = entry["sha256"]
+
+    expected_files = {
+        path: hashlib.sha256(item.content.encode("utf-8")).hexdigest()
+        for path, item in files_by_path.items()
+        if path != SIDECAR_FILENAME
+    }
+    if observed != expected_files:
+        raise CommandRenderError(
+            "Rendered ownership sidecar file inventory does not match the artifact."
+        )
+
+    entrypoint = files_by_path[ENTRYPOINT_FILENAME].content
+    frontmatter = _FRONTMATTER_BLOCK.match(entrypoint)
+    marker: str | None = None
+    if frontmatter is not None:
+        prefix = f"{OWNED_FRONTMATTER_KEY}:"
+        for line in frontmatter.group(1).splitlines():
+            stripped = line.strip()
+            if stripped.startswith(prefix):
+                marker = stripped[len(prefix):].strip().strip("'\"") or None
+                break
+    if marker != rendered.content_hash:
+        raise CommandRenderError(
+            "Rendered entrypoint ownership marker does not match the artifact."
+        )

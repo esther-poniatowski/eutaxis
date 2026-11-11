@@ -96,6 +96,7 @@ def test_personal_scope_translates_to_host_user_scope(
     )
 
     assert artifact.name == "complete-module"
+    assert artifact.scope == "user"
 
 
 def test_structured_skill_accepts_exact_final_byte_budgets(tmp_path: Path) -> None:

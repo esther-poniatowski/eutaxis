@@ -200,6 +200,7 @@ def _assemble_skill_with_adapter_files(
     return RenderedArtifact(
         name=source.name,
         adapter=adapter.name,
+        scope=source.scope,
         files=files,
         content_hash=pre_hash,
         warnings=tuple(warnings),

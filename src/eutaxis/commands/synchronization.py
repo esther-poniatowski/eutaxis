@@ -16,10 +16,10 @@ from pathlib import Path
 from .adapters import AgentAdapter
 from .exceptions import CommandError, OwnershipError
 from .installer import (
+    _uninstall_command,
     diff_command,
     install_command,
     is_eutaxis_owned,
-    uninstall_command,
 )
 from .models import CommandSource
 from .names import is_skill_name
@@ -305,7 +305,7 @@ def apply_skill_sync(
     ):
         for action in actions:
             if action.action == "remove":
-                outcome = uninstall_command(
+                outcome = _uninstall_command(
                     name=action.name,
                     adapter=action.adapter,
                     scope=action.scope,

@@ -846,11 +846,28 @@ Render and write one skill artifact to its native location.
 * **Return type:**
   [*InstallOutcome*](#eutaxis.commands.installer.InstallOutcome)
 
+<a id="eutaxis.commands.installer.install_artifact"></a>
+
+### eutaxis.commands.installer.install_artifact(rendered, adapter, \*, scope, project_root, home, registry, force=False)
+
+Publish one rendered Skill under the deployment lock with rollback.
+
+* **Parameters:**
+  * **rendered** ([*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact))
+  * **adapter** (*AgentAdapter*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
+  * **force** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+* **Return type:**
+  [*InstallOutcome*](#eutaxis.commands.installer.InstallOutcome)
+
 <a id="eutaxis.commands.installer.uninstall_command"></a>
 
 ### eutaxis.commands.installer.uninstall_command(\*, name, adapter, scope, project_root, home, registry, force=False)
 
-Remove one installed artifact and drop its registry row.
+Remove one artifact under the deployment lock with rollback.
 
 * **Parameters:**
   * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
@@ -877,6 +894,21 @@ reported as a removal.
 
 * **Parameters:**
   * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
+  * **adapter** (*AgentAdapter*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact), [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/builtins/stdtypes.html#str)]
+
+<a id="eutaxis.commands.installer.diff_artifact"></a>
+
+### eutaxis.commands.installer.diff_artifact(rendered, adapter, \*, scope, project_root, home)
+
+Return one rendered artifact, its directory, and its diff from disk.
+
+* **Parameters:**
+  * **rendered** ([*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact))
   * **adapter** (*AgentAdapter*)
   * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
@@ -1518,7 +1550,7 @@ Adapter-neutral content required to assemble one Agent Skill.
 
 <a id="eutaxis.commands.models.RenderedArtifact"></a>
 
-### *class* eutaxis.commands.models.RenderedArtifact(name, adapter, files, content_hash, warnings=())
+### *class* eutaxis.commands.models.RenderedArtifact(name, adapter, scope, files, content_hash, warnings=())
 
 Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
@@ -1532,6 +1564,7 @@ carries the `x-eutaxis-owned` hash) and the
 * **Parameters:**
   * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **files** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *,*  *...* *]*)
   * **content_hash** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **warnings** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
@@ -1543,6 +1576,15 @@ carries the `x-eutaxis-owned` hash) and the
 <a id="eutaxis.commands.models.RenderedArtifact.adapter"></a>
 
 #### adapter *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.RenderedArtifact.scope"></a>
+
+#### scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+`"user"` or `"project"`.
+
+* **Type:**
+  Host publication scope
 
 <a id="eutaxis.commands.models.RenderedArtifact.files"></a>
 

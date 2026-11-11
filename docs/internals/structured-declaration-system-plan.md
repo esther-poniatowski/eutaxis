@@ -220,7 +220,8 @@ The fixture must prove that identical inputs produce identical artifacts. This p
 - [x] Build a self-contained fixture corpus owned by Eutaxis before reading external repositories.
 - [x] Exercise cumulative assembly with several components.
 - [x] Require each manifest to declare its mechanism, with no target-derived default.
-- [ ] Exercise separate-directory artifacts and a single-slot collision after the required architecture contracts are settled.
+- [x] Exercise separate-directory artifacts through the shared install, diff, removal, registry, and rollback boundary.
+- [ ] Exercise a single-slot collision after the required architecture contracts are settled.
 - [x] Put resolved prerequisites before dependants and retain resolver-assigned manifest order among unrelated records.
 - [x] Reject a certified unit that displaces a directly named record from its authored anchor.
 - [x] Accept certified fixture units that contain prerequisites, policy results, and retained rule-set members not named directly in the manifest.

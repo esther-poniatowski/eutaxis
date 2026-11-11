@@ -23,8 +23,10 @@ render_command
     ``CommandSource × AgentAdapter`` -> ``RenderedArtifact``, without writes.
 assemble_skill
     ``SkillRenderInput × AgentAdapter`` -> ``RenderedArtifact``, without writes.
-install_command, uninstall_command, diff_command
+install_artifact, install_command, uninstall_command, diff_artifact, diff_command
     Filesystem-effecting operations guarded by ownership markers.
+skill_write_transaction
+    Deployment lock and rollback boundary for a complete Skill write set.
 is_eutaxis_owned
     Ownership predicate for an artifact directory.
 Registry
@@ -47,7 +49,9 @@ from .exceptions import (
     TemplateError,
 )
 from .installer import (
+    diff_artifact,
     diff_command,
+    install_artifact,
     install_command,
     is_eutaxis_owned,
     uninstall_command,
@@ -67,6 +71,7 @@ from .synchronization import (
     SkillSyncManifest,
     apply_skill_sync,
     plan_skill_sync,
+    skill_write_transaction,
 )
 
 __all__ = [
@@ -92,8 +97,10 @@ __all__ = [
     "apply_skill_sync",
     "check_failure_mode",
     "diff_command",
+    "diff_artifact",
     "get_adapter",
     "install_command",
+    "install_artifact",
     "is_eutaxis_owned",
     "load_from_instruction_config",
     "load_sources",
@@ -101,5 +108,6 @@ __all__ = [
     "plan_skill_sync",
     "register_adapter",
     "render_command",
+    "skill_write_transaction",
     "uninstall_command",
 ]

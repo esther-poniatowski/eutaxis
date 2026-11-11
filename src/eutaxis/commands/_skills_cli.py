@@ -35,8 +35,8 @@ from . import (
     measure_skill_budgets,
     plan_skill_sync,
     render_command,
-    uninstall_command,
 )
+from .installer import _uninstall_command
 from .disclosure import DISCLOSURE_INLINE
 from .adapters import AgentAdapter
 from .loading_unit_publication import (
@@ -441,7 +441,7 @@ def cli_uninstall(
         with skill_write_transaction((path for _, path in operations), registry):
             for adapter, _ in operations:
                 outcomes.append(
-                    uninstall_command(
+                    _uninstall_command(
                         name=name,
                         adapter=adapter,
                         scope=scope,

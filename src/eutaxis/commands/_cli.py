@@ -20,8 +20,8 @@ from . import (
     install_command,
     load_sources,
     render_command,
-    uninstall_command,
 )
+from .installer import _uninstall_command
 from .models import CommandSource
 from .registry import Registry, default_state_dir
 from .scopes import validate_scope
@@ -184,7 +184,7 @@ def cli_uninstall(
         with skill_write_transaction(paths, registry):
             for adapter in adapters:
                 outcomes.append(
-                    uninstall_command(
+                    _uninstall_command(
                         name=name,
                         adapter=adapter,
                         scope=scope,

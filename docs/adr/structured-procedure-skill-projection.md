@@ -93,6 +93,8 @@ One adapter-neutral `SkillRenderInput` carries the exact fields `name`, `descrip
 
 The structured renderer supplies the canonical Skill entrypoint, complete contract and support resources through this input. Existing host adapters add native metadata, and the existing `RenderedArtifact` installer owns planning, diff, publication, rollback and removal. Eutaxis does not introduce a second installer for structured Skills.
 
+`RenderedArtifact` retains the rendering adapter and host publication scope. `install_artifact` and `diff_artifact` accept this shared result directly and reject a different adapter, scope, unsafe path, symbolic-link route, path collision or inconsistent ownership inventory before using the artifact. Public install and removal operations derive their exact targets and enter `skill_write_transaction` themselves. The transaction holds the deployment lock, commits its registry mutations together and restores the complete prior artifact after a failure. Removal remains name-based because the ownership sidecar supplies the installed file set. Diff validates both current rendered paths and stale owned paths before reading them. Therefore, command-authored and structured Skills differ before rendering, but not during publication or recovery.
+
 ## Acceptance evidence
 
 The first slice requires:
