@@ -134,11 +134,12 @@ def _write_contract(
     git: GitLock | None = None,
     declaration_bytes: bytes | None = None,
     declaration_files: tuple[tuple[str, bytes], ...] | None = None,
+    facet_bytes: bytes | None = None,
 ) -> tuple[str, str]:
     source_root = workspace if root == "." else workspace / root
     (source_root / "declarations").mkdir(parents=True, exist_ok=True)
     facet_path = "declarations/context-facets.yaml"
-    facet_bytes = _facet_source(namespace)
+    facet_bytes = facet_bytes or _facet_source(namespace)
     if declaration_files is None:
         declaration_files = (
             (

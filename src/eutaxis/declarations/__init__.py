@@ -351,6 +351,14 @@ from .registry import (
     RegisteredDeclaration,
     load_declaration_registry,
 )
+from .semantic_comparison import (
+    SemanticChangeKind,
+    SemanticComparison,
+    SemanticDifference,
+    SemanticObjectKey,
+    SemanticObjectKind,
+    compare_external_declarations,
+)
 from .registry_checker import (
     DECLARATION_REGISTRY_EVALUATOR,
     DECLARATION_REGISTRY_INPUT_REVISION,
@@ -659,6 +667,11 @@ __all__ = [
     "RuleResidualJudgmentRequest",
     "RuleResidualJudgmentSubmission",
     "RuleSetDeclaration",
+    "SemanticChangeKind",
+    "SemanticComparison",
+    "SemanticDifference",
+    "SemanticObjectKey",
+    "SemanticObjectKind",
     "StaticCatalogQuery",
     "StaticField",
     "StaticPredicate",
@@ -716,5 +729,6 @@ __all__ = [
     "resolve_compilation_unit",
     "select_migration_baselines",
     "schema_path",
+    "compare_external_declarations",
     "validate_document",
 ]
