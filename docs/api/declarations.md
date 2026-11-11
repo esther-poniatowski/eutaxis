@@ -256,6 +256,17 @@ Assemble one external plan while rechecking its complete authority.
 * **Return type:**
   [*ExternalCumulativeArtifact*](#eutaxis.declarations.external_composition.ExternalCumulativeArtifact)
 
+<a id="eutaxis.declarations.external_composition.render_external_cumulative_markdown"></a>
+
+### eutaxis.declarations.external_composition.render_external_cumulative_markdown(plan)
+
+Render one external cumulative plan from its authenticated catalog.
+
+* **Parameters:**
+  **plan** ([*ExternalCumulativeCompositionPlan*](#eutaxis.declarations.external_composition.ExternalCumulativeCompositionPlan))
+* **Return type:**
+  [*ExternalCumulativeArtifact*](#eutaxis.declarations.external_composition.ExternalCumulativeArtifact)
+
 <a id="module-eutaxis.declarations.catalog"></a>
 
 <a id="declaration-catalog"></a>
