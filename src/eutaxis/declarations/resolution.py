@@ -573,7 +573,11 @@ class _Resolver:
                 )
                 declaration = selected.declaration
                 if isinstance(declaration, RuleSetDeclaration):
-                    for rule in declaration.rules:
+                    for member_offset, rule in enumerate(declaration.rules):
+                        member_anchor = ManifestAnchor(
+                            section.id,
+                            rank + member_offset,
+                        )
                         member = self.registry.records[rule.id]
                         if rule.status is not DeclarationStatus.ACTIVE:
                             self._emit(
@@ -582,7 +586,7 @@ class _Resolver:
                                 member,
                                 ("status",),
                                 causes=(selection_event,),
-                                anchor=anchor,
+                                anchor=member_anchor,
                             )
                             continue
                         expanded = self._emit(
@@ -591,13 +595,14 @@ class _Resolver:
                             member,
                             (),
                             causes=(selection_event,),
-                            anchor=anchor,
+                            anchor=member_anchor,
                         )
-                        self._register_discovery(rule.id, anchor, expanded)
+                        self._register_discovery(rule.id, member_anchor, expanded)
+                    rank += len(declaration.rules)
                 else:
                     self.direct_anchors[identifier] = anchor
                     self._register_discovery(identifier, anchor, selection_event)
-                rank += 1
+                    rank += 1
         for identifier in sorted(
             self.discovery_causes,
             key=lambda item: (self.anchors[item].rank, item),

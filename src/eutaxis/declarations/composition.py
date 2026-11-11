@@ -14,6 +14,7 @@ from .models import (
     CompositionManifestDeclaration,
     ProcedureDeclaration,
     RuleDeclaration,
+    RuleSetDeclaration,
 )
 from .registry import DeclarationRegistry, RegisteredDeclaration
 from .resolution import (
@@ -122,7 +123,7 @@ def plan_cumulative_composition(
             ("mechanism",),
             f"manifest mechanism {manifest.mechanism.value!r} is not cumulative",
         )
-    manifest_selections = _index_selections(record, manifest)
+    manifest_selections = _index_selections(registry, record, manifest)
     components = _index_resolved_components(
         registry, manifest, manifest_selections, unit
     )
@@ -352,28 +353,45 @@ def _validate_projection_identifiers(
 
 
 def _index_selections(
+    registry: DeclarationRegistry,
     record: RegisteredDeclaration,
     manifest: CompositionManifestDeclaration,
 ) -> dict[str, ResolvedComponent]:
-    """Index each declaration once and retain the manifest tie-break order."""
-    selections: dict[str, ResolvedComponent] = {}
+    """Index effective declarations in manifest and rule-set authored order."""
+    direct: dict[str, ResolvedComponent] = {}
+    expanded: dict[str, ResolvedComponent] = {}
+    seen: set[str] = set()
     rank = 0
     for section_index, section in enumerate(manifest.sections):
         for item_index, identifier in enumerate(section.declarations):
             path = ("sections", section_index, "declarations", item_index)
-            if identifier in selections:
+            if identifier in seen:
                 _raise_record_error(
                     record,
                     path,
                     f"declaration {identifier!r} appears in more than one manifest position",
                 )
-            selections[identifier] = ResolvedComponent(
-                section=section.id,
-                declaration=identifier,
-                rank=rank,
-            )
-            rank += 1
-    return selections
+            seen.add(identifier)
+            declaration = registry.records[identifier].declaration
+            if isinstance(declaration, RuleSetDeclaration):
+                for member_offset, rule in enumerate(declaration.rules):
+                    selection = ResolvedComponent(
+                        section=section.id,
+                        declaration=rule.id,
+                        rank=rank + member_offset,
+                    )
+                    prior = expanded.get(rule.id)
+                    if prior is None or selection.rank < prior.rank:
+                        expanded[rule.id] = selection
+                rank += len(declaration.rules)
+            else:
+                direct[identifier] = ResolvedComponent(
+                    section=section.id,
+                    declaration=identifier,
+                    rank=rank,
+                )
+                rank += 1
+    return {**expanded, **direct}
 
 
 def _index_resolved_dependencies(

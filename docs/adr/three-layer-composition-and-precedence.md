@@ -51,7 +51,7 @@ The composer does not reevaluate applicability, exceptions, dependencies, or pol
 
 `ResolvedCompilationUnit` is resolver-issued and contains the manifest, components, dependencies, and final rule projections. Composer boundary tests use deliberately unsafe local fixtures to verify rejection without exposing a second production issuer.
 
-The manifest declares its `sections` in order. Each `section` lists its records in order. A directly named record keeps its authored anchor. The resolver assigns an existing `(section, rank)` pair to every added record. Every prerequisite precedes its dependant. The renderer keeps the declared order of `sections`. An edge from a later `section` to an earlier one would violate that order.
+The manifest declares its `sections` in order. Each `section` lists its records in order. A rule set expands its members in authored order, and each member occupies the next rank in the flattened sequence. A directly named record keeps its authored anchor. The resolver assigns an existing `(section, rank)` pair to every added record. Every prerequisite precedes its dependant. The renderer keeps the declared order of `sections`. An edge from a later `section` to an earlier one would violate that order.
 
 Within those constraints, the composer uses a stable topological sort. The assigned rank forms the first tie-break key. The stable record identifier forms the second key. In addition to the projection checks above, the composer rejects three malformed ordering inputs:
 

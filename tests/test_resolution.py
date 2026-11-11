@@ -253,6 +253,37 @@ def test_rule_set_is_expanded_but_never_becomes_effective() -> None:
     assert result.unit.components[0].rank == 1
 
 
+def test_rule_set_members_retain_authored_order_through_composition(
+    tmp_path: Path,
+) -> None:
+    root = _mutable_fixture(tmp_path)
+    package = _document(root, "rule-set.yaml")
+    first = copy.deepcopy(package["rules"][0])  # type: ignore[index]
+    second = copy.deepcopy(first)
+    first["id"] = "resolution/z-first"
+    second["id"] = "resolution/base"
+    package["rules"] = [first, second]
+    _write_document(root, "rule-set.yaml", package)
+    manifest = _document(root, "manifest.yaml")
+    manifest["sections"][0]["declarations"] = [  # type: ignore[index]
+        "resolution/package"
+    ]
+    _write_document(root, "manifest.yaml", manifest)
+
+    result = _resolve(root)
+    plan = plan_cumulative_composition(_registry(root), result.unit)
+
+    assert tuple(component.declaration for component in result.unit.components) == (
+        "resolution/z-first",
+        "resolution/base",
+    )
+    assert tuple(component.rank for component in result.unit.components) == (0, 1)
+    assert tuple(component.declaration for component in plan.components) == (
+        "resolution/z-first",
+        "resolution/base",
+    )
+
+
 def test_composer_rejects_a_projection_for_an_effective_procedure() -> None:
     result = _resolve()
     unit = object.__new__(ResolvedCompilationUnit)

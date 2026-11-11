@@ -63,7 +63,7 @@ A `ResolutionError` may contain a failure trace with the same composite identifi
 
 The source points to the authored field that caused the event or failure. For example, a dependency discovery points to its relation target, and a manifest selection points to its declaration item.
 
-`ManifestAnchor` contains the section identifier and the zero-based rank in the manifest's flattened authored order.
+`ManifestAnchor` contains the section identifier and the zero-based rank in the manifest's flattened authored-content order. A direct rule or procedure occupies one rank. A selected rule set occupies one consecutive range whose members retain their authored order.
 
 ## Event record
 
@@ -146,7 +146,7 @@ The `error` policy strategy raises `unresolved-conflict`. If a policy result occ
 The resolver issues events in six phases:
 
 1. Evaluate the manifest.
-2. Visit manifest sections and items in authored order. Visit rule-set members in source order. Gather every initial discovery route, then evaluate distinct declarations by `(anchor rank, identifier)`.
+2. Visit manifest sections and items in authored order. Assign consecutive ranks to rule-set members in source order. Gather every initial discovery route, then evaluate distinct declarations by `(anchor rank, identifier)`.
 3. For each resolution round, visit active declarations by `(anchor rank, identifier)` and their dependency relations in authored order. Record every discovery cause, but evaluate each declaration at most once.
 4. Snapshot active conflict pairs and visit them in canonical lexical order. Emit `conflict-detected` before visiting policies. Evaluate each policy's normalized `all: [applicability, when]` predicate by `(order, identifier)` until the first true result. If no policy is true, the first unknown policy in that order supplies the trace and source of `conflict-policy-indeterminate`; the absence of an unknown produces `unresolved-conflict`. An `error` strategy also fails at its pair. Any selection or strategy failure stops the round before later pairs and before state changes. Policy events cite the detection event. After every pair has a valid winner, compute batch exclusions. For each policy result in pair order, emit `policy-result-discovered`, use its cached declaration trace or evaluate it once, then apply the false, unknown, exclusion, and alias checks in that order. Only a fully valid batch changes state. After applying the batch, emit `conflict-resolved`, `declaration-excluded`, and `alias-created` events. `conflict-resolved` cites the winning policy event. Newly added candidates enter the next round.
 5. Visit final-effective declarations by `(anchor rank, identifier)`. For each effective rule, evaluate norms in authored order, exceptions in authored order, and criteria in authored order.

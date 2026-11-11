@@ -185,7 +185,7 @@ The resolver assigns anchors by four rules:
 - A record named directly by the manifest keeps its authored `(section, rank)` pair.
 - A prerequisite added by closure takes the earliest anchor among all dependants that discovered it, including dependants later excluded.
 - For a policy result, the resolver chooses the earliest anchor of every replaced or satisfied record.
-- A rule-set member takes its containing rule set's anchor unless the manifest names the member directly.
+- A rule-set member takes its authored position within the consecutive rank range of its containing rule set unless the manifest names the member directly.
 
 More than one rule may give candidate anchors to the same record. When the manifest names that record directly, the authored anchor wins. Otherwise, the candidate with the lowest manifest rank wins. The rank identifies one exact `(section, rank)` pair, so no separate section tie-break exists.
 
