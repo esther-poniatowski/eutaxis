@@ -160,7 +160,16 @@ def test_packaged_known_failure_returns_located_registry_violation() -> None:
 
     fixture_id = "eutaxis/declaration-registry/unresolved-exact-reference"
     binding_fixture_id = "eutaxis/declaration-registry/wrong-schema-binding"
-    assert set(results) == {fixture_id, binding_fixture_id}
+    decision_fixture_id = "eutaxis/declaration-registry/unresolved-decided-by"
+    status_fixture_id = "eutaxis/declaration-registry/old-status"
+    superseded_fixture_id = "eutaxis/declaration-registry/orphaned-superseded"
+    assert set(results) == {
+        fixture_id,
+        binding_fixture_id,
+        decision_fixture_id,
+        status_fixture_id,
+        superseded_fixture_id,
+    }
     result = results[fixture_id]
     assert result.state is EvaluationState.VIOLATED
     assert result.evidence["outcome"] == "invalid"
@@ -175,6 +184,15 @@ def test_packaged_known_failure_returns_located_registry_violation() -> None:
     assert binding_result.state is EvaluationState.VIOLATED
     assert binding_result.evidence["error-class"] == "declaration-schema"
     assert binding_result.evidence["location"] == "$._schema"
+    decision_result = results[decision_fixture_id]
+    assert decision_result.evidence["error-class"] == "declaration-registry"
+    assert decision_result.evidence["location"] == "$.decided-by[0]"
+    status_result = results[status_fixture_id]
+    assert status_result.evidence["error-class"] == "declaration-schema"
+    assert status_result.evidence["location"] == "$.status"
+    superseded_result = results[superseded_fixture_id]
+    assert superseded_result.evidence["error-class"] == "declaration-registry"
+    assert superseded_result.evidence["location"] == "$.status"
 
 
 def test_packaged_procedure_and_operation_match_without_effects() -> None:

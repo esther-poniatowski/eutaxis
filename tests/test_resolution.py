@@ -292,6 +292,54 @@ def test_manifest_lookup_failures_precede_trace_creation(
     assert (captured.value.trace is not None) is has_trace
 
 
+def test_resolution_rejects_an_inactive_manifest_before_trace_creation(
+    tmp_path: Path,
+) -> None:
+    root = _mutable_fixture(tmp_path)
+    manifest = _document(root, "manifest.yaml")
+    manifest["status"] = "proposed"
+    _write_document(root, "manifest.yaml", manifest)
+
+    with pytest.raises(ResolutionError) as captured:
+        resolve_compilation_unit(_registry(root), "resolution/manifest", _context())
+
+    assert captured.value.code is ResolutionErrorCode.MANIFEST_INACTIVE
+    assert captured.value.trace is not None
+    assert captured.value.trace.events == ()
+    assert captured.value.source is not None
+    assert captured.value.source.document_path == ("status",)
+
+
+def test_inactive_rule_set_member_is_excluded_with_status_provenance(
+    tmp_path: Path,
+) -> None:
+    root = _mutable_fixture(tmp_path)
+    for path in root.glob("*.yaml"):
+        if path.name not in {"evaluator.yaml", "manifest.yaml", "rule-set.yaml"}:
+            path.unlink()
+    manifest = _document(root, "manifest.yaml")
+    manifest["sections"][0]["declarations"] = ["resolution/package"]  # type: ignore[index]
+    manifest["policies"] = []
+    package = _document(root, "rule-set.yaml")
+    package["rules"][0]["status"] = "retired"  # type: ignore[index]
+    _write_document(root, "manifest.yaml", manifest)
+    _write_document(root, "rule-set.yaml", package)
+
+    result = resolve_compilation_unit(
+        _registry(root), "resolution/manifest", _context()
+    )
+
+    assert result.unit.components == ()
+    event = next(
+        item
+        for item in result.trace.events
+        if item.kind is ResolutionEventKind.RULE_SET_MEMBER_INACTIVE
+    )
+    assert event.declaration == "resolution/base"
+    assert event.source.document_path == ("rules", 0, "status")
+    assert event.anchor is not None and event.anchor.rank == 0
+
+
 @pytest.mark.parametrize(
     ("target", "code", "truth"),
     [

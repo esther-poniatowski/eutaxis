@@ -97,6 +97,8 @@ def _validate_rule(
             location,
             root + ("criteria", index, "evaluator"),
         )
+    for index, identifier in enumerate(rule.decided_by):
+        _validate_identifier(identifier, location, root + ("decided-by", index))
 
 
 def _validate_procedure(

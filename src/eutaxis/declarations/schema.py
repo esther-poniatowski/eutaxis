@@ -97,6 +97,7 @@ DECLARATION_KINDS = frozenset(
         "composition-manifest",
         "evaluator",
         "operation",
+        "decision",
     }
 )
 
@@ -175,7 +176,7 @@ def declaration_schema() -> dict[str, object]:
     return deepcopy(_declaration_schema())
 
 
-@lru_cache(maxsize=7)
+@lru_cache(maxsize=8)
 def _validator_for_kind(kind: str) -> Draft202012Validator:
     """Return a discriminator-specific validator retaining shared definitions."""
     root = deepcopy(_declaration_schema())

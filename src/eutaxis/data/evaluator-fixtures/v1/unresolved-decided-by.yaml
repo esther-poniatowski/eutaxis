@@ -1,0 +1,10 @@
+schema-version: 1
+id: eutaxis/declaration-registry/unresolved-decided-by
+evaluator: {id: eutaxis/declaration-registry, version: 1}
+input-revision: declaration-v1
+input:
+  sources:
+    - resources/manual-judgment.yaml
+    - resources/unresolved-decided-by.yaml
+  facet-registry: resources/context-facets.yaml
+expected-state: violated

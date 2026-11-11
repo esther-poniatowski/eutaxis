@@ -29,6 +29,18 @@ The assembler joins an exact set of fixture-projected Markdown blocks into canon
 
 The static catalog now preserves lookup fields and portable provenance without testing context predicates. The loader validates the schema and cross-row contracts before it builds an immutable view of a persisted index. Both catalog forms apply the same exact static predicates. In both forms, matching rows follow canonical order.
 
+The Geonexus adoption slice is complete at the stage-A boundary:
+
+- Kleisis registers the portable contract named by each first-key `_schema` value
+- Ekphrasis receives an `x-kind` on each author-editable field whose complete value space fits one control
+- the lifecycle vocabulary is `proposed`, `active`, `superseded`, and `retired`
+- operative links require active sources and targets; supersession instead runs from active to superseded
+- governance choices use typed `decision` records, which rules cite through `decided-by`
+- the catalog retains lifecycle history and governance links
+- five packaged known failures test exact references, schema binding, governance links, obsolete status, and orphaned supersession
+
+Phase 6 remains outside this slice because it generates agent-facing artifacts.
+
 The resolver tests each context predicate, applies conflict policies in simultaneous canonical batches, and issues one certified unit with its explanation trace. The unit contains final-effective rules and procedures, rewritten dependency edges, stable manifest anchors, and final rule-local norm and criterion projections.
 
 The resolver contract now distinguishes selectable containers from records admitted to the output. The same contract fixes five further decisions:

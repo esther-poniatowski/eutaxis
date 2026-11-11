@@ -50,3 +50,6 @@ failure-behavior: block
 known-failure-fixtures:
   - eutaxis/declaration-registry/unresolved-exact-reference
   - eutaxis/declaration-registry/wrong-schema-binding
+  - eutaxis/declaration-registry/unresolved-decided-by
+  - eutaxis/declaration-registry/old-status
+  - eutaxis/declaration-registry/orphaned-superseded

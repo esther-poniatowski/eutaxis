@@ -17,7 +17,10 @@ from .models import (
     CompositionMechanism,
     CompositionManifestDeclaration,
     Criterion,
+    DecisionDeclaration,
+    DecisionOption,
     DeclarationKind,
+    DeclarationStatus,
     EvaluatorDeclaration,
     ExceptionClause,
     JsonValue,
@@ -60,7 +63,7 @@ class _BaseFields(TypedDict):
     id: str
     kind: DeclarationKind
     owner: str
-    status: str
+    status: DeclarationStatus
     source_revision: str
     applicability: Mapping[str, JsonValue]
     relations: tuple[Relation, ...]
@@ -208,7 +211,7 @@ def _base(
         "id": str(document["id"]),
         "kind": DeclarationKind(str(document["kind"])),
         "owner": str(document["owner"]),
-        "status": str(document["status"]),
+        "status": DeclarationStatus(str(document["status"])),
         "source_revision": str(document["source-revision"]),
         "applicability": _frozen_mapping(
             applicability if applicability is not None else document["applicability"]
@@ -297,6 +300,10 @@ def _build_rule(
             str(document["required-visibility"])
             if "required-visibility" in document
             else None
+        ),
+        decided_by=tuple(
+            str(identifier)
+            for identifier in cast(list[object], document.get("decided-by", []))
         ),
         norms=tuple(norms),
         criteria=criteria,
@@ -441,6 +448,17 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
             ),
             recovery=str(document["recovery"]),
         )
+    if kind is DeclarationKind.DECISION:
+        return DecisionDeclaration(
+            **_base(document),
+            context=str(document["context"]),
+            options=tuple(
+                DecisionOption(id=str(item["id"]), description=str(item["description"]))
+                for item in map(_mapping, cast(list[object], document["options"]))
+            ),
+            outcome=str(document["outcome"]),
+            consequences=str(document["consequences"]),
+        )
     raise AssertionError(f"Unhandled declaration kind: {kind}")
 
 
@@ -506,6 +524,28 @@ def _validate_semantics(
             path=path,
             locations=locations,
         )
+    elif kind == "decision":
+        options = [
+            _mapping(option) for option in cast(list[object], document["options"])
+        ]
+        option_ids: list[tuple[str, DocumentPath]] = [
+            (str(option["id"]), ("options", index, "id"))
+            for index, option in enumerate(options)
+        ]
+        _ensure_unique(
+            option_ids,
+            scope=f"decision {document['id']!r} options",
+            path=path,
+            locations=locations,
+        )
+        outcome = str(document["outcome"])
+        if outcome not in {identifier for identifier, _parts in option_ids}:
+            _semantic_error(
+                path,
+                locations,
+                ("outcome",),
+                f"decision outcome {outcome!r} does not name a declared option",
+            )
 
 
 def _validate_unique_ids(

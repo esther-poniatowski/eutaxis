@@ -1,0 +1,10 @@
+schema-version: 1
+id: eutaxis/declaration-registry/old-status
+evaluator: {id: eutaxis/declaration-registry, version: 1}
+input-revision: declaration-v1
+input:
+  sources:
+    - resources/manual-judgment.yaml
+    - resources/old-status.yaml
+  facet-registry: resources/context-facets.yaml
+expected-state: violated

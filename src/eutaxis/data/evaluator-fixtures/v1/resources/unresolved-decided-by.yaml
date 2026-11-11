@@ -1,0 +1,21 @@
+_schema: eutaxis:declaration@1
+id: eutaxis/fixture-unresolved-decided-by
+kind: rule
+owner: eutaxis
+status: active
+source-revision: contract-v1
+applicability: {facet: context.available, operator: exists}
+relations: []
+decided-by: [eutaxis/missing-decision]
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: cite-decision
+    modality: must
+    subject: fixture
+    action: {verb: cite, object: its governing decision}
+criteria:
+  - id: decision-resolves
+    norms: [cite-decision]
+    evaluator: {id: eutaxis/manual-judgment, version: 1}
+    statement: The governing decision resolves

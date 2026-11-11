@@ -96,6 +96,16 @@ class DeclarationKind(StrEnum):
     COMPOSITION_MANIFEST = "composition-manifest"
     EVALUATOR = "evaluator"
     OPERATION = "operation"
+    DECISION = "decision"
+
+
+class DeclarationStatus(StrEnum):
+    """Lifecycle states admitted by declaration schema version 1."""
+
+    PROPOSED = "proposed"
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+    RETIRED = "retired"
 
 
 EXACT_CONTRACT_KINDS = frozenset({DeclarationKind.EVALUATOR, DeclarationKind.OPERATION})
@@ -213,7 +223,7 @@ class Declaration:
     id: str
     kind: DeclarationKind
     owner: str
-    status: str
+    status: DeclarationStatus
     source_revision: str
     applicability: Mapping[str, JsonValue]
     relations: tuple[Relation, ...]
@@ -229,6 +239,7 @@ class RuleDeclaration(Declaration):
     axis: RuleAxis
     failure_mode: str
     required_visibility: str | None
+    decided_by: tuple[str, ...]
     norms: tuple[Norm, ...]
     criteria: tuple[Criterion, ...]
     exceptions: tuple[ExceptionClause, ...]
@@ -337,6 +348,24 @@ class OperationDeclaration(Declaration):
     recovery: str
 
 
+@dataclass(frozen=True)
+class DecisionOption:
+    """One explicitly considered option of a governance decision."""
+
+    id: str
+    description: str
+
+
+@dataclass(frozen=True)
+class DecisionDeclaration(Declaration):
+    """A governance decision with an explicit selected outcome."""
+
+    context: str
+    options: tuple[DecisionOption, ...]
+    outcome: str
+    consequences: str
+
+
 AnyDeclaration: TypeAlias = (
     RuleSetDeclaration
     | RuleDeclaration
@@ -345,4 +374,5 @@ AnyDeclaration: TypeAlias = (
     | CompositionManifestDeclaration
     | EvaluatorDeclaration
     | OperationDeclaration
+    | DecisionDeclaration
 )

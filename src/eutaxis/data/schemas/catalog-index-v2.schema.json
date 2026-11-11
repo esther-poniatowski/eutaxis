@@ -191,6 +191,14 @@
             "pre-action",
             null
           ]
+        },
+        "decided-by": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
         }
       },
       "additionalProperties": false
@@ -461,7 +469,8 @@
             "resolution-policy",
             "composition-manifest",
             "evaluator",
-            "operation"
+            "operation",
+            "decision"
           ]
         },
         "owner": {
@@ -488,9 +497,9 @@
         },
         "status": {
           "enum": [
-            "draft",
+            "proposed",
             "active",
-            "deprecated",
+            "superseded",
             "retired"
           ]
         },
@@ -632,6 +641,25 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "decision"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "query": {
+                "$ref": "#/$defs/decision-query"
+              }
+            }
+          }
         }
       ],
       "additionalProperties": false
@@ -649,7 +677,8 @@
                 "rule",
                 "procedure",
                 "resolution-policy",
-                "composition-manifest"
+                "composition-manifest",
+                "decision"
               ]
             }
           },
@@ -676,10 +705,29 @@
                 "evaluator",
                 "operation"
               ]
+            },
+            "status": {
+              "enum": [
+                "proposed",
+                "active",
+                "retired"
+              ]
             }
           }
         }
       ]
+    },
+    "decision-query": {
+      "type": "object",
+      "required": [
+        "outcome"
+      ],
+      "properties": {
+        "outcome": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

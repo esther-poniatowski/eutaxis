@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Callable, cast
 
 import pytest
+import yaml
 
 from eutaxis.declarations import (
     CatalogSource,
@@ -33,6 +35,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 REGISTRY_FIXTURES = FIXTURES / "registry" / "valid"
 FACET_FIXTURE = FIXTURES / "facets" / "valid" / "context-facets.yaml"
 GOLDEN_INDEX = FIXTURES / "catalog" / "static-index.json"
+V2_GOLDEN_INDEX = FIXTURES / "catalog" / "static-index-v2.json"
 
 
 def _live_catalog():
@@ -448,7 +451,7 @@ def test_loader_rejects_bad_relations_containers_and_conflict_links() -> None:
             lambda document: _entry(document, "registry/prefer-refined").update(
                 {"relations": [{"type": "requires", "target": "content/base"}]}
             ),
-            "only content rows may relate",
+            "resolution-policy rows admit only supersedes relations",
         ),
         (
             lambda document: cast(list[object], document["conflicts"]).append(
@@ -484,35 +487,146 @@ def test_loader_rejects_reciprocal_incompatibility_assertions() -> None:
         _load_document(document)
 
 
+def test_loader_rejects_persisted_dependency_cycles() -> None:
+    document = _document()
+    cast(list[object], _entry(document, "content/base")["relations"]).append(
+        {"type": "requires", "target": "content/refined"}
+    )
+
+    with pytest.raises(
+        DeclarationCatalogError, match="dependency relation closes a cycle"
+    ):
+        _load_document(document)
+
+
+def test_loader_rejects_an_orphaned_superseded_row() -> None:
+    document = _document()
+    orphan = json.loads(json.dumps(_entry(document, "content/alternate")))
+    orphan["id"] = "content/orphaned-alternate"
+    orphan["status"] = "superseded"
+    orphan["source"] = {
+        "path": "orphaned-alternate.yaml",
+        "document-path": [],
+        "line": 1,
+        "column": 1,
+    }
+    _declarations(document).append(orphan)
+    _sources(document).append({"path": "orphaned-alternate.yaml", "sha256": "0" * 64})
+
+    with pytest.raises(
+        DeclarationCatalogError, match="lacks an incoming supersedes relation"
+    ):
+        _load_document(document)
+
+
 @pytest.mark.parametrize(
-    ("relations", "message"),
+    ("identifier", "status", "relations"),
     [
         (
-            {"content/base": [{"type": "requires", "target": "content/refined"}]},
-            "dependency relation closes a cycle",
+            "content/refined",
+            "proposed",
+            [{"type": "requires", "target": "content/base"}],
         ),
         (
-            {
-                "content/alternate": [
-                    {"type": "supersedes", "target": "content/refined"}
-                ],
-                "content/refined": [
-                    {"type": "supersedes", "target": "content/alternate"}
-                ],
-            },
-            "supersedes relation closes a cycle",
+            "content/alternate",
+            "retired",
+            [{"type": "incompatible-with", "target": "content/base"}],
         ),
     ],
 )
-def test_loader_rejects_persisted_relation_cycles(
-    relations: dict[str, list[dict[str, str]]], message: str
+def test_loader_rejects_operative_relations_from_inactive_rows(
+    identifier: str,
+    status: str,
+    relations: list[dict[str, str]],
 ) -> None:
     document = _document()
-    for identifier, additions in relations.items():
-        cast(list[object], _entry(document, identifier)["relations"]).extend(additions)
+    row = _entry(document, identifier)
+    row["status"] = status
+    row["relations"] = relations
 
-    with pytest.raises(DeclarationCatalogError, match=message):
+    with pytest.raises(
+        DeclarationCatalogError, match="operative relations must be active"
+    ):
         _load_document(document)
+
+
+@pytest.mark.parametrize("golden", [GOLDEN_INDEX, V2_GOLDEN_INDEX])
+def test_loader_rejects_an_explicit_empty_decided_by_list(golden: Path) -> None:
+    document = cast(dict[str, object], json.loads(golden.read_bytes()))
+    rule = next(row for row in _declarations(document) if row["kind"] == "rule")
+    query = cast(dict[str, object], rule["query"])
+    query["decided-by"] = []
+
+    with pytest.raises(DeclarationCatalogError, match="should be non-empty"):
+        _load_document(document)
+
+
+def test_loader_accepts_active_to_superseded_same_kind_relation() -> None:
+    document = _document()
+    legacy = json.loads(json.dumps(_entry(document, "content/alternate")))
+    legacy["id"] = "content/legacy-alternate"
+    legacy["status"] = "superseded"
+    legacy["source"] = {
+        "path": "legacy-alternate.yaml",
+        "document-path": [],
+        "line": 1,
+        "column": 1,
+    }
+    _declarations(document).append(legacy)
+    _sources(document).append({"path": "legacy-alternate.yaml", "sha256": "0" * 64})
+    cast(list[object], _entry(document, "content/alternate")["relations"]).append(
+        {"type": "supersedes", "target": "content/legacy-alternate"}
+    )
+
+    index = _load_document(document)
+
+    assert index.get("content/legacy-alternate") is not None
+
+
+def test_live_and_persisted_catalogs_retain_decision_provenance(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "registry"
+    shutil.copytree(REGISTRY_FIXTURES, root)
+    decision = {
+        "_schema": "eutaxis:declaration@1",
+        "id": "registry/format-decision",
+        "kind": "decision",
+        "owner": "registry",
+        "status": "active",
+        "source-revision": "fixture-1",
+        "applicability": {"facet": "context.available", "operator": "exists"},
+        "relations": [],
+        "context": "The registry needs one canonical declaration format.",
+        "options": [{"id": "yaml", "description": "Use structured YAML records."}],
+        "outcome": "yaml",
+        "consequences": "Rules use YAML as their canonical source form.",
+    }
+    (root / "decision.yaml").write_text(
+        yaml.safe_dump(decision, sort_keys=False), encoding="utf-8"
+    )
+    rule_path = root / "refined-rule.yaml"
+    rule = yaml.safe_load(rule_path.read_text(encoding="utf-8"))
+    rule["decided-by"] = ["registry/format-decision"]
+    rule_path.write_text(yaml.safe_dump(rule, sort_keys=False), encoding="utf-8")
+    registry = load_declaration_registry(
+        sorted(root.glob("*.yaml")), load_facet_registry(FACET_FIXTURE)
+    )
+    live = build_declaration_catalog(registry, source_root=root)
+
+    persisted = load_persisted_catalog_index(catalog_json_bytes(live))
+
+    live_rule = live.get("content/refined")
+    persisted_rule = persisted.get("content/refined")
+    decision_row = persisted.get("registry/format-decision")
+    assert live_rule is not None
+    assert live_rule.declaration.decided_by == (  # type: ignore[union-attr]
+        "registry/format-decision",
+    )
+    assert persisted_rule is not None
+    assert persisted_rule.query["decided-by"] == ("registry/format-decision",)
+    assert decision_row is not None
+    assert decision_row.query["outcome"] == "yaml"
 
 
 def test_loader_rejects_duplicate_source_coordinates() -> None:

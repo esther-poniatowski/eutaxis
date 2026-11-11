@@ -13,6 +13,7 @@ import yaml
 from eutaxis.declarations import (
     CompositionMechanism,
     CompositionManifestDeclaration,
+    DecisionDeclaration,
     DeclarationSchemaError,
     DeclarationSemanticError,
     EvaluatorDeclaration,
@@ -72,6 +73,7 @@ def _line_containing(path: Path, text: str) -> int:
         ("composition-manifest.yaml", CompositionManifestDeclaration),
         ("evaluator.yaml", EvaluatorDeclaration),
         ("operation.yaml", OperationDeclaration),
+        ("decision.yaml", DecisionDeclaration),
     ],
 )
 def test_valid_declaration_fixtures_load(
@@ -81,6 +83,86 @@ def test_valid_declaration_fixtures_load(
     assert isinstance(declaration, expected_type)
     assert declaration.schema_version == 1
     assert declaration.owner == "eutaxis"
+
+
+def test_decision_loads_an_explicit_option_set_and_selected_outcome() -> None:
+    declaration = load_declaration(FIXTURES / "valid" / "decision.yaml")
+
+    assert isinstance(declaration, DecisionDeclaration)
+    assert tuple(option.id for option in declaration.options) == (
+        "yaml",
+        "labelled-markdown",
+    )
+    assert declaration.outcome == "yaml"
+
+
+def test_decision_rejects_a_repeated_option_identifier(tmp_path: Path) -> None:
+    def repeat_identifier(document: dict[str, object]) -> None:
+        document["options"][1]["id"] = "yaml"  # type: ignore[index]
+
+    path = _write_variant(tmp_path, "decision.yaml", repeat_identifier)
+
+    with pytest.raises(DeclarationSemanticError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.options[1].id"
+
+
+def test_decision_outcome_must_name_a_declared_option(tmp_path: Path) -> None:
+    path = _write_variant(
+        tmp_path,
+        "decision.yaml",
+        lambda document: document.update({"outcome": "database"}),
+    )
+
+    with pytest.raises(DeclarationSemanticError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.outcome"
+
+
+def test_declaration_rejects_the_legacy_draft_status(tmp_path: Path) -> None:
+    path = _write_variant(
+        tmp_path,
+        "rule.yaml",
+        lambda document: document.update({"status": "draft"}),
+    )
+
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.status"
+
+
+@pytest.mark.parametrize("source_name", ["evaluator.yaml", "operation.yaml"])
+def test_exact_contract_cannot_use_unversioned_supersession_status(
+    tmp_path: Path, source_name: str
+) -> None:
+    path = _write_variant(
+        tmp_path,
+        source_name,
+        lambda document: document.update({"status": "superseded"}),
+    )
+
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.status"
+
+
+def test_rule_retains_decision_provenance(tmp_path: Path) -> None:
+    path = _write_variant(
+        tmp_path,
+        "rule.yaml",
+        lambda document: document.update(
+            {"decided-by": ["governance/declaration-format"]}
+        ),
+    )
+
+    declaration = load_declaration(path)
+
+    assert isinstance(declaration, RuleDeclaration)
+    assert declaration.decided_by == ("governance/declaration-format",)
 
 
 def test_byte_owned_declaration_loader_uses_retained_source(tmp_path: Path) -> None:

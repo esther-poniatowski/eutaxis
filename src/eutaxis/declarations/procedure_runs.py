@@ -1699,7 +1699,7 @@ def _declaration_semantic_value(
         "id": declaration.id,
         "kind": declaration.kind.value,
         "owner": declaration.owner,
-        "status": declaration.status,
+        "status": declaration.status.value,
         "source_revision": declaration.source_revision,
         "applicability": declaration.applicability,
         "relations": [

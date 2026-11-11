@@ -14,7 +14,9 @@ from .loader import LoadedDeclarationSource, load_declaration_source
 from .models import (
     AnyDeclaration,
     CompositionManifestDeclaration,
+    DecisionDeclaration,
     DeclarationKind,
+    DeclarationStatus,
     EvaluatorDeclaration,
     OperationDeclaration,
     ParameterBinding,
@@ -238,25 +240,62 @@ class _RegistryBuilder:
         family.versions[declaration.version] = record
 
     def _validate_relations(self) -> None:
-        """Resolve effective-content edges and normalize incompatibility pairs."""
+        """Resolve binding edges and validate lifecycle-specific supersession."""
+        incoming_supersedes: set[str] = set()
         for record in self.all_records:
             declaration = record.declaration
-            if not _is_effective_content(declaration):
-                if declaration.relations:
-                    self._raise(
-                        record,
-                        ("relations", 0),
-                        f"{declaration.kind.value} records cannot declare relations",
-                    )
-                continue
             seen: set[tuple[str, str, str]] = set()
             for index, relation in enumerate(declaration.relations):
                 path = ("relations", index, "target")
+                if isinstance(
+                    declaration, (EvaluatorDeclaration, OperationDeclaration)
+                ):
+                    self._raise(
+                        record,
+                        ("relations", index),
+                        f"{declaration.kind.value} records cannot declare relations",
+                    )
+                if relation.type != "supersedes" and not _is_effective_content(
+                    declaration
+                ):
+                    self._raise(
+                        record,
+                        ("relations", index, "type"),
+                        f"{declaration.kind.value} records admit only supersedes relations",
+                    )
                 triple = (declaration.id, relation.type, relation.target)
                 if triple in seen:
                     self._raise(record, path, f"duplicate relation {relation.type!r}")
                 seen.add(triple)
-                target = self._effective_content(record, relation.target, path)
+                if relation.type == "supersedes":
+                    target = self._unversioned_record(record, relation.target, path)
+                    if declaration.status is not DeclarationStatus.ACTIVE:
+                        self._raise(
+                            record,
+                            ("status",),
+                            "a superseding declaration must be active",
+                        )
+                    if target.declaration.status is not DeclarationStatus.SUPERSEDED:
+                        self._raise(
+                            record,
+                            path,
+                            "a supersedes target must have status 'superseded'",
+                        )
+                    if target.declaration.kind is not declaration.kind:
+                        self._raise(
+                            record,
+                            path,
+                            "a supersedes relation must preserve declaration kind",
+                        )
+                    incoming_supersedes.add(target.declaration.id)
+                else:
+                    if declaration.status is not DeclarationStatus.ACTIVE:
+                        self._raise(
+                            record,
+                            ("status",),
+                            "a declaration with operative relations must be active",
+                        )
+                    target = self._effective_content(record, relation.target, path)
                 if target.declaration.id == declaration.id:
                     self._raise(record, path, "a declaration cannot relate to itself")
                 edge = _RelationEdge(
@@ -278,6 +317,20 @@ class _RegistryBuilder:
                             f"duplicate incompatibility pair {pair!r}",
                         )
                     self.conflicts[pair] = edge
+        for record in self.all_records:
+            declaration = record.declaration
+            if (
+                declaration.status is DeclarationStatus.SUPERSEDED
+                and not isinstance(
+                    declaration, (EvaluatorDeclaration, OperationDeclaration)
+                )
+                and declaration.id not in incoming_supersedes
+            ):
+                self._raise(
+                    record,
+                    ("status",),
+                    "a superseded declaration lacks an incoming supersedes relation",
+                )
 
     def _reject_cycles(
         self, edges: Mapping[str, list[_RelationEdge]], graph_name: str
@@ -300,9 +353,8 @@ class _RegistryBuilder:
 
         for identifier, record in self.records.items():
             if (
-                _is_effective_content(record.declaration)
-                and states.get(identifier, 0) == 0
-            ):
+                graph_name == "supersedes" or _is_effective_content(record.declaration)
+            ) and states.get(identifier, 0) == 0:
                 visit(identifier)
 
     def _validate_exact_references(self) -> None:
@@ -317,6 +369,8 @@ class _RegistryBuilder:
                         DeclarationKind.EVALUATOR,
                         ("criteria", index, "evaluator"),
                     )
+                for index, identifier in enumerate(declaration.decided_by):
+                    self._decision(record, identifier, ("decided-by", index))
             elif isinstance(declaration, ProcedureDeclaration):
                 self._validate_predicate_references(record, declaration)
                 self._validate_procedure_actions(record, declaration)
@@ -491,7 +545,23 @@ class _RegistryBuilder:
                 path + ("version",),
                 f"unknown contract version {reference.id!r}@{reference.version}",
             )
+        self._require_active(record, target, path)
         return target
+
+    def _decision(
+        self,
+        referring_record: RegisteredDeclaration,
+        identifier: str,
+        path: DocumentPath,
+    ) -> RegisteredDeclaration:
+        """Resolve one rule justification as an active decision."""
+        return self._unversioned_kind(
+            referring_record,
+            identifier,
+            path,
+            lambda declaration: isinstance(declaration, DecisionDeclaration),
+            "decision declaration",
+        )
 
     def _validate_policies(self) -> None:
         """Validate conflict pairs and type-preserving strategy targets."""
@@ -581,6 +651,7 @@ class _RegistryBuilder:
                         path,
                         f"manifest policy {identifier!r} is not a resolution-policy",
                     )
+                self._require_active(record, target, path)
                 policy = target.declaration
                 if policy.owner != manifest.owner:
                     self._raise(
@@ -649,7 +720,38 @@ class _RegistryBuilder:
                 path,
                 f"{identifier!r} does not name {kind_name}",
             )
+        self._require_active(referring_record, target, path)
         return target
+
+    def _unversioned_record(
+        self,
+        referring_record: RegisteredDeclaration,
+        identifier: str,
+        path: DocumentPath,
+    ) -> RegisteredDeclaration:
+        """Resolve one unversioned record without imposing active status."""
+        target = self.records.get(identifier)
+        if target is None:
+            if identifier in self.families:
+                message = f"{identifier!r} is an exact contract, not a declaration"
+            else:
+                message = f"unknown declaration {identifier!r}"
+            self._raise(referring_record, path, message)
+        return target
+
+    def _require_active(
+        self,
+        referring_record: RegisteredDeclaration,
+        target: RegisteredDeclaration,
+        path: DocumentPath,
+    ) -> None:
+        """Require a semantic-reference target to be binding."""
+        if target.declaration.status is not DeclarationStatus.ACTIVE:
+            self._raise(
+                referring_record,
+                path,
+                f"semantic reference target {target.declaration.id!r} is not active",
+            )
 
     def _raise(
         self, record: RegisteredDeclaration, path: DocumentPath, message: str

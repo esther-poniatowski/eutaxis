@@ -28,6 +28,7 @@ from .loader import LoadedDeclarationSource
 from .models import (
     AnyDeclaration,
     CompositionManifestDeclaration,
+    DecisionDeclaration,
     DeclarationKind,
     EXACT_CONTRACT_KINDS,
     EvaluatorDeclaration,
@@ -544,7 +545,7 @@ def _entry_payload(
         "id": declaration.id,
         "kind": declaration.kind.value,
         "owner": declaration.owner,
-        "status": declaration.status,
+        "status": declaration.status.value,
         "source-revision": declaration.source_revision,
         "schema-version": declaration.schema_version,
         "applicability": _json_value(declaration.applicability),
@@ -590,11 +591,14 @@ def _query_fields(declaration: AnyDeclaration) -> dict[str, object]:
     if isinstance(declaration, RuleSetDeclaration):
         return {"purpose": declaration.purpose}
     if isinstance(declaration, RuleDeclaration):
-        return {
+        rule_query: dict[str, object] = {
             "axis": declaration.axis.value,
             "failure-mode": declaration.failure_mode,
             "required-visibility": declaration.required_visibility,
         }
+        if declaration.decided_by:
+            rule_query["decided-by"] = sorted(declaration.decided_by)
+        return rule_query
     if isinstance(declaration, ProcedureDeclaration):
         return {"purpose": declaration.purpose}
     if isinstance(declaration, ResolutionPolicyDeclaration):
@@ -625,6 +629,8 @@ def _query_fields(declaration: AnyDeclaration) -> dict[str, object]:
             "effects": sorted(declaration.effects),
             "failure-outcomes": sorted(declaration.failure_outcomes),
         }
+    if isinstance(declaration, DecisionDeclaration):
+        return {"outcome": declaration.outcome}
     raise TypeError(f"unsupported declaration kind {declaration.kind.value!r}")
 
 

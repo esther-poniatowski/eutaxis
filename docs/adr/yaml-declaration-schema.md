@@ -27,15 +27,25 @@ Every author-editable field with a matching Ekphrasis control carries a shape-co
 
 ## Declaration kinds
 
-The discriminated union contains seven kinds:
+The discriminated union contains eight kinds:
 
 - `rule-set` groups coherent rules and supplies one discovery purpose; it is a selection container, not effective content
-- `rule` declares one addressable artifact or decision constraint
+- `rule` declares one addressable operative constraint
 - `procedure` declares a finite externally observable action graph
 - `resolution-policy` resolves a named class of semantic conflicts inside one compilation unit
 - `composition-manifest` selects and orders content under one declared artifact mechanism
 - `evaluator` declares how a criterion is assessed and what its evidence means
 - `operation` declares an action node available to procedures
+- `decision` records a governance choice, the alternatives considered, and its consequences
+
+Each decision supplies four elements:
+
+- non-empty Markdown `context`
+- one or more options, each with a unique local identifier and a Markdown description
+- one `outcome` that names an option
+- non-empty Markdown `consequences`
+
+These elements record what was chosen and why. They do not duplicate the governed rules.
 
 Only rules carry an `axis`: `reasoning-target`, `output-structure`, or `surface-style`. Procedures are a declaration kind, not a fourth axis. A file may contain one declaration or a declared collection; member objects retain their own `kind` and stable identifier.
 
@@ -53,11 +63,26 @@ The `mechanism` field accepts exactly three values:
 
 Authors must provide the field explicitly. The opaque `target` remains independent of the selected mechanism.
 
-Rules and procedures are the only effective-content kinds. They may declare relations and participate in conflict policies. Rule sets must have an empty `relations` field. A rule set expands to its member rules during resolution and never enters a candidate, required, excluded, effective, or certified set.
+Rules and procedures are the only effective-content kinds. Each kind admits the following links:
+
+- rules and procedures may use `requires`, `refines`, `incompatible-with`, and `supersedes`
+- rule sets, resolution policies, composition manifests, and decisions may use only `supersedes`
+- evaluators and operations admit no relations because their positive integer `version` supplies their replacement lineage
+
+During resolution, a rule set expands to its active member rules. The rule set never enters a candidate, required, excluded, effective, or certified set.
 
 ## Common envelope
 
 Every authored declaration begins with `_schema: eutaxis:declaration@1`, followed by its stable `id`, `kind`, `owner`, lifecycle status, source revision, applicability, and relations. Classification, failure mode, visibility, rationale, title, and purpose appear only where the normative schema admits them. A required per-rule `description` is excluded because it normally paraphrases the norm. A rule set or procedure may carry one `purpose` for discovery.
+
+The lifecycle vocabulary has four states:
+
+- `proposed` is not binding
+- `active` is binding and is the only state admitted for a semantic target or effective resolver content
+- `superseded` marks an unversioned record replaced by an active record of the same kind; the active record must point to it through `supersedes`
+- `retired` marks a record withdrawn without replacement
+
+Exact evaluator and operation contracts cannot use `superseded`. Their versioned keys express replacement without an unversioned relation. Catalog discovery retains every lifecycle state. The resolver rejects an inactive manifest, records and excludes each inactive rule-set member, and never emits inactive content.
 
 The source loader enforces first-key placement because JSON Schema validates mappings without assigning significance to key order. Nested rule-set members are independently bound and begin with the same `_schema` key. Normalized Python models retain the internal integer `schema_version`; generated catalogs, acquisition records, evaluator-fixture descriptors, evidence records, and migration baselines retain their distinct `schema-version` fields. Those internal formats do not claim to be author-editable declaration documents.
 
@@ -71,7 +96,7 @@ A child does not replace its inherited predicate. The loader constructs `all: [<
 
 ## Context-facet registry
 
-One explicitly supplied YAML registry defines the context vocabulary for a typed load. The registry remains separate from the seven-kind declaration union and binds to its own logical contract. The registry owns all facet entries and records their owner and source revision:
+One explicitly supplied YAML registry defines the context vocabulary for a typed load. The registry remains separate from the eight-kind declaration union and binds to its own logical contract. The registry owns all facet entries and records their owner and source revision:
 
 ```yaml
 _schema: eutaxis:context-facets@1
@@ -171,6 +196,8 @@ The applicability operators and declaration registry both use these rules. Separ
 ## Rules and criteria
 
 Rules express modality as data. The values follow [BCP 14](https://www.rfc-editor.org/info/bcp14): `must`, `must-not`, `should`, `should-not`, and `may`. Each norm has a local stable `id`, `modality`, `subject`, an action with `verb`, `object`, and optional `timing`, and optional narrowing applicability, Markdown guidance, and rationale.
+
+A rule may cite its governance basis through `decided-by`. Each list item must name an active, unversioned `decision` record. Only the rule carries this directed link.
 
 `should` and `should-not` require a decision criterion that evaluates the norm or inclusion in the `affects` set of a closed exception. An exception names the local norms affected, its applicability predicate, and either a waiver or replacement norms. Version 1 admits at most one exception for each affected norm and only one-step substitutions: a replacement norm cannot itself be affected by an exception. This direction excludes waivers of the enclosing rule and unrelated declarations. `may` is admitted only for a genuinely discretionary choice. Prohibitions are `must-not` norms, not a parallel prose field. Each success criterion names the norm identifiers that it evaluates and one registered evaluator.
 
@@ -317,7 +344,15 @@ Reviewed Python, rather than YAML, names executable callables. During the normat
 
 Packaged known-failure descriptors live under `src/eutaxis/data/evaluator-fixtures/v1/` as YAML and conform to the closed `evaluator-fixture-v1` schema. A descriptor contains `schema-version: 1`, a stable `id`, an exact `evaluator` reference, `input-revision: declaration-v1`, an `input` object, and `expected-state: violated`. The input object contains non-empty `sources` and one `facet-registry`. These resource paths use POSIX separators, are relative to the descriptor directory, contain no `..` segment, and must resolve within the packaged fixture root.
 
-The checker declares two known failures in version 1: `eutaxis/declaration-registry/unresolved-exact-reference` exercises semantic reference resolution, and `eutaxis/declaration-registry/wrong-schema-binding` exercises the bound source contract. Its `known-failure-fixtures` field contains both identifiers, and each descriptor references `eutaxis/declaration-registry` version 1.
+The version 1 checker declares five known failures:
+
+- `eutaxis/declaration-registry/unresolved-exact-reference` tests exact semantic references
+- `eutaxis/declaration-registry/wrong-schema-binding` tests the bound source contract
+- `eutaxis/declaration-registry/unresolved-decided-by` tests the governance link
+- `eutaxis/declaration-registry/old-status` tests the current lifecycle vocabulary
+- `eutaxis/declaration-registry/orphaned-superseded` tests the required active successor
+
+The `known-failure-fixtures` field contains all five identifiers. Each descriptor names `eutaxis/declaration-registry` version 1.
 
 The fixture loader resolves descriptor paths canonically and visits their string forms in lexical order. Fixture identifiers are unique across that traversal; a duplicate fails at the later `id`. A malformed descriptor fails at its invalid field. An unresolved source or facet-registry resource fails at the corresponding path value. After the exact evaluator and its registered input operation resolve, the fixture input must satisfy that operation's input schema; a mismatch belongs to `input` at the deepest failing instance path. Every identifier in `known-failure-fixtures` must resolve to one descriptor, and a missing fixture belongs to the referring list item. The descriptor must point back to the same evaluator, or the descriptor's `evaluator` field fails. The loader issues the immutable index with a process-local private stamp; direct construction, copying, serialization, and reconstruction fail, and execution rejects an unstamped index before invoking a runner. The loaded index retains one immutable digest record for the descriptor and for each resolved resource field. Each record preserves its canonical path, lowercase SHA-256 value, fixture identifier, resource role, and descriptor document path. Known-failure execution checks these records before and after each invocation and once more before assurance issuance. This contract assumes no hostile concurrent change-and-restoration cycle while a path-based runner executes.
 
@@ -327,7 +362,7 @@ The `eutaxis/declaration-registry` evidence schema is closed and has three varia
 
 The execution gate requires the returned evaluator identity and input revision to match the invocation. It also requires the state to match the fixture expectation and the evidence to satisfy this schema. A missing runner belongs to the evaluator reference under execution. A returned identity, revision, state, or evidence defect belongs to that result field.
 
-The shipped checker wraps facet-registry loading and `load_declaration_registry`. It accepts the same `sources` and `facet-registry` input as its registered operation contract. Its valid packaged corpus must return `satisfied`. Its known-failure corpus contains an unresolved exact reference and a wrong declaration schema binding; both must return `violated` with located diagnostics. Separately, the packaged procedure and operation must pass the static procedure–operation checks. Planted tests cover malformed and duplicate fixture descriptors, invalid payloads, unresolved resources, missing runner and fixture bindings, result identity and revision mismatches, wrong states, invalid evidence, action bindings, outcome maps, and mutation footprints.
+The shipped checker wraps facet-registry loading and `load_declaration_registry`. It accepts the same `sources` and `facet-registry` input as its registered operation contract. Its valid packaged corpus must return `satisfied`. Each of the five known-failure corpora must return `violated` with a located diagnostic. Separately, the packaged procedure and operation must pass the static procedure–operation checks. Planted tests cover malformed and duplicate fixture descriptors, invalid payloads, unresolved resources, missing runner and fixture bindings, result identity and revision mismatches, wrong states, invalid evidence, action bindings, outcome maps, and mutation footprints.
 
 ## Runtime boundary
 

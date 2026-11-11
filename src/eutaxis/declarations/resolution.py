@@ -20,6 +20,7 @@ from .composite_facets import (
 )
 from .models import (
     CompositionManifestDeclaration,
+    DeclarationStatus,
     ExceptionClause,
     JsonValue,
     ProcedureDeclaration,
@@ -86,6 +87,7 @@ class ResolutionEventKind(StrEnum):
     MANIFEST_EVALUATED = "manifest-evaluated"
     MANIFEST_SELECTED = "manifest-selected"
     RULE_SET_MEMBER_EXPANDED = "rule-set-member-expanded"
+    RULE_SET_MEMBER_INACTIVE = "rule-set-member-inactive"
     DEPENDENCY_DISCOVERED = "dependency-discovered"
     POLICY_RESULT_DISCOVERED = "policy-result-discovered"
     DECLARATION_EVALUATED = "declaration-evaluated"
@@ -110,6 +112,7 @@ class ResolutionErrorCode(StrEnum):
 
     UNKNOWN_MANIFEST = "unknown-manifest"
     MANIFEST_WRONG_KIND = "manifest-wrong-kind"
+    MANIFEST_INACTIVE = "manifest-inactive"
     MANIFEST_INAPPLICABLE = "manifest-inapplicable"
     MANIFEST_APPLICABILITY_INDETERMINATE = "manifest-applicability-indeterminate"
     DEPENDENCY_INAPPLICABLE = "dependency-inapplicable"
@@ -386,6 +389,7 @@ _EVENT_FIELDS: Mapping[ResolutionEventKind, frozenset[str]] = {
     ResolutionEventKind.MANIFEST_EVALUATED: frozenset({"truth", "applicability"}),
     ResolutionEventKind.MANIFEST_SELECTED: frozenset({"anchor"}),
     ResolutionEventKind.RULE_SET_MEMBER_EXPANDED: frozenset({"anchor"}),
+    ResolutionEventKind.RULE_SET_MEMBER_INACTIVE: frozenset({"anchor"}),
     ResolutionEventKind.DEPENDENCY_DISCOVERED: frozenset(
         {"anchor", "relation", "dependant"}
     ),
@@ -514,6 +518,13 @@ class _Resolver:
             )
         self.manifest_record = record
         self.manifest = cast(CompositionManifestDeclaration, record.declaration)
+        if self.manifest.status is not DeclarationStatus.ACTIVE:
+            self._fail(
+                ResolutionErrorCode.MANIFEST_INACTIVE,
+                "composition manifest is not active",
+                record,
+                ("status",),
+            )
         self.context = self.registry.facet_registry.validate_context(self.input_context)
         trace = self._evaluate_predicate(self.manifest.applicability)
         event = self._emit(
@@ -564,6 +575,16 @@ class _Resolver:
                 if isinstance(declaration, RuleSetDeclaration):
                     for rule in declaration.rules:
                         member = self.registry.records[rule.id]
+                        if rule.status is not DeclarationStatus.ACTIVE:
+                            self._emit(
+                                ResolutionEventKind.RULE_SET_MEMBER_INACTIVE,
+                                rule.id,
+                                member,
+                                ("status",),
+                                causes=(selection_event,),
+                                anchor=anchor,
+                            )
+                            continue
                         expanded = self._emit(
                             ResolutionEventKind.RULE_SET_MEMBER_EXPANDED,
                             rule.id,
@@ -922,6 +943,8 @@ class _Resolver:
                 ResolvedComponent(anchor.section, identifier, anchor.rank)
             )
             record = self.registry.records[identifier]
+            if record.declaration.status is not DeclarationStatus.ACTIVE:
+                raise AssertionError("only active declarations may become effective")
             events.append(
                 self._emit(
                     ResolutionEventKind.DECLARATION_EFFECTIVE,

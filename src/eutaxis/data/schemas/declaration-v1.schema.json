@@ -47,6 +47,9 @@
     },
     {
       "$ref": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json#/$defs/operation"
+    },
+    {
+      "$ref": "https://eutaxis.dev/schemas/declaration-v1.base.schema.json#/$defs/decision"
     }
   ],
   "$defs": {

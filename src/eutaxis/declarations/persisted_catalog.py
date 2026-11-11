@@ -14,12 +14,16 @@ from .acquisition_paths import AcquisitionPathError, normalized_relative_path
 from .catalog import CATALOG_INDEX_REVISION, CatalogSource, ExactContractKey
 from .catalog_schema import validate_catalog_index_payload
 from .exceptions import DeclarationCatalogError
-from .models import DeclarationKind, EXACT_CONTRACT_KINDS, JsonValue, freeze_json
+from .models import (
+    DeclarationKind,
+    DeclarationStatus,
+    EXACT_CONTRACT_KINDS,
+    JsonValue,
+    freeze_json,
+)
 from .static_query import StaticCatalogQuery, matches_static_query
 
-_CONTENT_KINDS = frozenset(
-    {DeclarationKind.RULE_SET, DeclarationKind.RULE, DeclarationKind.PROCEDURE}
-)
+_EFFECTIVE_KINDS = frozenset({DeclarationKind.RULE, DeclarationKind.PROCEDURE})
 _NAMESPACE = re.compile(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")
 _V1_DIGEST = re.compile(r"[0-9a-f]{64}")
 _V2_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
@@ -51,7 +55,7 @@ class PersistedCatalogEntry:
     id: str
     kind: DeclarationKind
     owner: str
-    status: str
+    status: DeclarationStatus
     source_revision: str
     schema_version: int
     applicability: Mapping[str, JsonValue]
@@ -343,7 +347,7 @@ def _entry(
         id=cast(str, row["id"]),
         kind=kind,
         owner=cast(str, row["owner"]),
-        status=cast(str, row["status"]),
+        status=DeclarationStatus(cast(str, row["status"])),
         source_revision=cast(str, row["source-revision"]),
         schema_version=cast(int, row["schema-version"]),
         applicability=applicability,
@@ -375,14 +379,15 @@ def _validate_entry_integrity(
     source: Path | None,
 ) -> None:
     """Check references whose validity spans several persisted rows."""
-    content = {
+    effective = {
         identifier: entry
         for identifier, entry in declarations.items()
-        if entry.kind in _CONTENT_KINDS
+        if entry.kind in _EFFECTIVE_KINDS
     }
     asserted_conflicts: dict[tuple[str, str], str] = {}
     dependency_edges: dict[str, list[tuple[str, str]]] = {}
     supersedes_edges: dict[str, list[tuple[str, str]]] = {}
+    incoming_supersedes: set[str] = set()
     coordinates: dict[tuple[str | None, str, tuple[str | int, ...]], str] = {}
     for entry in entries:
         entry_location = entry_locations[id(entry)]
@@ -417,8 +422,6 @@ def _validate_entry_integrity(
             )
         coordinates[coordinate] = entry_location
         seen_relations: set[tuple[str, str]] = set()
-        if entry.kind not in _CONTENT_KINDS and entry.relations:
-            _fail(source, f"{entry_location}.relations", "only content rows may relate")
         for relation in entry.relations:
             relation_key = (relation.type, relation.target)
             if relation_key in seen_relations:
@@ -428,17 +431,72 @@ def _validate_entry_integrity(
                     f"duplicate relation {relation_key!r}",
                 )
             seen_relations.add(relation_key)
-            if relation.target not in content:
+            target = declarations.get(relation.target)
+            if target is None:
+                target_class = (
+                    "indexed declaration"
+                    if relation.type == "supersedes"
+                    else "indexed content"
+                )
                 _fail(
                     source,
                     f"{entry_location}.relations",
-                    f"relation target {relation.target!r} is not indexed content",
+                    f"relation target {relation.target!r} is not {target_class}",
                 )
             if relation.target == entry.id:
                 _fail(
                     source,
                     f"{entry_location}.relations",
                     "a row cannot relate to itself",
+                )
+            assert target is not None
+            if relation.type == "supersedes":
+                if entry.status is not DeclarationStatus.ACTIVE:
+                    _fail(
+                        source,
+                        f"{entry_location}.status",
+                        "a superseding row must be active",
+                    )
+                if target.status is not DeclarationStatus.SUPERSEDED:
+                    _fail(
+                        source,
+                        f"{entry_location}.relations",
+                        "a supersedes target must have status 'superseded'",
+                    )
+                if target.kind is not entry.kind:
+                    _fail(
+                        source,
+                        f"{entry_location}.relations",
+                        "a supersedes relation must preserve declaration kind",
+                    )
+                incoming_supersedes.add(target.id)
+                supersedes_edges.setdefault(entry.id, []).append(
+                    (relation.target, entry_location)
+                )
+                continue
+            if entry.kind not in _EFFECTIVE_KINDS:
+                _fail(
+                    source,
+                    f"{entry_location}.relations",
+                    f"{entry.kind.value} rows admit only supersedes relations",
+                )
+            if entry.status is not DeclarationStatus.ACTIVE:
+                _fail(
+                    source,
+                    f"{entry_location}.status",
+                    "a row with operative relations must be active",
+                )
+            if target.kind not in _EFFECTIVE_KINDS:
+                _fail(
+                    source,
+                    f"{entry_location}.relations",
+                    f"relation target {relation.target!r} is not effective content",
+                )
+            if target.status is not DeclarationStatus.ACTIVE:
+                _fail(
+                    source,
+                    f"{entry_location}.relations",
+                    f"relation target {relation.target!r} is not active",
                 )
             if relation.type == "incompatible-with":
                 pair = cast(tuple[str, str], tuple(sorted((entry.id, relation.target))))
@@ -453,10 +511,21 @@ def _validate_entry_integrity(
                 dependency_edges.setdefault(entry.id, []).append(
                     (relation.target, entry_location)
                 )
-            elif relation.type == "supersedes":
-                supersedes_edges.setdefault(entry.id, []).append(
-                    (relation.target, entry_location)
-                )
+        if entry.kind is DeclarationKind.RULE:
+            for identifier in cast(tuple[str, ...], entry.query.get("decided-by", ())):
+                decision = declarations.get(identifier)
+                if decision is None or decision.kind is not DeclarationKind.DECISION:
+                    _fail(
+                        source,
+                        f"{entry_location}.query.decided-by",
+                        f"rule decision {identifier!r} is not indexed",
+                    )
+                if decision.status is not DeclarationStatus.ACTIVE:
+                    _fail(
+                        source,
+                        f"{entry_location}.query.decided-by",
+                        f"rule decision {identifier!r} is not active",
+                    )
         container = entry.containing_rule_set
         if container is None:
             if entry.source.document_path:
@@ -511,8 +580,19 @@ def _validate_entry_integrity(
                     "an embedded rule must use the path ['rules', nonnegative-index]",
                 )
 
-    _reject_relation_cycles(content, dependency_edges, "dependency", source=source)
-    _reject_relation_cycles(content, supersedes_edges, "supersedes", source=source)
+    for entry in declarations.values():
+        if (
+            entry.status is DeclarationStatus.SUPERSEDED
+            and entry.id not in incoming_supersedes
+        ):
+            _fail(
+                source,
+                f"{entry_locations[id(entry)]}.status",
+                "a superseded row lacks an incoming supersedes relation",
+            )
+
+    _reject_relation_cycles(effective, dependency_edges, "dependency", source=source)
+    _reject_relation_cycles(declarations, supersedes_edges, "supersedes", source=source)
 
     conflicts = _validated_conflicts(raw_conflicts, source=source)
     conflict_set = set(conflicts)

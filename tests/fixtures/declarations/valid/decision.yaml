@@ -1,0 +1,26 @@
+_schema: eutaxis:declaration@1
+id: governance/declaration-format
+kind: decision
+owner: eutaxis
+status: active
+source-revision: fixture-1
+applicability:
+  facet: artifact.created
+  operator: equals
+  value: true
+relations: []
+context: >-
+  Declaration authors need one canonical source format that tools can validate
+  without discarding explanatory prose.
+options:
+  - id: yaml
+    description: >-
+      Store each declaration as structured YAML with Markdown admitted in prose
+      fields.
+  - id: labelled-markdown
+    description: >-
+      Store each declaration as labelled Markdown parsed into structured fields.
+outcome: yaml
+consequences: >-
+  YAML becomes the canonical authored form, while labelled Markdown remains a
+  fallback ingestion format.

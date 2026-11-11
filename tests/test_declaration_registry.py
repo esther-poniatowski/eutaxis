@@ -53,6 +53,33 @@ def _mutate(
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
 
 
+def _add_decision(directory: Path, *, status: str = "active") -> None:
+    """Add one governance decision that rules may cite."""
+    document = {
+        "_schema": "eutaxis:declaration@1",
+        "id": "registry/format-decision",
+        "kind": "decision",
+        "owner": "registry",
+        "status": status,
+        "source-revision": "fixture-1",
+        "applicability": {"facet": "context.available", "operator": "exists"},
+        "relations": [],
+        "context": "The registry needs one canonical declaration format.",
+        "options": [
+            {"id": "yaml", "description": "Use structured YAML records."},
+            {
+                "id": "markdown",
+                "description": "Use labelled Markdown records.",
+            },
+        ],
+        "outcome": "yaml",
+        "consequences": "Rule sources use YAML as their canonical form.",
+    }
+    (directory / "decision.yaml").write_text(
+        yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
+    )
+
+
 def _assert_registry_error(
     directory: Path,
     facets,
@@ -181,6 +208,41 @@ def test_relation_target_must_be_effective_content(tmp_path: Path, facets) -> No
     )
 
 
+@pytest.mark.parametrize(
+    ("filename", "status", "relations"),
+    [
+        (
+            "refined-rule.yaml",
+            "proposed",
+            [{"type": "requires", "target": "content/base"}],
+        ),
+        (
+            "alternate-rule.yaml",
+            "retired",
+            [{"type": "incompatible-with", "target": "content/base"}],
+        ),
+    ],
+)
+def test_inactive_content_cannot_assert_operative_relations(
+    tmp_path: Path,
+    facets,
+    filename: str,
+    status: str,
+    relations: list[dict[str, str]],
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    _mutate(
+        directory,
+        filename,
+        lambda document: document.update({"status": status, "relations": relations}),
+    )
+
+    error = _assert_registry_error(
+        directory, facets, location="$.status", filename=filename
+    )
+    assert "operative relations must be active" in str(error)
+
+
 def test_reciprocal_conflict_fails_at_the_later_canonical_source(
     tmp_path: Path, facets
 ) -> None:
@@ -250,6 +312,137 @@ def test_exact_reference_failures_distinguish_family_version_and_kind(
     _assert_registry_error(
         directory, facets, location=location, filename="refined-rule.yaml"
     )
+
+
+def test_rule_decision_provenance_resolves_an_active_decision(
+    tmp_path: Path, facets
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    _add_decision(directory)
+    _mutate(
+        directory,
+        "refined-rule.yaml",
+        lambda document: document.update({"decided-by": ["registry/format-decision"]}),
+    )
+
+    registry = load_declaration_registry(_paths(directory), facets)
+
+    rule = registry.records["content/refined"].declaration
+    assert rule.decided_by == ("registry/format-decision",)  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(
+    ("decision", "expected"),
+    [
+        ("registry/missing", "unknown decision declaration"),
+        ("content/base", "does not name decision declaration"),
+    ],
+)
+def test_rule_decision_provenance_requires_a_resolved_decision(
+    tmp_path: Path, facets, decision: str, expected: str
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    _mutate(
+        directory,
+        "refined-rule.yaml",
+        lambda document: document.update({"decided-by": [decision]}),
+    )
+
+    error = _assert_registry_error(
+        directory,
+        facets,
+        location="$.decided-by[0]",
+        filename="refined-rule.yaml",
+    )
+    assert expected in str(error)
+
+
+def test_rule_decision_provenance_requires_an_active_decision(
+    tmp_path: Path, facets
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    _add_decision(directory, status="proposed")
+    _mutate(
+        directory,
+        "refined-rule.yaml",
+        lambda document: document.update({"decided-by": ["registry/format-decision"]}),
+    )
+
+    error = _assert_registry_error(
+        directory,
+        facets,
+        location="$.decided-by[0]",
+        filename="refined-rule.yaml",
+    )
+    assert "is not active" in str(error)
+
+
+def test_exact_reference_requires_an_active_contract(tmp_path: Path, facets) -> None:
+    directory = _copy_corpus(tmp_path)
+    _mutate(
+        directory,
+        "evaluator.yaml",
+        lambda document: document.update({"status": "proposed"}),
+    )
+
+    error = _assert_registry_error(
+        directory,
+        facets,
+        location="$.criteria[0].evaluator",
+        filename="alternate-rule.yaml",
+    )
+    assert "is not active" in str(error)
+
+
+def test_superseded_declaration_requires_an_incoming_supersedes_relation(
+    tmp_path: Path, facets
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    orphan = yaml.safe_load(
+        (directory / "alternate-rule.yaml").read_text(encoding="utf-8")
+    )
+    orphan["id"] = "content/orphaned-alternate"
+    orphan["status"] = "superseded"
+    (directory / "orphaned-rule.yaml").write_text(
+        yaml.safe_dump(orphan, sort_keys=False), encoding="utf-8"
+    )
+
+    error = _assert_registry_error(
+        directory,
+        facets,
+        location="$.status",
+        filename="orphaned-rule.yaml",
+    )
+    assert "lacks an incoming supersedes relation" in str(error)
+
+
+def test_active_same_kind_declaration_may_supersede_a_superseded_record(
+    tmp_path: Path, facets
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    legacy = yaml.safe_load(
+        (directory / "alternate-rule.yaml").read_text(encoding="utf-8")
+    )
+    legacy["id"] = "content/legacy-alternate"
+    legacy["status"] = "superseded"
+    (directory / "legacy-rule.yaml").write_text(
+        yaml.safe_dump(legacy, sort_keys=False), encoding="utf-8"
+    )
+    _mutate(
+        directory,
+        "alternate-rule.yaml",
+        lambda document: document.update(
+            {
+                "relations": [
+                    {"type": "supersedes", "target": "content/legacy-alternate"}
+                ]
+            }
+        ),
+    )
+
+    registry = load_declaration_registry(_paths(directory), facets)
+
+    assert "content/legacy-alternate" in registry.records
 
 
 @pytest.mark.parametrize(

@@ -1,0 +1,20 @@
+_schema: eutaxis:declaration@1
+id: eutaxis/fixture-old-status
+kind: rule
+owner: eutaxis
+status: draft
+source-revision: contract-v1
+applicability: {facet: context.available, operator: exists}
+relations: []
+axis: reasoning-target
+failure-mode: visible
+norms:
+  - id: use-current-status
+    modality: must
+    subject: fixture
+    action: {verb: use, object: the current lifecycle vocabulary}
+criteria:
+  - id: lifecycle-valid
+    norms: [use-current-status]
+    evaluator: {id: eutaxis/manual-judgment, version: 1}
+    statement: The declaration uses a current lifecycle status

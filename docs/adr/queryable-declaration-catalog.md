@@ -48,6 +48,7 @@ Each source path is relative to an explicit source root and uses `/` as its sepa
 Each indexed record contains the following fields:
 
 - its stable identifier and kind
+- its lifecycle status
 - its static query fields
 - its relations and containing rule set
 - its portable source coordinates
@@ -70,8 +71,15 @@ One packaged schema validates both emitted and loaded index payloads. The loader
 - every source path is portable, and each row names a listed source
 - every listed source has a row, and each source coordinate occurs once
 - top-level rows use the source root, while each embedded rule shares a source with its root rule set and uses a `rules` sequence coordinate
-- content rows alone may link to indexed content; each typed link occurs once and does not target its source
-- dependency and supersedes links form acyclic graphs
+- active content rows may link to active indexed content
+- inactive content rows cannot carry operative links
+- a non-content row may only use `supersedes`, from an active source to a superseded target of the same kind
+- exact contracts admit no links
+- each superseded unversioned row has an incoming `supersedes` link
+- each typed link occurs once and does not target its source
+- dependency links form an acyclic graph
+- the endpoint statuses make a supersession cycle invalid before graph traversal
+- every rule `decided-by` query value names an active indexed decision
 - exactly one content row asserts each unordered incompatibility pair, and the normalized conflict index contains exactly those pairs
 - each resolution policy names a normalized pair contained in the conflict index
 

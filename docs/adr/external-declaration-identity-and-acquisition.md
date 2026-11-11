@@ -213,7 +213,7 @@ is managed outside Eutaxis. `git-submodule` requires the additional Git proof
 below. None of the three kinds grants a different semantic authority.
 
 Capabilities are outside version 1 external acquisition. Every acquired file
-must contain only the seven structured declaration kinds governed by the YAML
+must contain only the eight structured declaration kinds governed by the YAML
 declaration schema. A future capability-acquisition decision must add its own
 privilege review and cannot inherit this instruction-source gate silently.
 

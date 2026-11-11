@@ -1,0 +1,14 @@
+_schema: eutaxis:declaration@1
+id: eutaxis/fixture-orphaned-superseded
+kind: decision
+owner: eutaxis
+status: superseded
+source-revision: contract-v1
+applicability: {facet: context.available, operator: exists}
+relations: []
+context: The fixture tests whether superseded records retain their successor edge.
+options:
+  - id: retain
+    description: Retain the superseded decision without a successor.
+outcome: retain
+consequences: The registry must reject this orphaned lifecycle state.
