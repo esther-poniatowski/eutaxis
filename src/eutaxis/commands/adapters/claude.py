@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..exceptions import CommandError
-from ..models import ArtifactFile, CommandSource
+from ..models import ArtifactFile, SkillRenderInput
 from ..names import is_skill_name
 from . import sibling_artifact_link
 
@@ -55,7 +55,7 @@ class ClaudeCodeAdapter:
         raise CommandError(f"Unknown scope: {scope!r}")
 
     def skill_frontmatter(
-        self, source: CommandSource, *, rendered_body: str
+        self, source: SkillRenderInput, *, rendered_body: str
     ) -> dict[str, object]:
         del rendered_body  # Claude frontmatter is body-independent.
         front: dict[str, object] = {
@@ -64,19 +64,14 @@ class ClaudeCodeAdapter:
         }
         if "model" not in source.invocation:
             front["disable-model-invocation"] = True
-        if source.argument_hint:
-            front["argument-hint"] = source.argument_hint
-        passthrough = source.adapters.get(self.name)
+        passthrough = source.adapter_passthrough.get(self.name)
         if passthrough is not None:
             for key, value in passthrough.frontmatter.items():
                 front[key] = value
         return front
 
-    def sibling_files(
-        self, source: CommandSource, *, context: dict[str, object]
-    ) -> Iterable[ArtifactFile]:
-        del context  # No Claude-native sibling files; passthrough files only.
-        passthrough = source.adapters.get(self.name)
+    def sibling_files(self, source: SkillRenderInput) -> Iterable[ArtifactFile]:
+        passthrough = source.adapter_passthrough.get(self.name)
         if passthrough is None:
             return ()
         return tuple(

@@ -405,6 +405,10 @@ from .structured_skill import (
     StructuredSkillPlan,
     plan_structured_skill,
 )
+from .structured_skill_rendering import (
+    CONTRACT_FILENAME,
+    render_structured_skill,
+)
 from .runners import (
     CheckerRunner,
     CheckerRunnerBinding,
@@ -696,6 +700,7 @@ __all__ = [
     "SupportResourceReference",
     "PlannedSupportResource",
     "StructuredSkillPlan",
+    "CONTRACT_FILENAME",
     "SemanticChangeKind",
     "SemanticComparison",
     "SemanticDifference",
@@ -759,6 +764,7 @@ __all__ = [
     "resolve_external_compilation_unit",
     "plan_external_cumulative_composition",
     "plan_structured_skill",
+    "render_structured_skill",
     "assemble_external_cumulative_artifact",
     "render_external_cumulative_markdown",
     "select_migration_baselines",

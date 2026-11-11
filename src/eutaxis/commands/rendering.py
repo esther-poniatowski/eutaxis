@@ -1,9 +1,10 @@
-"""Rendering: ``CommandSource × AgentAdapter -> RenderedArtifact``.
+"""Render adapter-neutral Skill inputs into multi-file artifacts.
 
 The renderer writes no file. Its one read of the file system tests whether
 the target of a relative link exists.
 
-The renderer assembles a multi-file Agent Skill artifact:
+The command-source entry point converts ``CommandSource`` into the shared
+``SkillRenderInput`` model. The assembler then emits a multi-file artifact:
 
 - ``SKILL.md`` — entrypoint, YAML frontmatter + Markdown body.
 - adapter-specific siblings (e.g. ``agents/openai.yaml`` for Codex).
@@ -34,7 +35,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
+from types import MappingProxyType
 
 import yaml
 
@@ -42,7 +45,14 @@ from .adapters import AgentAdapter
 from .disclosure import DISCLOSURE_PROGRESSIVE, disclose
 from .exceptions import CommandRenderError, FailureModeError
 from .links import LinkResolver
-from .models import ActionSpec, ArtifactFile, CommandSource, RenderedArtifact
+from .models import (
+    ActionSpec,
+    AdapterPassthrough,
+    ArtifactFile,
+    CommandSource,
+    RenderedArtifact,
+    SkillRenderInput,
+)
 from .templating import render as render_template
 
 OWNED_FRONTMATTER_KEY = "x-eutaxis-owned"
@@ -99,32 +109,79 @@ def render_command(
     """Render a command source for one adapter as a multi-file artifact."""
     check_failure_mode(source)
     body_context = _body_context(source, adapter.name, project_root, home)
-    adapter_files = tuple(adapter.sibling_files(source, context=body_context))
+    render_input = _command_render_input(source, adapter.name, body_context)
+    adapter_files = tuple(adapter.sibling_files(render_input))
     rendered_body, rule_files, warnings = _layout_body(
         source,
         adapter.name,
-        render_template(source.body, body_context),
+        render_input.entrypoint_body,
         sibling_paths=frozenset(file.relative_path for file in adapter_files),
     )
+    render_input = replace(
+        render_input,
+        entrypoint_body=rendered_body,
+        resources=rule_files,
+    )
+    return _assemble_skill_with_adapter_files(
+        render_input,
+        adapter,
+        adapter_files,
+        warnings=warnings,
+    )
 
-    front = adapter.skill_frontmatter(source, rendered_body=rendered_body)
+
+def assemble_skill(
+    source: SkillRenderInput,
+    adapter: AgentAdapter,
+    *,
+    warnings: tuple[str, ...] = (),
+) -> RenderedArtifact:
+    """Assemble one adapter-neutral input into a host-native Skill artifact."""
+    if not adapter.supports_scope(source.scope):
+        raise CommandRenderError(
+            f"Adapter {adapter.name!r} does not support scope {source.scope!r}"
+        )
+    adapter_files = tuple(adapter.sibling_files(source))
+    return _assemble_skill_with_adapter_files(
+        source,
+        adapter,
+        adapter_files,
+        warnings=warnings,
+    )
+
+
+def _assemble_skill_with_adapter_files(
+    source: SkillRenderInput,
+    adapter: AgentAdapter,
+    adapter_files: tuple[ArtifactFile, ...],
+    *,
+    warnings: tuple[str, ...],
+) -> RenderedArtifact:
+    """Assemble with one retained result from the adapter extension point."""
+
+    front = adapter.skill_frontmatter(source, rendered_body=source.entrypoint_body)
     if OWNED_FRONTMATTER_KEY in front:
         raise CommandRenderError(
             f"Adapter {adapter.name!r} set reserved frontmatter key "
             f"{OWNED_FRONTMATTER_KEY!r}"
         )
 
-    siblings = _merge_siblings(
-        adapter_files,
-        rule_files,
-        adapter_name=adapter.name,
+    content_files = (
+        *((source.contract_file,) if source.contract_file is not None else ()),
+        *source.resources,
     )
+    first, second = (
+        (content_files, adapter_files)
+        if source.contract_file is not None
+        else (adapter_files, content_files)
+    )
+    siblings = _merge_artifact_files(first, second, adapter_name=adapter.name)
 
-    pre_hash = _content_hash(front, rendered_body, siblings)
+    pre_hash = _content_hash(front, source.entrypoint_body, siblings)
 
     front_with_marker = dict(front)
     front_with_marker[OWNED_FRONTMATTER_KEY] = pre_hash
-    skill_md = _format_skill_md(front_with_marker, rendered_body)
+    skill_md = _format_skill_md(front_with_marker, source.entrypoint_body)
 
     sidecar = _format_sidecar(
         skill_md=skill_md,
@@ -145,7 +202,47 @@ def render_command(
         adapter=adapter.name,
         files=files,
         content_hash=pre_hash,
-        warnings=warnings,
+        warnings=tuple(warnings),
+    )
+
+
+def _command_render_input(
+    source: CommandSource,
+    adapter_name: str,
+    body_context: dict[str, object],
+) -> SkillRenderInput:
+    """Convert one established command source into the shared render model."""
+    passthrough = source.adapters.get(adapter_name, AdapterPassthrough())
+    frontmatter = dict(passthrough.frontmatter)
+    if adapter_name == "claude" and source.argument_hint:
+        frontmatter.setdefault("argument-hint", source.argument_hint)
+    files = dict(passthrough.files)
+    if adapter_name == "codex":
+        files = {
+            path: (
+                content
+                if path == "agents/openai.yaml"
+                else render_template(content, body_context)
+            )
+            for path, content in files.items()
+        }
+    adapter_passthrough = MappingProxyType(
+        {
+            adapter_name: AdapterPassthrough(
+                frontmatter=frontmatter,
+                files=files,
+            )
+        }
+    )
+    return SkillRenderInput(
+        name=source.name,
+        description=source.description,
+        scope=source.scope_default,
+        invocation=source.invocation,
+        entrypoint_body=render_template(source.body, body_context),
+        contract_file=None,
+        resources=(),
+        adapter_passthrough=adapter_passthrough,
     )
 
 
@@ -229,27 +326,39 @@ def _rewrite_links(
     return rewritten_body, rewritten_rules
 
 
-def _merge_siblings(
-    adapter_files: tuple[ArtifactFile, ...],
-    rule_files: tuple[ArtifactFile, ...],
+def _merge_artifact_files(
+    first: tuple[ArtifactFile, ...],
+    second: tuple[ArtifactFile, ...],
     *,
     adapter_name: str,
 ) -> tuple[ArtifactFile, ...]:
-    """Append the rule files to the adapter siblings, refusing path clashes.
+    """Merge adapter and source files while rejecting every path collision."""
+    files = (*first, *second)
+    reserved = (ENTRYPOINT_FILENAME, SIDECAR_FILENAME)
+    for index, candidate in enumerate(files):
+        if any(
+            _artifact_paths_collide(candidate.relative_path, path) for path in reserved
+        ):
+            raise CommandRenderError(
+                f"Adapter {adapter_name!r} emits reserved artifact path "
+                f"{candidate.relative_path!r}"
+            )
+        for prior in files[:index]:
+            if _artifact_paths_collide(candidate.relative_path, prior.relative_path):
+                raise CommandRenderError(
+                    f"Artifact paths {prior.relative_path!r} and "
+                    f"{candidate.relative_path!r} collide for adapter "
+                    f"{adapter_name!r}"
+                )
+    return files
 
-    A passthrough file at the path of a rule file would be silently replaced
-    by one of the two, so the clash is an authoring error.
-    """
-    adapter_paths = {f.relative_path for f in adapter_files}
-    clashes = sorted(
-        f.relative_path for f in rule_files if f.relative_path in adapter_paths
-    )
-    if clashes:
-        raise CommandRenderError(
-            f"Adapter {adapter_name!r} emits sibling files at rule-file "
-            f"paths {clashes}; rename the passthrough files or the rules."
-        )
-    return (*adapter_files, *rule_files)
+
+def _artifact_paths_collide(first: str, second: str) -> bool:
+    """Return whether two POSIX file paths require one path as a directory."""
+    first_parts = tuple(first.split("/"))
+    second_parts = tuple(second.split("/"))
+    common = min(len(first_parts), len(second_parts))
+    return first_parts[:common] == second_parts[:common]
 
 
 def _body_context(

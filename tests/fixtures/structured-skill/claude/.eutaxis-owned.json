@@ -1,0 +1,20 @@
+{
+  "_schema": "eutaxis:skill-ownership@1",
+  "adapter": "claude",
+  "content_hash": "1b4a78d98f2b0149",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "sha256": "05f6a0b8c118c1ae686caca9e55db1efaf5655b868207451658ee8db173cfb9d"
+    },
+    {
+      "path": "references/contract.md",
+      "sha256": "50548f3822d88cb63ea74c5ff994dfaa8f86f2bd492f1b92714a36296d8deff1"
+    },
+    {
+      "path": "scripts/publish-index.py",
+      "sha256": "af2c725e5286846c6bb1f315d4fb45215e35f5f28bbe1ffc5c925ef8abf45938"
+    }
+  ],
+  "name": "complete-module"
+}

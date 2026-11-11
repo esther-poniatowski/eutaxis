@@ -11,6 +11,7 @@ metadata / invocation policy / tool dependencies in the sibling
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -180,8 +181,22 @@ class ArtifactFile:
 
 
 @dataclass(frozen=True)
+class SkillRenderInput:
+    """Adapter-neutral content required to assemble one Agent Skill."""
+
+    name: str
+    description: str
+    scope: str
+    invocation: tuple[str, ...]
+    entrypoint_body: str
+    contract_file: ArtifactFile | None
+    resources: tuple[ArtifactFile, ...]
+    adapter_passthrough: Mapping[str, AdapterPassthrough]
+
+
+@dataclass(frozen=True)
 class RenderedArtifact:
-    """A command source rendered for one adapter as a multi-file artifact.
+    """One Skill input rendered for an adapter as a multi-file artifact.
 
     Files always include the entrypoint ``SKILL.md`` (whose frontmatter
     carries the ``x-eutaxis-owned`` hash) and the

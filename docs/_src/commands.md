@@ -103,7 +103,7 @@ Cross-agent command compilation: load command definitions, render them for each 
 
 ## Agent Adapters
 
-Per-agent renderers that translate a `CommandSource` into the file layout and frontmatter expected by each target agent.
+Per-agent renderers that translate a `SkillRenderInput` into the file layout and frontmatter expected by each target agent.
 
 ### Claude
 

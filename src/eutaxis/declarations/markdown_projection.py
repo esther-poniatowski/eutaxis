@@ -121,6 +121,8 @@ def _render_criterion(criterion: Criterion) -> str:
 def _render_procedure(
     catalog: DeclarationCatalog,
     procedure: ProcedureDeclaration,
+    *,
+    allow_support_resources: bool = False,
 ) -> str:
     """Render one finite procedure and its exact operation contracts."""
     blocks = [f"**{procedure.id}** (procedure):", procedure.purpose]
@@ -177,7 +179,12 @@ def _render_procedure(
         blocks.append(_render_values("Failure outcomes", procedure.failures))
     operation_blocks = ["*Operation contracts.*"]
     operation_blocks.extend(
-        _render_operation(catalog, reference) for reference in operation_references
+        _render_operation(
+            catalog,
+            reference,
+            allow_support_resources=allow_support_resources,
+        )
+        for reference in operation_references
     )
     blocks.append("\n\n".join(operation_blocks))
     return "\n\n".join(blocks)
@@ -265,6 +272,8 @@ def _longest_backtick_run(value: str) -> int:
 def _render_operation(
     catalog: DeclarationCatalog,
     reference: VersionedReference,
+    *,
+    allow_support_resources: bool = False,
 ) -> str:
     """Render the complete exact contract for one referenced operation."""
     record = catalog.get_contract(
@@ -278,7 +287,7 @@ def _render_operation(
             f"catalog has no operation {reference.id!r}@{reference.version}",
         )
     operation = record.declaration
-    if operation.support_resources:
+    if operation.support_resources and not allow_support_resources:
         raise CompositionError(
             "$.operation-contracts",
             (
@@ -298,6 +307,18 @@ def _render_operation(
     )
     if operation.method is not None:
         blocks.append("*Method.*\n\n" + operation.method)
+    if operation.support_resources:
+        blocks.append(
+            "\n".join(
+                (
+                    "*Support resources.*",
+                    *(
+                        f"- `{support.resource}` → `{support.destination}`"
+                        for support in operation.support_resources
+                    ),
+                )
+            )
+        )
     blocks.extend(
         (
             _render_values("Effects", operation.effects),

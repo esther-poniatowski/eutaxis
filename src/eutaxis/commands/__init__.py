@@ -13,7 +13,7 @@ Public objects
 CommandError, CommandNotFoundError, CommandRenderError, OwnershipError,
 TemplateError, RegistryCorruptedError
     Exception hierarchy.
-CommandSource, RenderedArtifact, ArtifactFile, InstallRecord
+CommandSource, SkillRenderInput, RenderedArtifact, ArtifactFile, InstallRecord
     Data containers.
 AgentAdapter, register_adapter, get_adapter, all_adapters
     Adapter registry contract.
@@ -21,6 +21,8 @@ load_sources
     Discover command sources across built-in, user, and project layers.
 render_command
     ``CommandSource × AgentAdapter`` -> ``RenderedArtifact``, without writes.
+assemble_skill
+    ``SkillRenderInput × AgentAdapter`` -> ``RenderedArtifact``, without writes.
 install_command, uninstall_command, diff_command
     Filesystem-effecting operations guarded by ownership markers.
 is_eutaxis_owned
@@ -51,9 +53,15 @@ from .installer import (
     uninstall_command,
 )
 from .loader import load_from_instruction_config, load_sources
-from .models import ArtifactFile, CommandSource, InstallRecord, RenderedArtifact
+from .models import (
+    ArtifactFile,
+    CommandSource,
+    InstallRecord,
+    RenderedArtifact,
+    SkillRenderInput,
+)
 from .registry import Registry, RegistryCorruptedError
-from .rendering import check_failure_mode, render_command
+from .rendering import assemble_skill, check_failure_mode, render_command
 from .synchronization import (
     SkillSyncAction,
     SkillSyncManifest,
@@ -75,10 +83,12 @@ __all__ = [
     "RegistryCorruptedError",
     "RenderedArtifact",
     "SkillBudgetMeasurement",
+    "SkillRenderInput",
     "SkillSyncAction",
     "SkillSyncManifest",
     "TemplateError",
     "all_adapters",
+    "assemble_skill",
     "apply_skill_sync",
     "check_failure_mode",
     "diff_command",

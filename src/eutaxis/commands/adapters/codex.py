@@ -36,9 +36,8 @@ from pathlib import Path
 import yaml
 
 from ..exceptions import CommandError
-from ..models import ArtifactFile, CommandSource
+from ..models import ArtifactFile, SkillRenderInput
 from ..names import is_skill_name
-from ..templating import render as render_template
 from . import sibling_artifact_link
 
 
@@ -67,14 +66,14 @@ class CodexAdapter:
         raise CommandError(f"Unknown scope: {scope!r}")
 
     def skill_frontmatter(
-        self, source: CommandSource, *, rendered_body: str
+        self, source: SkillRenderInput, *, rendered_body: str
     ) -> dict[str, object]:
         del rendered_body
         front: dict[str, object] = {
             "name": source.name,
             "description": source.description,
         }
-        passthrough = source.adapters.get(self.name)
+        passthrough = source.adapter_passthrough.get(self.name)
         if passthrough is not None:
             for key, value in passthrough.frontmatter.items():
                 if key == "allowed-tools":
@@ -87,11 +86,9 @@ class CodexAdapter:
                 front[key] = value
         return front
 
-    def sibling_files(
-        self, source: CommandSource, *, context: dict[str, object]
-    ) -> Iterable[ArtifactFile]:
+    def sibling_files(self, source: SkillRenderInput) -> Iterable[ArtifactFile]:
         siblings: list[ArtifactFile] = []
-        passthrough = source.adapters.get(self.name)
+        passthrough = source.adapter_passthrough.get(self.name)
         passthrough_files = passthrough.files if passthrough is not None else {}
 
         openai_yaml = _build_openai_yaml(source, passthrough_files)
@@ -104,8 +101,7 @@ class CodexAdapter:
             if path == "agents/openai.yaml":
                 # Already merged into the derived openai.yaml above.
                 continue
-            rendered = render_template(content, context)
-            siblings.append(ArtifactFile(relative_path=path, content=rendered))
+            siblings.append(ArtifactFile(relative_path=path, content=content))
 
         return tuple(siblings)
 
@@ -127,7 +123,7 @@ class CodexAdapter:
 
 
 def _build_openai_yaml(
-    source: CommandSource, passthrough_files: dict[str, str]
+    source: SkillRenderInput, passthrough_files: dict[str, str]
 ) -> str | None:
     """Merge regime-derived policy into the passthrough openai.yaml.
 

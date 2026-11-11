@@ -218,12 +218,13 @@ Return the default user-level state directory.
 
 ## Rendering
 
-Rendering: `CommandSource × AgentAdapter -> RenderedArtifact`.
+Render adapter-neutral Skill inputs into multi-file artifacts.
 
 The renderer writes no file. Its one read of the file system tests whether
 the target of a relative link exists.
 
-The renderer assembles a multi-file Agent Skill artifact:
+The command-source entry point converts `CommandSource` into the shared
+`SkillRenderInput` model. The assembler then emits a multi-file artifact:
 
 - `SKILL.md` — entrypoint, YAML frontmatter + Markdown body.
 - adapter-specific siblings (e.g. `agents/openai.yaml` for Codex).
@@ -284,6 +285,19 @@ Render a command source for one adapter as a multi-file artifact.
   * **adapter** (*AgentAdapter*)
   * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact)
+
+<a id="eutaxis.commands.rendering.assemble_skill"></a>
+
+### eutaxis.commands.rendering.assemble_skill(source, adapter, \*, warnings=())
+
+Assemble one adapter-neutral input into a host-native Skill artifact.
+
+* **Parameters:**
+  * **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
+  * **adapter** (*AgentAdapter*)
+  * **warnings** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
 * **Return type:**
   [*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact)
 
@@ -1452,13 +1466,63 @@ One file inside a rendered skill artifact directory.
 
 #### content *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
+<a id="eutaxis.commands.models.SkillRenderInput"></a>
+
+### *class* eutaxis.commands.models.SkillRenderInput(name, description, scope, invocation, entrypoint_body, contract_file, resources, adapter_passthrough)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Adapter-neutral content required to assemble one Agent Skill.
+
+* **Parameters:**
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **description** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **invocation** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **entrypoint_body** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **contract_file** ([*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *|* *None*)
+  * **resources** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *,*  *...* *]*)
+  * **adapter_passthrough** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*AdapterPassthrough*](#eutaxis.commands.models.AdapterPassthrough) *]*)
+
+<a id="eutaxis.commands.models.SkillRenderInput.name"></a>
+
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.SkillRenderInput.description"></a>
+
+#### description *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.SkillRenderInput.scope"></a>
+
+#### scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.SkillRenderInput.invocation"></a>
+
+#### invocation *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+
+<a id="eutaxis.commands.models.SkillRenderInput.entrypoint_body"></a>
+
+#### entrypoint_body *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.models.SkillRenderInput.contract_file"></a>
+
+#### contract_file *: [ArtifactFile](#eutaxis.commands.models.ArtifactFile) | [None](https://docs.python.org/3/builtins/constants.html#None)*
+
+<a id="eutaxis.commands.models.SkillRenderInput.resources"></a>
+
+#### resources *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[ArtifactFile](#eutaxis.commands.models.ArtifactFile), ...]*
+
+<a id="eutaxis.commands.models.SkillRenderInput.adapter_passthrough"></a>
+
+#### adapter_passthrough *: [Mapping](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [AdapterPassthrough](#eutaxis.commands.models.AdapterPassthrough)]*
+
 <a id="eutaxis.commands.models.RenderedArtifact"></a>
 
 ### *class* eutaxis.commands.models.RenderedArtifact(name, adapter, files, content_hash, warnings=())
 
 Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
-A command source rendered for one adapter as a multi-file artifact.
+One Skill input rendered for an adapter as a multi-file artifact.
 
 Files always include the entrypoint `SKILL.md` (whose frontmatter
 carries the `x-eutaxis-owned` hash) and the
@@ -1621,7 +1685,7 @@ skill either; it routes only to the always-on body. See the
 
 ## Agent Adapters
 
-Per-agent renderers that translate a `CommandSource` into the file layout and frontmatter expected by each target agent.
+Per-agent renderers that translate a `SkillRenderInput` into the file layout and frontmatter expected by each target agent.
 
 <a id="module-eutaxis.commands.adapters.claude"></a>
 
@@ -1700,18 +1764,17 @@ Compile a command source into a Claude skill directory.
 #### skill_frontmatter(source, \*, rendered_body)
 
 * **Parameters:**
-  * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
+  * **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
   * **rendered_body** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
   [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [object](https://docs.python.org/3/builtins/functions.html#object)]
 
 <a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.sibling_files"></a>
 
-#### sibling_files(source, \*, context)
+#### sibling_files(source)
 
 * **Parameters:**
-  * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
-  * **context** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*object*](https://docs.python.org/3/builtins/functions.html#object) *]*)
+  **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
 * **Return type:**
   [*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile)]
 
@@ -1815,18 +1878,17 @@ Compile a command source into a Codex skill directory.
 #### skill_frontmatter(source, \*, rendered_body)
 
 * **Parameters:**
-  * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
+  * **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
   * **rendered_body** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
   [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [object](https://docs.python.org/3/builtins/functions.html#object)]
 
 <a id="eutaxis.commands.adapters.codex.CodexAdapter.sibling_files"></a>
 
-#### sibling_files(source, \*, context)
+#### sibling_files(source)
 
 * **Parameters:**
-  * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
-  * **context** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*object*](https://docs.python.org/3/builtins/functions.html#object) *]*)
+  **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
 * **Return type:**
   [*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile)]
 

@@ -35,6 +35,10 @@ External declaration acquisition: verifies one external corpus and exposes its p
 .. automodule:: eutaxis.declarations.structured_skill
    :members: PlannedSupportResource, StructuredSkillPlan, plan_structured_skill
    :show-inheritance:
+
+.. automodule:: eutaxis.declarations.structured_skill_rendering
+   :members: CONTRACT_FILENAME, render_structured_skill
+   :show-inheritance:
 ```
 
 ## Declaration catalog

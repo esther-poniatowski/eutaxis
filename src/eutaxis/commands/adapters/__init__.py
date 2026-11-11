@@ -1,6 +1,6 @@
 """Per-agent adapter registry for skill-style artifacts.
 
-Each adapter describes how one source compiles into an Agent Skill
+Each adapter describes how one render input compiles into an Agent Skill
 directory native to the target agent: the on-disk location, the
 ``SKILL.md`` frontmatter convention, and the sibling files (e.g.
 ``agents/openai.yaml`` for Codex). The source layer stays
@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 from typing import Protocol, runtime_checkable
 
 from ..exceptions import CommandError
-from ..models import ArtifactFile, CommandSource
+from ..models import ArtifactFile, SkillRenderInput
 
 
 @runtime_checkable
@@ -46,7 +46,7 @@ class AgentAdapter(Protocol):
         """Return the directory containing installed Skill artifacts."""
 
     def skill_frontmatter(
-        self, source: CommandSource, *, rendered_body: str
+        self, source: SkillRenderInput, *, rendered_body: str
     ) -> dict[str, object]:
         """Return the adapter-specific ``SKILL.md`` frontmatter as a dict.
 
@@ -54,13 +54,11 @@ class AgentAdapter(Protocol):
         the adapter is consulted, so adapters must not set that key.
         """
 
-    def sibling_files(
-        self, source: CommandSource, *, context: dict[str, object]
-    ) -> Iterable[ArtifactFile]:
+    def sibling_files(self, source: SkillRenderInput) -> Iterable[ArtifactFile]:
         """Return sibling artifact files (other than ``SKILL.md``).
 
-        Each file is rendered against ``context`` by the caller before
-        being added to the artifact.
+        Passthrough files in ``source`` are already rendered by its source
+        converter before being added to the artifact.
         """
 
     def relative_artifact_link(

@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import MappingProxyType
 
+import pytest
 import yaml
 
-from eutaxis.commands import get_adapter, load_sources, render_command
+from eutaxis.commands import (
+    ArtifactFile,
+    CommandRenderError,
+    SkillRenderInput,
+    assemble_skill,
+    get_adapter,
+    load_sources,
+    render_command,
+)
 from eutaxis.commands.rendering import (
     ENTRYPOINT_FILENAME,
     OWNED_FRONTMATTER_KEY,
@@ -29,7 +39,9 @@ def test_clean_memory_renders_for_claude_skill(tmp_path: Path) -> None:
     project = Path("/Users/eresther/oikos")
     home = Path("/Users/eresther")
 
-    artifact = render_command(src, get_adapter("claude"), project_root=project, home=home)
+    artifact = render_command(
+        src, get_adapter("claude"), project_root=project, home=home
+    )
     files = _files_by_path(artifact)
 
     # Claude artifact: SKILL.md and sidecar; no agents/openai.yaml.
@@ -58,7 +70,9 @@ def test_clean_memory_renders_for_codex_skill(tmp_path: Path) -> None:
     project = Path("/Users/eresther/oikos")
     home = Path("/Users/eresther")
 
-    artifact = render_command(src, get_adapter("codex"), project_root=project, home=home)
+    artifact = render_command(
+        src, get_adapter("codex"), project_root=project, home=home
+    )
     files = _files_by_path(artifact)
 
     assert ENTRYPOINT_FILENAME in files
@@ -94,8 +108,12 @@ def test_override_replaces_action_template(tmp_path: Path) -> None:
     sources = load_sources(home=tmp_path, project_root=tmp_path)
     src = next(s for s in sources if s.name == "demo")
 
-    claude = render_command(src, get_adapter("claude"), project_root=tmp_path, home=tmp_path)
-    codex = render_command(src, get_adapter("codex"), project_root=tmp_path, home=tmp_path)
+    claude = render_command(
+        src, get_adapter("claude"), project_root=tmp_path, home=tmp_path
+    )
+    codex = render_command(
+        src, get_adapter("codex"), project_root=tmp_path, home=tmp_path
+    )
 
     claude_skill = _files_by_path(claude)[ENTRYPOINT_FILENAME]
     codex_skill = _files_by_path(codex)[ENTRYPOINT_FILENAME]
@@ -116,12 +134,65 @@ def test_codex_refuses_allowed_tools_passthrough(tmp_path: Path) -> None:
     )
     sources = load_sources(home=tmp_path, project_root=tmp_path)
     src = next(s for s in sources if s.name == "demo")
-    import pytest
-
     from eutaxis.commands import CommandError
 
     with pytest.raises(CommandError):
         render_command(src, get_adapter("codex"), project_root=tmp_path, home=tmp_path)
+
+
+@pytest.mark.parametrize("path", ("SKILL.md/payload", "agents"))
+def test_shared_assembler_rejects_generated_path_prefix_collisions(path: str) -> None:
+    source = SkillRenderInput(
+        name="demo",
+        description="Demonstrate assembly",
+        scope="project",
+        invocation=("user",),
+        entrypoint_body="# Demo\n",
+        contract_file=None,
+        resources=(ArtifactFile(path, "content\n"),),
+        adapter_passthrough=MappingProxyType({}),
+    )
+
+    with pytest.raises(CommandRenderError, match="reserved artifact path|collide"):
+        assemble_skill(source, get_adapter("codex"))
+
+
+def test_command_renderer_calls_adapter_siblings_once(tmp_path: Path) -> None:
+    source = next(
+        item
+        for item in load_sources(home=tmp_path, project_root=tmp_path)
+        if item.name == "clean-memory"
+    )
+
+    class OneShotAdapter:
+        name = "one-shot"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def supports_scope(self, scope: str) -> bool:
+            return scope in {"user", "project"}
+
+        def sibling_files(self, render_input):
+            self.calls += 1
+            if self.calls > 1:
+                raise AssertionError("sibling_files called more than once")
+            return (ArtifactFile("support.md", "support\n"),)
+
+        def skill_frontmatter(self, render_input, *, rendered_body: str):
+            return {
+                "name": render_input.name,
+                "description": render_input.description,
+            }
+
+    adapter = OneShotAdapter()
+
+    artifact = render_command(
+        source, adapter, project_root=tmp_path, home=tmp_path  # type: ignore[arg-type]
+    )
+
+    assert adapter.calls == 1
+    assert "support.md" in _files_by_path(artifact)
 
 
 def test_sidecar_lists_all_files_with_hashes(tmp_path: Path) -> None:

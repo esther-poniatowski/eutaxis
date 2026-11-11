@@ -431,6 +431,24 @@ Close one resolved procedure over exact operations and support resources.
 * **Return type:**
   [*StructuredSkillPlan*](#eutaxis.declarations.structured_skill.StructuredSkillPlan)
 
+<a id="module-eutaxis.declarations.structured_skill_rendering"></a>
+
+Render authenticated structured procedure plans as bounded Agent Skills.
+
+<a id="eutaxis.declarations.structured_skill_rendering.render_structured_skill"></a>
+
+### eutaxis.declarations.structured_skill_rendering.render_structured_skill(plan, adapter, \*, entrypoint_max_bytes, artifact_max_bytes)
+
+Render one issued plan within explicit entrypoint and artifact limits.
+
+* **Parameters:**
+  * **plan** ([*StructuredSkillPlan*](#eutaxis.declarations.structured_skill.StructuredSkillPlan))
+  * **adapter** (*AgentAdapter*)
+  * **entrypoint_max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **artifact_max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+* **Return type:**
+  [*RenderedArtifact*](commands.md#eutaxis.commands.models.RenderedArtifact)
+
 <a id="module-eutaxis.declarations.catalog"></a>
 
 <a id="declaration-catalog"></a>
