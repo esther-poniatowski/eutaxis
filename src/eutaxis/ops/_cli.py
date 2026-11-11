@@ -55,7 +55,8 @@ def cli_clean_memory(
 
     The memory files lie outside the outputs of Eutaxis, so the deletion asks
     for a confirmation on a terminal. ``--yes`` answers it; without a
-    terminal and without ``--yes``, the command stops with status 2.
+    terminal and without ``--yes``, the command stops with status 2. A
+    declined confirmation deletes nothing and exits with status 1.
     """
     clean = functools.partial(
         clean_memory,
@@ -72,7 +73,7 @@ def cli_clean_memory(
                 f"Delete these {len(preview.removed)} file(s)?", default=False
             ):
                 typer.echo("Nothing deleted.")
-                return
+                raise typer.Exit(1)
 
     result = clean(dry_run=dry_run)
     _echo_result(result, "Would remove" if dry_run else "Removed")

@@ -431,7 +431,7 @@ def test_clean_memory_asks_on_a_terminal(
 
     result = _clean_memory(home, project, input=answer)
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == (0 if deleted else 1), result.output
     assert "Delete these 1 file(s)?" in result.stdout
     assert (memory / "note.md").exists() is not deleted
     assert ("Nothing deleted." in result.stdout) is not deleted
