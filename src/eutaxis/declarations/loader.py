@@ -17,7 +17,9 @@ from .models import (
     CompositionMechanism,
     CompositionManifestDeclaration,
     Criterion,
+    DecisionAssessment,
     DecisionDeclaration,
+    DecisionDriver,
     DecisionOption,
     DeclarationKind,
     DeclarationStatus,
@@ -452,8 +454,24 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
         return DecisionDeclaration(
             **_base(document),
             context=str(document["context"]),
+            drivers=tuple(
+                DecisionDriver(id=str(item["id"]), statement=str(item["statement"]))
+                for item in map(_mapping, cast(list[object], document["drivers"]))
+            ),
             options=tuple(
-                DecisionOption(id=str(item["id"]), description=str(item["description"]))
+                DecisionOption(
+                    id=str(item["id"]),
+                    description=str(item["description"]),
+                    assessments=tuple(
+                        DecisionAssessment(
+                            driver=str(assessment["driver"]),
+                            judgment=str(assessment["judgment"]),
+                        )
+                        for assessment in map(
+                            _mapping, cast(list[object], item["assessments"])
+                        )
+                    ),
+                )
                 for item in map(_mapping, cast(list[object], document["options"]))
             ),
             outcome=str(document["outcome"]),
@@ -525,6 +543,20 @@ def _validate_semantics(
             locations=locations,
         )
     elif kind == "decision":
+        drivers = [
+            _mapping(driver) for driver in cast(list[object], document["drivers"])
+        ]
+        driver_ids: list[tuple[str, DocumentPath]] = [
+            (str(driver["id"]), ("drivers", index, "id"))
+            for index, driver in enumerate(drivers)
+        ]
+        _ensure_unique(
+            driver_ids,
+            scope=f"decision {document['id']!r} drivers",
+            path=path,
+            locations=locations,
+        )
+        declared_drivers = {identifier for identifier, _parts in driver_ids}
         options = [
             _mapping(option) for option in cast(list[object], document["options"])
         ]
@@ -538,6 +570,51 @@ def _validate_semantics(
             path=path,
             locations=locations,
         )
+        for option_index, option in enumerate(options):
+            assessments = [
+                _mapping(assessment)
+                for assessment in cast(list[object], option["assessments"])
+            ]
+            assessed_drivers: list[tuple[str, DocumentPath]] = [
+                (
+                    str(assessment["driver"]),
+                    ("options", option_index, "assessments", index, "driver"),
+                )
+                for index, assessment in enumerate(assessments)
+            ]
+            _ensure_unique(
+                assessed_drivers,
+                scope=(
+                    f"decision {document['id']!r} option {option['id']!r} "
+                    "assessments"
+                ),
+                path=path,
+                locations=locations,
+            )
+            for identifier, parts in assessed_drivers:
+                if identifier not in declared_drivers:
+                    _semantic_error(
+                        path,
+                        locations,
+                        parts,
+                        (
+                            f"option {option['id']!r} assesses unknown driver "
+                            f"{identifier!r}"
+                        ),
+                    )
+            missing = declared_drivers.difference(
+                identifier for identifier, _parts in assessed_drivers
+            )
+            if missing:
+                _semantic_error(
+                    path,
+                    locations,
+                    ("options", option_index, "assessments"),
+                    (
+                        f"option {option['id']!r} lacks assessments for drivers: "
+                        f"{', '.join(sorted(missing))}"
+                    ),
+                )
         outcome = str(document["outcome"])
         if outcome not in {identifier for identifier, _parts in option_ids}:
             _semantic_error(

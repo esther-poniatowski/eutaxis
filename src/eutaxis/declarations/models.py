@@ -349,11 +349,28 @@ class OperationDeclaration(Declaration):
 
 
 @dataclass(frozen=True)
+class DecisionDriver:
+    """One criterion used to compare every option of a decision."""
+
+    id: str
+    statement: str
+
+
+@dataclass(frozen=True)
+class DecisionAssessment:
+    """One option-specific judgment against a declared decision driver."""
+
+    driver: str
+    judgment: str
+
+
+@dataclass(frozen=True)
 class DecisionOption:
     """One explicitly considered option of a governance decision."""
 
     id: str
     description: str
+    assessments: tuple[DecisionAssessment, ...]
 
 
 @dataclass(frozen=True)
@@ -361,6 +378,7 @@ class DecisionDeclaration(Declaration):
     """A governance decision with an explicit selected outcome."""
 
     context: str
+    drivers: tuple[DecisionDriver, ...]
     options: tuple[DecisionOption, ...]
     outcome: str
     consequences: str

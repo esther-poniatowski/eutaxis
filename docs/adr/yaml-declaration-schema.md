@@ -38,14 +38,15 @@ The discriminated union contains eight kinds:
 - `operation` declares an action node available to procedures
 - `decision` records a governance choice, the alternatives considered, and its consequences
 
-Each decision supplies four elements:
+Each decision supplies five elements:
 
 - non-empty Markdown `context`
-- one or more options, each with a unique local identifier and a Markdown description
+- one or more decision `drivers`, each with a unique local identifier and a Markdown statement
+- one or more options, each with a unique local identifier, a Markdown description, and an assessment for every driver
 - one `outcome` that names an option
 - non-empty Markdown `consequences`
 
-These elements record what was chosen and why. They do not duplicate the governed rules.
+Each assessment names one declared driver and supplies a non-empty Markdown `judgment`. Within one option, a driver may be assessed only once. Each option must assess every declared driver, so validation establishes the complete option-by-driver matrix. These elements record what was chosen and why. They do not duplicate the governed rules.
 
 Only rules carry an `axis`: `reasoning-target`, `output-structure`, or `surface-style`. Procedures are a declaration kind, not a fourth axis. A file may contain one declaration or a declared collection; member objects retain their own `kind` and stable identifier.
 

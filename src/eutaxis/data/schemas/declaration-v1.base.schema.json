@@ -1425,11 +1425,50 @@
         }
       ]
     },
+    "decision-driver": {
+      "type": "object",
+      "required": [
+        "id",
+        "statement"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown"
+        }
+      },
+      "additionalProperties": false
+    },
+    "decision-assessment": {
+      "type": "object",
+      "required": [
+        "driver",
+        "judgment"
+      ],
+      "properties": {
+        "driver": {
+          "$ref": "#/$defs/id",
+          "x-kind": "label"
+        },
+        "judgment": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown"
+        }
+      },
+      "additionalProperties": false
+    },
     "decision-option": {
       "type": "object",
       "required": [
         "id",
-        "description"
+        "description",
+        "assessments"
       ],
       "properties": {
         "id": {
@@ -1440,6 +1479,14 @@
           "type": "string",
           "minLength": 1,
           "x-kind": "markdown"
+        },
+        "assessments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/decision-assessment"
+          },
+          "x-kind": "records"
         }
       },
       "additionalProperties": false
@@ -1453,6 +1500,7 @@
           "type": "object",
           "required": [
             "context",
+            "drivers",
             "options",
             "outcome",
             "consequences"
@@ -1466,6 +1514,14 @@
               "type": "string",
               "minLength": 1,
               "x-kind": "markdown"
+            },
+            "drivers": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/decision-driver"
+              },
+              "x-kind": "records"
             },
             "options": {
               "type": "array",

@@ -12,14 +12,29 @@ relations: []
 context: >-
   Declaration authors need one canonical source format that tools can validate
   without discarding explanatory prose.
+drivers:
+  - id: structure
+    statement: The format must expose every normative field to validation.
+  - id: explanation
+    statement: The format must retain explanatory prose beside structured data.
 options:
   - id: yaml
     description: >-
       Store each declaration as structured YAML with Markdown admitted in prose
       fields.
+    assessments:
+      - driver: structure
+        judgment: Every normative field has a schema-addressable YAML position.
+      - driver: explanation
+        judgment: Markdown prose remains available in typed string fields.
   - id: labelled-markdown
     description: >-
       Store each declaration as labelled Markdown parsed into structured fields.
+    assessments:
+      - driver: structure
+        judgment: Labels require a separate parser before schema validation.
+      - driver: explanation
+        judgment: Markdown prose is native to the authored representation.
 outcome: yaml
 consequences: >-
   YAML becomes the canonical authored form, while labelled Markdown remains a

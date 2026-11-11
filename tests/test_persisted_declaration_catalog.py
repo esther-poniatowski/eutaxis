@@ -14,6 +14,7 @@ import yaml
 
 from eutaxis.declarations import (
     CatalogSource,
+    DecisionDeclaration,
     DeclarationCatalogError,
     DeclarationKind,
     ExactContractKey,
@@ -598,7 +599,24 @@ def test_live_and_persisted_catalogs_retain_decision_provenance(
         "applicability": {"facet": "context.available", "operator": "exists"},
         "relations": [],
         "context": "The registry needs one canonical declaration format.",
-        "options": [{"id": "yaml", "description": "Use structured YAML records."}],
+        "drivers": [
+            {
+                "id": "structure",
+                "statement": "The format exposes fields to validation.",
+            }
+        ],
+        "options": [
+            {
+                "id": "yaml",
+                "description": "Use structured YAML records.",
+                "assessments": [
+                    {
+                        "driver": "structure",
+                        "judgment": "YAML fields are directly schema-addressable.",
+                    }
+                ],
+            }
+        ],
         "outcome": "yaml",
         "consequences": "Rules use YAML as their canonical source form.",
     }
@@ -619,6 +637,12 @@ def test_live_and_persisted_catalogs_retain_decision_provenance(
     live_rule = live.get("content/refined")
     persisted_rule = persisted.get("content/refined")
     decision_row = persisted.get("registry/format-decision")
+    live_decision = registry.records["registry/format-decision"].declaration
+    assert isinstance(live_decision, DecisionDeclaration)
+    assert tuple(driver.id for driver in live_decision.drivers) == ("structure",)
+    assert tuple(
+        assessment.driver for assessment in live_decision.options[0].assessments
+    ) == ("structure",)
     assert live_rule is not None
     assert live_rule.declaration.decided_by == (  # type: ignore[union-attr]
         "registry/format-decision",

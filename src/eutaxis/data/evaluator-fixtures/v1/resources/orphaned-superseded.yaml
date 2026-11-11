@@ -7,8 +7,14 @@ source-revision: contract-v1
 applicability: {facet: context.available, operator: exists}
 relations: []
 context: The fixture tests whether superseded records retain their successor edge.
+drivers:
+  - id: lifecycle-integrity
+    statement: A superseded record must identify the decision that replaces it.
 options:
   - id: retain
     description: Retain the superseded decision without a successor.
+    assessments:
+      - driver: lifecycle-integrity
+        judgment: The option violates the required successor relation.
 outcome: retain
 consequences: The registry must reject this orphaned lifecycle state.

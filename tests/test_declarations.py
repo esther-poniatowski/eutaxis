@@ -13,7 +13,9 @@ import yaml
 from eutaxis.declarations import (
     CompositionMechanism,
     CompositionManifestDeclaration,
+    DecisionAssessment,
     DecisionDeclaration,
+    DecisionDriver,
     DeclarationSchemaError,
     DeclarationSemanticError,
     EvaluatorDeclaration,
@@ -89,11 +91,36 @@ def test_decision_loads_an_explicit_option_set_and_selected_outcome() -> None:
     declaration = load_declaration(FIXTURES / "valid" / "decision.yaml")
 
     assert isinstance(declaration, DecisionDeclaration)
+    assert tuple(driver.id for driver in declaration.drivers) == (
+        "structure",
+        "explanation",
+    )
+    assert all(isinstance(driver, DecisionDriver) for driver in declaration.drivers)
     assert tuple(option.id for option in declaration.options) == (
         "yaml",
         "labelled-markdown",
     )
+    assert tuple(
+        assessment.driver for assessment in declaration.options[0].assessments
+    ) == ("structure", "explanation")
+    assert all(
+        isinstance(assessment, DecisionAssessment)
+        for option in declaration.options
+        for assessment in option.assessments
+    )
     assert declaration.outcome == "yaml"
+
+
+def test_decision_rejects_a_repeated_driver_identifier(tmp_path: Path) -> None:
+    def repeat_identifier(document: dict[str, object]) -> None:
+        document["drivers"][1]["id"] = "structure"  # type: ignore[index]
+
+    path = _write_variant(tmp_path, "decision.yaml", repeat_identifier)
+
+    with pytest.raises(DeclarationSemanticError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.drivers[1].id"
 
 
 def test_decision_rejects_a_repeated_option_identifier(tmp_path: Path) -> None:
@@ -106,6 +133,43 @@ def test_decision_rejects_a_repeated_option_identifier(tmp_path: Path) -> None:
         load_declaration(path)
 
     assert captured.value.location == "$.options[1].id"
+
+
+def test_decision_rejects_a_repeated_assessment_driver(tmp_path: Path) -> None:
+    def repeat_driver(document: dict[str, object]) -> None:
+        document["options"][0]["assessments"][1]["driver"] = "structure"  # type: ignore[index]
+
+    path = _write_variant(tmp_path, "decision.yaml", repeat_driver)
+
+    with pytest.raises(DeclarationSemanticError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.options[0].assessments[1].driver"
+
+
+def test_decision_rejects_an_unknown_assessment_driver(tmp_path: Path) -> None:
+    def replace_driver(document: dict[str, object]) -> None:
+        document["options"][0]["assessments"][1]["driver"] = "portability"  # type: ignore[index]
+
+    path = _write_variant(tmp_path, "decision.yaml", replace_driver)
+
+    with pytest.raises(DeclarationSemanticError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.options[0].assessments[1].driver"
+
+
+def test_decision_requires_every_option_to_assess_every_driver(tmp_path: Path) -> None:
+    def omit_assessment(document: dict[str, object]) -> None:
+        document["options"][0]["assessments"].pop()  # type: ignore[index]
+
+    path = _write_variant(tmp_path, "decision.yaml", omit_assessment)
+
+    with pytest.raises(DeclarationSemanticError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.options[0].assessments"
+    assert "explanation" in str(captured.value)
 
 
 def test_decision_outcome_must_name_a_declared_option(tmp_path: Path) -> None:

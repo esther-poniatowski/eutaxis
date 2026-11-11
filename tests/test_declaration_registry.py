@@ -65,11 +65,32 @@ def _add_decision(directory: Path, *, status: str = "active") -> None:
         "applicability": {"facet": "context.available", "operator": "exists"},
         "relations": [],
         "context": "The registry needs one canonical declaration format.",
+        "drivers": [
+            {
+                "id": "structure",
+                "statement": "The format exposes fields to validation.",
+            }
+        ],
         "options": [
-            {"id": "yaml", "description": "Use structured YAML records."},
+            {
+                "id": "yaml",
+                "description": "Use structured YAML records.",
+                "assessments": [
+                    {
+                        "driver": "structure",
+                        "judgment": "YAML fields are directly schema-addressable.",
+                    }
+                ],
+            },
             {
                 "id": "markdown",
                 "description": "Use labelled Markdown records.",
+                "assessments": [
+                    {
+                        "driver": "structure",
+                        "judgment": "Markdown labels require parsing first.",
+                    }
+                ],
             },
         ],
         "outcome": "yaml",
