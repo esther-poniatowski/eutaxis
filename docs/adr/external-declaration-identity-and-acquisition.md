@@ -882,6 +882,134 @@ The create-only guarantee covers atomic visibility, not survival of an immediate
 
 Lock generation establishes what bytes and transport state the operator proposes to authorize. It does not establish that a change is semantically equivalent to the reviewed release. The semantic-diff command owns that decision. A successful generation therefore cannot promote its own output or change the active release.
 
+## Reviewed declaration releases ^reviewed-declaration-releases
+
+A reviewed declaration release binds the exact source and consumer bytes that its review authorizes.
+
+### Persisted records
+
+The release store retains five canonical records:
+
+- **Release capsule.** The `_schema: eutaxis:declaration-release@1` record receives the SHA-256 digest of its canonical bytes as its identifier. The capsule binds:
+  - its predecessor;
+  - the acquisition manifest and canonical lock;
+  - the workspace sources;
+  - the packaged-source and Eutaxis distribution revisions; and
+  - the review-packet digest and complete managed-target map.
+  Each managed target records either exact consumer bytes or an explicit absent state.
+  For a successor release, the map covers the union of candidate outputs and predecessor targets. The initialization map covers the candidate outputs and golden baseline targets.
+- **Review packet.** The content-addressed `_schema: eutaxis:declaration-review@1` record compares three properties independently:
+  - typed declaration and facet semantics;
+  - the authorized acquisition state; and
+  - generated artifact bytes.
+  Matching semantics cannot discharge a change in authorization or artifact bytes.
+- **Activation record.** The content-addressed `_schema: eutaxis:declaration-activation@1` record identifies:
+  - its record number;
+  - its predecessor record;
+  - the expected active release; and
+  - the selected release.
+- **Commit marker.** The marker occupies the next sequence name and binds one activation-record digest. A record without its exact marker is inert.
+- **Pending intent.** The canonical `_schema: eutaxis:declaration-pending@1` record occupies the create-only pending name for the successor record number. It binds the activation-record digest, expected active release or initialization baseline, candidate release, and union of their managed targets.
+
+Process-local acquisition results and issuance authorities must never enter these records.
+
+### Preparation and review
+
+To prepare a candidate, Eutaxis must:
+
+1. acquire the current release and candidate from their retained source snapshots;
+2. generate each consumer artifact once;
+3. compute the typed semantic changes;
+4. compare the authorized acquisition state;
+5. compare the generated artifact bytes; and
+6. emit the complete capsule and review packet.
+
+The prepared capsule fixes the reviewed bytes. Therefore, the activation command must use its contents directly. The command must not reacquire sources or regenerate artifacts.
+
+### Activation and rollback
+
+Committed activation records form an append-only chain under four rules:
+
+- record zero starts the chain;
+- each successor names the digest of its predecessor;
+- each sequence marker names one content-addressed record; and
+- the selected capsule of the highest contiguous committed record is active.
+
+A missing marker ends the chain. Any of these defects invalidates it:
+
+- a missing or malformed record;
+- a broken predecessor digest;
+- a changed capsule; or
+- a mismatched marker.
+
+To activate a reviewed capsule, Eutaxis must:
+
+1. verify the chain against the expected record number and active release;
+2. verify the capsule and review packet;
+3. verify the source snapshot and artifact digests;
+4. publish an absent candidate capsule, or verify the existing capsule selected for rollback;
+5. publish and durably verify the inert activation record at its absent content-addressed path;
+6. publish and verify the pending intent at the absent successor-pending name before changing any consumer target;
+7. materialize the stored consumer artifacts at their logical targets and verify their exact bytes;
+8. make every materialized file and changed parent-directory entry durable; and
+9. publish the successor marker through a no-replace link.
+
+Linking the commit marker commits the release. A reader must ignore an unmarked record. After the marker link, Eutaxis must make the marker's parent-directory entry durable before returning success. If that final step fails, Eutaxis reports the outcome as committed or explicitly ambiguous. Eutaxis must not delete the marker or restore the preceding artifacts.
+
+Current agents read conventional files rather than the release store. Therefore, Eutaxis must update those files under the deployment exclusion boundary. Three rules govern this update:
+
+- Before Eutaxis writes a managed target, the target must match the active capsule or initialization baseline.
+- After a precommit failure, Eutaxis may restore a target only when it still contains the bytes written by the failed update. When the target differs, Eutaxis reports a concurrent-edit conflict and leaves it unchanged.
+- The operator must exclude agent readers and non-Eutaxis writers because no atomic filesystem primitive covers every conventional target.
+
+The pending intent closes the crash-recovery boundary. Its canonical digest and bound activation record authenticate the interrupted update. Before agent readers are released after any interrupted update, Eutaxis must verify and recover the intent under the same exclusion boundary. Recovery covers the union of baseline and candidate targets:
+
+- when a target matches the active capsule or initialization baseline, including explicit absence, Eutaxis leaves it unchanged;
+- when a target matches the candidate capsule, including explicit absence, Eutaxis restores the active or initialization state; and
+- otherwise, Eutaxis reports a concurrent-edit conflict and leaves the target unchanged.
+
+Eutaxis must verify and make every restored target state durable before it removes the pending intent. Eutaxis may remove the intent only after recovery completes or the bound activation record has a committed marker. If removing the intent fails, Eutaxis leaves a recoverable residue without changing the active record. A stale or substituted intent fails authentication and cannot authorize recovery.
+
+Rollback appends a record that selects the predecessor capsule. The rollback command must not:
+
+- reconstruct sources;
+- rerender artifacts;
+- delete history; or
+- restore mutable files from backups.
+
+A failure before the commit point leaves the preceding record active. Eutaxis restores its stored artifacts subject to the concurrent-edit check. Eutaxis must report failed cleanup after the commit point and cannot append another rollback.
+
+Concurrent promoters from the same record contend for the same absent successor name. Therefore, only one promoter can reach the commit point. A stale review fails when its expected record or release differs from the validated chain. Any change to an existing capsule or activation record makes loading fail closed. Operators must still exclude an actor that can restore every observed byte and metadata value between checks.
+
+### Pilot boundary
+
+The first structured Oikos release has no structured predecessor. Therefore, its initial capsule must bind the legacy accountability ledger and reviewed golden consumer artifacts. The initial capsule cannot claim that legacy and structured semantics match.
+
+The first capsule schema admits packaged sources and workspace sources. Each workspace source must use a root inside the candidate snapshot. The workspace pilot defers:
+
+- vendored sources;
+- Git-submodule sources;
+- signatures;
+- garbage collection; and
+- remote approval policies.
+
+Before the general capsule commands ship, a reviewed Git commit may temporarily authorize the workspace-only Oikos pilot. The commit must contain:
+
+- the source snapshot;
+- the canonical lock;
+- the accountability ledger;
+- the generated consumer artifacts; and
+- the exact Eutaxis vendor revision used to validate and generate them.
+
+The initialization review compares the acquisition records and generated artifact bytes. The accountability ledger supplies the missing semantic baseline. The ledger assigns each legacy unit one outcome:
+
+- keep a stable identifier;
+- join a named target;
+- retire for a stated reason; or
+- wait for a named owner and prerequisite.
+
+To roll back, the operator uses `git revert`. Git reports a conflict instead of overwriting a concurrent edit. This bridge enables the pilot but does not satisfy the general Eutaxis release gate.
+
 ## Failure ownership
 
 An acquisition failure names the source entry and deepest manifest, lock, path,

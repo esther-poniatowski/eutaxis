@@ -169,12 +169,13 @@ carrier mutation.
 - Procedures are a declaration kind, separate from the three rule axes.
 - Semantic resolution, deterministic artifact composition, and host scope precedence are separate layers.
 - External declaration identity and offline acquisition now follow the [accepted namespace and acquisition contract](../adr/external-declaration-identity-and-acquisition.md).
-- The external pilot remains blocked until Eutaxis:
+- The general external-source release remains blocked until Eutaxis:
   - issues the public acquisition result;
   - writes the persisted catalog with `index-revision: 2`;
   - generates and validates canonical locks through the general command;
   - proves semantic comparison and rollback through general commands; and
   - emits the selected query packet and consumer artifacts.
+- The workspace-only Oikos pilot may proceed through the reviewed Git bridge specified by the [acquisition contract](../adr/external-declaration-identity-and-acquisition.md#^reviewed-declaration-releases), but still requires its accountability ledger and consumer artifacts.
 - SQLite remains conditional on measured JSON-index performance.
 
 ## Work sequence
@@ -316,7 +317,7 @@ This phase has turned the validated registry into a static query boundary, resol
 - [x] Build the combined registry from the issued stage and apply the existing cross-record contracts.
 - [x] Issue one public acquisition result that binds the combined registry to every retained acquisition record.
 - [x] Move the persisted catalog to `index-revision: 2`.
-- [ ] Publish lock generation, semantic-diff tooling, and rollback before converting an external source.
+- [ ] Publish lock generation, semantic-diff tooling, and rollback before generalizing beyond the workspace-only pilot.
   - [x] Publish the review-first `eutaxis declarations lock` command. Emit canonical bytes to standard output, compare through `--check`, and create only an absent path through `--output`.
   - [ ] Generate packaged, workspace, vendored, and Git-submodule lock components through the existing descriptor and restricted-Git boundaries.
     - [x] Observe the fixed packaged facet and declaration resources through the retained running-distribution boundary. Bind complete two-read evidence and root identity to private, single-use lock components.
@@ -333,7 +334,7 @@ This phase has turned the validated registry into a static query boundary, resol
   - [x] Compare the complete typed semantics of two authenticated declaration corpora, including each exact contract and each local facet schema.
   - [ ] Promote a reviewed release and restore the preceding release on failure.
 
-The shared revision and serialization slice, both private source observers, candidate assembly, sealed semantic validation, safe lock-file boundaries, and the public lock command are implemented and adversarially accepted. The packaged observer permits production issuance only inside the no-argument running-distribution bootstrap. The workspace observer reads only manifest-declared paths, completes every authoritative read before verification, and rebinds every source identity and carrier sequence to the original live workspace and manifest at consumption. Candidate assembly retains those observations, constructs the complete lock, serializes exact canonical bytes, parses those bytes again, and authenticates the complete relation before single-use consumption. The validation transaction repeats ordinary locked acquisition, builds the complete semantic registry, exposes no authority outside the transaction, and returns exact bytes only after retiring its candidate and receipt. The command then writes those bytes to standard output, checks an existing lock without repair, or creates an absent lock through verified no-replace publication. The typed comparator now reports deterministic changes across authenticated corpora without treating transport metadata as semantics. Git proof remains deferred to transport generalization. Before converting the Oikos pilot source, the early-deployment route must promote a reviewed release and restore its predecessor on failure.
+The shared revision and serialization slice, both private source observers, candidate assembly, sealed semantic validation, safe lock-file boundaries, and the public lock command are implemented and adversarially accepted. The packaged observer permits production issuance only inside the no-argument running-distribution bootstrap. The workspace observer reads only manifest-declared paths, completes every authoritative read before verification, and rebinds every source identity and carrier sequence to the original live workspace and manifest at consumption. Candidate assembly retains those observations, constructs the complete lock, serializes exact canonical bytes, parses those bytes again, and authenticates the complete relation before single-use consumption. The validation transaction repeats ordinary locked acquisition, builds the complete semantic registry, exposes no authority outside the transaction, and returns exact bytes only after retiring its candidate and receipt. The command then writes those bytes to standard output, checks an existing lock without repair, or creates an absent lock through verified no-replace publication. The typed comparator now reports deterministic changes across authenticated corpora without treating transport metadata as semantics. Git proof remains deferred to transport generalization. The workspace-only Oikos pilot can now use the reviewed Git commit-and-revert bridge. Eutaxis still must append and validate capsule records for the general release path.
 - [ ] Complete the query, cumulative Markdown, and compact Skill projections selected by the pilot.
 - [ ] Pilot one coherent Oikos rule set and one procedure through the complete external-source path.
 - [ ] Convert additional sources only after the pilot passes.
@@ -682,9 +683,10 @@ The revision-2 catalog checks report:
 - the revision-1 and revision-2 golden indexes both pass
 - `git diff --check` passes
 
-Eutaxis must next publish and verify the general lock-generation, semantic-diff
-and rollback commands. The pilot retains the current reviewed output as its
-golden artifact and rollback target.
+The workspace-only pilot now must produce its accountability ledger and
+consumer projections. Its reviewed Git commit retains the current output as
+the golden baseline and rollback target. General capsule commands remain
+parallel release-system debt.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 
