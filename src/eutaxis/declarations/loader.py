@@ -442,6 +442,7 @@ def _build_declaration(document: Mapping[str, object]) -> AnyDeclaration:
                 _predicate(item)
                 for item in cast(list[object], document["preconditions"])
             ),
+            method=str(document["method"]) if "method" in document else None,
             effects=tuple(
                 str(item) for item in cast(list[object], document["effects"])
             ),

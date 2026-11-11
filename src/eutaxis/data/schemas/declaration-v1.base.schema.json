@@ -1399,6 +1399,11 @@
               },
               "x-kind": "records"
             },
+            "method": {
+              "type": "string",
+              "minLength": 1,
+              "x-kind": "markdown"
+            },
             "effects": {
               "type": "array",
               "uniqueItems": true,

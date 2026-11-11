@@ -188,6 +188,8 @@ The normative contract closes through the following gates.
 - [x] Specify and test applicability semantics and explicit policy ordering.
 - [x] Generate typed models from the schema or prove their conformance against the same fixture corpus.
 - [x] Complete and adversarially review the [procedure contract](../adr/yaml-declaration-schema.md).
+- [x] Add optional Markdown operation methods; preserve them through loading, semantic comparison, attention snapshots, and cumulative rendering, with a golden projection test.
+- [ ] Gate every selected agent-executed operation on either verified runner availability or a non-empty method before deployment.
 - [x] Add the canonical YAML facet registry and validate applicability values against registered facet types.
 - [x] Add semantic and versioned-contract indexes, then validate the static cross-record contracts fixed by the [relation contract](../adr/rule-relations-and-resolution.md).
 - [x] Package the exact records required by the [shipped execution contract](../adr/yaml-declaration-schema.md#^shipped-contract-execution), including `eutaxis/declaration-corpus-contract` and its named norm and criteria.

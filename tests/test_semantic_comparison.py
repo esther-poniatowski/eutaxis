@@ -101,9 +101,7 @@ def test_distinguishes_boolean_from_numeric_json_value(tmp_path: Path) -> None:
     comparison = compare_external_declarations(baseline, candidate)
 
     difference = next(
-        item
-        for item in comparison.differences
-        if item.key.id == "oikos/reader-purpose"
+        item for item in comparison.differences if item.key.id == "oikos/reader-purpose"
     )
     assert difference.paths == (
         ("applicability", "value"),
@@ -184,7 +182,9 @@ def test_rule_set_does_not_duplicate_nested_rule_change(tmp_path: Path) -> None:
         for difference in comparison.differences
         if difference.key.id.startswith("oikos/")
     ]
-    assert [(difference.key.id, difference.paths) for difference in external_differences] == [
+    assert [
+        (difference.key.id, difference.paths) for difference in external_differences
+    ] == [
         ("oikos/exact-claims", (("norms", 0, "modality"),)),
     ]
 
@@ -213,6 +213,25 @@ def test_versions_are_distinct_semantic_objects(tmp_path: Path) -> None:
         SemanticChangeKind.REMOVED,
         SemanticChangeKind.ADDED,
     ]
+
+
+def test_compares_operation_method(tmp_path: Path) -> None:
+    source_path = "declarations/operation.yaml"
+    baseline = _acquire(
+        tmp_path / "baseline",
+        declaration_files=((source_path, _operation_source("Inspect the index.")),),
+    )
+    candidate = _acquire(
+        tmp_path / "candidate",
+        declaration_files=((source_path, _operation_source("Inspect the diff.")),),
+    )
+
+    comparison = compare_external_declarations(baseline, candidate)
+
+    difference = next(
+        item for item in comparison.differences if item.key.id == "oikos/stage"
+    )
+    assert difference.paths == (("method",),)
 
 
 def test_revalidates_authority_after_projection(
@@ -314,4 +333,29 @@ evidence-schema:
   required: [conclusion]
   additionalProperties: false
 failure-behavior: block
+""".encode()
+
+
+def _operation_source(method: str) -> bytes:
+    return f"""\
+_schema: eutaxis:declaration@1
+id: oikos/stage
+kind: operation
+owner: oikos
+status: active
+source-revision: fixture-1
+applicability: {{facet: oikos.enabled, operator: equals, value: true}}
+relations: []
+version: 1
+inputs:
+  type: object
+  properties: {{}}
+  required: []
+  additionalProperties: false
+outputs: {{type: object}}
+preconditions: []
+method: {method}
+effects: [git/index]
+failure-outcomes: [staging-failed]
+recovery: Preserve the working tree
 """.encode()

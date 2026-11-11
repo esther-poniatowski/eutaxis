@@ -286,6 +286,12 @@ def _render_operation(
             "*Inputs.*\n\n" + _json_fence(operation.inputs),
             "*Outputs.*\n\n" + _json_fence(operation.outputs),
             _render_predicates("Preconditions", operation.preconditions),
+        )
+    )
+    if operation.method is not None:
+        blocks.append("*Method.*\n\n" + operation.method)
+    blocks.extend(
+        (
             _render_values("Effects", operation.effects),
             _render_values("Failure outcomes", operation.failure_outcomes),
             f"*Recovery.* {operation.recovery}",

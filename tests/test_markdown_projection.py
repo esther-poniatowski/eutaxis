@@ -136,6 +136,10 @@ preconditions:
     class: guard
     expression: {facet: projection.enabled, operator: equals, value: true}
     evaluator: {id: eutaxis/manual-judgment, version: 1}
+method: |-
+  Transform each source in declared order.
+
+  Inspect the `result` before publication.
 effects: [projection/artifact]
 failure-outcomes: [choose-failed, finalize-failed, recover-failed]
 recovery: Preserve the input and report the failed graph node

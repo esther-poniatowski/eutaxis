@@ -1171,6 +1171,11 @@ def test_mixed_plan_preserves_complete_context_order_and_authority(
         for item in local_operations
     )
     assert all(
+        item.operation_method
+        == "Write the bound content and inspect the resulting artifact."
+        for item in local_operations
+    )
+    assert all(
         item.procedure_parameters["required"] == ("path",) for item in local_operations
     )
     assert all(
@@ -2159,6 +2164,33 @@ def test_procedure_run_preflight_contains_hostile_requirement_mapping(
 
     assert error.value.location == "$.attention"
     assert "not issued by planning" in error.value.detail
+
+
+def test_procedure_run_rejects_mutated_operation_method(tmp_path: Path) -> None:
+    runner_calls = 0
+
+    def runner(input_data):
+        nonlocal runner_calls
+        runner_calls += 1
+        return OperationFailure(WRITE, "write-failed")
+
+    _, requirements, _, _, attention = _mixed_plan(tmp_path)
+    requirement = next(
+        item
+        for item in requirements.completion
+        if type(item.key) is OperationPredicateKey
+    )
+    obligation = cast(OperationObligationSnapshot, requirement.obligation)
+    assert obligation.operation_method is not None
+    object.__setattr__(obligation, "operation_method", "Substituted method")
+
+    assert not _is_issued_attention_plan(attention)
+    with pytest.raises(ProcedureRunPlanningError) as error:
+        _procedure_run(attention, cast(OperationRunner, runner))
+
+    assert error.value.location == "$.attention"
+    assert "not issued by planning" in error.value.detail
+    assert runner_calls == 0
 
 
 def test_precondition_evaluation_plan_rejects_same_output_binding_substitution(

@@ -20,6 +20,7 @@ outputs:
   required: [written]
   additionalProperties: false
 preconditions: []
+method: Write the bound content and inspect the resulting artifact.
 effects: [filesystem/artifact]
 failure-outcomes: [write-failed]
 recovery: Preserve the prior artifact

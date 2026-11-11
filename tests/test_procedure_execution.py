@@ -2430,6 +2430,27 @@ def test_factory_rejects_detached_action_not_correlated_with_final_live_state(
     )
 
 
+def test_factory_rejects_mutated_operation_method_before_execution(tmp_path) -> None:
+    runner_calls = 0
+
+    def runner(input_data):
+        nonlocal runner_calls
+        runner_calls += 1
+        return OperationFailure(WRITE, "write-failed")
+
+    entry, registry = _entry_evidence(
+        tmp_path, lambda request: {}, operation_runner=runner
+    )
+    contract = entry.plan.run.actions[0].contract
+    assert contract.method is not None
+    object.__setattr__(contract, "method", "Substituted method")
+
+    with pytest.raises(ProcedureExecutionError):
+        create_procedure_execution_session(entry, registry)
+
+    assert runner_calls == 0
+
+
 def test_publication_rebuilds_after_transcript_capture_interruption(
     tmp_path, monkeypatch
 ) -> None:

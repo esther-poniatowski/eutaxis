@@ -137,6 +137,7 @@ class OperationObligationSnapshot:
     procedure_parameters: Mapping[str, JsonValue]
     action: ProcedureNode
     operation_inputs: Mapping[str, JsonValue]
+    operation_method: str | None
     operation_effects: tuple[str, ...]
     failure_outcomes: tuple[str, ...]
     recovery: str
@@ -779,6 +780,7 @@ def _procedure_obligations(
                 procedure_parameters=procedure.parameters,
                 action=action,
                 operation_inputs=operation.inputs,
+                operation_method=operation.method,
                 operation_effects=operation.effects,
                 failure_outcomes=operation.failure_outcomes,
                 recovery=operation.recovery,

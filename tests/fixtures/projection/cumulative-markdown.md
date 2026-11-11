@@ -146,6 +146,12 @@ Exercises a graph whose entry is not its first authored node
 {"facet":"projection.enabled","operator":"equals","value":true}
 ```
 
+*Method.*
+
+Transform each source in declared order.
+
+Inspect the `result` before publication.
+
 *Effects.*
 - `projection/artifact`
 

@@ -1008,6 +1008,7 @@ def _snapshot_requirement_authority(
             obligation.procedure_purpose,
             obligation.procedure_title,
             obligation.procedure_rationale,
+            obligation.operation_method,
             obligation.recovery,
         )
         obligation_maps = (
@@ -1589,6 +1590,7 @@ def _obligation_authority_is_current(
             obligation.procedure_purpose,
             obligation.procedure_title,
             obligation.procedure_rationale,
+            obligation.operation_method,
             obligation.recovery,
         )
         current_maps = (
@@ -1742,6 +1744,7 @@ def _declaration_semantic_value(
                     _predicate_semantic_value(item)
                     for item in declaration.preconditions
                 ],
+                "method": declaration.method,
                 "effects": declaration.effects,
                 "failure_outcomes": declaration.failure_outcomes,
                 "recovery": declaration.recovery,
@@ -1905,6 +1908,7 @@ def _declaration_scalar_state(
         return common + (
             declaration.version,
             tuple(_predicate_scalar_state(item) for item in declaration.preconditions),
+            declaration.method,
             declaration.effects,
             declaration.failure_outcomes,
             declaration.recovery,
@@ -2385,6 +2389,7 @@ def _current_obligation_scalar_state(
         obligation.procedure_purpose,
         obligation.procedure_title,
         obligation.procedure_rationale,
+        obligation.operation_method,
         obligation.recovery,
     )
 

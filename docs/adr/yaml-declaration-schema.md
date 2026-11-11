@@ -294,6 +294,8 @@ To ensure termination, schema version 1 admits no unbounded loop. Every path mus
 
 Schema version 1 restricts operation inputs and procedure parameters to closed object schemas. Each schema declares its `properties`. The schema rejects additional properties and requires only declared properties. Property names and action input keys use the identifier syntax of the declaration schema. Each binding selects a parameter or literal variant. The immutable domain model represents these variants with separate types.
 
+An operation may declare a Markdown `method`. The method states an algorithm or command sequence for a consumer that executes the operation from instructions. Preconditions, effects, failure outcomes and recovery remain structured fields; the method does not replace them. Cumulative Markdown renders a present method as part of the exact operation contract, and attention snapshots retain it with each expanded operation occurrence. The field does not declare an execution route or prove that a callable exists. Before deployment, a separate gate must verify an available runner or require a method for every selected agent-executed operation.
+
 The declaration registry requires each binding to satisfy four conditions:
 
 - every required input is bound

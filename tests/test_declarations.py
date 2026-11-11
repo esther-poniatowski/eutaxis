@@ -572,6 +572,36 @@ def test_policy_manifest_evaluator_and_operation_models_are_complete() -> None:
     assert operation.failure_outcomes == ("write-failed",)
 
 
+def test_operation_retains_an_optional_markdown_method(tmp_path: Path) -> None:
+    path = _write_variant(
+        tmp_path,
+        "operation.yaml",
+        lambda document: document.update(
+            {"method": "Run the bounded transformation.\n\nInspect its result."}
+        ),
+    )
+
+    operation = load_declaration(path)
+
+    assert isinstance(operation, OperationDeclaration)
+    assert operation.method == (
+        "Run the bounded transformation.\n\nInspect its result."
+    )
+
+
+def test_operation_rejects_an_empty_method(tmp_path: Path) -> None:
+    path = _write_variant(
+        tmp_path,
+        "operation.yaml",
+        lambda document: document.update({"method": ""}),
+    )
+
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.method"
+
+
 @pytest.mark.parametrize(
     ("case", "evidence_schema"),
     [

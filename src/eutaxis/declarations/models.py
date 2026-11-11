@@ -343,6 +343,7 @@ class OperationDeclaration(Declaration):
     inputs: Mapping[str, JsonValue]
     outputs: Mapping[str, JsonValue]
     preconditions: tuple[Predicate, ...]
+    method: str | None
     effects: tuple[str, ...]
     failure_outcomes: tuple[str, ...]
     recovery: str
