@@ -15,6 +15,8 @@ from .acquisition_contract import (
     FacetConstituentLock,
     FacetExtensionManifest,
     LockedFile,
+    LockedResource,
+    ResourceManifest,
     _external_source_acquisition_revision,
     _facet_extension_acquisition_revision,
     _require_manifest_state,
@@ -45,6 +47,7 @@ class _ObservedGenerationSource(NamedTuple):
     root_device: int
     root_inode: int
     evidence: tuple[VerifiedByteCarrier, ...]
+    resource_evidence: tuple[VerifiedByteCarrier, ...]
 
 
 class _ObservedGenerationExtension(NamedTuple):
@@ -138,12 +141,31 @@ def _observe_workspace_generation(
             tuple(root.read_authoritative(path) for path in source.files)
             for source, root in zip(manifest.sources, roots, strict=True)
         )
+        resource_authoritative = tuple(
+            tuple(
+                root.read_authoritative(resource.path) for resource in source.resources
+            )
+            for source, root in zip(manifest.sources, roots, strict=True)
+        )
+
+        for source_position, (source, carriers) in enumerate(
+            zip(manifest.sources, resource_authoritative, strict=True)
+        ):
+            for resource_position, (resource, carrier) in enumerate(
+                zip(source.resources, carriers, strict=True)
+            ):
+                _validate_resource_bytes(
+                    resource,
+                    carrier,
+                    f"$.sources[{source_position}].resources[{resource_position}]",
+                )
 
         source_locks = tuple(
-            _source_lock(source, carriers)
-            for source, carriers in zip(
+            _source_lock(source, declaration_carriers, resource_carriers)
+            for source, declaration_carriers, resource_carriers in zip(
                 manifest.sources,
                 declaration_authoritative,
+                resource_authoritative,
                 strict=True,
             )
         )
@@ -181,6 +203,14 @@ def _observe_workspace_generation(
                 strict=True,
             )
         )
+        resource_evidence = tuple(
+            tuple(root.verify(carrier) for carrier in carriers)
+            for root, carriers in zip(
+                roots,
+                resource_authoritative,
+                strict=True,
+            )
+        )
 
     observed_sources = tuple(
         _ObservedGenerationSource(
@@ -192,13 +222,21 @@ def _observe_workspace_generation(
             root_identity.device,
             root_identity.inode,
             evidence,
+            resources,
         )
-        for position, (source, lock, (root_path, root_identity), evidence) in enumerate(
+        for position, (
+            source,
+            lock,
+            (root_path, root_identity),
+            evidence,
+            resources,
+        ) in enumerate(
             zip(
                 manifest.sources,
                 source_locks,
                 root_contexts,
                 declaration_evidence,
+                resource_evidence,
                 strict=True,
             )
         )
@@ -347,21 +385,36 @@ def _retire_workspace_generation_observation(observation: object) -> None:
 def _source_lock(
     manifest: ExternalSourceManifest,
     carriers: tuple[AuthoritativeByteCarrier, ...],
+    resource_carriers: tuple[AuthoritativeByteCarrier, ...],
 ) -> ExternalSourceLock:
     """Derive one non-Git source lock from ordered authoritative carriers."""
     files = tuple(
         LockedFile(path, carrier.sha256)
         for path, carrier in zip(manifest.files, carriers, strict=True)
     )
-    return _source_lock_from_files(manifest, files)
+    resources = tuple(
+        LockedResource(
+            resource.id,
+            resource.path,
+            resource.media_type,
+            carrier.sha256,
+        )
+        for resource, carrier in zip(
+            manifest.resources,
+            resource_carriers,
+            strict=True,
+        )
+    )
+    return _source_lock_from_files(manifest, files, resources)
 
 
 def _source_lock_from_files(
     manifest: ExternalSourceManifest,
     files: tuple[LockedFile, ...],
+    resources: tuple[LockedResource, ...] = (),
 ) -> ExternalSourceLock:
     """Derive one non-Git source lock from detached ordered file values."""
-    content = source_content_revision(manifest.namespace, files)
+    content = source_content_revision(manifest.namespace, files, resources)
     return ExternalSourceLock(
         _external_source_acquisition_revision(manifest, content, None),
         content,
@@ -369,7 +422,29 @@ def _source_lock_from_files(
         manifest.kind,
         manifest.namespace,
         None,
+        resources,
     )
+
+
+def _validate_resource_bytes(
+    manifest: ResourceManifest,
+    carrier: AuthoritativeByteCarrier,
+    location: str,
+) -> None:
+    """Require one acquired Python resource to round-trip as strict UTF-8."""
+    _require_strict_utf8(carrier.data, location + ".path")
+    if carrier.path != manifest.path:
+        _fail(location + ".path", "resource carrier path differs from manifest")
+
+
+def _require_strict_utf8(data: bytes, location: str) -> None:
+    """Require exact UTF-8 bytes without applying text normalization."""
+    try:
+        text = data.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        _fail(location, f"resource is not strict UTF-8: {exc}")
+    if text.encode("utf-8", errors="strict") != data:
+        _fail(location, "resource UTF-8 round-trip changed bytes")
 
 
 def _extension_registry(
@@ -426,6 +501,15 @@ def _authenticate_source(source: _ObservedGenerationSource) -> None:
             f"$.sources[{source.position}].files",
             "manifest, lock, and evidence counts differ",
         )
+    if not (
+        len(source.manifest.resources)
+        == len(source.lock.resources)
+        == len(source.resource_evidence)
+    ):
+        _fail(
+            f"$.sources[{source.position}].resources",
+            "manifest, lock, and resource evidence counts differ",
+        )
     observed_files: list[LockedFile] = []
     for file_index, (manifest_path, locked_file, evidence) in enumerate(
         zip(
@@ -456,9 +540,57 @@ def _authenticate_source(source: _ObservedGenerationSource) -> None:
                 "declaration evidence differs from lock",
             )
         observed_files.append(LockedFile(snapshot[0], snapshot[2]))
-    expected = _source_lock_from_files(source.manifest, tuple(observed_files))
+    observed_resources: list[LockedResource] = []
+    for resource_index, (manifest_resource, locked_resource, evidence) in enumerate(
+        zip(
+            source.manifest.resources,
+            source.lock.resources,
+            source.resource_evidence,
+            strict=True,
+        )
+    ):
+        location = f"$.sources[{source.position}].resources[{resource_index}]"
+        root_path, root_identity, snapshot = _verified_carrier_context(evidence)
+        if (
+            root_path != source.root_path
+            or root_identity.device != source.root_device
+            or root_identity.inode != source.root_inode
+        ):
+            _fail(location, "resource evidence belongs to another source root")
+        if (
+            manifest_resource.id != locked_resource.id
+            or manifest_resource.path != locked_resource.path
+            or manifest_resource.media_type != locked_resource.media_type
+        ):
+            _fail(location, "locked resource differs from manifest")
+        if (
+            snapshot[0] != manifest_resource.path
+            or snapshot[2] != locked_resource.sha256
+        ):
+            _fail(location, "resource evidence differs from lock")
+        _validate_verified_resource_bytes(snapshot[1], location)
+        observed_resources.append(
+            LockedResource(
+                manifest_resource.id,
+                snapshot[0],
+                manifest_resource.media_type,
+                snapshot[2],
+            )
+        )
+    expected = _source_lock_from_files(
+        source.manifest,
+        tuple(observed_files),
+        tuple(observed_resources),
+    )
     if expected != source.lock:
         _fail(f"$.sources[{source.position}]", "observed source lock is invalid")
+
+
+def _validate_verified_resource_bytes(
+    data: bytes,
+    location: str,
+) -> None:
+    _require_strict_utf8(data, location + ".path")
 
 
 def _authenticate_extension(

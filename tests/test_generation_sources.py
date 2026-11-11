@@ -18,7 +18,9 @@ from eutaxis.declarations.acquisition_contract import (
     AcquisitionManifest,
     FacetConstituentLock,
     LockedFile,
+    LockedResource,
     parse_acquisition_manifest,
+    source_content_revision,
 )
 from eutaxis.declarations.byte_carriers import (
     RetainedDirectory,
@@ -41,6 +43,7 @@ def _write_workspace(
     *,
     kind: str = "workspace",
     source_root: str = ".",
+    resource_bytes: bytes | None = None,
 ) -> tuple[AcquisitionManifest, Path, Path]:
     source = root if source_root == "." else root / source_root
     declarations = source / "declarations"
@@ -88,6 +91,18 @@ def _write_workspace(
             )
         )
     )
+    resources: list[dict[str, str]] = []
+    if resource_bytes is not None:
+        resource = declarations / "resources" / "publish-index.py"
+        resource.parent.mkdir()
+        resource.write_bytes(resource_bytes)
+        resources.append(
+            {
+                "id": "oikos/publish-index",
+                "path": "declarations/resources/publish-index.py",
+                "media-type": "text/x-python; charset=utf-8",
+            }
+        )
     manifest = parse_acquisition_manifest(
         {
             "schema-version": 1,
@@ -106,6 +121,7 @@ def _write_workspace(
                     "kind": kind,
                     "root": source_root,
                     "files": ["declarations/process-core.yaml"],
+                    **({"resources": resources} if resources else {}),
                 }
             ],
         }
@@ -202,6 +218,151 @@ def test_workspace_generation_observer_derives_exact_non_git_locks(
             assert extensions == (_expected_extension_lock(manifest, facet),)
         finally:
             generation_module._retire_workspace_generation_observation(observation)
+    finally:
+        workspace.close()
+
+
+@pytest.mark.parametrize("kind", ["workspace", "vendored"])
+def test_workspace_generation_retains_exact_resource_lock(
+    tmp_path: Path,
+    kind: str,
+) -> None:
+    resource_bytes = b'print("guarded index")\n'
+    manifest, _facet, declaration = _write_workspace(
+        tmp_path,
+        kind=kind,
+        resource_bytes=resource_bytes,
+    )
+    workspace = _trusted_directory_from_workspace_path(str(tmp_path))
+    try:
+        observation = generation_module._observe_workspace_generation(
+            workspace,
+            manifest,
+        )
+        try:
+            sources, _extensions = generation_module._workspace_generation_components(
+                observation
+            )
+            resource = manifest.sources[0].resources[0]
+            expected = LockedResource(
+                resource.id,
+                resource.path,
+                resource.media_type,
+                _digest(resource_bytes),
+            )
+            files = (
+                LockedFile(
+                    manifest.sources[0].files[0],
+                    _digest(declaration.read_bytes()),
+                ),
+            )
+
+            assert sources[0].resources == (expected,)
+            assert sources[0].content_revision == source_content_revision(
+                "oikos", files, (expected,)
+            )
+        finally:
+            generation_module._retire_workspace_generation_observation(observation)
+    finally:
+        workspace.close()
+
+
+def test_workspace_generation_reads_resources_before_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _facet, _declaration = _write_workspace(
+        tmp_path,
+        resource_bytes=b"pass\n",
+    )
+    events: list[tuple[str, str]] = []
+    original_read = RetainedDirectory.read_authoritative
+    original_verify = RetainedDirectory.verify
+
+    def recording_read(self: RetainedDirectory, path: str):
+        events.append(("read", path))
+        return original_read(self, path)
+
+    def recording_verify(self: RetainedDirectory, carrier):
+        events.append(("verify", carrier.path))
+        return original_verify(self, carrier)
+
+    monkeypatch.setattr(RetainedDirectory, "read_authoritative", recording_read)
+    monkeypatch.setattr(RetainedDirectory, "verify", recording_verify)
+    workspace = _trusted_directory_from_workspace_path(str(tmp_path))
+    try:
+        observation = generation_module._observe_workspace_generation(
+            workspace,
+            manifest,
+        )
+        generation_module._retire_workspace_generation_observation(observation)
+    finally:
+        workspace.close()
+
+    paths = (
+        "declarations/context-facets.yaml",
+        "declarations/process-core.yaml",
+        "declarations/resources/publish-index.py",
+    )
+    assert events == [("read", path) for path in paths] + [
+        ("verify", path) for path in paths
+    ]
+
+
+def test_workspace_generation_rejects_non_utf8_resource(tmp_path: Path) -> None:
+    manifest, _facet, _declaration = _write_workspace(
+        tmp_path,
+        resource_bytes=b"\xff",
+    )
+    workspace = _trusted_directory_from_workspace_path(str(tmp_path))
+    try:
+        with pytest.raises(AcquisitionContractError) as error:
+            generation_module._observe_workspace_generation(workspace, manifest)
+    finally:
+        workspace.close()
+
+    assert error.value.location == "$.sources[0].resources[0].path"
+
+
+def test_workspace_generation_rejects_resource_mutation_before_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest, _facet, _declaration = _write_workspace(
+        tmp_path,
+        resource_bytes=b"pass\n",
+    )
+    resource_path = tmp_path / "declarations" / "resources" / "publish-index.py"
+    original_read = RetainedDirectory.read_authoritative
+
+    def mutating_read(self: RetainedDirectory, path: str):
+        carrier = original_read(self, path)
+        if path == "declarations/resources/publish-index.py":
+            resource_path.write_bytes(b"changed = True\n")
+        return carrier
+
+    monkeypatch.setattr(RetainedDirectory, "read_authoritative", mutating_read)
+    workspace = _trusted_directory_from_workspace_path(str(tmp_path))
+    try:
+        with pytest.raises(ByteCarrierError, match="verification"):
+            generation_module._observe_workspace_generation(workspace, manifest)
+    finally:
+        workspace.close()
+
+
+def test_workspace_generation_rejects_symlinked_resource(tmp_path: Path) -> None:
+    manifest, _facet, _declaration = _write_workspace(
+        tmp_path,
+        resource_bytes=b"pass\n",
+    )
+    resource = tmp_path / "declarations" / "resources" / "publish-index.py"
+    actual = tmp_path / "actual.py"
+    resource.rename(actual)
+    resource.symlink_to(actual)
+    workspace = _trusted_directory_from_workspace_path(str(tmp_path))
+    try:
+        with pytest.raises(ByteCarrierError):
+            generation_module._observe_workspace_generation(workspace, manifest)
     finally:
         workspace.close()
 
@@ -461,6 +622,45 @@ def test_workspace_generation_observation_reauthenticates_verified_evidence(
         )
         state = generation_module._issued_workspace_generation_state(observation)
         evidence = state.sources[0].evidence[0]
+        verified_state = carrier_module._VERIFIED_AUTHORITIES.retire(evidence)
+        assert verified_state is not None
+        verification_snapshot = cast(
+            tuple[str, bytes, str, object, object],
+            verified_state[6],
+        )
+        corrupted = (
+            verification_snapshot[0],
+            verification_snapshot[1],
+            "sha256:" + "0" * 64,
+            verification_snapshot[3],
+            verification_snapshot[4],
+        )
+        carrier_module._VERIFIED_AUTHORITIES.issue(
+            evidence,
+            (*verified_state[:6], corrupted),
+        )
+        with pytest.raises(ByteCarrierError, match="verified carrier state is invalid"):
+            generation_module._workspace_generation_components(observation)
+        generation_module._retire_workspace_generation_observation(observation)
+    finally:
+        workspace.close()
+
+
+def test_workspace_generation_reauthenticates_resource_evidence(
+    tmp_path: Path,
+) -> None:
+    manifest, _facet, _declaration = _write_workspace(
+        tmp_path,
+        resource_bytes=b"pass\n",
+    )
+    workspace = _trusted_directory_from_workspace_path(str(tmp_path))
+    try:
+        observation = generation_module._observe_workspace_generation(
+            workspace,
+            manifest,
+        )
+        state = generation_module._issued_workspace_generation_state(observation)
+        evidence = state.sources[0].resource_evidence[0]
         verified_state = carrier_module._VERIFIED_AUTHORITIES.retire(evidence)
         assert verified_state is not None
         verification_snapshot = cast(

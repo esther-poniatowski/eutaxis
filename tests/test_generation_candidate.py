@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import pickle
 from pathlib import Path
 from typing import cast
@@ -23,7 +24,10 @@ from eutaxis.declarations.exceptions import AcquisitionContractError, ByteCarrie
 
 
 def _write_candidate_workspace(
-    root: Path, *, rule_id: str = "oikos/process-core"
+    root: Path,
+    *,
+    rule_id: str = "oikos/process-core",
+    resource_bytes: bytes | None = None,
 ) -> str:
     declarations = root / "declarations"
     declarations.mkdir(parents=True)
@@ -68,6 +72,17 @@ def _write_candidate_workspace(
             )
         )
     )
+    resource_lines: tuple[str, ...] = ()
+    if resource_bytes is not None:
+        resource = declarations / "resources" / "publish-index.py"
+        resource.parent.mkdir()
+        resource.write_bytes(resource_bytes)
+        resource_lines = (
+            "    resources:",
+            "      - id: oikos/publish-index",
+            "        path: declarations/resources/publish-index.py",
+            "        media-type: text/x-python; charset=utf-8",
+        )
     manifest_path = "declarations/acquisition.yaml"
     (root / manifest_path).write_text(
         "\n".join(
@@ -87,6 +102,7 @@ def _write_candidate_workspace(
                 "    root: .",
                 "    files:",
                 "      - declarations/process-core.yaml",
+                *resource_lines,
                 "",
             )
         )
@@ -113,6 +129,87 @@ def test_generated_candidate_binds_exact_canonical_lock_bytes(tmp_path: Path) ->
             assert lock.sources[0].namespace == "oikos"
             assert lock.sources[0].files[0].path == "declarations/process-core.yaml"
             assert manifest.sources[0].files == ("declarations/process-core.yaml",)
+        finally:
+            candidate_module._retire_generated_candidate(candidate)
+    finally:
+        workspace.close()
+
+
+def test_generated_candidate_binds_resource_bytes_in_canonical_lock(
+    tmp_path: Path,
+) -> None:
+    resource_bytes = b"pass\n"
+    manifest_path = _write_candidate_workspace(
+        tmp_path,
+        resource_bytes=resource_bytes,
+    )
+    workspace = _trusted_directory_from_workspace_path(str(tmp_path))
+    try:
+        candidate = candidate_module._generate_workspace_candidate(
+            workspace,
+            manifest_path,
+        )
+        try:
+            source, manifest, lock = candidate_module._generated_candidate_payload(
+                candidate
+            )
+            resource = lock.sources[0].resources[0]
+
+            assert source == jcs_bytes(_lock_document(lock))
+            assert parse_acquisition_lock_bytes(source) == lock
+            assert resource.id == "oikos/publish-index"
+            assert resource.path == "declarations/resources/publish-index.py"
+            assert (
+                resource.sha256
+                == "sha256:" + hashlib.sha256(resource_bytes).hexdigest()
+            )
+            assert manifest.sources[0].resources[0].id == resource.id
+        finally:
+            candidate_module._retire_generated_candidate(candidate)
+    finally:
+        workspace.close()
+
+
+def test_generated_candidate_reauthenticates_resource_evidence(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_candidate_workspace(
+        tmp_path,
+        resource_bytes=b"pass\n",
+    )
+    workspace = _trusted_directory_from_workspace_path(str(tmp_path))
+    try:
+        candidate = candidate_module._generate_workspace_candidate(
+            workspace,
+            manifest_path,
+        )
+        state = candidate_module._issued_generated_candidate_state(candidate)
+        external_state = source_module._issued_workspace_generation_state(
+            state.external
+        )
+        evidence = external_state.sources[0].resource_evidence[0]
+        verified_state = carrier_module._VERIFIED_AUTHORITIES.retire(evidence)
+        assert verified_state is not None
+        verification_snapshot = cast(
+            tuple[str, bytes, str, object, object],
+            verified_state[6],
+        )
+        corrupted = (
+            verification_snapshot[0],
+            verification_snapshot[1],
+            "sha256:" + "0" * 64,
+            verification_snapshot[3],
+            verification_snapshot[4],
+        )
+        carrier_module._VERIFIED_AUTHORITIES.issue(
+            evidence,
+            (*verified_state[:6], corrupted),
+        )
+        try:
+            with pytest.raises(
+                ByteCarrierError, match="verified carrier state is invalid"
+            ):
+                candidate_module._generated_candidate_payload(candidate)
         finally:
             candidate_module._retire_generated_candidate(candidate)
     finally:
