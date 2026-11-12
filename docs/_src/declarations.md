@@ -18,6 +18,14 @@ External declaration acquisition: verifies one external corpus and exposes its p
    :show-inheritance:
 ```
 
+## External attention requirements
+
+```{eval-rst}
+.. automodule:: eutaxis.declarations.external_attention
+   :members: ExternalAttentionRequirements, derive_external_attention_requirements
+   :show-inheritance:
+```
+
 ## External cumulative composition
 
 ```{eval-rst}

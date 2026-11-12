@@ -14,6 +14,7 @@
 * [Declarations](declarations.md)
   * [External acquisition result](declarations.md#module-eutaxis.declarations.external_result)
   * [External resolution](declarations.md#module-eutaxis.declarations.external_resolution)
+  * [External attention requirements](declarations.md#module-eutaxis.declarations.external_attention)
   * [External cumulative composition](declarations.md#module-eutaxis.declarations.external_composition)
   * [Structured procedure Skill planning](declarations.md#structured-procedure-skill-planning)
   * [Declaration catalog](declarations.md#module-eutaxis.declarations.catalog)

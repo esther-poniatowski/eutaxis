@@ -193,6 +193,63 @@ Resolve one manifest while retaining its exact acquisition authority.
 * **Return type:**
   [*ExternalResolutionResult*](#eutaxis.declarations.external_resolution.ExternalResolutionResult)
 
+<a id="module-eutaxis.declarations.external_attention"></a>
+
+<a id="external-attention-requirements"></a>
+
+## External attention requirements
+
+Derive enforcement requirements from external resolutions without registry access.
+
+<a id="eutaxis.declarations.external_attention.ExternalAttentionRequirements"></a>
+
+### *class* eutaxis.declarations.external_attention.ExternalAttentionRequirements(\*\_args, \*\*\_kwargs)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Expose canonical enforcement requirements without the private registry.
+
+* **Parameters:**
+  * **\_args** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+  * **\_kwargs** ([*object*](https://docs.python.org/3/builtins/functions.html#object))
+
+<a id="eutaxis.declarations.external_attention.ExternalAttentionRequirements.completion"></a>
+
+#### *property* completion *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[CompletionRequirement, ...]*
+
+Return every canonical requirement in execution order.
+
+<a id="eutaxis.declarations.external_attention.ExternalAttentionRequirements.deliberative"></a>
+
+#### *property* deliberative *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[DeliberativeAttentionRequirement, ...]*
+
+Return requirements decided by unaided judgment.
+
+<a id="eutaxis.declarations.external_attention.ExternalAttentionRequirements.assisted"></a>
+
+#### *property* assisted *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[RunnableAttentionRequirement, ...]*
+
+Return requirements supported by candidate detectors.
+
+<a id="eutaxis.declarations.external_attention.ExternalAttentionRequirements.mechanical"></a>
+
+#### *property* mechanical *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[RunnableAttentionRequirement, ...]*
+
+Return requirements decided by authoritative checkers.
+
+<a id="eutaxis.declarations.external_attention.derive_external_attention_requirements"></a>
+
+### eutaxis.declarations.external_attention.derive_external_attention_requirements(resolution, \*, checker_registry=None, detector_registry=None)
+
+Derive canonical requirements through an authenticated external boundary.
+
+* **Parameters:**
+  * **resolution** ([*ExternalResolutionResult*](#eutaxis.declarations.external_resolution.ExternalResolutionResult))
+  * **checker_registry** (*CheckerRunnerRegistry* *|* *None*)
+  * **detector_registry** (*DetectorRunnerRegistry* *|* *None*)
+* **Return type:**
+  [*ExternalAttentionRequirements*](#eutaxis.declarations.external_attention.ExternalAttentionRequirements)
+
 <a id="module-eutaxis.declarations.external_composition"></a>
 
 <a id="external-cumulative-composition"></a>

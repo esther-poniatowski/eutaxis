@@ -400,6 +400,10 @@ from .external_composition import (
     plan_external_cumulative_composition,
     render_external_cumulative_markdown,
 )
+from .external_attention import (
+    ExternalAttentionRequirements,
+    derive_external_attention_requirements,
+)
 from .structured_skill import (
     PlannedSupportResource,
     StructuredSkillPlan,
@@ -673,6 +677,7 @@ __all__ = [
     "ExternalResolutionResult",
     "ExternalCumulativeArtifact",
     "ExternalCumulativeCompositionPlan",
+    "ExternalAttentionRequirements",
     "ResolutionSource",
     "ResolutionStrategy",
     "ResolutionTrace",
@@ -729,6 +734,7 @@ __all__ = [
     "catalog_index_schema_path",
     "declaration_schema",
     "derive_attention_requirements",
+    "derive_external_attention_requirements",
     "derive_enforcement_class",
     "declaration_registry_checker",
     "declaration_registry_checker_binding",
