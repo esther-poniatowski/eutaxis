@@ -300,6 +300,7 @@ This phase gives each host the smallest artifact that preserves the complete res
   - [x] Reject missing methods, unresolved resources, unsafe or colliding paths and stale planner authority.
   - [x] Reject entrypoint and complete-artifact budget overflow during rendering.
   - [x] Preserve cumulative Markdown as a single-file projection.
+  - [x] Publish all rendered host artifacts through one failure-atomic transaction that rejects aliased or nested targets and rolls back registry and finalized state changes.
   - [ ] Activate the Oikos batch procedure only after cross-agent golden, rollback and adversarial gates pass.
 - [ ] Generalize compact Skill entrypoints from the first procedure consumer to other catalog records only after a second use case exposes the required variation.
 - [ ] Emit normalized YAML or JSON query packets with context, trace, registry versions, hashes, and source revisions.

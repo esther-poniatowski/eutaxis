@@ -17,6 +17,7 @@ from eutaxis.commands import (
     diff_artifact,
     get_adapter,
     install_artifact,
+    install_artifacts,
     uninstall_command,
 )
 from eutaxis.declarations import plan_structured_skill, render_structured_skill
@@ -208,6 +209,161 @@ def test_failed_structured_publication_restores_artifact_and_registry(
 
     assert _tree_bytes(target) == artifact_before
     assert registry.path.read_bytes() == registry_before
+
+
+def test_structured_batch_install_is_atomic_across_adapters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    project = tmp_path / "project"
+    home.mkdir()
+    project.mkdir()
+    initial = tuple(
+        _rendered_skill(tmp_path / f"initial-{name}", name)
+        for name in ("claude", "codex")
+    )
+    changed = tuple(
+        _rendered_skill(
+            tmp_path / f"changed-{name}",
+            name,
+            purpose="Changed publication purpose.",
+        )
+        for name in ("claude", "codex")
+    )
+    registry = Registry(home / ".eutaxis" / "state")
+    install_artifacts(
+        tuple((artifact, adapter) for adapter, artifact in initial),
+        project_root=project,
+        home=home,
+        registry=registry,
+    )
+    targets = tuple(
+        adapter.artifact_dir(
+            artifact.name,
+            artifact.scope,
+            home=home,
+            project_root=project,
+        )
+        for adapter, artifact in initial
+    )
+    trees_before = tuple(_tree_bytes(target) for target in targets)
+    registry_before = registry.path.read_bytes()
+    working_upsert = registry.upsert
+
+    def fail_on_codex(record) -> None:
+        working_upsert(record)
+        if record.adapter == "codex":
+            raise CommandError("planted second-host failure")
+
+    monkeypatch.setattr(registry, "upsert", fail_on_codex)
+
+    with pytest.raises(CommandError, match="planted second-host failure"):
+        install_artifacts(
+            tuple((artifact, adapter) for adapter, artifact in changed),
+            project_root=project,
+            home=home,
+            registry=registry,
+        )
+
+    assert tuple(_tree_bytes(target) for target in targets) == trees_before
+    assert registry.path.read_bytes() == registry_before
+
+
+def test_structured_batch_install_rolls_back_finalized_state(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    project = tmp_path / "project"
+    home.mkdir()
+    project.mkdir()
+    batch = tuple(
+        (artifact, adapter)
+        for adapter, artifact in (
+            _rendered_skill(tmp_path / name, name) for name in ("claude", "codex")
+        )
+    )
+    registry = Registry(home / ".eutaxis" / "state")
+    state = tmp_path / "sync-manifest.json"
+    state.write_text("baseline\n", encoding="utf-8")
+
+    def fail_after_state_write() -> None:
+        state.write_text("candidate\n", encoding="utf-8")
+        raise CommandError("planted finalization failure")
+
+    with pytest.raises(CommandError, match="planted finalization failure"):
+        install_artifacts(
+            batch,
+            project_root=project,
+            home=home,
+            registry=registry,
+            finalize=fail_after_state_write,
+            rollback_files=(state,),
+        )
+
+    assert state.read_text(encoding="utf-8") == "baseline\n"
+    assert registry.load() == []
+    for artifact, adapter in batch:
+        assert not adapter.artifact_dir(
+            artifact.name,
+            artifact.scope,
+            home=home,
+            project_root=project,
+        ).exists()
+
+
+def test_structured_batch_install_rejects_a_repeated_target(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    project = tmp_path / "project"
+    home.mkdir()
+    project.mkdir()
+    adapter, artifact = _rendered_skill(tmp_path / "source", "claude")
+    registry = Registry(home / ".eutaxis" / "state")
+
+    with pytest.raises(CommandRenderError, match="repeats target"):
+        install_artifacts(
+            ((artifact, adapter), (artifact, adapter)),
+            project_root=project,
+            home=home,
+            registry=registry,
+        )
+
+    assert registry.load() == []
+
+
+def test_structured_batch_install_rejects_aliased_adapter_roots(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    project = tmp_path / "project"
+    home.mkdir()
+    project.mkdir()
+    codex_root = home / ".agents" / "skills"
+    codex_root.mkdir(parents=True)
+    claude_parent = home / ".claude"
+    claude_parent.mkdir()
+    (claude_parent / "skills").symlink_to(codex_root, target_is_directory=True)
+    batch = tuple(
+        (artifact, adapter)
+        for adapter, artifact in (
+            _rendered_skill(tmp_path / name, name, scope="personal")
+            for name in ("claude", "codex")
+        )
+    )
+    registry = Registry(home / ".eutaxis" / "state")
+
+    with pytest.raises(OwnershipError, match="aliased or overlapping"):
+        install_artifacts(
+            batch,
+            project_root=project,
+            home=home,
+            registry=registry,
+        )
+
+    assert registry.load() == []
+    assert not (codex_root / "test-procedure").exists()
 
 
 def test_failed_structured_removal_restores_artifact_and_registry(

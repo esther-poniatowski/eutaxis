@@ -18,6 +18,7 @@ import difflib
 import hashlib
 import json
 import re
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 
@@ -105,6 +106,96 @@ def install_artifact(
             registry=registry,
             force=force,
         )
+
+
+def install_artifacts(
+    artifacts: Collection[tuple[RenderedArtifact, AgentAdapter]],
+    *,
+    project_root: Path,
+    home: Path,
+    registry: Registry,
+    finalize: Callable[[], None] | None = None,
+    rollback_files: Collection[Path] = (),
+    force: bool = False,
+) -> tuple[InstallOutcome, ...]:
+    """Publish several rendered Skills as one failure-atomic write set.
+
+    Parameters
+    ----------
+    artifacts
+        Rendered artifact and matching adapter pairs. Each artifact supplies
+        its installation scope.
+    project_root
+        Project root used to resolve project-scope targets.
+    home
+        User home used to resolve user-scope targets.
+    registry
+        Registry updated with the complete installed set.
+    finalize
+        Optional callback run after every artifact is installed but before the
+        transaction commits.
+    rollback_files
+        State files changed by ``finalize`` and restored if any operation
+        fails.
+    force
+        Whether an existing non-Eutaxis directory may be replaced.
+
+    Returns
+    -------
+    tuple of InstallOutcome
+        One outcome for each input artifact, in input order.
+
+    Raises
+    ------
+    CommandRenderError
+        If the batch is empty, repeats a target, or contains an invalid
+        artifact.
+    OwnershipError
+        If distinct target paths resolve to the same or nested filesystem
+        tree.
+    """
+    batch = tuple(artifacts)
+    if not batch:
+        raise CommandRenderError("At least one rendered artifact is required.")
+
+    targets: list[Path] = []
+    for rendered, adapter in batch:
+        target = adapter.artifact_dir(
+            rendered.name,
+            rendered.scope,
+            home=home,
+            project_root=project_root,
+        )
+        if target in targets:
+            raise CommandRenderError(
+                f"Rendered artifact batch repeats target: {target}."
+            )
+        _validated_artifact_paths(rendered, adapter, rendered.scope, target)
+        targets.append(target)
+
+    outcomes: list[InstallOutcome] = []
+    from .synchronization import skill_write_transaction
+
+    with skill_write_transaction(
+        targets,
+        registry,
+        file_paths=rollback_files,
+    ):
+        for rendered, adapter in batch:
+            outcomes.append(
+                _install_artifact(
+                    rendered,
+                    adapter,
+                    scope=rendered.scope,
+                    project_root=project_root,
+                    home=home,
+                    registry=registry,
+                    force=force,
+                )
+            )
+        if finalize is not None:
+            finalize()
+    return tuple(outcomes)
 
 
 def _install_artifact(

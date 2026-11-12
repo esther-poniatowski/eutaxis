@@ -863,6 +863,33 @@ Publish one rendered Skill under the deployment lock with rollback.
 * **Return type:**
   [*InstallOutcome*](#eutaxis.commands.installer.InstallOutcome)
 
+<a id="eutaxis.commands.installer.install_artifacts"></a>
+
+### eutaxis.commands.installer.install_artifacts(artifacts, \*, project_root, home, registry, finalize=None, rollback_files=(), force=False)
+
+Publish several rendered Skills as one failure-atomic write set.
+
+* **Parameters:**
+  * **artifacts** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact) *,* *AgentAdapter* *]* *]*) – Rendered artifact and matching adapter pairs. Each artifact supplies
+    its installation scope.
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)) – Project root used to resolve project-scope targets.
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)) – User home used to resolve user-scope targets.
+  * **registry** ([*Registry*](#eutaxis.commands.registry.Registry)) – Registry updated with the complete installed set.
+  * **finalize** ([*Callable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable) *[* *[* *]* *,* *None* *]*  *|* *None*) – Optional callback run after every artifact is installed but before the
+    transaction commits.
+  * **rollback_files** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*) – State files changed by `finalize` and restored if any operation
+    fails.
+  * **force** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool)) – Whether an existing non-Eutaxis directory may be replaced.
+* **Returns:**
+  One outcome for each input artifact, in input order.
+* **Return type:**
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple) of [InstallOutcome](#eutaxis.commands.installer.InstallOutcome)
+* **Raises:**
+  * [**CommandRenderError**](#eutaxis.commands.exceptions.CommandRenderError) – If the batch is empty, repeats a target, or contains an invalid
+        artifact.
+  * [**OwnershipError**](#eutaxis.commands.exceptions.OwnershipError) – If distinct target paths resolve to the same or nested filesystem
+        tree.
+
 <a id="eutaxis.commands.installer.uninstall_command"></a>
 
 ### eutaxis.commands.installer.uninstall_command(\*, name, adapter, scope, project_root, home, registry, force=False)

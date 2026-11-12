@@ -351,6 +351,7 @@ def skill_write_transaction(
     unique_paths = tuple(dict.fromkeys(Path(path) for path in paths))
     unique_files = tuple(dict.fromkeys(Path(path) for path in file_paths))
     with registry.deployment_locked():
+        _reject_aliased_or_overlapping_targets(unique_paths)
         with tempfile.TemporaryDirectory(prefix="eutaxis-skill-transaction-") as raw:
             scratch = Path(raw)
             snapshots: list[tuple[Path, Path | None]] = []
@@ -406,6 +407,29 @@ def skill_write_transaction(
                         + "\n- ".join(cleanup_failures)
                     )
                 raise
+
+
+def _reject_aliased_or_overlapping_targets(paths: tuple[Path, ...]) -> None:
+    """Reject write targets that resolve to the same or nested filesystem tree."""
+    canonical: list[tuple[Path, Path]] = []
+    for path in paths:
+        try:
+            resolved = path.resolve(strict=False)
+        except (OSError, RuntimeError) as exc:
+            raise OwnershipError(
+                f"Cannot resolve Skill transaction target: {path}."
+            ) from exc
+        for prior_path, prior_resolved in canonical:
+            if (
+                resolved == prior_resolved
+                or resolved in prior_resolved.parents
+                or prior_resolved in resolved.parents
+            ):
+                raise OwnershipError(
+                    "Refusing aliased or overlapping Skill transaction targets: "
+                    f"{prior_path} and {path}."
+                )
+        canonical.append((path, resolved))
 
 
 def _restore_directory_snapshot(path: Path, backup: Path | None) -> None:
