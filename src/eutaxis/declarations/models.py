@@ -127,6 +127,13 @@ class CompositionMechanism(StrEnum):
     SINGLE_SLOT = "single-slot"
 
 
+class CumulativeMarkdownProfile(StrEnum):
+    """Consumer profiles for cumulative Markdown projections."""
+
+    AUDITABLE = "auditable"
+    AGENT_INSTRUCTIONS = "agent-instructions"
+
+
 @dataclass(frozen=True)
 class VersionedReference:
     """An opaque identifier paired with its positive contract version."""

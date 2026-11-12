@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 
+from ..names import SAFE_SLUG_PATTERN
 from .catalog import DeclarationCatalog
 from .composition import (
     CumulativeArtifact,
@@ -15,6 +16,7 @@ from .exceptions import CompositionError
 from .models import (
     Binding,
     Criterion,
+    CumulativeMarkdownProfile,
     DeclarationKind,
     LiteralBinding,
     Norm,
@@ -23,6 +25,7 @@ from .models import (
     Predicate,
     ProcedureDeclaration,
     RuleDeclaration,
+    RuleSetDeclaration,
     VersionedReference,
 )
 from .resolution import ResolvedCompilationUnit, ResolvedRuleProjection
@@ -40,12 +43,20 @@ def _render_cumulative_markdown(
     catalog: DeclarationCatalog,
     unit: ResolvedCompilationUnit,
     plan: CumulativeCompositionPlan,
+    profile: CumulativeMarkdownProfile,
 ) -> CumulativeArtifact:
     """Render one authenticated catalog and resolved cumulative plan."""
+    if type(profile) is not CumulativeMarkdownProfile:
+        raise CompositionError(
+            "$.profile",
+            "cumulative Markdown profile must be a CumulativeMarkdownProfile",
+        )
     projections = {
         projection.declaration: projection for projection in unit.rule_projections
     }
     fragments: dict[str, str] = {}
+    projected_labels: dict[str, str] = {}
+    rendered_rule_sets: set[str] = set()
     for component in plan.components:
         identifier = component.declaration
         record = catalog.get(identifier)
@@ -55,6 +66,8 @@ def _render_cumulative_markdown(
                 f"catalog has no declaration {identifier!r}",
             )
         declaration = record.declaration
+        label = _projection_label(identifier, profile)
+        _claim_projected_label(projected_labels, label, identifier)
         if isinstance(declaration, RuleDeclaration):
             projection = projections.get(identifier)
             if projection is None:
@@ -62,9 +75,30 @@ def _render_cumulative_markdown(
                     _component_location(identifier),
                     f"resolved unit has no rule projection for {identifier!r}",
                 )
-            fragments[identifier] = _render_rule(declaration, projection)
+            blocks: list[str] = []
+            rule_set = record.containing_rule_set
+            if (
+                profile is CumulativeMarkdownProfile.AGENT_INSTRUCTIONS
+                and rule_set is not None
+                and rule_set not in rendered_rule_sets
+            ):
+                blocks.append(_render_rule_set(catalog, rule_set))
+                rendered_rule_sets.add(rule_set)
+            blocks.append(
+                _render_rule(
+                    declaration,
+                    projection,
+                    profile=profile,
+                    label=label,
+                )
+            )
+            fragments[identifier] = "\n\n".join(blocks)
         elif isinstance(declaration, ProcedureDeclaration):
-            fragments[identifier] = _render_procedure(catalog, declaration)
+            fragments[identifier] = _render_procedure(
+                catalog,
+                declaration,
+                label=label,
+            )
         else:
             raise CompositionError(
                 _component_location(identifier),
@@ -76,14 +110,17 @@ def _render_cumulative_markdown(
 def _render_rule(
     rule: RuleDeclaration,
     projection: ResolvedRuleProjection,
+    *,
+    profile: CumulativeMarkdownProfile,
+    label: str,
 ) -> str:
     """Render the effective local projection of one rule."""
     norms = {norm.id: norm for norm in rule.norms}
     criteria = {criterion.id: criterion for criterion in rule.criteria}
-    blocks = [f"**{rule.id}**:"]
+    blocks = [f"**{label}**:"]
     for identifier in projection.norms:
         norm = norms[identifier]
-        blocks.append(_render_norm(norm))
+        blocks.append(_render_norm(norm, profile))
         if norm.guidance is not None:
             blocks.append(f"*How to apply.* {norm.guidance}")
         if norm.rationale is not None:
@@ -92,7 +129,7 @@ def _render_rule(
             blocks.append(f"*Decision criterion.* {norm.decision_criterion}")
     if rule.rationale is not None:
         blocks.append(f"*Why.* {rule.rationale}")
-    if projection.criteria:
+    if profile is CumulativeMarkdownProfile.AUDITABLE and projection.criteria:
         lines = ["*Success criteria.*"]
         lines.extend(
             _render_criterion(criteria[identifier])
@@ -102,14 +139,71 @@ def _render_rule(
     return "\n\n".join(blocks)
 
 
-def _render_norm(norm: Norm) -> str:
+def _render_rule_set(
+    catalog: DeclarationCatalog,
+    identifier: str,
+) -> str:
+    """Render one selected rule-set frame before its first effective rule."""
+    record = catalog.get(identifier)
+    if record is None or not isinstance(record.declaration, RuleSetDeclaration):
+        raise CompositionError(
+            _component_location(identifier),
+            f"catalog has no containing rule set {identifier!r}",
+        )
+    rule_set = record.declaration
+    label = _projection_label(
+        rule_set.id,
+        CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+    )
+    heading = f"# {label.replace('-', ' ').capitalize()}"
+    blocks = [heading, rule_set.purpose]
+    if rule_set.rationale is not None:
+        blocks.append(f"*Why.* {rule_set.rationale}")
+    return "\n\n".join(blocks)
+
+
+def _render_norm(norm: Norm, profile: CumulativeMarkdownProfile) -> str:
     """Render one BCP 14 norm as one labelled instruction line."""
     marker, keyword = _MODALITY[norm.modality]
     subject = norm.subject[0].upper() + norm.subject[1:]
     statement = f"{subject} {keyword} {norm.action.verb} {norm.action.object}"
     if norm.action.timing is not None:
         statement += f" {norm.action.timing}"
+    if profile is CumulativeMarkdownProfile.AGENT_INSTRUCTIONS:
+        return f"{marker} {statement}."
     return f"{marker} `{norm.id}`: {statement}."
+
+
+def _projection_label(
+    identifier: str,
+    profile: CumulativeMarkdownProfile,
+) -> str:
+    """Return one profile-specific label without changing canonical identity."""
+    if profile is CumulativeMarkdownProfile.AUDITABLE:
+        return identifier
+    label = identifier.rsplit("/", 1)[-1]
+    if SAFE_SLUG_PATTERN.fullmatch(label) is None:
+        raise CompositionError(
+            "$.profile",
+            f"declaration {identifier!r} has no valid agent label",
+        )
+    return label
+
+
+def _claim_projected_label(
+    labels: dict[str, str],
+    label: str,
+    identifier: str,
+) -> None:
+    """Claim one consumer label and reject cross-namespace collisions."""
+    previous = labels.get(label)
+    if previous is not None:
+        raise CompositionError(
+            "$.profile",
+            f"projected label {label!r} is shared by {previous!r} and "
+            f"{identifier!r}",
+        )
+    labels[label] = identifier
 
 
 def _render_criterion(criterion: Criterion) -> str:
@@ -122,10 +216,11 @@ def _render_procedure(
     catalog: DeclarationCatalog,
     procedure: ProcedureDeclaration,
     *,
+    label: str | None = None,
     allow_support_resources: bool = False,
 ) -> str:
     """Render one finite procedure and its exact operation contracts."""
-    blocks = [f"**{procedure.id}** (procedure):", procedure.purpose]
+    blocks = [f"**{label or procedure.id}** (procedure):", procedure.purpose]
     if procedure.rationale is not None:
         blocks.append(f"*Why.* {procedure.rationale}")
     blocks.extend(

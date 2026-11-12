@@ -19,6 +19,7 @@ from .composition import (
     plan_cumulative_composition,
 )
 from .exceptions import AcquisitionContractError
+from .models import CumulativeMarkdownProfile
 from .external_resolution import (
     ExternalResolutionResult,
     _ExternalResolutionState,
@@ -194,8 +195,10 @@ def assemble_external_cumulative_artifact(
 
 def render_external_cumulative_markdown(
     plan: ExternalCumulativeCompositionPlan,
+    *,
+    profile: CumulativeMarkdownProfile = CumulativeMarkdownProfile.AUDITABLE,
 ) -> ExternalCumulativeArtifact:
-    """Render one external cumulative plan from its authenticated catalog."""
+    """Render one external cumulative plan for a declared consumer profile."""
     plan_state = _issued_external_plan_state(plan)
     acquisition = plan_state.resolution_state.acquisition
     catalog = build_declaration_catalog(acquisition)
@@ -206,6 +209,7 @@ def render_external_cumulative_markdown(
             catalog,
             plan_state.resolution_state.resolution.unit,
             plan_state.plan,
+            profile,
         )
     except BaseException as error:
         _raise_changed_plan(plan, plan_state, error)

@@ -12,6 +12,7 @@ import pytest
 import eutaxis.declarations.external_composition as external_composition_module
 import eutaxis.declarations.external_resolution as external_resolution_module
 from eutaxis.declarations import (
+    CumulativeMarkdownProfile,
     AcquisitionContractError,
     ExternalCumulativeArtifact,
     ExternalCumulativeCompositionPlan,
@@ -225,6 +226,23 @@ def test_renders_external_cumulative_markdown_from_catalog(tmp_path: Path) -> No
         "*Success criteria.*\n"
         "- `purpose-is-explicit` [eutaxis/manual-judgment@1]: "
         "The artifact states a reader-facing purpose\n"
+    )
+
+
+def test_renders_bounded_agent_instruction_markdown(tmp_path: Path) -> None:
+    acquisition = _acquire(tmp_path)
+    resolution = resolve_external_compilation_unit(
+        acquisition, "resolution/manifest", _context()
+    )
+    plan = plan_external_cumulative_composition(resolution)
+
+    artifact = render_external_cumulative_markdown(
+        plan,
+        profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+    )
+
+    assert artifact.text == (
+        "**purpose**:\n\n" "✓ Agent MUST state the reader-facing purpose.\n"
     )
 
 

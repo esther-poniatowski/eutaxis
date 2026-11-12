@@ -5,9 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 import eutaxis.declarations.external_composition as external_composition_module
+from eutaxis.cli import app
 from eutaxis.declarations import (
+    CumulativeMarkdownProfile,
     CompositionError,
     DeclarationCatalogError,
     acquire_external_declarations_from_path,
@@ -106,6 +109,40 @@ criteria:
     norms: [context-excluded]
     evaluator: {id: eutaxis/manual-judgment, version: 1}
     statement: This criterion must not appear
+"""
+
+RULE_SET = b"""\
+_schema: eutaxis:declaration@1
+id: projection/strategic-rules
+kind: rule-set
+owner: projection
+status: active
+source-revision: fixture-1
+applicability: {facet: projection.enabled, operator: equals, value: true}
+relations: []
+purpose: These rules govern every projected artifact
+rationale: The frame states why the selected rules belong together
+rules:
+  - _schema: eutaxis:declaration@1
+    id: projection/framed-rule
+    kind: rule
+    owner: projection
+    status: active
+    source-revision: fixture-1
+    applicability: {facet: projection.enabled, operator: equals, value: true}
+    relations: []
+    axis: reasoning-target
+    failure-mode: visible
+    norms:
+      - id: preserve-frame
+        modality: must
+        subject: agent
+        action: {verb: preserve, object: the rule-set frame}
+    criteria:
+      - id: frame-visible
+        norms: [preserve-frame]
+        evaluator: {id: eutaxis/manual-judgment, version: 1}
+        statement: The rule-set frame appears once
 """
 
 OPERATION = b"""\
@@ -235,6 +272,24 @@ sections:
 policies: []
 """
 
+RULE_SET_MANIFEST = b"""\
+_schema: eutaxis:declaration@1
+id: projection/rule-set-manifest
+kind: composition-manifest
+owner: projection
+status: active
+source-revision: fixture-1
+applicability: {facet: projection.enabled, operator: equals, value: true}
+relations: []
+mechanism: cumulative
+scope: project
+target: AGENTS.md
+sections:
+  - id: rules
+    declarations: [projection/strategic-rules]
+policies: []
+"""
+
 
 def _plan(tmp_path: Path):
     manifest_path, lock_path = _write_contract(
@@ -294,6 +349,142 @@ def _plan_with_operation(tmp_path: Path, operation: bytes):
     return plan_external_cumulative_composition(resolution)
 
 
+def _rule_set_plan(tmp_path: Path):
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="projection",
+        declaration_files=(
+            ("declarations/rule-set.yaml", RULE_SET),
+            ("declarations/manifest.yaml", RULE_SET_MANIFEST),
+        ),
+        facet_bytes=FACETS,
+    )
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    resolution = resolve_external_compilation_unit(
+        acquisition,
+        "projection/rule-set-manifest",
+        {
+            "context.available": True,
+            "projection.enabled": True,
+            "projection.optional": False,
+            "projection.stable": True,
+            "projection.done": False,
+        },
+    )
+    return plan_external_cumulative_composition(resolution)
+
+
+def _plan_with_rule_identifier(tmp_path: Path, identifier: str):
+    rule = RULE.replace(b"projection/all-modalities", identifier.encode())
+    manifest = MANIFEST.replace(b"projection/all-modalities", identifier.encode())
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="projection",
+        declaration_files=(
+            ("declarations/rule.yaml", rule),
+            ("declarations/operation.yaml", OPERATION),
+            ("declarations/procedure.yaml", PROCEDURE),
+            ("declarations/manifest.yaml", manifest),
+        ),
+        facet_bytes=FACETS,
+    )
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    resolution = resolve_external_compilation_unit(
+        acquisition,
+        "projection/manifest",
+        {
+            "context.available": True,
+            "projection.enabled": True,
+            "projection.optional": False,
+            "projection.stable": True,
+            "projection.done": False,
+        },
+    )
+    return plan_external_cumulative_composition(resolution)
+
+
+def _collision_plan(tmp_path: Path):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    (first / "declarations").mkdir(parents=True)
+    (second / "declarations").mkdir(parents=True)
+    shared_rule = RULE.replace(b"projection.enabled", b"context.available").replace(
+        b"projection.optional", b"context.available"
+    )
+    (first / "declarations" / "rule.yaml").write_bytes(
+        shared_rule.replace(b"projection/", b"first/").replace(
+            b"owner: projection", b"owner: first"
+        )
+    )
+    (second / "declarations" / "rule.yaml").write_bytes(
+        shared_rule.replace(b"projection/", b"second/").replace(
+            b"owner: projection", b"owner: second"
+        )
+    )
+    (first / "declarations" / "manifest.yaml").write_bytes(b"""\
+_schema: eutaxis:declaration@1
+id: first/collision-manifest
+kind: composition-manifest
+owner: first
+status: active
+source-revision: fixture-1
+applicability: {facet: context.available, operator: equals, value: true}
+relations: []
+mechanism: cumulative
+scope: project
+target: AGENTS.md
+sections:
+  - id: rules
+    declarations: [first/all-modalities, second/all-modalities]
+policies: []
+""")
+    acquisition_manifest = "acquisition.yaml"
+    (tmp_path / acquisition_manifest).write_text(
+        """\
+schema-version: 1
+facet-extensions: []
+internal-source: {namespace: eutaxis, kind: packaged}
+sources:
+  - namespace: first
+    kind: workspace
+    root: first
+    files: [declarations/rule.yaml, declarations/manifest.yaml]
+  - namespace: second
+    kind: workspace
+    root: second
+    files: [declarations/rule.yaml]
+""",
+        encoding="utf-8",
+    )
+    lock_path = "acquisition.lock.json"
+    result = CliRunner().invoke(
+        app,
+        [
+            "declarations",
+            "lock",
+            "--workspace",
+            str(tmp_path),
+            "--manifest",
+            acquisition_manifest,
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    (tmp_path / lock_path).write_bytes(result.stdout_bytes)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), acquisition_manifest, lock_path
+    )
+    resolution = resolve_external_compilation_unit(
+        acquisition,
+        "first/collision-manifest",
+        {"context.available": True},
+    )
+    return plan_external_cumulative_composition(resolution)
+
+
 def test_complete_projection_matches_reviewed_golden(tmp_path: Path) -> None:
     _acquisition, plan = _plan(tmp_path)
 
@@ -306,6 +497,73 @@ def test_complete_projection_matches_reviewed_golden(tmp_path: Path) -> None:
     assert "1. `finalize`" not in first.text
     assert "*Entry.* `choose`" in first.text
     assert '````"value ``` with backticks"````' in first.text
+
+
+def test_agent_profile_uses_local_labels_and_omits_evaluator_metadata(
+    tmp_path: Path,
+) -> None:
+    _acquisition, plan = _plan(tmp_path)
+
+    artifact = render_external_cumulative_markdown(
+        plan,
+        profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+    )
+
+    assert "**all-modalities**:" in artifact.text
+    assert "**branching-procedure** (procedure):" in artifact.text
+    assert "projection/all-modalities" not in artifact.text
+    assert "*Success criteria.*" not in artifact.text
+    assert "[eutaxis/manual-judgment@1]" not in artifact.text
+    assert "✓ Agent MUST retain every required field before rendering." in artifact.text
+
+
+def test_agent_profile_renders_containing_rule_set_once(tmp_path: Path) -> None:
+    artifact = render_external_cumulative_markdown(
+        _rule_set_plan(tmp_path),
+        profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+    )
+
+    assert artifact.text.count("# Strategic rules") == 1
+    assert artifact.text.count("These rules govern every projected artifact") == 1
+    assert artifact.text.count("*Why.* The frame states") == 1
+    assert "**framed-rule**:" in artifact.text
+
+
+def test_default_profile_does_not_add_rule_set_frame(tmp_path: Path) -> None:
+    artifact = render_external_cumulative_markdown(_rule_set_plan(tmp_path))
+
+    assert "strategic-rules" not in artifact.text
+    assert artifact.text.startswith("**projection/framed-rule**:")
+
+
+def test_agent_profile_rejects_digit_leading_local_label(tmp_path: Path) -> None:
+    plan = _plan_with_rule_identifier(tmp_path, "projection/1-rule")
+
+    with pytest.raises(CompositionError, match="has no valid agent label"):
+        render_external_cumulative_markdown(
+            plan,
+            profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+        )
+
+
+def test_profile_rejects_untyped_string(tmp_path: Path) -> None:
+    _acquisition, plan = _plan(tmp_path)
+
+    with pytest.raises(CompositionError, match="must be a CumulativeMarkdownProfile"):
+        render_external_cumulative_markdown(
+            plan,
+            profile="agent-instructions",  # type: ignore[arg-type]
+        )
+
+
+def test_agent_profile_rejects_colliding_local_labels(tmp_path: Path) -> None:
+    plan = _collision_plan(tmp_path)
+
+    with pytest.raises(CompositionError, match="projected label 'all-modalities'"):
+        render_external_cumulative_markdown(
+            plan,
+            profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+        )
 
 
 def test_cumulative_projection_rejects_operation_support_resources(
@@ -330,8 +588,8 @@ def test_catalog_retirement_after_projection_blocks_publication(
     _acquisition, plan = _plan(tmp_path)
     original = external_composition_module._render_cumulative_markdown
 
-    def hostile_render(catalog, unit, internal_plan):
-        artifact = original(catalog, unit, internal_plan)
+    def hostile_render(catalog, unit, internal_plan, profile):
+        artifact = original(catalog, unit, internal_plan, profile)
         _CATALOG_AUTHORITIES.retire(catalog)
         return artifact
 

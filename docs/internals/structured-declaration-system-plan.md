@@ -293,6 +293,7 @@ This phase has turned the validated registry into a static query boundary, resol
 This phase gives each host the smallest artifact that preserves the complete resolved contract required by its activation route.
 
 - [x] Render authenticated cumulative Markdown from live catalog records, with complete effective rule and procedure contracts and reviewed golden bytes.
+- [x] Add an explicit compact agent-instruction profile that preserves effective norms and rule-set framing, maps canonical identifiers to collision-checked host labels, and leaves evaluator metadata in queryable records.
 - [ ] Render the first compact structured procedure Skill under the [separate-directory contract](../adr/structured-procedure-skill-projection.md):
   - [x] Acquire locked UTF-8 support resources separately from declaration YAML and retain their verified carriers in the issued external result.
   - [x] Derive and authenticate the operation-owned resource closure from the resolved procedure and live catalog in the structured-Skill planner.
@@ -351,7 +352,7 @@ This phase gives each host the smallest artifact that preserves the complete res
   - [ ] Promote a reviewed release and restore the preceding release on failure.
 
 The shared revision and serialization slice, both private source observers, candidate assembly, sealed semantic validation, safe lock-file boundaries, and the public lock command are implemented and adversarially accepted. The packaged observer permits production issuance only inside the no-argument running-distribution bootstrap. The workspace observer reads only manifest-declared paths, completes every authoritative read before verification, and rebinds every source identity and carrier sequence to the original live workspace and manifest at consumption. Candidate assembly retains those observations, constructs the complete lock, serializes exact canonical bytes, parses those bytes again, and authenticates the complete relation before single-use consumption. The validation transaction repeats ordinary locked acquisition, builds the complete semantic registry, exposes no authority outside the transaction, and returns exact bytes only after retiring its candidate and receipt. The command then writes those bytes to standard output, checks an existing lock without repair, or creates an absent lock through verified no-replace publication. The typed comparator now reports deterministic changes across authenticated corpora without treating transport metadata as semantics. Git proof remains deferred to transport generalization. The workspace-only Oikos pilot can now use the reviewed Git commit-and-revert bridge. Eutaxis still must append and validate capsule records for the general release path.
-- [ ] Complete the query, cumulative Markdown, and compact Skill projections selected by the pilot.
+- [ ] Emit normalized query packets selected by the pilot; Eutaxis already emits cumulative Markdown and compact Skill outputs.
 - [ ] Pilot one coherent Oikos rule set and one procedure through the complete external-source path.
 - [ ] Convert additional sources only after the pilot passes.
 
