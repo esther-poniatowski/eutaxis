@@ -16,7 +16,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
@@ -118,11 +118,17 @@ class Registry:
             return removed
 
     @contextmanager
-    def transaction(self) -> Iterator[None]:
-        """Commit all registry mutations together or discard all of them."""
+    def transaction(self, *, externally_locked: bool = False) -> Iterator[None]:
+        """Commit all registry mutations together or discard all of them.
+
+        ``externally_locked`` is reserved for a transaction coordinator that
+        already holds :attr:`lock_path` continuously. Ordinary callers must
+        use the default so registry reads and writes remain serialized.
+        """
         if self._pending_records is not None:
             raise RuntimeError("Registry transaction is already active")
-        with self._locked():
+        lock = nullcontext() if externally_locked else self._locked()
+        with lock:
             records = self.load()
             self._pending_records = records
             try:
@@ -146,6 +152,13 @@ class Registry:
         finally:
             fcntl.flock(descriptor, fcntl.LOCK_UN)
             os.close(descriptor)
+
+    @contextmanager
+    def mutation_locked(self) -> Iterator[None]:
+        """Hold the deployment and registry locks in canonical order."""
+        with self.deployment_locked():
+            with self._locked():
+                yield
 
     def find(
         self,

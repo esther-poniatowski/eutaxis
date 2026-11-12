@@ -19,6 +19,7 @@ from eutaxis.commands import (
     install_artifact,
     install_artifacts,
     uninstall_command,
+    verify_artifact,
 )
 from eutaxis.declarations import plan_structured_skill, render_structured_skill
 from tests.test_structured_skill import _manifest, _pipeline, _procedure
@@ -109,6 +110,16 @@ def test_structured_skill_uses_shared_install_diff_and_removal(
         )[2]
         == ""
     )
+    assert (
+        verify_artifact(
+            artifact,
+            adapter,
+            scope="project",
+            project_root=project,
+            home=home,
+        )
+        == target
+    )
 
     contract = target / "references" / "contract.md"
     contract.write_text(
@@ -155,6 +166,41 @@ def test_structured_skill_uses_shared_install_diff_and_removal(
         )
         is None
     )
+
+
+@pytest.mark.parametrize("defect", ("missing", "corrupt"))
+def test_exact_artifact_verification_rejects_sidecar_defects(
+    tmp_path: Path,
+    defect: str,
+) -> None:
+    home = tmp_path / "home"
+    project = tmp_path / "project"
+    home.mkdir()
+    project.mkdir()
+    adapter, artifact = _rendered_skill(tmp_path / "source", "codex")
+    registry = Registry(home / ".eutaxis" / "state")
+    installed = install_artifact(
+        artifact,
+        adapter,
+        scope="project",
+        project_root=project,
+        home=home,
+        registry=registry,
+    )
+    sidecar = installed.path / ".eutaxis-owned.json"
+    if defect == "missing":
+        sidecar.unlink()
+    else:
+        sidecar.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(OwnershipError, match="tree differs"):
+        verify_artifact(
+            artifact,
+            adapter,
+            scope="project",
+            project_root=project,
+            home=home,
+        )
 
 
 def test_failed_structured_publication_restores_artifact_and_registry(
@@ -310,6 +356,33 @@ def test_structured_batch_install_rolls_back_finalized_state(
             home=home,
             project_root=project,
         ).exists()
+
+
+def test_structured_batch_install_composes_under_caller_owned_locks(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    project = tmp_path / "project"
+    home.mkdir()
+    project.mkdir()
+    batch = tuple(
+        (artifact, adapter)
+        for adapter, artifact in (
+            _rendered_skill(tmp_path / name, name) for name in ("claude", "codex")
+        )
+    )
+    registry = Registry(home / ".eutaxis" / "state")
+
+    with registry.mutation_locked():
+        install_artifacts(
+            batch,
+            project_root=project,
+            home=home,
+            registry=registry,
+            externally_locked=True,
+        )
+
+    assert len(registry.load()) == 2
 
 
 def test_structured_batch_install_rejects_a_repeated_target(

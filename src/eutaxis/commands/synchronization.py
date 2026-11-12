@@ -9,7 +9,7 @@ import os
 import shutil
 import tempfile
 from collections.abc import Callable, Collection, Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -346,11 +346,20 @@ def skill_write_transaction(
     registry: Registry,
     *,
     file_paths: Collection[Path] = (),
+    externally_locked: bool = False,
 ) -> Iterator[None]:
-    """Restore every target when one write in a managed set fails."""
+    """Restore every target when one write in a managed set fails.
+
+    ``externally_locked`` is reserved for a transaction coordinator that
+    already holds the deployment and registry locks continuously, in that
+    order. Ordinary callers must use the default.
+    """
     unique_paths = tuple(dict.fromkeys(Path(path) for path in paths))
     unique_files = tuple(dict.fromkeys(Path(path) for path in file_paths))
-    with registry.deployment_locked():
+    deployment_lock = (
+        nullcontext() if externally_locked else registry.deployment_locked()
+    )
+    with deployment_lock:
         _reject_aliased_or_overlapping_targets(unique_paths)
         with tempfile.TemporaryDirectory(prefix="eutaxis-skill-transaction-") as raw:
             scratch = Path(raw)
@@ -383,7 +392,7 @@ def skill_write_transaction(
                     )
                 )
             try:
-                with registry.transaction():
+                with registry.transaction(externally_locked=externally_locked):
                     yield
             except BaseException as primary:
                 cleanup_failures: list[str] = []

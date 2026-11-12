@@ -24,7 +24,7 @@ render_command
 assemble_skill
     ``SkillRenderInput × AgentAdapter`` -> ``RenderedArtifact``, without writes.
 install_artifact, install_artifacts, install_command, uninstall_command,
-diff_artifact, diff_command
+diff_artifact, diff_command, verify_artifact
     Filesystem-effecting operations guarded by ownership markers.
 skill_write_transaction
     Deployment lock and rollback boundary for a complete Skill write set.
@@ -57,6 +57,7 @@ from .installer import (
     install_command,
     is_eutaxis_owned,
     uninstall_command,
+    verify_artifact,
 )
 from .loader import load_from_instruction_config, load_sources
 from .models import (
@@ -108,6 +109,7 @@ __all__ = [
     "load_from_instruction_config",
     "load_sources",
     "measure_skill_budgets",
+    "verify_artifact",
     "plan_skill_sync",
     "register_adapter",
     "render_command",

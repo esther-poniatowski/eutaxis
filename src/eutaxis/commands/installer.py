@@ -62,9 +62,7 @@ def install_command(
     force: bool = False,
 ) -> InstallOutcome:
     """Render and write one skill artifact to its native location."""
-    rendered = render_command(
-        source, adapter, project_root=project_root, home=home
-    )
+    rendered = render_command(source, adapter, project_root=project_root, home=home)
     rendered = replace(rendered, scope=scope)
     return _install_artifact(
         rendered,
@@ -117,6 +115,7 @@ def install_artifacts(
     finalize: Callable[[], None] | None = None,
     rollback_files: Collection[Path] = (),
     force: bool = False,
+    externally_locked: bool = False,
 ) -> tuple[InstallOutcome, ...]:
     """Publish several rendered Skills as one failure-atomic write set.
 
@@ -139,6 +138,10 @@ def install_artifacts(
         fails.
     force
         Whether an existing non-Eutaxis directory may be replaced.
+    externally_locked
+        Whether a transaction coordinator already holds the deployment and
+        registry locks continuously, in canonical order. Ordinary callers
+        must use the default.
 
     Returns
     -------
@@ -180,6 +183,7 @@ def install_artifacts(
         targets,
         registry,
         file_paths=rollback_files,
+        externally_locked=externally_locked,
     ):
         for rendered, adapter in batch:
             outcomes.append(
@@ -281,9 +285,7 @@ def uninstall_command(
     force: bool = False,
 ) -> InstallOutcome:
     """Remove one artifact under the deployment lock with rollback."""
-    target_dir = adapter.artifact_dir(
-        name, scope, home=home, project_root=project_root
-    )
+    target_dir = adapter.artifact_dir(name, scope, home=home, project_root=project_root)
     from .synchronization import skill_write_transaction
 
     with skill_write_transaction((target_dir,), registry):
@@ -309,18 +311,14 @@ def _uninstall_command(
     force: bool = False,
 ) -> InstallOutcome:
     """Remove one artifact inside its caller's write transaction."""
-    target_dir = adapter.artifact_dir(
-        name, scope, home=home, project_root=project_root
-    )
+    target_dir = adapter.artifact_dir(name, scope, home=home, project_root=project_root)
 
     if target_dir.is_symlink():
         raise OwnershipError(
             f"Refusing to uninstall through symbolic-link target: {target_dir}."
         )
     if not target_dir.exists():
-        registry.remove(
-            name=name, adapter=adapter.name, scope=scope, path=target_dir
-        )
+        registry.remove(name=name, adapter=adapter.name, scope=scope, path=target_dir)
         return InstallOutcome(
             name=name,
             adapter=adapter.name,
@@ -338,9 +336,7 @@ def _uninstall_command(
 
     _remove_owned_files(target_dir, existing.owned_paths)
     _remove_dir_if_empty(target_dir)
-    registry.remove(
-        name=name, adapter=adapter.name, scope=scope, path=target_dir
-    )
+    registry.remove(name=name, adapter=adapter.name, scope=scope, path=target_dir)
     return InstallOutcome(
         name=name,
         adapter=adapter.name,
@@ -366,9 +362,7 @@ def diff_command(
     the render no longer produces, such as the file of a deleted rule, is
     reported as a removal.
     """
-    rendered = render_command(
-        source, adapter, project_root=project_root, home=home
-    )
+    rendered = render_command(source, adapter, project_root=project_root, home=home)
     rendered = replace(rendered, scope=scope)
     return diff_artifact(
         rendered,
@@ -391,9 +385,7 @@ def diff_artifact(
     target_dir = adapter.artifact_dir(
         rendered.name, scope, home=home, project_root=project_root
     )
-    validated_paths = _validated_artifact_paths(
-        rendered, adapter, scope, target_dir
-    )
+    validated_paths = _validated_artifact_paths(rendered, adapter, scope, target_dir)
 
     diff_chunks: list[str] = []
     rendered_files = {
@@ -404,7 +396,9 @@ def diff_artifact(
     paths = sorted(rendered_files)
     for rel in paths:
         rendered_content, on_disk_path = rendered_files[rel]
-        existing = on_disk_path.read_text(encoding="utf-8") if on_disk_path.is_file() else ""
+        existing = (
+            on_disk_path.read_text(encoding="utf-8") if on_disk_path.is_file() else ""
+        )
         chunk = "".join(
             difflib.unified_diff(
                 existing.splitlines(keepends=True),
@@ -427,6 +421,61 @@ def diff_artifact(
             )
         )
     return rendered, target_dir, "".join(diff_chunks)
+
+
+def verify_artifact(
+    rendered: RenderedArtifact,
+    adapter: AgentAdapter,
+    *,
+    scope: str,
+    project_root: Path,
+    home: Path,
+) -> Path:
+    """Require the installed artifact to equal the complete rendered tree.
+
+    Unlike :func:`diff_artifact`, this verification includes the ownership
+    sidecar and rejects extra entries, symbolic links, and mismatched file or
+    directory kinds. It returns the verified artifact directory.
+    """
+    target_dir = adapter.artifact_dir(
+        rendered.name, scope, home=home, project_root=project_root
+    )
+    validated = _validated_artifact_paths(rendered, adapter, scope, target_dir)
+    expected_files = {
+        artifact.relative_path: artifact.content.encode("utf-8", errors="strict")
+        for artifact, _path in validated
+    }
+    expected_directories = {
+        parent.as_posix()
+        for relative_path in expected_files
+        for parent in Path(relative_path).parents
+        if parent != Path(".")
+    }
+    if not target_dir.is_dir() or target_dir.is_symlink():
+        raise OwnershipError(
+            f"Installed artifact is not a regular directory: {target_dir}."
+        )
+    observed_files: dict[str, bytes] = {}
+    observed_directories: set[str] = set()
+    for path in target_dir.rglob("*"):
+        relative = path.relative_to(target_dir).as_posix()
+        if path.is_symlink():
+            raise OwnershipError(
+                f"Installed artifact contains a symbolic link: {path}."
+            )
+        if path.is_file():
+            observed_files[relative] = path.read_bytes()
+        elif path.is_dir():
+            observed_directories.add(relative)
+        else:
+            raise OwnershipError(
+                f"Installed artifact contains an unsupported entry: {path}."
+            )
+    if observed_files != expected_files or observed_directories != expected_directories:
+        raise OwnershipError(
+            f"Installed artifact tree differs from the rendered artifact: {target_dir}."
+        )
+    return target_dir
 
 
 def is_eutaxis_owned(target_dir: Path) -> bool:
@@ -546,9 +595,7 @@ def _read_existing(target_dir: Path) -> _ExistingArtifact:
 
     # Directory exists but neither marker is present.
     if any(target_dir.iterdir()):
-        return _ExistingArtifact(
-            eutaxis_owned=False, owned_paths=(), content_hash=None
-        )
+        return _ExistingArtifact(eutaxis_owned=False, owned_paths=(), content_hash=None)
     return _ExistingArtifact(eutaxis_owned=True, owned_paths=(), content_hash=None)
 
 
@@ -564,7 +611,7 @@ def _read_frontmatter_marker(skill_md: Path) -> str | None:
         stripped = line.strip()
         prefix = f"{OWNED_FRONTMATTER_KEY}:"
         if stripped.startswith(prefix):
-            return stripped[len(prefix):].strip().strip("'\"") or None
+            return stripped[len(prefix) :].strip().strip("'\"") or None
     return None
 
 
@@ -611,8 +658,7 @@ def _owned_path(
         or any(part in {"", ".", ".."} for part in rel.parts)
     ):
         raise OwnershipError(
-            f"Ownership sidecar at {source} contains unsafe path "
-            f"{relative_path!r}."
+            f"Ownership sidecar at {source} contains unsafe path " f"{relative_path!r}."
         )
     path = target_dir.joinpath(*rel.parts)
     root = target_dir.resolve()
@@ -677,9 +723,7 @@ def _validated_artifact_paths(
             f"{rendered.scope!r}, not {scope!r}."
         )
     if target_dir.is_symlink():
-        raise OwnershipError(
-            f"Refusing to access symbolic-link target: {target_dir}."
-        )
+        raise OwnershipError(f"Refusing to access symbolic-link target: {target_dir}.")
 
     validated: list[tuple[ArtifactFile, Path]] = []
     parts_by_path: dict[str, tuple[str, ...]] = {}
@@ -795,7 +839,7 @@ def _validate_rendered_sidecar(
         for line in frontmatter.group(1).splitlines():
             stripped = line.strip()
             if stripped.startswith(prefix):
-                marker = stripped[len(prefix):].strip().strip("'\"") or None
+                marker = stripped[len(prefix) :].strip().strip("'\"") or None
                 break
     if marker != rendered.content_hash:
         raise CommandRenderError(
