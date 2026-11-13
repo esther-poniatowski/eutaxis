@@ -22,13 +22,13 @@ resolve. They perform no I/O.
 
 ### *class* eutaxis.rule_query.catalog.LocatedRule(rule, path)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 A rule record and the file whose line numbers it carries.
 
 * **Parameters:**
   * **rule** ([*Rule*](instructions.md#eutaxis.instructions.rules.Rule))
-  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **path** (*Path*)
 
 <a id="eutaxis.rule_query.catalog.LocatedRule.rule"></a>
 
@@ -36,19 +36,19 @@ A rule record and the file whose line numbers it carries.
 
 <a id="eutaxis.rule_query.catalog.LocatedRule.path"></a>
 
-#### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
+#### path *: Path*
 
 <a id="eutaxis.rule_query.catalog.LocatedRejection"></a>
 
 ### *class* eutaxis.rule_query.catalog.LocatedRejection(rejection, path)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 A rejected label line and the file that holds it.
 
 * **Parameters:**
   * **rejection** ([*RejectedLabel*](instructions.md#eutaxis.instructions.rules.RejectedLabel))
-  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **path** (*Path*)
 
 <a id="eutaxis.rule_query.catalog.LocatedRejection.rejection"></a>
 
@@ -56,43 +56,43 @@ A rejected label line and the file that holds it.
 
 <a id="eutaxis.rule_query.catalog.LocatedRejection.path"></a>
 
-#### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
+#### path *: Path*
 
 <a id="eutaxis.rule_query.catalog.RuleCatalog"></a>
 
 ### *class* eutaxis.rule_query.catalog.RuleCatalog(origin, rules, rejected=(), hint='')
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 Rules collected from one source of modules.
 
 * **Parameters:**
-  * **origin** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **rules** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*LocatedRule*](#eutaxis.rule_query.catalog.LocatedRule) *,*  *...* *]*)
-  * **rejected** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*LocatedRejection*](#eutaxis.rule_query.catalog.LocatedRejection) *,*  *...* *]*)
-  * **hint** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **origin** (*str*)
+  * **rules** (*tuple* *[*[*LocatedRule*](#eutaxis.rule_query.catalog.LocatedRule) *,*  *...* *]*)
+  * **rejected** (*tuple* *[*[*LocatedRejection*](#eutaxis.rule_query.catalog.LocatedRejection) *,*  *...* *]*)
+  * **hint** (*str*)
 
 <a id="eutaxis.rule_query.catalog.RuleCatalog.origin"></a>
 
-#### origin *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### origin *: str*
 
 Description of the source, quoted in error messages.
 
 <a id="eutaxis.rule_query.catalog.RuleCatalog.rules"></a>
 
-#### rules *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[LocatedRule](#eutaxis.rule_query.catalog.LocatedRule), ...]*
+#### rules *: tuple[[LocatedRule](#eutaxis.rule_query.catalog.LocatedRule), ...]*
 
 Rules in module order, then source order.
 
 <a id="eutaxis.rule_query.catalog.RuleCatalog.rejected"></a>
 
-#### rejected *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[LocatedRejection](#eutaxis.rule_query.catalog.LocatedRejection), ...]* *= ()*
+#### rejected *: tuple[[LocatedRejection](#eutaxis.rule_query.catalog.LocatedRejection), ...]* *= ()*
 
 Label-shaped lines that the parser rejected.
 
 <a id="eutaxis.rule_query.catalog.RuleCatalog.hint"></a>
 
-#### hint *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= ''*
+#### hint *: str* *= ''*
 
 Advice appended to the message of an unknown label, such as the reason
 why a label may be absent from this source.
@@ -104,13 +104,13 @@ why a label may be absent from this source.
 Return the rules of `module`, or every rule when it is `None`.
 
 * **Parameters:**
-  **module** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+  **module** (*str* *|* *None*)
 * **Return type:**
-  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*LocatedRule*](#eutaxis.rule_query.catalog.LocatedRule), …]
+  tuple[[*LocatedRule*](#eutaxis.rule_query.catalog.LocatedRule), …]
 
 <a id="eutaxis.rule_query.catalog.RuleCatalog.modules"></a>
 
-#### *property* modules *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+#### *property* modules *: tuple[str, ...]*
 
 Names of the modules that hold at least one rule, in order.
 
@@ -122,8 +122,8 @@ Return the one rule labelled `label`.
 
 * **Parameters:**
   * **catalog** ([*RuleCatalog*](#eutaxis.rule_query.catalog.RuleCatalog)) – Rules to search.
-  * **label** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Requested label.
-  * **module** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* *optional*) – Module that must hold the rule; required when several modules
+  * **label** (*str*) – Requested label.
+  * **module** (*str* *,* *optional*) – Module that must hold the rule; required when several modules
     define the label.
 * **Raises:**
   * [**UnknownRuleError**](#eutaxis.rule_query.exceptions.UnknownRuleError) – When no rule carries the label. The message lists close labels,
@@ -144,9 +144,9 @@ Return the parts of `rule` whose key equals `part`.
       has.
 * **Parameters:**
   * **rule** ([*Rule*](instructions.md#eutaxis.instructions.rules.Rule))
-  * **part** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **part** (*str*)
 * **Return type:**
-  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*RulePart*](instructions.md#eutaxis.instructions.rules.RulePart), …]
+  tuple[[*RulePart*](instructions.md#eutaxis.instructions.rules.RulePart), …]
 
 ### Examples
 
@@ -225,7 +225,7 @@ Exceptions for the rule query.
 
 ### *exception* eutaxis.rule_query.exceptions.RuleQueryError
 
-Bases: [`Exception`](https://docs.python.org/3/builtins/exceptions.html#Exception)
+Bases: `Exception`
 
 Base exception for rule queries; every one is a usage error (exit status 2).
 

@@ -266,7 +266,7 @@ def test_configuration_declaring_its_identifier_loads(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert CONFIG_SCHEMA == "eutaxis:configuration@1"
+    assert CONFIG_SCHEMA == "eutaxis:configuration@2"
     assert [agent.name for agent in load_config(first).agents] == ["codex"]
     assert [agent.name for agent in load_config(later, root=project).agents] == [
         "codex"
@@ -282,13 +282,13 @@ def test_configuration_without_identifier_is_a_configuration_error(
         load_config(settings)
 
     assert "declares no key '_schema'" in str(excinfo.value)
-    assert "_schema: eutaxis:configuration@1" in str(excinfo.value)
+    assert "_schema: eutaxis:configuration@2" in str(excinfo.value)
 
 
 @pytest.mark.parametrize(
     "value",
     [
-        "eutaxis:configuration@2",
+        "eutaxis:configuration@3",
         "eutaxis:configuration@10",
         "ktisma:configuration@1",
         "eutaxis:skill-sync-manifest@1",
@@ -306,7 +306,7 @@ def test_configuration_with_other_identifier_is_a_configuration_error(
         load_config(settings)
 
     assert f"declares _schema: {value}" in str(excinfo.value)
-    assert "_schema: eutaxis:configuration@1" in str(excinfo.value)
+    assert "_schema: eutaxis:configuration@2" in str(excinfo.value)
 
 
 def test_generate_without_identifier_exits_2_naming_the_value(
@@ -318,7 +318,7 @@ def test_generate_without_identifier_exits_2_naming_the_value(
     result = CliRunner().invoke(app, ["generate", "--root", str(project)])
 
     assert result.exit_code == 2
-    assert "_schema: eutaxis:configuration@1" in result.stderr
+    assert "_schema: eutaxis:configuration@2" in result.stderr
     assert not (project / "AGENTS.md").exists()
 
 

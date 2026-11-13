@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import difflib
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, Iterator
+
+if TYPE_CHECKING:
+    from ..declarations import ResolvedCumulativeSource
 
 from .exceptions import (
     ConfigurationError,
+    DeclarationResolutionError,
     RejectedLabelError,
     SourceNotFoundError,
 )
@@ -20,8 +25,10 @@ from .instruction_budgets import (
 from .markdown import MarkdownAssembler
 from .models import (
     AgentConfig,
+    DeclarationSource,
     InstructionChain,
     InstructionConfig,
+    InstructionSource,
     ReferenceDoc,
     SourceFile,
     TaskModule,
@@ -40,6 +47,9 @@ class InstructionGenerator:
     ) -> None:
         self.config = config
         self.assembler = assembler or MarkdownAssembler()
+        self._declaration_source_cache: dict[
+            tuple[object, ...], ResolvedCumulativeSource
+        ] = {}
 
     def generate_all(
         self,
@@ -148,6 +158,130 @@ class InstructionGenerator:
             parsed = parse_module(path.read_text(encoding="utf-8"), module=path.stem)
             found.extend((path, rejection) for rejection in parsed.rejected)
         return found
+
+    def declaration_resolution_report(
+        self,
+        agent_name: str | None = None,
+    ) -> list[tuple[DeclarationSource, "ResolvedCumulativeSource"]]:
+        """Return structured sources used by the selected generated artifacts."""
+        selected_agents = self._selected_agents(agent_name)
+        standalone_index_selected = (
+            agent_name is None and self.render_standalone_rule_index() is not None
+        )
+        sources: list[DeclarationSource] = []
+        if selected_agents or standalone_index_selected:
+            sources.extend(
+                source
+                for source in self.config.common_sources
+                if isinstance(source, DeclarationSource)
+            )
+        sources.extend(
+            source
+            for agent in selected_agents
+            for source in agent.sources
+            if isinstance(source, DeclarationSource)
+        )
+        reports: list[tuple[DeclarationSource, ResolvedCumulativeSource]] = []
+        seen: set[tuple[object, ...]] = set()
+        for source in sources:
+            key = self._declaration_source_key(source)
+            if key in seen:
+                continue
+            seen.add(key)
+            reports.append((source, self._resolve_declaration_source(source)))
+        return reports
+
+    def _resolve_declaration_source(
+        self,
+        source: DeclarationSource,
+    ) -> "ResolvedCumulativeSource":
+        """Resolve one source once for rendering, comparison and reporting."""
+        from ..declarations import (
+            AcquisitionAuthorityError,
+            AcquisitionContractError,
+            ByteCarrierError,
+            CompositionError,
+            DeclarationError,
+            ExternalResolutionError,
+            FacetContextError,
+            FacetRegistryError,
+            resolve_external_cumulative_source_from_path,
+        )
+
+        key = self._declaration_source_key(source)
+        cached = self._declaration_source_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            resolved = resolve_external_cumulative_source_from_path(
+                str(self.config.root),
+                source.acquisition_manifest.as_posix(),
+                source.acquisition_lock.as_posix(),
+                source.composition_manifest,
+                source.context,
+            )
+        except FacetContextError as exc:
+            raise DeclarationResolutionError(
+                source.composition_manifest,
+                str(exc),
+                exit_code=2,
+            ) from exc
+        except ExternalResolutionError as exc:
+            raise DeclarationResolutionError(
+                source.composition_manifest,
+                str(exc),
+            ) from exc
+        except (AcquisitionAuthorityError, ByteCarrierError, OSError) as exc:
+            raise DeclarationResolutionError(
+                source.composition_manifest,
+                str(exc),
+                exit_code=2,
+            ) from exc
+        except (
+            AcquisitionContractError,
+            CompositionError,
+            DeclarationError,
+            FacetRegistryError,
+        ) as exc:
+            raise DeclarationResolutionError(
+                source.composition_manifest,
+                str(exc),
+            ) from exc
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            raise DeclarationResolutionError(
+                source.composition_manifest,
+                str(exc),
+                exit_code=2,
+            ) from exc
+        self._declaration_source_cache[key] = resolved
+        return resolved
+
+    @staticmethod
+    def _declaration_source_key(source: DeclarationSource) -> tuple[object, ...]:
+        """Return the immutable semantic identity of one configured source."""
+        return (
+            source.module,
+            source.acquisition_manifest,
+            source.acquisition_lock,
+            source.composition_manifest,
+            InstructionGenerator._json_key(source.context),
+        )
+
+    @staticmethod
+    def _json_key(value: object) -> object:
+        if isinstance(value, Mapping):
+            return tuple(
+                sorted(
+                    (
+                        str(key),
+                        InstructionGenerator._json_key(member),
+                    )
+                    for key, member in value.items()
+                )
+            )
+        if isinstance(value, tuple):
+            return tuple(InstructionGenerator._json_key(item) for item in value)
+        return (type(value), value)
 
     def enforce_rule_labels(self) -> None:
         """Raise when ``strict_rule_labels`` is set and a label line is rejected.
@@ -323,16 +457,26 @@ class InstructionGenerator:
     def _scan_rule_index_entries(
         self, target_dir: Path
     ) -> list[tuple[str, list[str]]]:
-        scan_paths: list[Path] = []
+        entries: list[tuple[str, list[str]]] = []
         for source in self.config.common_sources:
-            scan_paths.append(self.config.resolve(source.path))
+            if isinstance(source, DeclarationSource):
+                labels = self._label_pattern.findall(
+                    self._resolve_declaration_source(source).text
+                )
+                if labels:
+                    entries.append((source.module, labels))
+            else:
+                path = self.config.resolve(source.path)
+                labels = self._scan_labels(path)
+                if labels:
+                    entries.append((path.stem, labels))
+        scan_paths: list[Path] = []
         for module in self.config.task_modules:
             if module.path.is_absolute():
                 scan_paths.append(module.path)
             else:
                 scan_paths.append((target_dir / module.path).resolve())
 
-        entries: list[tuple[str, list[str]]] = []
         for path in scan_paths:
             labels = self._scan_labels(path)
             if labels:
@@ -368,7 +512,9 @@ class InstructionGenerator:
             f"  - GitHub (fallback): <{doc.github_url}>"
         )
 
-    def _load_source(self, source: SourceFile) -> str:
+    def _load_source(self, source: InstructionSource) -> str:
+        if isinstance(source, DeclarationSource):
+            return self._resolve_declaration_source(source).text
         source_path = self.config.resolve(source.path)
         if not source_path.is_file():
             raise SourceNotFoundError(source_path)

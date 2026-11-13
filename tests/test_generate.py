@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+import eutaxis.cli as cli_module
 from eutaxis.cli import app
 from eutaxis.generate import (
     ConfigurationError,
@@ -14,7 +15,9 @@ from eutaxis.generate import (
     SourceNotFoundError,
     load_config,
 )
-from eutaxis.instructions import RejectedLabelError
+from eutaxis.instructions import DeclarationResolutionError, RejectedLabelError
+from tests.test_external_acquisition import _write_contract
+from tests.test_external_resolution import MANIFEST, RULE, _context
 
 
 def test_load_config_supports_existing_agent_instructions_shape(tmp_path: Path) -> None:
@@ -804,6 +807,374 @@ def test_generate_plan_reports_drift_and_cumulative_budgets(tmp_path: Path) -> N
     assert "[CHAIN    ] codex-project" in result.output
     assert target.read_text(encoding="utf-8") == "# Rules\n\nOld.\n"
     assert index_target.read_text(encoding="utf-8") == "# Old index\n"
+    assert result.output.rstrip().endswith("[COMMAND  ] complete")
+
+
+def test_plan_and_check_report_resolved_records_and_completion(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    config = tmp_path / "eutaxis.yml"
+    context = _context()
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "common_sources:\n"
+        "  - declaration:\n"
+        "      module: purpose\n"
+        f"      acquisition_manifest: {manifest_path}\n"
+        f"      acquisition_lock: {lock_path}\n"
+        "      composition_manifest: resolution/manifest\n"
+        "      context:\n"
+        f"        context.available: {str(context['context.available']).lower()}\n"
+        f"        resolution.enabled: {str(context['resolution.enabled']).lower()}\n"
+        "agents:\n"
+        "  - name: codex\n"
+        "    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+
+    plan = runner.invoke(
+        app,
+        [
+            "generate",
+            "--root",
+            str(tmp_path),
+            "-c",
+            str(config),
+            "--dry-run",
+            "--plan",
+        ],
+    )
+
+    assert plan.exit_code == 0, plan.output
+    assert (
+        "[SELECT   ] purpose <= resolution/manifest [cumulative, project, "
+        "AGENTS.md, sha256:"
+        in plan.output
+    )
+    assert "  - resolution/purpose" in plan.output
+    assert "**purpose**:" in InstructionGenerator(load_config(config)).generate_all()[
+        "codex"
+    ]
+    assert plan.output.rstrip().endswith("[COMMAND  ] complete")
+    assert not (tmp_path / "AGENTS.md").exists()
+
+    generated = runner.invoke(
+        app,
+        ["generate", "--root", str(tmp_path), "-c", str(config)],
+    )
+    assert generated.exit_code == 0, generated.output
+    checked = runner.invoke(
+        app,
+        ["check", "--root", str(tmp_path), "-c", str(config)],
+    )
+
+    assert checked.exit_code == 0, checked.output
+    assert "  - resolution/purpose" in checked.output
+    assert checked.output.rstrip().endswith("[COMMAND  ] complete")
+
+
+def test_plan_reports_failed_command_without_selected_records(tmp_path: Path) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "common_sources:\n"
+        "  - declaration:\n"
+        "      module: purpose\n"
+        f"      acquisition_manifest: {manifest_path}\n"
+        f"      acquisition_lock: {lock_path}\n"
+        "      composition_manifest: resolution/manifest\n"
+        "      context:\n"
+        "        context.available: true\n"
+        "        resolution.enabled: false\n"
+        "agents:\n"
+        "  - name: codex\n"
+        "    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "generate",
+            "--root",
+            str(tmp_path),
+            "-c",
+            str(config),
+            "--dry-run",
+            "--plan",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Declaration resolution 'resolution/manifest' failed" in result.stderr
+    assert "[COMMAND  ] failed" in result.stderr
+    assert "[SELECT" not in result.output
+
+
+def test_version_one_rejects_declaration_sources(tmp_path: Path) -> None:
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@1\n"
+        "common_sources:\n"
+        "  - declaration:\n"
+        "      module: core\n"
+        "      acquisition_manifest: declarations/acquisition.yaml\n"
+        "      acquisition_lock: declarations/acquisition.lock.json\n"
+        "      composition_manifest: example/core\n"
+        "      context: {}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="configuration@2"):
+        load_config(config)
+
+
+@pytest.mark.parametrize(
+    "replacement, message",
+    [
+        ("      module: 3\n", "non-empty string"),
+        ("      acquisition_manifest: ../acquisition.yaml\n", "command root"),
+        ("      misspelled: true\n", "unknown fields"),
+    ],
+)
+def test_declaration_source_rejects_malformed_fields(
+    tmp_path: Path,
+    replacement: str,
+    message: str,
+) -> None:
+    config = tmp_path / "eutaxis.yml"
+    fields = (
+        "      module: core\n"
+        "      acquisition_manifest: declarations/acquisition.yaml\n"
+        "      acquisition_lock: declarations/acquisition.lock.json\n"
+        "      composition_manifest: example/core\n"
+        "      context: {}\n"
+    )
+    if "module:" in replacement:
+        fields = fields.replace("      module: core\n", replacement)
+    elif "acquisition_manifest:" in replacement:
+        fields = fields.replace(
+            "      acquisition_manifest: declarations/acquisition.yaml\n",
+            replacement,
+        )
+    else:
+        fields += replacement
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "common_sources:\n"
+        "  - declaration:\n"
+        + fields,
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match=message):
+        load_config(config)
+
+
+def test_unfiltered_report_excludes_sources_of_disabled_agents(tmp_path: Path) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n", encoding="utf-8")
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "common_sources: [rules.md]\n"
+        "agents:\n"
+        "  - name: enabled\n"
+        "    target: AGENTS.md\n"
+        "  - name: disabled\n"
+        "    enabled: false\n"
+        "    target: DISABLED.md\n"
+        "    sources:\n"
+        "      - declaration:\n"
+        "          module: hidden\n"
+        "          acquisition_manifest: absent.yaml\n"
+        "          acquisition_lock: absent.lock.json\n"
+        "          composition_manifest: hidden/manifest\n"
+        "          context: {}\n",
+        encoding="utf-8",
+    )
+
+    generator = InstructionGenerator(load_config(config))
+
+    assert generator.declaration_resolution_report() == []
+    assert generator.generate_all() == {"enabled": "# Rules\n"}
+
+
+def test_report_excludes_common_source_without_selected_artifact(
+    tmp_path: Path,
+) -> None:
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "common_sources:\n"
+        "  - declaration:\n"
+        "      module: unused\n"
+        "      acquisition_manifest: absent.yaml\n"
+        "      acquisition_lock: absent.lock.json\n"
+        "      composition_manifest: unused/manifest\n"
+        "      context: {}\n"
+        "agents: []\n",
+        encoding="utf-8",
+    )
+
+    generator = InstructionGenerator(load_config(config))
+
+    assert generator.declaration_resolution_report() == []
+
+
+def test_report_includes_common_source_used_by_standalone_rule_index(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "common_sources:\n"
+        "  - declaration:\n"
+        "      module: purpose\n"
+        f"      acquisition_manifest: {manifest_path}\n"
+        f"      acquisition_lock: {lock_path}\n"
+        "      composition_manifest: resolution/manifest\n"
+        "      context:\n"
+        "        context.available: true\n"
+        "        resolution.enabled: true\n"
+        "rule_index_enabled: true\n"
+        "rule_index_target:\n"
+        "  path: rule-index.md\n"
+        "agents: []\n",
+        encoding="utf-8",
+    )
+
+    generator = InstructionGenerator(load_config(config))
+
+    reports = generator.declaration_resolution_report()
+    assert len(reports) == 1
+    assert reports[0][1].selection.records == ("resolution/purpose",)
+    assert generator.render_standalone_rule_index() is not None
+
+
+def test_one_generator_binds_report_and_output_to_one_candidate(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "common_sources:\n"
+        "  - declaration:\n"
+        "      module: purpose\n"
+        f"      acquisition_manifest: {manifest_path}\n"
+        f"      acquisition_lock: {lock_path}\n"
+        "      composition_manifest: resolution/manifest\n"
+        "      context:\n"
+        "        context.available: true\n"
+        "        resolution.enabled: true\n"
+        "agents:\n"
+        "  - name: codex\n"
+        "    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+    generator = InstructionGenerator(load_config(config))
+    _source, resolved = generator.declaration_resolution_report()[0]
+    (tmp_path / "declarations" / "rule.yaml").write_text(
+        "changed after resolution\n", encoding="utf-8"
+    )
+
+    assert generator.generate_all()["codex"].encode() == resolved.content
+    with pytest.raises(DeclarationResolutionError):
+        InstructionGenerator(load_config(config)).generate_all()
+
+
+def test_plan_maps_operational_failure_to_failed_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n", encoding="utf-8")
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@1\n"
+        "common_sources: [rules.md]\n"
+        "agents:\n"
+        "  - name: codex\n"
+        "    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+
+    def fail_diff(_self: InstructionGenerator, _name: str) -> str:
+        raise OSError("planted diff failure")
+
+    monkeypatch.setattr(InstructionGenerator, "unified_diff", fail_diff)
+    result = CliRunner().invoke(
+        app,
+        ["generate", "-c", str(config), "--dry-run", "--plan"],
+    )
+
+    assert result.exit_code == 2
+    assert "planted diff failure" in result.stderr
+    assert "[COMMAND  ] failed" in result.stderr
+    assert "[COMMAND  ] complete" not in result.output
+
+
+def test_report_output_failure_uses_failed_diagnostic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "rules.md").write_text("# Rules\n", encoding="utf-8")
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@1\n"
+        "common_sources: [rules.md]\n"
+        "agents:\n"
+        "  - name: codex\n"
+        "    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+    diagnostics: list[str] = []
+
+    def fail_stdout(message: object = None, *, err: bool = False, **_kwargs) -> None:
+        if err:
+            diagnostics.append(str(message))
+            return
+        raise OSError("planted output failure")
+
+    monkeypatch.setattr(cli_module.typer, "echo", fail_stdout)
+    result = CliRunner().invoke(
+        app,
+        ["generate", "-c", str(config), "--dry-run", "--plan"],
+    )
+
+    assert result.exit_code == 2
+    assert diagnostics == ["Error: planted output failure", "[COMMAND  ] failed"]
 
 
 def test_check_fails_for_stale_standalone_rule_index(tmp_path: Path) -> None:
@@ -832,6 +1203,7 @@ def test_check_fails_for_stale_standalone_rule_index(tmp_path: Path) -> None:
     assert result.exit_code == 1
     assert "[OK      ] codex" in result.output
     assert "[OUTDATED] rule-index" in result.output
+    assert result.output.rstrip().endswith("[COMMAND  ] complete")
 
 
 def test_check_reports_current_standalone_rule_index(tmp_path: Path) -> None:

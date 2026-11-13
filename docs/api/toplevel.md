@@ -41,12 +41,12 @@ error. Under `strict_rule_labels`, such a line fails the command before
 any file is written.
 
 * **Parameters:**
-  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **agent** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **dry_run** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
-  * **plan** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
-  * **ignore_budget** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **config** (*str* *|* *None*)
+  * **root** (*str* *|* *None*)
+  * **agent** (*str* *|* *None*)
+  * **dry_run** (*bool*)
+  * **plan** (*bool*)
+  * **ignore_budget** (*bool*)
 * **Return type:**
   None
 
@@ -60,11 +60,11 @@ Rejected label lines are reported as by `generate`, and they fail the
 check under `strict_rule_labels`.
 
 * **Parameters:**
-  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **agent** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **diff** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
-  * **ignore_budget** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **config** (*str* *|* *None*)
+  * **root** (*str* *|* *None*)
+  * **agent** (*str* *|* *None*)
+  * **diff** (*bool*)
+  * **ignore_budget** (*bool*)
 * **Return type:**
   None
 
@@ -75,8 +75,8 @@ check under `strict_rule_labels`.
 List configured instruction outputs and their source counts.
 
 * **Parameters:**
-  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+  * **config** (*str* *|* *None*)
+  * **root** (*str* *|* *None*)
 * **Return type:**
   None
 
@@ -87,10 +87,10 @@ List configured instruction outputs and their source counts.
 Report instruction files that drift from the configured registry.
 
 * **Parameters:**
-  * **config** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **directory** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **register** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **config** (*str* *|* *None*)
+  * **root** (*str* *|* *None*)
+  * **directory** (*str* *|* *None*)
+  * **register** (*bool*)
 * **Return type:**
   None
 
@@ -101,7 +101,7 @@ Report instruction files that drift from the configured registry.
 Validate prompt family layouts and configs (planned).
 
 * **Parameters:**
-  **paths** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+  **paths** (*list* *[**str* *]*)
 * **Return type:**
   None
 
@@ -112,9 +112,9 @@ Validate prompt family layouts and configs (planned).
 Scaffold prompt-composition structure into a project.
 
 * **Parameters:**
-  * **root** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **template** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **force** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **root** (*str* *|* *None*)
+  * **template** (*str*)
+  * **force** (*bool*)
 * **Return type:**
   None
 
@@ -125,7 +125,7 @@ Scaffold prompt-composition structure into a project.
 Prompt composition framework.
 
 * **Parameters:**
-  **version** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  **version** (*bool*)
 * **Return type:**
   None
 
@@ -145,9 +145,9 @@ entry point is documented here; the re-exported classes appear under
 Compatibility entry point used by older `eutaxis generate` calls.
 
 * **Parameters:**
-  **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  **config_path** (*Path*)
 * **Return type:**
-  [int](https://docs.python.org/3/builtins/functions.html#int)
+  int
 
 <a id="module-eutaxis.validate"></a>
 
@@ -170,11 +170,11 @@ and assembly diagnostics are stabilized.
 Validate that the referenced prompt files exist.
 
 * **Parameters:**
-  **paths** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[**Path* *]*) – Prompt-related files or directories to validate.
+  **paths** (*list* *[**Path* *]*) – Prompt-related files or directories to validate.
 * **Returns:**
   List of validation error messages. Empty if all paths exist.
 * **Return type:**
-  [list](https://docs.python.org/3/builtins/stdtypes.html#list) of [str](https://docs.python.org/3/builtins/stdtypes.html#str)
+  list of str
 
 <a id="module-eutaxis.scaffold"></a>
 
@@ -188,7 +188,7 @@ Prompt scaffolding helpers.
 
 ### *exception* eutaxis.scaffold.ScaffoldError
 
-Bases: [`RuntimeError`](https://docs.python.org/3/builtins/exceptions.html#RuntimeError)
+Bases: `RuntimeError`
 
 Raised when a scaffold operation cannot be completed safely.
 
@@ -206,7 +206,7 @@ template, or an existing file that only `--force` may overwrite.
 Return the packaged template root.
 
 * **Return type:**
-  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
+  *Path*
 
 <a id="eutaxis.scaffold.available_templates"></a>
 
@@ -215,7 +215,7 @@ Return the packaged template root.
 Return available named scaffold template directories.
 
 * **Return type:**
-  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)]
+  list[str]
 
 <a id="eutaxis.scaffold.scaffold_workspace"></a>
 
@@ -227,7 +227,7 @@ Existing files are left untouched unless `force` is true.
 
 * **Parameters:**
   * **target** (*Path*) – Root of the target project.
-  * **template** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Name of the template directory under `eutaxis/data/templates`.
-  * **force** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool)) – Overwrite existing files when true.
+  * **template** (*str*) – Name of the template directory under `eutaxis/data/templates`.
+  * **force** (*bool*) – Overwrite existing files when true.
 * **Return type:**
-  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)]
+  list[*Path*]

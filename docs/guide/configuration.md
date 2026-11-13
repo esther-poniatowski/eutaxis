@@ -12,12 +12,13 @@ The `generate` command reads a YAML configuration file that declares shared sour
 ## Top-level keys
 
 ```yaml
-_schema: eutaxis:configuration@1 # required; the format of the file
+_schema: eutaxis:configuration@2 # required; the format of the file
 common_sources:                  # source entries shared across all agents
 task_modules:                    # source entries compiled to Skill artifacts
 task_modules_router_enabled:     # default true; set false to suppress the pointer section
 skill_entrypoint_max_bytes:      # optional byte limit checked by `skills budget`
-skill_loading_units:       # finite task-specific Skill reads and their limits
+skill_loading_units:             # finite task-specific Skill reads and their limits
+required_loading_routes:         # routes that must be published to named Skill owners
 instruction_chains:              # generated targets plus project instruction files
 strict_rule_labels:              # default false; set true to fail generate and check on a rejected label line
 agents:                          # cumulative-file targets
@@ -29,7 +30,7 @@ The `common_sources` list feeds the cumulative-file surface (`eutaxis generate`)
 
 ## Format identifier
 
-The key `_schema` declares the format of the file, and its value is `eutaxis:configuration@1`. The key is written first, so that a reader identifies the format before reading any other key. Eutaxis reads the key at any position, and compares its whole value with this identifier. A file that lacks the key, or that holds another value such as `eutaxis:configuration@2` or the identifier of another tool, is a configuration error: the command stops with status `2`, and the message names `_schema: eutaxis:configuration@1` as the value to write. The number after `@` rises only when a valid configuration file becomes invalid or is read differently.
+The key `_schema` declares the format of the file. The current value is `eutaxis:configuration@2`. Eutaxis still reads version 1 configurations, whose sources are Markdown files only. A declaration source requires version 2. Therefore, an older Eutaxis reader rejects the whole version 2 file instead of silently ignoring a structured source. A missing or unsupported identifier is a configuration error, and the message names version 2 as the current value.
 
 ## Source entries
 
@@ -53,6 +54,29 @@ Each entry in `common_sources` or an agent's `sources` list has the form:
 When `sections` is present, the generator extracts only the content under headings whose text matches exactly. Each extracted block runs from its heading to the next heading at the same or higher level. YAML frontmatter (`---` fences at the top of a file) is stripped before extraction.
 
 Missing source files abort generation. This prevents stale generated instruction files from silently omitting required modules.
+
+Version 2 also admits a declaration source at any position where a Markdown source is admitted:
+
+```yaml
+common_sources:
+  - declaration:
+      module: process-core
+      acquisition_manifest: declarations/acquisition.yaml
+      acquisition_lock: declarations/acquisition.lock.json
+      composition_manifest: example/global-instructions
+      context:
+        artifact.is-created-or-revised: true
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `module` | non-empty string | yes | Stable module name used by the rule index and plan report. |
+| `acquisition_manifest` | root-relative path | yes | Acquisition manifest for the locked corpus. |
+| `acquisition_lock` | root-relative path | yes | Lock matched to the acquisition manifest. |
+| `composition_manifest` | non-empty string | yes | Composition manifest resolved for this source. |
+| `context` | mapping of JSON values | yes | Complete typed applicability context supplied to semantic resolution. |
+
+The declaration source resolves and renders once per command. Its immutable candidate bytes then occupy that exact position in every applicable generated output. Plan and check use the same candidate for their content comparison and selection report. The report includes the candidate digest and the ordered final-effective record identifiers. A valid source with no effective records is reported explicitly. Excluded, inapplicable and inactive candidates remain available through `declarations explain`; they are not selected records in the artifact facade.
 
 ## Task module entries
 
@@ -107,6 +131,16 @@ skill_loading_units:
 Each `module` must match a task-module `id`. Each loading-unit `name` must match the lowercase slug grammar `[a-z][a-z0-9]*(-[a-z0-9]+)*`. Names must also be unique after case folding. The optional `rules` list selects files in `rules/` for that skill. The field `include_entrypoint` defaults to `true`. Set it to `false` only when a dependency selects a rule file directly. Such a dependency does not activate the Skill. The optional `includes` list composes other declared loading units. Eutaxis deduplicates files shared by several included units and rejects composition cycles.
 
 The optional `publish_to` field names the task module whose Skill owns a generated route manifest. A published unit must include that owner's entrypoint. Eutaxis adds one route index to the owner entrypoint. Eutaxis places the route and included batch manifests under `routes/`. The generated files link to the exact installed Skill files for the selected adapter. The owner's hash and budget cover them, while the drift and sync commands manage them. Publishing a loading unit does not add another native Skill entry.
+
+A consumer can use the optional `required_loading_routes` key to require Eutaxis to publish selected routes to named owners:
+
+```yaml
+required_loading_routes:
+  prose-route-field: prose-authoring-workflow
+  prose-route-section-markdown: prose-authoring-workflow
+```
+
+Each entry has two parts: a loading-unit name and its required owner. Eutaxis rejects the configuration when the unit is absent, unpublished, or published to another owner. For every adapter selected by a command, the required owner must also target that adapter. Eutaxis reports an incompatible adapter before writing any Skill. An owner excluded from an adapter still causes Eutaxis to skip an ordinary published route that is not required. The key generates no route. Instead, the `publish_to` field selects the owner and causes Eutaxis to generate the route. Thus, a consumer can require a delivery path without changing the graph that produces it.
 
 Use small loading units for tool-read batches and composite loading units for complete task routes. A batch limit prevents one tool response from truncating. A route limit constrains the full context activated by the task. The command `eutaxis skills budget -c <config> --agent <adapter>` reports every entrypoint, batch, and route. For a published route, the reported byte total includes its generated manifests. When several owners publish one batch, the batch limit covers the largest owner-specific manifest. The loading-unit diagnostic reports every owner variant. The command fails when bytes cross a declared limit or the rendered Skill lacks a named rule.
 
@@ -179,7 +213,7 @@ Parts are joined with double newlines. The output file ends with a single traili
 ## Full example
 
 ```yaml
-_schema: eutaxis:configuration@1
+_schema: eutaxis:configuration@2
 
 common_sources:
   - path: docs/instructions/style-rules.md
@@ -215,7 +249,7 @@ Running `eutaxis generate` with this config writes `.claude/CLAUDE.md` (the clau
 A global config can write an absolute target path while sourcing shared modules from a separate agent-config repository. The configuration below lies at `~/agent-config/config/tools/eutaxis.yml`, so its source paths resolve against `~/agent-config`:
 
 ```yaml
-_schema: eutaxis:configuration@1
+_schema: eutaxis:configuration@2
 
 common_sources:
   - modules/global/file-authority.md

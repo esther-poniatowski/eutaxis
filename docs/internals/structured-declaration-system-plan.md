@@ -302,11 +302,12 @@ This phase gives each host the smallest artifact that preserves the complete res
   - [x] Reject entrypoint and complete-artifact budget overflow during rendering.
   - [x] Preserve cumulative Markdown as a single-file projection.
   - [x] Publish all rendered host artifacts through one failure-atomic transaction that rejects aliased or nested targets and rolls back registry and finalized state changes.
-  - [ ] Activate the Oikos batch procedure only after cross-agent golden, rollback and adversarial gates pass.
+  - [x] Activate the Oikos batch procedure after cross-agent golden, rollback and adversarial gates pass.
 - [ ] Generalize compact Skill entrypoints from the first procedure consumer to other catalog records only after a second use case exposes the required variation.
-- [ ] Emit normalized YAML or JSON query packets with context, trace, registry versions, hashes, and source revisions.
+- [x] Emit normalized JSON query packets with context, trace, registry versions, hashes, source revisions, selection outcomes, and explicit successful completion.
 - [ ] Bundle rendered fallbacks for Skills whose deployment cannot guarantee catalog access.
-- [ ] Extend `plan`, `check`, and `explain` with resolution and completion evidence.
+- [x] Add `declarations explain` to emit authenticated successful packets and closed failed-resolution diagnostics.
+- [x] Make the existing `plan` and `check` facades report selected records and final command state.
 
 **Exit evidence:** existing Markdown consumers receive reviewable golden artifacts; query consumers retrieve bounded packets without direct source access.
 
@@ -352,7 +353,7 @@ This phase gives each host the smallest artifact that preserves the complete res
   - [ ] Promote a reviewed release and restore the preceding release on failure.
 
 The shared revision and serialization slice, both private source observers, candidate assembly, sealed semantic validation, safe lock-file boundaries, and the public lock command are implemented and adversarially accepted. The packaged observer permits production issuance only inside the no-argument running-distribution bootstrap. The workspace observer reads only manifest-declared paths, completes every authoritative read before verification, and rebinds every source identity and carrier sequence to the original live workspace and manifest at consumption. Candidate assembly retains those observations, constructs the complete lock, serializes exact canonical bytes, parses those bytes again, and authenticates the complete relation before single-use consumption. The validation transaction repeats ordinary locked acquisition, builds the complete semantic registry, exposes no authority outside the transaction, and returns exact bytes only after retiring its candidate and receipt. The command then writes those bytes to standard output, checks an existing lock without repair, or creates an absent lock through verified no-replace publication. The typed comparator now reports deterministic changes across authenticated corpora without treating transport metadata as semantics. Git proof remains deferred to transport generalization. The workspace-only Oikos pilot can now use the reviewed Git commit-and-revert bridge. Eutaxis still must append and validate capsule records for the general release path.
-- [ ] Emit normalized query packets selected by the pilot; Eutaxis already emits cumulative Markdown and compact Skill outputs.
+- [x] Emit normalized query packets selected by the pilot; the generic packet is validated against the Oikos process-core declarations.
 - [ ] Pilot one coherent Oikos rule set and one procedure through the complete external-source path.
 - [ ] Convert additional sources only after the pilot passes.
 

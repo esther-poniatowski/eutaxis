@@ -5,12 +5,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from .exceptions import ConfigurationError
-from .models import SkillLoadingMember, SkillLoadingUnit
+from .models import RequiredLoadingRoute, SkillLoadingMember, SkillLoadingUnit
 
 
 def validate_loading_units(
     loading_units: Iterable[SkillLoadingUnit],
     module_ids: Iterable[str],
+    required_routes: Iterable[RequiredLoadingRoute] = (),
 ) -> None:
     """Reject loading units that name unknown modules or form cycles."""
     units = tuple(loading_units)
@@ -71,6 +72,19 @@ def validate_loading_units(
             raise ConfigurationError(
                 f"Skill loading unit '{unit.name}' must include the entrypoint "
                 f"of its publication owner '{unit.publish_to}'"
+            )
+
+    for requirement in required_routes:
+        required_unit = units_by_name.get(requirement.name)
+        if required_unit is None:
+            raise ConfigurationError(
+                f"Required loading route '{requirement.name}' is not declared"
+            )
+        if required_unit.publish_to != requirement.owner:
+            actual = required_unit.publish_to or "unpublished"
+            raise ConfigurationError(
+                f"Required loading route '{requirement.name}' must publish to "
+                f"'{requirement.owner}', not '{actual}'"
             )
 
 

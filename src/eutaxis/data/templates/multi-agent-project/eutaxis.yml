@@ -1,4 +1,4 @@
-_schema: eutaxis:configuration@1
+_schema: eutaxis:configuration@2
 
 common_sources:
   - docs/instructions/project-overview.md

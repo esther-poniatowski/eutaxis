@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eutaxis.dev/schemas/query-packet-v1.schema.json",
+  "title": "Eutaxis query packet version 1",
+  "type": "object",
+  "required": [
+    "_schema",
+    "completion",
+    "manifest",
+    "context",
+    "acquisition-schema-version",
+    "catalog-index-revision",
+    "facet-registry",
+    "source-revisions",
+    "sources",
+    "resources",
+    "declarations",
+    "controls",
+    "contracts",
+    "decisions",
+    "unit",
+    "selections",
+    "trace"
+  ],
+  "properties": {
+    "_schema": {"const": "eutaxis:query-packet@1"},
+    "completion": {"const": "complete"},
+    "manifest": {"$ref": "#/$defs/id"},
+    "context": {"type": "object"},
+    "acquisition-schema-version": {"const": 1},
+    "catalog-index-revision": {"const": 2},
+    "facet-registry": {
+      "type": "object",
+      "required": ["id", "schema-version", "content-revision"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "schema-version": {"const": 1},
+        "content-revision": {"$ref": "#/$defs/revision"}
+      },
+      "additionalProperties": false
+    },
+    "source-revisions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/source-revision"}
+    },
+    "sources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/acquired-source"}
+    },
+    "resources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/resource"}
+    },
+    "declarations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/declaration-record"}
+    },
+    "controls": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/declaration-record"}
+    },
+    "contracts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/contract-record"}
+    },
+    "decisions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/declaration-record"}
+    },
+    "unit": {"$ref": "#/$defs/unit"},
+    "selections": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/selection"}
+    },
+    "trace": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/event"}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "pattern": "^(?!.*\\s)[\\s\\S]+$"},
+    "revision": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "document-path": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"type": "string"},
+          {"type": "integer", "minimum": 0}
+        ]
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["namespace", "path", "sha256"],
+      "properties": {
+        "namespace": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "acquired-source": {
+      "type": "object",
+      "required": ["namespace", "path", "sha256", "records"],
+      "properties": {
+        "namespace": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "records": {"type": "array", "items": {"$ref": "#/$defs/source-record-entry"}}
+      },
+      "additionalProperties": false
+    },
+    "source-record-entry": {
+      "type": "object",
+      "required": ["id", "kind", "source-revision", "document-path", "content-digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "minLength": 1},
+        "source-revision": {"type": "string", "minLength": 1},
+        "version": {"type": "integer", "minimum": 1},
+        "document-path": {"$ref": "#/$defs/document-path"},
+        "content-digest": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "source-revision": {
+      "type": "object",
+      "required": ["role", "namespace", "kind", "content-revision"],
+      "properties": {
+        "role": {"enum": ["facet-base", "facet-extension", "declaration-source"]},
+        "namespace": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "content-revision": {"$ref": "#/$defs/revision"}
+      },
+      "additionalProperties": false
+    },
+    "resource": {
+      "type": "object",
+      "required": ["namespace", "id", "path", "media-type", "sha256", "text"],
+      "properties": {
+        "namespace": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/id"},
+        "path": {"type": "string", "minLength": 1},
+        "media-type": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "text": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "record-source": {
+      "type": "object",
+      "required": ["namespace", "path", "sha256", "document-path"],
+      "properties": {
+        "namespace": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "document-path": {"$ref": "#/$defs/document-path"}
+      },
+      "additionalProperties": false
+    },
+    "effective-rule": {
+      "type": "object",
+      "required": ["norms", "criteria"],
+      "properties": {
+        "norms": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "criteria": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      },
+      "additionalProperties": false
+    },
+    "declaration-record": {
+      "type": "object",
+      "required": ["id", "kind", "source-revision", "source", "document", "record-digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"type": "string", "minLength": 1},
+        "source-revision": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/$defs/record-source"},
+        "document": {"type": "object"},
+        "effective-rule": {"$ref": "#/$defs/effective-rule"},
+        "version": {"type": "integer", "minimum": 1},
+        "record-digest": {"$ref": "#/$defs/digest"}
+      },
+      "additionalProperties": false
+    },
+    "contract-record": {
+      "allOf": [
+        {"$ref": "#/$defs/declaration-record"},
+        {
+          "type": "object",
+          "required": ["version"],
+          "properties": {"version": {"type": "integer", "minimum": 1}}
+        }
+      ]
+    },
+    "component": {
+      "type": "object",
+      "required": ["section", "declaration", "rank"],
+      "properties": {
+        "section": {"type": "string", "minLength": 1},
+        "declaration": {"$ref": "#/$defs/id"},
+        "rank": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "dependency": {
+      "type": "object",
+      "required": ["prerequisite", "dependant"],
+      "properties": {
+        "prerequisite": {"$ref": "#/$defs/id"},
+        "dependant": {"$ref": "#/$defs/id"}
+      },
+      "additionalProperties": false
+    },
+    "rule-projection": {
+      "type": "object",
+      "required": ["declaration", "norms", "criteria"],
+      "properties": {
+        "declaration": {"$ref": "#/$defs/id"},
+        "norms": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "criteria": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      },
+      "additionalProperties": false
+    },
+    "unit": {
+      "type": "object",
+      "required": ["components", "dependencies", "rule-projections"],
+      "properties": {
+        "components": {"type": "array", "items": {"$ref": "#/$defs/component"}},
+        "dependencies": {"type": "array", "items": {"$ref": "#/$defs/dependency"}},
+        "rule-projections": {"type": "array", "items": {"$ref": "#/$defs/rule-projection"}}
+      },
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "required": ["declaration", "outcome", "source-revision", "source", "reason-events"],
+      "properties": {
+        "declaration": {"$ref": "#/$defs/id"},
+        "outcome": {"enum": ["effective", "excluded", "inapplicable", "inactive"]},
+        "source-revision": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/$defs/source"},
+        "reason-events": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}}
+      },
+      "additionalProperties": false
+    },
+    "anchor": {
+      "type": "object",
+      "required": ["section", "rank"],
+      "properties": {
+        "section": {"type": "string", "minLength": 1},
+        "rank": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "applicability": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["predicate-path", "operator", "facet", "result", "observed-present", "observed", "expected"],
+          "properties": {
+            "predicate-path": {"$ref": "#/$defs/document-path"},
+            "operator": {"enum": ["exists", "equals", "in"]},
+            "facet": {"type": "string", "minLength": 1},
+            "result": {"enum": ["true", "false", "unknown"]},
+            "observed-present": {"type": "boolean"},
+            "observed": {},
+            "expected": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["predicate-path", "operator", "result", "children"],
+          "properties": {
+            "predicate-path": {"$ref": "#/$defs/document-path"},
+            "operator": {"enum": ["all", "any", "not"]},
+            "result": {"enum": ["true", "false", "unknown"]},
+            "children": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/applicability"}}
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "required": ["ordinal", "kind", "declaration", "source", "causes"],
+      "properties": {
+        "ordinal": {"type": "integer", "minimum": 0},
+        "kind": {
+          "enum": [
+            "manifest-evaluated",
+            "manifest-selected",
+            "rule-set-member-expanded",
+            "rule-set-member-inactive",
+            "dependency-discovered",
+            "policy-result-discovered",
+            "declaration-evaluated",
+            "conflict-detected",
+            "policy-evaluated",
+            "conflict-resolved",
+            "declaration-excluded",
+            "alias-created",
+            "declaration-effective",
+            "norm-evaluated",
+            "exception-evaluated",
+            "norm-removed",
+            "norm-substituted",
+            "norm-effective",
+            "criterion-effective",
+            "criterion-inactive",
+            "unit-issued"
+          ]
+        },
+        "declaration": {"$ref": "#/$defs/id"},
+        "source": {"$ref": "#/$defs/record-source"},
+        "causes": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "anchor": {"$ref": "#/$defs/anchor"},
+        "relation": {"type": "string", "minLength": 1},
+        "dependant": {"$ref": "#/$defs/id"},
+        "policy": {"$ref": "#/$defs/id"},
+        "exception": {"type": "string", "minLength": 1},
+        "norm": {"type": "string", "minLength": 1},
+        "criterion": {"type": "string", "minLength": 1},
+        "conflict": {"type": "array", "prefixItems": [{"$ref": "#/$defs/id"}, {"$ref": "#/$defs/id"}], "items": false},
+        "replacement": {"$ref": "#/$defs/id"},
+        "truth": {"enum": ["true", "false", "unknown"]},
+        "applicability": {"$ref": "#/$defs/applicability"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

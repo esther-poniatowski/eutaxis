@@ -15,7 +15,7 @@
 # Wrap as a Jinja template (`.yml.j2`) only if the consumer also runs a
 # machine-inventory rendering pass before invoking `eutaxis generate`.
 
-_schema: eutaxis:configuration@1
+_schema: eutaxis:configuration@2
 
 common_sources:
   # Instruction modules always loaded for every task. Replace the entries below.

@@ -71,3 +71,14 @@ class InstructionChainBudgetExceededError(InstructionError):
         self.chain_name = chain_name
         self.size = size
         self.limit = limit
+
+
+class DeclarationResolutionError(InstructionError):
+    """Report a structured artifact that plan or check could not resolve."""
+
+    exit_code = 1
+
+    def __init__(self, manifest: str, detail: str, *, exit_code: int = 1) -> None:
+        super().__init__(f"Declaration resolution {manifest!r} failed: {detail}")
+        self.manifest = manifest
+        self.exit_code = exit_code

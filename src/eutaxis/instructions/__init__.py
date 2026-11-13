@@ -14,6 +14,7 @@ from .config import (
 from .exceptions import (
     BudgetExceededError,
     ConfigurationError,
+    DeclarationResolutionError,
     InstructionChainBudgetExceededError,
     InstructionError,
     RejectedLabelError,
@@ -23,6 +24,7 @@ from .generator import InstructionGenerator
 from .markdown import MarkdownAssembler, parse_frontmatter
 from .models import (
     AgentConfig,
+    DeclarationSource,
     InstructionChain,
     InstructionConfig,
     ReferenceDoc,
@@ -60,6 +62,8 @@ __all__ = [
     "BudgetExceededError",
     "ConfigLoader",
     "ConfigurationError",
+    "DeclarationSource",
+    "DeclarationResolutionError",
     "InstructionConfig",
     "InstructionChain",
     "InstructionChainBudgetExceededError",

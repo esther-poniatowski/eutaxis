@@ -60,4 +60,4 @@ def test_scaffolded_configuration_declares_its_format_first(
     raw = yaml.safe_load((tmp_path / "eutaxis.yml").read_text(encoding="utf-8"))
 
     assert list(raw)[0] == "_schema"
-    assert raw["_schema"] == "eutaxis:configuration@1"
+    assert raw["_schema"] == "eutaxis:configuration@2"

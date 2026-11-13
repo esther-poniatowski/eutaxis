@@ -62,6 +62,15 @@ def prepare_published_loading_units(
         return sources, ()
 
     by_module = sources_by_module(config, sources)
+    for adapter in adapters:
+        for requirement in config.required_loading_routes:
+            required_owner = by_module[requirement.owner]
+            if not required_owner.targets.admits(adapter.name):
+                raise CommandRenderError(
+                    f"Required loading route '{requirement.name}' cannot publish "
+                    f"to '{requirement.owner}' for adapter '{adapter.name}': "
+                    "the owner does not target that adapter"
+                )
     indexed = _append_route_indexes(by_module, published)
     generated_by_owner: dict[tuple[str, str], dict[str, str]] = {}
     publications: list[LoadingUnitPublication] = []

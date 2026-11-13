@@ -1003,6 +1003,134 @@ def test_publication_owner_must_exist_inside_the_route(
         load_config(config)
 
 
+@pytest.mark.parametrize(
+    "mutation, message",
+    (
+        (
+            lambda payload: payload.update(
+                required_loading_routes={"missing-route": "workflow"}
+            ),
+            "is not declared",
+        ),
+        (
+            lambda payload: (
+                payload["skill_loading_units"][2].pop("publish_to"),
+                payload.update(
+                    required_loading_routes={"section-route": "workflow"}
+                ),
+            ),
+            "not 'unpublished'",
+        ),
+        (
+            lambda payload: payload.update(
+                required_loading_routes={"section-route": "style"}
+            ),
+            "not 'workflow'",
+        ),
+    ),
+)
+def test_required_loading_route_must_be_published_to_declared_owner(
+    tmp_path: Path, mutation, message: str
+) -> None:
+    config = _workspace(tmp_path)
+    payload = yaml.safe_load(config.read_text(encoding="utf-8"))
+    mutation(payload)
+    config.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match=message):
+        load_config(config)
+
+
+def test_required_loading_routes_must_be_a_mapping(tmp_path: Path) -> None:
+    config = _workspace(tmp_path)
+    payload = yaml.safe_load(config.read_text(encoding="utf-8"))
+    payload["required_loading_routes"] = ["section-route"]
+    config.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="must be a mapping"):
+        load_config(config)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ("budget", "--agent", "codex"),
+        ("diff", "workflow"),
+    ),
+)
+def test_skill_checks_reject_an_unpublished_required_route(
+    tmp_path: Path, arguments: tuple[str, ...]
+) -> None:
+    config = _workspace(tmp_path)
+    payload = yaml.safe_load(config.read_text(encoding="utf-8"))
+    payload["skill_loading_units"][2].pop("publish_to")
+    payload["required_loading_routes"] = {"section-route": "workflow"}
+    config.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    home = tmp_path / "home"
+    home.mkdir()
+
+    result = _run(home, *arguments, "-c", str(config))
+
+    assert result.exit_code != 0
+    assert "must publish to 'workflow', not 'unpublished'" in result.output
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ("budget", "--agent", "codex"),
+        ("diff", "workflow", "--agent", "codex"),
+        ("loading-unit", "list", "--agent", "codex"),
+    ),
+)
+def test_skill_checks_reject_a_required_owner_excluded_from_adapter(
+    tmp_path: Path, arguments: tuple[str, ...]
+) -> None:
+    config = _workspace(tmp_path)
+    payload = yaml.safe_load(config.read_text(encoding="utf-8"))
+    payload["required_loading_routes"] = {"section-route": "workflow"}
+    config.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    _write_module(
+        tmp_path / "instructions" / "workflow.md",
+        name="workflow",
+        rule="workflow-rule",
+        targets="{include: [claude]}",
+    )
+    home = tmp_path / "home"
+    home.mkdir()
+
+    result = _run(home, *arguments, "-c", str(config))
+
+    assert result.exit_code == 2
+    assert "the owner does not target that adapter" in result.output
+    assert not (home / ".agents").exists()
+    assert not (home / ".claude").exists()
+
+
+def test_all_agent_sync_rejects_an_excluded_required_owner_before_writes(
+    tmp_path: Path,
+) -> None:
+    config = _workspace(tmp_path)
+    payload = yaml.safe_load(config.read_text(encoding="utf-8"))
+    payload["required_loading_routes"] = {"section-route": "workflow"}
+    config.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    _write_module(
+        tmp_path / "instructions" / "workflow.md",
+        name="workflow",
+        rule="workflow-rule",
+        targets="{include: [claude]}",
+    )
+    home = tmp_path / "home"
+    home.mkdir()
+
+    result = _run(home, "sync", "-c", str(config), "--agent", "all", "--apply")
+
+    assert result.exit_code == 2
+    assert "the owner does not target that adapter" in result.output
+    assert not (home / ".agents").exists()
+    assert not (home / ".claude").exists()
+
+
 def test_publication_fails_before_writing_when_a_member_excludes_the_adapter(
     tmp_path: Path,
 ) -> None:

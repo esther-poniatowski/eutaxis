@@ -16,12 +16,13 @@ Configuration loading for instruction-file assembly.
 
 ### *class* eutaxis.instructions.config.ConfigLoader(config_path, root=None)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 Load and validate instruction assembly configuration.
 
-The configuration file declares its format in the key `_schema`, whose
-value must equal `CONFIG_SCHEMA` as a whole string. The relative paths of
+The configuration file declares its format in the key `_schema`. Version
+1 admits Markdown sources; version 2 also admits structured declaration
+sources. The relative paths of
 the configuration file resolve against `root`, or, when `root` is
 absent, against `settings_root(config_path)`. The retired key `root` is
 rejected.
@@ -51,15 +52,27 @@ File name of the configuration file of Eutaxis.
 
 Key that declares the format of the configuration file.
 
+<a id="eutaxis.instructions.config.CONFIG_SCHEMA_V1"></a>
+
+### eutaxis.instructions.config.CONFIG_SCHEMA_V1 *= 'eutaxis:configuration@1'*
+
+Legacy format identifier for Markdown-only instruction sources.
+
 <a id="eutaxis.instructions.config.CONFIG_SCHEMA"></a>
 
-### eutaxis.instructions.config.CONFIG_SCHEMA *= 'eutaxis:configuration@1'*
+### eutaxis.instructions.config.CONFIG_SCHEMA *= 'eutaxis:configuration@2'*
 
-Format identifier that the configuration file declares in `_schema`.
+Current format identifier, including structured declaration sources.
+
+<a id="eutaxis.instructions.config.CONFIG_SCHEMAS"></a>
+
+### eutaxis.instructions.config.CONFIG_SCHEMAS *= frozenset({'eutaxis:configuration@1', 'eutaxis:configuration@2'})*
+
+Configuration formats admitted by this reader.
 
 <a id="eutaxis.instructions.config.CONFIG_SEARCH_PATHS"></a>
 
-### eutaxis.instructions.config.CONFIG_SEARCH_PATHS *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path), ...]* *= (PosixPath('config/tools/eutaxis.yml'), PosixPath('eutaxis.yml'))*
+### eutaxis.instructions.config.CONFIG_SEARCH_PATHS *: tuple[Path, ...]* *= (PosixPath('config/tools/eutaxis.yml'), PosixPath('eutaxis.yml'))*
 
 Places of the configuration file below the root. At most one of them may exist.
 
@@ -86,7 +99,7 @@ The sources are tried in this order:
 * **Parameters:**
   * **root** (*Path* *,* *optional*) – Root given on the command line, relative to the current folder.
   * **cwd** (*Path* *,* *optional*) – Current folder. Default: the working directory of the process.
-  * **environ** (*Mapping* *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *,* *optional*) – Environment variables. Default: `os.environ`.
+  * **environ** (*Mapping* *[**str* *,* *str* *]* *,* *optional*) – Environment variables. Default: `os.environ`.
 * **Returns:**
   Absolute root folder.
 * **Return type:**
@@ -104,9 +117,9 @@ when its caller gives none; the command line always passes the root
 that `resolve_root` returns.
 
 * **Parameters:**
-  **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  **config_path** (*Path*)
 * **Return type:**
-  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
+  *Path*
 
 <a id="eutaxis.instructions.config.find_config"></a>
 
@@ -154,7 +167,7 @@ Instruction-file generation and stale-output checks.
 
 ### *class* eutaxis.instructions.generator.InstructionGenerator(config, assembler=None)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 Generate, write and compare instruction outputs.
 
@@ -169,10 +182,10 @@ Generate, write and compare instruction outputs.
 Generate content for enabled outputs.
 
 * **Parameters:**
-  * **agent_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **enforce_budget** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **agent_name** (*str* *|* *None*)
+  * **enforce_budget** (*bool*)
 * **Return type:**
-  [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [str](https://docs.python.org/3/builtins/stdtypes.html#str)]
+  dict[str, str]
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.generate_for_agent"></a>
 
@@ -183,7 +196,7 @@ Generate content for one output.
 * **Parameters:**
   **agent** ([*AgentConfig*](#eutaxis.instructions.models.AgentConfig))
 * **Return type:**
-  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
+  str
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.write_all"></a>
 
@@ -196,11 +209,11 @@ Write selected outputs and return their paths.
         module holds a rejected label line. Nothing is written.
   * [**BudgetExceededError**](#eutaxis.instructions.exceptions.BudgetExceededError) – When `enforce_budget` is set and an output exceeds its budget.
 * **Parameters:**
-  * **agent_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
-  * **dry_run** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
-  * **enforce_budget** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **agent_name** (*str* *|* *None*)
+  * **dry_run** (*bool*)
+  * **enforce_budget** (*bool*)
 * **Return type:**
-  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)]
+  list[*Path*]
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.rejected_labels"></a>
 
@@ -216,7 +229,18 @@ declared module missing on disk is skipped here; generation reports
 it.
 
 * **Return type:**
-  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [*RejectedLabel*](#eutaxis.instructions.rules.RejectedLabel)]]
+  list[tuple[*Path*, [*RejectedLabel*](#eutaxis.instructions.rules.RejectedLabel)]]
+
+<a id="eutaxis.instructions.generator.InstructionGenerator.declaration_resolution_report"></a>
+
+#### declaration_resolution_report(agent_name=None)
+
+Return structured sources used by the selected generated artifacts.
+
+* **Parameters:**
+  **agent_name** (*str* *|* *None*)
+* **Return type:**
+  list[tuple[[DeclarationSource](#eutaxis.instructions.models.DeclarationSource), ‘ResolvedCumulativeSource’]]
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.enforce_rule_labels"></a>
 
@@ -236,9 +260,9 @@ Raise when `strict_rule_labels` is set and a label line is rejected.
 Yield whether each selected output differs from generated content.
 
 * **Parameters:**
-  **agent_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+  **agent_name** (*str* *|* *None*)
 * **Return type:**
-  [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[[tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig), [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [bool](https://docs.python.org/3/builtins/functions.html#bool)]]
+  *Iterator*[tuple[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig), *Path*, bool]]
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.unified_diff"></a>
 
@@ -247,9 +271,9 @@ Yield whether each selected output differs from generated content.
 Return a unified diff for one output.
 
 * **Parameters:**
-  **agent_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  **agent_name** (*str*)
 * **Return type:**
-  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
+  str
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.standalone_rule_index_diff"></a>
 
@@ -258,7 +282,7 @@ Return a unified diff for one output.
 Return the standalone rule index, its content, and its diff.
 
 * **Return type:**
-  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/builtins/stdtypes.html#str), [str](https://docs.python.org/3/builtins/stdtypes.html#str)] | None
+  tuple[*Path*, str, str] | None
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.budget_report"></a>
 
@@ -267,9 +291,9 @@ Return the standalone rule index, its content, and its diff.
 Yield (agent, byte_size, byte_budget) for each selected agent.
 
 * **Parameters:**
-  **agent_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+  **agent_name** (*str* *|* *None*)
 * **Return type:**
-  [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[[tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig), [int](https://docs.python.org/3/builtins/functions.html#int), [int](https://docs.python.org/3/builtins/functions.html#int) | None]]
+  *Iterator*[tuple[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig), int, int | None]]
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.instruction_chain_budget_report"></a>
 
@@ -278,9 +302,9 @@ Yield (agent, byte_size, byte_budget) for each selected agent.
 Yield each selected global-plus-project chain and its byte budget.
 
 * **Parameters:**
-  **agent_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+  **agent_name** (*str* *|* *None*)
 * **Return type:**
-  [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[[tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*InstructionChain*](#eutaxis.instructions.models.InstructionChain), [int](https://docs.python.org/3/builtins/functions.html#int), [int](https://docs.python.org/3/builtins/functions.html#int)]]
+  *Iterator*[tuple[[*InstructionChain*](#eutaxis.instructions.models.InstructionChain), int, int]]
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.render_standalone_rule_index"></a>
 
@@ -289,7 +313,7 @@ Yield each selected global-plus-project chain and its byte budget.
 Return (path, content) for the standalone rule-index file, if any.
 
 * **Return type:**
-  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/builtins/stdtypes.html#str)] | None
+  tuple[*Path*, str] | None
 
 <a id="module-eutaxis.instructions.instruction_budgets"></a>
 
@@ -308,9 +332,9 @@ Return one generated target, its byte size, and its budget.
 * **Parameters:**
   * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
   * **agent** ([*AgentConfig*](#eutaxis.instructions.models.AgentConfig))
-  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **content** (*str*)
 * **Return type:**
-  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig), [int](https://docs.python.org/3/builtins/functions.html#int), [int](https://docs.python.org/3/builtins/functions.html#int) | None]
+  tuple[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig), int, int | None]
 
 <a id="eutaxis.instructions.instruction_budgets.enforce_target_budget"></a>
 
@@ -321,7 +345,7 @@ Raise when one generated target exceeds its configured budget.
 * **Parameters:**
   * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
   * **agent** ([*AgentConfig*](#eutaxis.instructions.models.AgentConfig))
-  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **content** (*str*)
 * **Return type:**
   None
 
@@ -334,9 +358,9 @@ Measure one cumulative output with its project instruction sources.
 * **Parameters:**
   * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
   * **chain** ([*InstructionChain*](#eutaxis.instructions.models.InstructionChain))
-  * **outputs** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+  * **outputs** (*Mapping* *[**str* *,* *str* *]*)
 * **Return type:**
-  [int](https://docs.python.org/3/builtins/functions.html#int)
+  int
 
 <a id="eutaxis.instructions.instruction_budgets.instruction_chain_budget_report"></a>
 
@@ -346,9 +370,9 @@ Yield the size and limit of each chain represented in `outputs`.
 
 * **Parameters:**
   * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
-  * **outputs** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+  * **outputs** (*Mapping* *[**str* *,* *str* *]*)
 * **Return type:**
-  [*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator)[[tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*InstructionChain*](#eutaxis.instructions.models.InstructionChain), [int](https://docs.python.org/3/builtins/functions.html#int), [int](https://docs.python.org/3/builtins/functions.html#int)]]
+  *Iterator*[tuple[[*InstructionChain*](#eutaxis.instructions.models.InstructionChain), int, int]]
 
 <a id="eutaxis.instructions.instruction_budgets.enforce_instruction_chain_budgets"></a>
 
@@ -358,8 +382,8 @@ Raise when a selected cumulative instruction chain exceeds its budget.
 
 * **Parameters:**
   * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
-  * **outputs** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
-  * **selected** ([*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable) *[*[*AgentConfig*](#eutaxis.instructions.models.AgentConfig) *]*)
+  * **outputs** (*Mapping* *[**str* *,* *str* *]*)
+  * **selected** (*Iterable* *[*[*AgentConfig*](#eutaxis.instructions.models.AgentConfig) *]*)
 * **Return type:**
   None
 
@@ -373,13 +397,14 @@ Validate and expand the graph of declared Skill loading units.
 
 <a id="eutaxis.instructions.loading_units.validate_loading_units"></a>
 
-### eutaxis.instructions.loading_units.validate_loading_units(loading_units, module_ids)
+### eutaxis.instructions.loading_units.validate_loading_units(loading_units, module_ids, required_routes=())
 
 Reject loading units that name unknown modules or form cycles.
 
 * **Parameters:**
-  * **loading_units** ([*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable) *[*[*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit) *]*)
-  * **module_ids** ([*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+  * **loading_units** (*Iterable* *[*[*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit) *]*)
+  * **module_ids** (*Iterable* *[**str* *]*)
+  * **required_routes** (*Iterable* *[*[*RequiredLoadingRoute*](#eutaxis.instructions.models.RequiredLoadingRoute) *]*)
 * **Return type:**
   None
 
@@ -396,9 +421,9 @@ members.
 
 * **Parameters:**
   * **loading_unit** ([*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit))
-  * **loading_units** ([*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable) *[*[*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit) *]*)
+  * **loading_units** (*Iterable* *[*[*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit) *]*)
 * **Return type:**
-  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillLoadingMember*](#eutaxis.instructions.models.SkillLoadingMember), …]
+  tuple[[*SkillLoadingMember*](#eutaxis.instructions.models.SkillLoadingMember), …]
 
 <a id="module-eutaxis.instructions.markdown"></a>
 
@@ -418,15 +443,15 @@ Returns an empty dict when the file has no frontmatter or when the
 frontmatter is empty. Raises `yaml.YAMLError` if the block is malformed.
 
 * **Parameters:**
-  **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  **content** (*str*)
 * **Return type:**
-  [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [*Any*](https://docs.python.org/3/library/typing.html#typing.Any)]
+  dict[str, *Any*]
 
 <a id="eutaxis.instructions.markdown.MarkdownAssembler"></a>
 
 ### *class* eutaxis.instructions.markdown.MarkdownAssembler
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 Extract and rewrite Markdown source content.
 
@@ -441,10 +466,10 @@ Extract and rewrite Markdown source content.
 Apply frontmatter stripping, section filtering and heading offsets.
 
 * **Parameters:**
-  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **content** (*str*)
   * **source** ([*SourceFile*](#eutaxis.instructions.models.SourceFile))
 * **Return type:**
-  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
+  str
 
 <a id="eutaxis.instructions.markdown.MarkdownAssembler.strip_frontmatter"></a>
 
@@ -453,9 +478,9 @@ Apply frontmatter stripping, section filtering and heading offsets.
 Remove top-level YAML frontmatter from Markdown content.
 
 * **Parameters:**
-  **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  **content** (*str*)
 * **Return type:**
-  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
+  str
 
 <a id="eutaxis.instructions.markdown.MarkdownAssembler.parse_sections"></a>
 
@@ -464,9 +489,9 @@ Remove top-level YAML frontmatter from Markdown content.
 Parse Markdown into sections.
 
 * **Parameters:**
-  **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  **content** (*str*)
 * **Return type:**
-  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*Section*](#eutaxis.instructions.models.Section)]
+  list[[*Section*](#eutaxis.instructions.models.Section)]
 
 <a id="eutaxis.instructions.markdown.MarkdownAssembler.include_sections"></a>
 
@@ -475,10 +500,10 @@ Parse Markdown into sections.
 Include named sections and their nested subsections.
 
 * **Parameters:**
-  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **headings** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **content** (*str*)
+  * **headings** (*tuple* *[**str* *,*  *...* *]*)
 * **Return type:**
-  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
+  str
 
 <a id="eutaxis.instructions.markdown.MarkdownAssembler.exclude_sections"></a>
 
@@ -487,10 +512,10 @@ Include named sections and their nested subsections.
 Remove named sections and their nested subsections.
 
 * **Parameters:**
-  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **headings** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **content** (*str*)
+  * **headings** (*tuple* *[**str* *,*  *...* *]*)
 * **Return type:**
-  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
+  str
 
 <a id="eutaxis.instructions.markdown.MarkdownAssembler.selected_line_numbers"></a>
 
@@ -503,14 +528,14 @@ The selection follows [`process()`](#eutaxis.instructions.markdown.MarkdownAssem
 trimming change no membership, so they are ignored.
 
 * **Parameters:**
-  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Full text of the source file, as read from disk.
+  * **content** (*str*) – Full text of the source file, as read from disk.
   * **source** ([*SourceFile*](#eutaxis.instructions.models.SourceFile)) – Source entry whose selection applies.
 * **Returns:**
   Line numbers of `content`, counted from 1, that the selection
   keeps; `None` when the entry selects no section, so that every
   line is kept.
 * **Return type:**
-  [frozenset](https://docs.python.org/3/builtins/stdtypes.html#frozenset)[[int](https://docs.python.org/3/builtins/functions.html#int)] or None
+  frozenset[int] or None
 
 ### Examples
 
@@ -529,10 +554,10 @@ trimming change no membership, so they are ignored.
 Increase all Markdown heading levels by `offset`.
 
 * **Parameters:**
-  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **offset** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **content** (*str*)
+  * **offset** (*int*)
 * **Return type:**
-  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
+  str
 
 <a id="module-eutaxis.instructions.rules"></a>
 
@@ -605,20 +630,20 @@ Field keys that absorb the plural forms and the titled variants of a marker.
 
 ### *class* eutaxis.instructions.rules.RulePart(key, title, text, start_line, end_line)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 One part of a rule: a statement, a field, or the lead text.
 
 * **Parameters:**
-  * **key** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **title** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **text** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **start_line** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
-  * **end_line** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **key** (*str*)
+  * **title** (*str*)
+  * **text** (*str*)
+  * **start_line** (*int*)
+  * **end_line** (*int*)
 
 <a id="eutaxis.instructions.rules.RulePart.key"></a>
 
-#### key *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### key *: str*
 
 `valid`, `invalid`, `lead`, a canonical field
 key, or the slug of a field title.
@@ -628,7 +653,7 @@ key, or the slug of a field title.
 
 <a id="eutaxis.instructions.rules.RulePart.title"></a>
 
-#### title *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### title *: str*
 
 Title as written in the module, without its closing punctuation
 (`"Why the tiers"`); `"✓"` or `"✗"` for a statement; empty for the
@@ -636,19 +661,19 @@ lead text.
 
 <a id="eutaxis.instructions.rules.RulePart.text"></a>
 
-#### text *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### text *: str*
 
 Text of the part, marker line included, trailing blank lines removed.
 
 <a id="eutaxis.instructions.rules.RulePart.start_line"></a>
 
-#### start_line *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### start_line *: int*
 
 First line of the part in the parsed text.
 
 <a id="eutaxis.instructions.rules.RulePart.end_line"></a>
 
-#### end_line *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### end_line *: int*
 
 Last line of the part in the parsed text.
 
@@ -656,82 +681,82 @@ Last line of the part in the parsed text.
 
 ### *class* eutaxis.instructions.rules.Rule(label, module, heading_path, parts, text, start_line, end_line)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 One labelled rule of an instruction module.
 
 * **Parameters:**
-  * **label** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **module** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **heading_path** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
-  * **parts** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*RulePart*](#eutaxis.instructions.rules.RulePart) *,*  *...* *]*)
-  * **text** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **start_line** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
-  * **end_line** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **label** (*str*)
+  * **module** (*str*)
+  * **heading_path** (*tuple* *[**str* *,*  *...* *]*)
+  * **parts** (*tuple* *[*[*RulePart*](#eutaxis.instructions.rules.RulePart) *,*  *...* *]*)
+  * **text** (*str*)
+  * **start_line** (*int*)
+  * **end_line** (*int*)
 
 <a id="eutaxis.instructions.rules.Rule.label"></a>
 
-#### label *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### label *: str*
 
 Label of the rule, as written on its label line.
 
 <a id="eutaxis.instructions.rules.Rule.module"></a>
 
-#### module *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### module *: str*
 
 Name of the module that holds the rule.
 
 <a id="eutaxis.instructions.rules.Rule.heading_path"></a>
 
-#### heading_path *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+#### heading_path *: tuple[str, ...]*
 
 Texts of the headings enclosing the rule, outermost first.
 
 <a id="eutaxis.instructions.rules.Rule.parts"></a>
 
-#### parts *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[RulePart](#eutaxis.instructions.rules.RulePart), ...]*
+#### parts *: tuple[[RulePart](#eutaxis.instructions.rules.RulePart), ...]*
 
 Parts of the rule, in source order.
 
 <a id="eutaxis.instructions.rules.Rule.text"></a>
 
-#### text *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### text *: str*
 
 Raw text of the block, label line included.
 
 <a id="eutaxis.instructions.rules.Rule.start_line"></a>
 
-#### start_line *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### start_line *: int*
 
 First line of the block in the parsed text.
 
 <a id="eutaxis.instructions.rules.Rule.end_line"></a>
 
-#### end_line *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### end_line *: int*
 
 Last line of the block in the parsed text.
 
 <a id="eutaxis.instructions.rules.Rule.valid"></a>
 
-#### *property* valid *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+#### *property* valid *: tuple[str, ...]*
 
 Texts of the `✓` statements.
 
 <a id="eutaxis.instructions.rules.Rule.invalid"></a>
 
-#### *property* invalid *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+#### *property* invalid *: tuple[str, ...]*
 
 Texts of the `✗` statements.
 
 <a id="eutaxis.instructions.rules.Rule.fields"></a>
 
-#### *property* fields *: [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[RulePart](#eutaxis.instructions.rules.RulePart), ...]]*
+#### *property* fields *: dict[str, tuple[[RulePart](#eutaxis.instructions.rules.RulePart), ...]]*
 
 Fields of the rule, grouped by normalized key in source order.
 
 <a id="eutaxis.instructions.rules.Rule.part_keys"></a>
 
-#### *property* part_keys *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+#### *property* part_keys *: tuple[str, ...]*
 
 Distinct part keys of the rule, in order of first occurrence.
 
@@ -742,13 +767,13 @@ Distinct part keys of the rule, in order of first occurrence.
 Return every part whose key equals `key`, in source order.
 
 * **Parameters:**
-  **key** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  **key** (*str*)
 * **Return type:**
-  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*RulePart*](#eutaxis.instructions.rules.RulePart), …]
+  tuple[[*RulePart*](#eutaxis.instructions.rules.RulePart), …]
 
 <a id="eutaxis.instructions.rules.Rule.summary"></a>
 
-#### *property* summary *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### *property* summary *: str*
 
 First line of the first `✓` statement, without its marker.
 
@@ -759,7 +784,7 @@ its first part. A rule without any part yields an empty string.
 
 ### *class* eutaxis.instructions.rules.RejectedLabel(module, line_number, line, token, reason)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 A line shaped as a label line whose token violates the label grammar.
 
@@ -767,45 +792,45 @@ A rejected line still ends the preceding rule block, so its text is not
 attributed to the rule above it.
 
 * **Parameters:**
-  * **module** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **line_number** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
-  * **line** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **token** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **reason** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **module** (*str*)
+  * **line_number** (*int*)
+  * **line** (*str*)
+  * **token** (*str*)
+  * **reason** (*str*)
 
 <a id="eutaxis.instructions.rules.RejectedLabel.module"></a>
 
-#### module *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### module *: str*
 
 Name of the module that holds the line.
 
 <a id="eutaxis.instructions.rules.RejectedLabel.line_number"></a>
 
-#### line_number *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### line_number *: int*
 
 Line number in the parsed text.
 
 <a id="eutaxis.instructions.rules.RejectedLabel.line"></a>
 
-#### line *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### line *: str*
 
 The line as written.
 
 <a id="eutaxis.instructions.rules.RejectedLabel.token"></a>
 
-#### token *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### token *: str*
 
 Text between the bold markers.
 
 <a id="eutaxis.instructions.rules.RejectedLabel.reason"></a>
 
-#### reason *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### reason *: str*
 
 Part of the grammar that the token violates.
 
 <a id="eutaxis.instructions.rules.RejectedLabel.message"></a>
 
-#### *property* message *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### *property* message *: str*
 
 Diagnostic naming the line and the violated part of the grammar.
 
@@ -820,57 +845,57 @@ Diagnostic naming the line and the violated part of the grammar.
 
 ### *class* eutaxis.instructions.rules.HeadingBlock(level, text, line, start_line)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 A Markdown heading outside fenced code.
 
 * **Parameters:**
-  * **level** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
-  * **text** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **line** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **start_line** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **level** (*int*)
+  * **text** (*str*)
+  * **line** (*str*)
+  * **start_line** (*int*)
 
 <a id="eutaxis.instructions.rules.HeadingBlock.level"></a>
 
-#### level *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### level *: int*
 
 <a id="eutaxis.instructions.rules.HeadingBlock.text"></a>
 
-#### text *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### text *: str*
 
 <a id="eutaxis.instructions.rules.HeadingBlock.line"></a>
 
-#### line *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### line *: str*
 
 <a id="eutaxis.instructions.rules.HeadingBlock.start_line"></a>
 
-#### start_line *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### start_line *: int*
 
 <a id="eutaxis.instructions.rules.TextBlock"></a>
 
 ### *class* eutaxis.instructions.rules.TextBlock(lines, start_line)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 A run of lines that belongs to no rule block.
 
 * **Parameters:**
-  * **lines** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
-  * **start_line** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **lines** (*tuple* *[**str* *,*  *...* *]*)
+  * **start_line** (*int*)
 
 <a id="eutaxis.instructions.rules.TextBlock.lines"></a>
 
-#### lines *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
+#### lines *: tuple[str, ...]*
 
 <a id="eutaxis.instructions.rules.TextBlock.start_line"></a>
 
-#### start_line *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### start_line *: int*
 
 <a id="eutaxis.instructions.rules.RuleBlock"></a>
 
 ### *class* eutaxis.instructions.rules.RuleBlock(rule)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 The block of one rule.
 
@@ -891,37 +916,37 @@ One structural block of a module.
 
 ### *class* eutaxis.instructions.rules.ParsedModule(name, blocks, rejected)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 Structure of one instruction module.
 
 * **Parameters:**
-  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **blocks** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*HeadingBlock*](#eutaxis.instructions.rules.HeadingBlock) *|* [*TextBlock*](#eutaxis.instructions.rules.TextBlock) *|* [*RuleBlock*](#eutaxis.instructions.rules.RuleBlock) *,*  *...* *]*)
-  * **rejected** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*RejectedLabel*](#eutaxis.instructions.rules.RejectedLabel) *,*  *...* *]*)
+  * **name** (*str*)
+  * **blocks** (*tuple* *[*[*HeadingBlock*](#eutaxis.instructions.rules.HeadingBlock) *|* [*TextBlock*](#eutaxis.instructions.rules.TextBlock) *|* [*RuleBlock*](#eutaxis.instructions.rules.RuleBlock) *,*  *...* *]*)
+  * **rejected** (*tuple* *[*[*RejectedLabel*](#eutaxis.instructions.rules.RejectedLabel) *,*  *...* *]*)
 
 <a id="eutaxis.instructions.rules.ParsedModule.name"></a>
 
-#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### name *: str*
 
 Name of the module.
 
 <a id="eutaxis.instructions.rules.ParsedModule.blocks"></a>
 
-#### blocks *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[HeadingBlock](#eutaxis.instructions.rules.HeadingBlock) | [TextBlock](#eutaxis.instructions.rules.TextBlock) | [RuleBlock](#eutaxis.instructions.rules.RuleBlock), ...]*
+#### blocks *: tuple[[HeadingBlock](#eutaxis.instructions.rules.HeadingBlock) | [TextBlock](#eutaxis.instructions.rules.TextBlock) | [RuleBlock](#eutaxis.instructions.rules.RuleBlock), ...]*
 
 Headings, rule blocks and remaining text, in source order. The
 frontmatter is excluded.
 
 <a id="eutaxis.instructions.rules.ParsedModule.rejected"></a>
 
-#### rejected *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[RejectedLabel](#eutaxis.instructions.rules.RejectedLabel), ...]*
+#### rejected *: tuple[[RejectedLabel](#eutaxis.instructions.rules.RejectedLabel), ...]*
 
 Label-shaped lines that violate the label grammar.
 
 <a id="eutaxis.instructions.rules.ParsedModule.rules"></a>
 
-#### *property* rules *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[Rule](#eutaxis.instructions.rules.Rule), ...]*
+#### *property* rules *: tuple[[Rule](#eutaxis.instructions.rules.Rule), ...]*
 
 Rule records of the module, in source order.
 
@@ -932,7 +957,7 @@ Rule records of the module, in source order.
 Return the first rule labelled `label`, if any.
 
 * **Parameters:**
-  **label** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  **label** (*str*)
 * **Return type:**
   [*Rule*](#eutaxis.instructions.rules.Rule) | None
 
@@ -948,11 +973,11 @@ form, maps to that marker, so titled variants share the key of their
 marker. Every other title maps to the slug of its words.
 
 * **Parameters:**
-  **title** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Field title, with or without closing punctuation.
+  **title** (*str*) – Field title, with or without closing punctuation.
 * **Returns:**
   Normalized key.
 * **Return type:**
-  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
+  str
 
 ### Examples
 
@@ -976,8 +1001,8 @@ marker. Every other title maps to the slug of its words.
 Parse the text of one instruction module.
 
 * **Parameters:**
-  * **text** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Full text of the module, with or without YAML frontmatter.
-  * **module** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Name recorded on every rule and rejected line.
+  * **text** (*str*) – Full text of the module, with or without YAML frontmatter.
+  * **module** (*str*) – Name recorded on every rule and rejected line.
 * **Returns:**
   Blocks, rules and rejected label lines of the module.
 * **Return type:**
@@ -1012,247 +1037,302 @@ Data models for instruction-file assembly.
 
 ### *class* eutaxis.instructions.models.SourceFile(path, sections=(), exclude_sections=(), heading_offset=0, strip_frontmatter=True)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 Markdown source file included in one or more instruction outputs.
 
 * **Parameters:**
-  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
-  * **sections** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
-  * **exclude_sections** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
-  * **heading_offset** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
-  * **strip_frontmatter** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **path** (*Path*)
+  * **sections** (*tuple* *[**str* *,*  *...* *]*)
+  * **exclude_sections** (*tuple* *[**str* *,*  *...* *]*)
+  * **heading_offset** (*int*)
+  * **strip_frontmatter** (*bool*)
 
 <a id="eutaxis.instructions.models.SourceFile.path"></a>
 
-#### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
+#### path *: Path*
 
 <a id="eutaxis.instructions.models.SourceFile.sections"></a>
 
-#### sections *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
+#### sections *: tuple[str, ...]* *= ()*
 
 <a id="eutaxis.instructions.models.SourceFile.exclude_sections"></a>
 
-#### exclude_sections *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
+#### exclude_sections *: tuple[str, ...]* *= ()*
 
 <a id="eutaxis.instructions.models.SourceFile.heading_offset"></a>
 
-#### heading_offset *: [int](https://docs.python.org/3/builtins/functions.html#int)* *= 0*
+#### heading_offset *: int* *= 0*
 
 <a id="eutaxis.instructions.models.SourceFile.strip_frontmatter"></a>
 
-#### strip_frontmatter *: [bool](https://docs.python.org/3/builtins/functions.html#bool)* *= True*
+#### strip_frontmatter *: bool* *= True*
 
 <a id="eutaxis.instructions.models.TargetConfig"></a>
 
 ### *class* eutaxis.instructions.models.TargetConfig(path, header='', footer='')
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 Output file target and surrounding literal content.
 
 * **Parameters:**
-  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
-  * **header** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **footer** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** (*Path*)
+  * **header** (*str*)
+  * **footer** (*str*)
 
 <a id="eutaxis.instructions.models.TargetConfig.path"></a>
 
-#### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
+#### path *: Path*
 
 <a id="eutaxis.instructions.models.TargetConfig.header"></a>
 
-#### header *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= ''*
+#### header *: str* *= ''*
 
 <a id="eutaxis.instructions.models.TargetConfig.footer"></a>
 
-#### footer *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= ''*
+#### footer *: str* *= ''*
 
 <a id="eutaxis.instructions.models.TaskModule"></a>
 
 ### *class* eutaxis.instructions.models.TaskModule(id, title, path, trigger, description=None)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 A task-specific instruction module compiled to an Agent Skill artifact.
 
 * **Parameters:**
-  * **id** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **title** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
-  * **trigger** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **description** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+  * **id** (*str*)
+  * **title** (*str*)
+  * **path** (*Path*)
+  * **trigger** (*str*)
+  * **description** (*str* *|* *None*)
 
 <a id="eutaxis.instructions.models.TaskModule.id"></a>
 
-#### id *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### id *: str*
 
 <a id="eutaxis.instructions.models.TaskModule.title"></a>
 
-#### title *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### title *: str*
 
 <a id="eutaxis.instructions.models.TaskModule.path"></a>
 
-#### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
+#### path *: Path*
 
 <a id="eutaxis.instructions.models.TaskModule.trigger"></a>
 
-#### trigger *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### trigger *: str*
 
 <a id="eutaxis.instructions.models.TaskModule.description"></a>
 
-#### description *: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+#### description *: str | None* *= None*
 
 <a id="eutaxis.instructions.models.SkillLoadingMember"></a>
 
 ### *class* eutaxis.instructions.models.SkillLoadingMember(module, rules=(), include_entrypoint=True)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 One Skill and the files selected from it for a loading unit.
 
 * **Parameters:**
-  * **module** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **rules** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
-  * **include_entrypoint** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **module** (*str*)
+  * **rules** (*tuple* *[**str* *,*  *...* *]*)
+  * **include_entrypoint** (*bool*)
 
 <a id="eutaxis.instructions.models.SkillLoadingMember.module"></a>
 
-#### module *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### module *: str*
 
 <a id="eutaxis.instructions.models.SkillLoadingMember.rules"></a>
 
-#### rules *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
+#### rules *: tuple[str, ...]* *= ()*
 
 <a id="eutaxis.instructions.models.SkillLoadingMember.include_entrypoint"></a>
 
-#### include_entrypoint *: [bool](https://docs.python.org/3/builtins/functions.html#bool)* *= True*
+#### include_entrypoint *: bool* *= True*
 
 <a id="eutaxis.instructions.models.SkillLoadingUnit"></a>
 
 ### *class* eutaxis.instructions.models.SkillLoadingUnit(name, max_bytes, members=(), includes=(), publish_to=None)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 A finite, budgeted set of Skill files loaded for one task.
 
 * **Parameters:**
-  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
-  * **members** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*SkillLoadingMember*](#eutaxis.instructions.models.SkillLoadingMember) *,*  *...* *]*)
-  * **includes** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
-  * **publish_to** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+  * **name** (*str*)
+  * **max_bytes** (*int*)
+  * **members** (*tuple* *[*[*SkillLoadingMember*](#eutaxis.instructions.models.SkillLoadingMember) *,*  *...* *]*)
+  * **includes** (*tuple* *[**str* *,*  *...* *]*)
+  * **publish_to** (*str* *|* *None*)
 
 <a id="eutaxis.instructions.models.SkillLoadingUnit.name"></a>
 
-#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### name *: str*
 
 <a id="eutaxis.instructions.models.SkillLoadingUnit.max_bytes"></a>
 
-#### max_bytes *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### max_bytes *: int*
 
 <a id="eutaxis.instructions.models.SkillLoadingUnit.members"></a>
 
-#### members *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[SkillLoadingMember](#eutaxis.instructions.models.SkillLoadingMember), ...]* *= ()*
+#### members *: tuple[[SkillLoadingMember](#eutaxis.instructions.models.SkillLoadingMember), ...]* *= ()*
 
 <a id="eutaxis.instructions.models.SkillLoadingUnit.includes"></a>
 
-#### includes *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
+#### includes *: tuple[str, ...]* *= ()*
 
 <a id="eutaxis.instructions.models.SkillLoadingUnit.publish_to"></a>
 
-#### publish_to *: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+#### publish_to *: str | None* *= None*
 
 Task module whose Skill carries this unit’s generated manifest.
+
+<a id="eutaxis.instructions.models.RequiredLoadingRoute"></a>
+
+### *class* eutaxis.instructions.models.RequiredLoadingRoute(name, owner)
+
+Bases: `object`
+
+One loading unit that must be published to a specific owner Skill.
+
+* **Parameters:**
+  * **name** (*str*)
+  * **owner** (*str*)
+
+<a id="eutaxis.instructions.models.RequiredLoadingRoute.name"></a>
+
+#### name *: str*
+
+<a id="eutaxis.instructions.models.RequiredLoadingRoute.owner"></a>
+
+#### owner *: str*
 
 <a id="eutaxis.instructions.models.InstructionChain"></a>
 
 ### *class* eutaxis.instructions.models.InstructionChain(name, agent, sources, max_bytes)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 A generated global output and its project-level instruction files.
 
 * **Parameters:**
-  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **agent** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **sources** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *,*  *...* *]*)
-  * **max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **name** (*str*)
+  * **agent** (*str*)
+  * **sources** (*tuple* *[**Path* *,*  *...* *]*)
+  * **max_bytes** (*int*)
 
 <a id="eutaxis.instructions.models.InstructionChain.name"></a>
 
-#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### name *: str*
 
 <a id="eutaxis.instructions.models.InstructionChain.agent"></a>
 
-#### agent *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### agent *: str*
 
 <a id="eutaxis.instructions.models.InstructionChain.sources"></a>
 
-#### sources *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path), ...]*
+#### sources *: tuple[Path, ...]*
 
 <a id="eutaxis.instructions.models.InstructionChain.max_bytes"></a>
 
-#### max_bytes *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### max_bytes *: int*
+
+<a id="eutaxis.instructions.models.DeclarationSource"></a>
+
+### *class* eutaxis.instructions.models.DeclarationSource(module, acquisition_manifest, acquisition_lock, composition_manifest, context)
+
+Bases: `object`
+
+One structured cumulative source resolved before instruction assembly.
+
+* **Parameters:**
+  * **module** (*str*)
+  * **acquisition_manifest** (*Path*)
+  * **acquisition_lock** (*Path*)
+  * **composition_manifest** (*str*)
+  * **context** (*Mapping* *[**str* *,* *None* *|* *bool* *|* *int* *|* *float* *|* *str* *|* *tuple* *[**None* *|* *bool* *|* *int* *|* *float* *|* *str* *|* *tuple* *[**JsonValue* *,*  *...* *]*  *|* *Mapping* *[**str* *,* *JsonValue* *]* *,*  *...* *]*  *|* *Mapping* *[**str* *,* *None* *|* *bool* *|* *int* *|* *float* *|* *str* *|* *tuple* *[**JsonValue* *,*  *...* *]*  *|* *Mapping* *[**str* *,* *JsonValue* *]* *]* *]*)
+
+<a id="eutaxis.instructions.models.DeclarationSource.module"></a>
+
+#### module *: str*
+
+<a id="eutaxis.instructions.models.DeclarationSource.acquisition_manifest"></a>
+
+#### acquisition_manifest *: Path*
+
+<a id="eutaxis.instructions.models.DeclarationSource.acquisition_lock"></a>
+
+#### acquisition_lock *: Path*
+
+<a id="eutaxis.instructions.models.DeclarationSource.composition_manifest"></a>
+
+#### composition_manifest *: str*
+
+<a id="eutaxis.instructions.models.DeclarationSource.context"></a>
+
+#### context *: Mapping[str, None | bool | int | float | str | tuple[None | bool | int | float | str | tuple[JsonValue, ...] | Mapping[str, JsonValue], ...] | Mapping[str, None | bool | int | float | str | tuple[JsonValue, ...] | Mapping[str, JsonValue]]]*
 
 <a id="eutaxis.instructions.models.ReferenceDoc"></a>
 
 ### *class* eutaxis.instructions.models.ReferenceDoc(id, title, local_path, github_url, trigger, description='')
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 An authoritative external reference doc with a local path and GitHub fallback.
 
 * **Parameters:**
-  * **id** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **title** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **local_path** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **github_url** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **trigger** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **description** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **id** (*str*)
+  * **title** (*str*)
+  * **local_path** (*str*)
+  * **github_url** (*str*)
+  * **trigger** (*str*)
+  * **description** (*str*)
 
 <a id="eutaxis.instructions.models.ReferenceDoc.id"></a>
 
-#### id *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### id *: str*
 
 <a id="eutaxis.instructions.models.ReferenceDoc.title"></a>
 
-#### title *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### title *: str*
 
 <a id="eutaxis.instructions.models.ReferenceDoc.local_path"></a>
 
-#### local_path *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### local_path *: str*
 
 <a id="eutaxis.instructions.models.ReferenceDoc.github_url"></a>
 
-#### github_url *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### github_url *: str*
 
 <a id="eutaxis.instructions.models.ReferenceDoc.trigger"></a>
 
-#### trigger *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### trigger *: str*
 
 <a id="eutaxis.instructions.models.ReferenceDoc.description"></a>
 
-#### description *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= ''*
+#### description *: str* *= ''*
 
 <a id="eutaxis.instructions.models.AgentConfig"></a>
 
 ### *class* eutaxis.instructions.models.AgentConfig(name, target, sources=<factory>, enabled=True, max_bytes=None)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 One generated instruction output.
 
 * **Parameters:**
-  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **name** (*str*)
   * **target** ([*TargetConfig*](#eutaxis.instructions.models.TargetConfig))
-  * **sources** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*SourceFile*](#eutaxis.instructions.models.SourceFile) *]*)
-  * **enabled** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
-  * **max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int) *|* *None*)
+  * **sources** (*list* *[*[*SourceFile*](#eutaxis.instructions.models.SourceFile) *|* [*DeclarationSource*](#eutaxis.instructions.models.DeclarationSource) *]*)
+  * **enabled** (*bool*)
+  * **max_bytes** (*int* *|* *None*)
 
 <a id="eutaxis.instructions.models.AgentConfig.name"></a>
 
-#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### name *: str*
 
 <a id="eutaxis.instructions.models.AgentConfig.target"></a>
 
@@ -1260,130 +1340,135 @@ One generated instruction output.
 
 <a id="eutaxis.instructions.models.AgentConfig.sources"></a>
 
-#### sources *: [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[SourceFile](#eutaxis.instructions.models.SourceFile)]*
+#### sources *: list[[SourceFile](#eutaxis.instructions.models.SourceFile) | [DeclarationSource](#eutaxis.instructions.models.DeclarationSource)]*
 
 <a id="eutaxis.instructions.models.AgentConfig.enabled"></a>
 
-#### enabled *: [bool](https://docs.python.org/3/builtins/functions.html#bool)* *= True*
+#### enabled *: bool* *= True*
 
 <a id="eutaxis.instructions.models.AgentConfig.max_bytes"></a>
 
-#### max_bytes *: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+#### max_bytes *: int | None* *= None*
 
 <a id="eutaxis.instructions.models.InstructionConfig"></a>
 
-### *class* eutaxis.instructions.models.InstructionConfig(root, config_path, agents=<factory>, common_sources=<factory>, task_modules=<factory>, task_modules_heading='Task modules', task_modules_intro='', task_modules_router_enabled=True, skill_entrypoint_max_bytes=None, skill_loading_units=<factory>, instruction_chains=<factory>, reference_docs=<factory>, reference_docs_heading='Reference docs', reference_docs_intro='', rule_index_enabled=False, rule_index_heading='Rule index', rule_index_intro='', rule_index_pointer='', rule_index_target=None, default_max_bytes=None, strict_rule_labels=False)
+### *class* eutaxis.instructions.models.InstructionConfig(root, config_path, agents=<factory>, common_sources=<factory>, task_modules=<factory>, task_modules_heading='Task modules', task_modules_intro='', task_modules_router_enabled=True, skill_entrypoint_max_bytes=None, skill_loading_units=<factory>, required_loading_routes=(), instruction_chains=<factory>, reference_docs=<factory>, reference_docs_heading='Reference docs', reference_docs_intro='', rule_index_enabled=False, rule_index_heading='Rule index', rule_index_intro='', rule_index_pointer='', rule_index_target=None, default_max_bytes=None, strict_rule_labels=False)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 Complete instruction assembly configuration.
 
 * **Parameters:**
-  * **root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
-  * **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
-  * **agents** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*AgentConfig*](#eutaxis.instructions.models.AgentConfig) *]*)
-  * **common_sources** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*SourceFile*](#eutaxis.instructions.models.SourceFile) *]*)
-  * **task_modules** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*TaskModule*](#eutaxis.instructions.models.TaskModule) *]*)
-  * **task_modules_heading** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **task_modules_intro** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **task_modules_router_enabled** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
-  * **skill_entrypoint_max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int) *|* *None*)
-  * **skill_loading_units** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit) *]*)
-  * **instruction_chains** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*InstructionChain*](#eutaxis.instructions.models.InstructionChain) *]*)
-  * **reference_docs** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*ReferenceDoc*](#eutaxis.instructions.models.ReferenceDoc) *]*)
-  * **reference_docs_heading** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **reference_docs_intro** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **rule_index_enabled** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
-  * **rule_index_heading** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **rule_index_intro** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **rule_index_pointer** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **root** (*Path*)
+  * **config_path** (*Path*)
+  * **agents** (*list* *[*[*AgentConfig*](#eutaxis.instructions.models.AgentConfig) *]*)
+  * **common_sources** (*list* *[*[*SourceFile*](#eutaxis.instructions.models.SourceFile) *|* [*DeclarationSource*](#eutaxis.instructions.models.DeclarationSource) *]*)
+  * **task_modules** (*list* *[*[*TaskModule*](#eutaxis.instructions.models.TaskModule) *]*)
+  * **task_modules_heading** (*str*)
+  * **task_modules_intro** (*str*)
+  * **task_modules_router_enabled** (*bool*)
+  * **skill_entrypoint_max_bytes** (*int* *|* *None*)
+  * **skill_loading_units** (*list* *[*[*SkillLoadingUnit*](#eutaxis.instructions.models.SkillLoadingUnit) *]*)
+  * **required_loading_routes** (*tuple* *[*[*RequiredLoadingRoute*](#eutaxis.instructions.models.RequiredLoadingRoute) *,*  *...* *]*)
+  * **instruction_chains** (*list* *[*[*InstructionChain*](#eutaxis.instructions.models.InstructionChain) *]*)
+  * **reference_docs** (*list* *[*[*ReferenceDoc*](#eutaxis.instructions.models.ReferenceDoc) *]*)
+  * **reference_docs_heading** (*str*)
+  * **reference_docs_intro** (*str*)
+  * **rule_index_enabled** (*bool*)
+  * **rule_index_heading** (*str*)
+  * **rule_index_intro** (*str*)
+  * **rule_index_pointer** (*str*)
   * **rule_index_target** ([*TargetConfig*](#eutaxis.instructions.models.TargetConfig) *|* *None*)
-  * **default_max_bytes** ([*int*](https://docs.python.org/3/builtins/functions.html#int) *|* *None*)
-  * **strict_rule_labels** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **default_max_bytes** (*int* *|* *None*)
+  * **strict_rule_labels** (*bool*)
 
 <a id="eutaxis.instructions.models.InstructionConfig.root"></a>
 
-#### root *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
+#### root *: Path*
 
 <a id="eutaxis.instructions.models.InstructionConfig.config_path"></a>
 
-#### config_path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
+#### config_path *: Path*
 
 <a id="eutaxis.instructions.models.InstructionConfig.agents"></a>
 
-#### agents *: [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[AgentConfig](#eutaxis.instructions.models.AgentConfig)]*
+#### agents *: list[[AgentConfig](#eutaxis.instructions.models.AgentConfig)]*
 
 <a id="eutaxis.instructions.models.InstructionConfig.common_sources"></a>
 
-#### common_sources *: [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[SourceFile](#eutaxis.instructions.models.SourceFile)]*
+#### common_sources *: list[[SourceFile](#eutaxis.instructions.models.SourceFile) | [DeclarationSource](#eutaxis.instructions.models.DeclarationSource)]*
 
 <a id="eutaxis.instructions.models.InstructionConfig.task_modules"></a>
 
-#### task_modules *: [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[TaskModule](#eutaxis.instructions.models.TaskModule)]*
+#### task_modules *: list[[TaskModule](#eutaxis.instructions.models.TaskModule)]*
 
 <a id="eutaxis.instructions.models.InstructionConfig.task_modules_heading"></a>
 
-#### task_modules_heading *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= 'Task modules'*
+#### task_modules_heading *: str* *= 'Task modules'*
 
 <a id="eutaxis.instructions.models.InstructionConfig.task_modules_intro"></a>
 
-#### task_modules_intro *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= ''*
+#### task_modules_intro *: str* *= ''*
 
 <a id="eutaxis.instructions.models.InstructionConfig.task_modules_router_enabled"></a>
 
-#### task_modules_router_enabled *: [bool](https://docs.python.org/3/builtins/functions.html#bool)* *= True*
+#### task_modules_router_enabled *: bool* *= True*
 
 <a id="eutaxis.instructions.models.InstructionConfig.skill_entrypoint_max_bytes"></a>
 
-#### skill_entrypoint_max_bytes *: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+#### skill_entrypoint_max_bytes *: int | None* *= None*
 
 <a id="eutaxis.instructions.models.InstructionConfig.skill_loading_units"></a>
 
-#### skill_loading_units *: [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[SkillLoadingUnit](#eutaxis.instructions.models.SkillLoadingUnit)]*
+#### skill_loading_units *: list[[SkillLoadingUnit](#eutaxis.instructions.models.SkillLoadingUnit)]*
+
+<a id="eutaxis.instructions.models.InstructionConfig.required_loading_routes"></a>
+
+#### required_loading_routes *: tuple[[RequiredLoadingRoute](#eutaxis.instructions.models.RequiredLoadingRoute), ...]* *= ()*
 
 <a id="eutaxis.instructions.models.InstructionConfig.instruction_chains"></a>
 
-#### instruction_chains *: [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[InstructionChain](#eutaxis.instructions.models.InstructionChain)]*
+#### instruction_chains *: list[[InstructionChain](#eutaxis.instructions.models.InstructionChain)]*
 
 <a id="eutaxis.instructions.models.InstructionConfig.reference_docs"></a>
 
-#### reference_docs *: [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[ReferenceDoc](#eutaxis.instructions.models.ReferenceDoc)]*
+#### reference_docs *: list[[ReferenceDoc](#eutaxis.instructions.models.ReferenceDoc)]*
 
 <a id="eutaxis.instructions.models.InstructionConfig.reference_docs_heading"></a>
 
-#### reference_docs_heading *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= 'Reference docs'*
+#### reference_docs_heading *: str* *= 'Reference docs'*
 
 <a id="eutaxis.instructions.models.InstructionConfig.reference_docs_intro"></a>
 
-#### reference_docs_intro *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= ''*
+#### reference_docs_intro *: str* *= ''*
 
 <a id="eutaxis.instructions.models.InstructionConfig.rule_index_enabled"></a>
 
-#### rule_index_enabled *: [bool](https://docs.python.org/3/builtins/functions.html#bool)* *= False*
+#### rule_index_enabled *: bool* *= False*
 
 <a id="eutaxis.instructions.models.InstructionConfig.rule_index_heading"></a>
 
-#### rule_index_heading *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= 'Rule index'*
+#### rule_index_heading *: str* *= 'Rule index'*
 
 <a id="eutaxis.instructions.models.InstructionConfig.rule_index_intro"></a>
 
-#### rule_index_intro *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= ''*
+#### rule_index_intro *: str* *= ''*
 
 <a id="eutaxis.instructions.models.InstructionConfig.rule_index_pointer"></a>
 
-#### rule_index_pointer *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= ''*
+#### rule_index_pointer *: str* *= ''*
 
 <a id="eutaxis.instructions.models.InstructionConfig.rule_index_target"></a>
 
-#### rule_index_target *: [TargetConfig](#eutaxis.instructions.models.TargetConfig) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+#### rule_index_target *: [TargetConfig](#eutaxis.instructions.models.TargetConfig) | None* *= None*
 
 <a id="eutaxis.instructions.models.InstructionConfig.default_max_bytes"></a>
 
-#### default_max_bytes *: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+#### default_max_bytes *: int | None* *= None*
 
 <a id="eutaxis.instructions.models.InstructionConfig.strict_rule_labels"></a>
 
-#### strict_rule_labels *: [bool](https://docs.python.org/3/builtins/functions.html#bool)* *= False*
+#### strict_rule_labels *: bool* *= False*
 
 <a id="eutaxis.instructions.models.InstructionConfig.budget_for"></a>
 
@@ -1394,7 +1479,7 @@ Return the byte budget that applies to one agent, if any.
 * **Parameters:**
   **agent** ([*AgentConfig*](#eutaxis.instructions.models.AgentConfig))
 * **Return type:**
-  [int](https://docs.python.org/3/builtins/functions.html#int) | None
+  int | None
 
 <a id="eutaxis.instructions.models.InstructionConfig.enabled_agents"></a>
 
@@ -1403,7 +1488,7 @@ Return the byte budget that applies to one agent, if any.
 Return enabled agent outputs.
 
 * **Return type:**
-  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig)]
+  list[[*AgentConfig*](#eutaxis.instructions.models.AgentConfig)]
 
 <a id="eutaxis.instructions.models.InstructionConfig.get_agent"></a>
 
@@ -1412,7 +1497,7 @@ Return enabled agent outputs.
 Return an agent output by name.
 
 * **Parameters:**
-  **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  **name** (*str*)
 * **Return type:**
   [*AgentConfig*](#eutaxis.instructions.models.AgentConfig) | None
 
@@ -1423,34 +1508,34 @@ Return an agent output by name.
 Resolve a config path against the configured root.
 
 * **Parameters:**
-  **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  **path** (*Path*)
 * **Return type:**
-  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
+  *Path*
 
 <a id="eutaxis.instructions.models.Section"></a>
 
 ### *class* eutaxis.instructions.models.Section(heading, level, content)
 
-Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+Bases: `object`
 
 A Markdown section with its heading and full body.
 
 * **Parameters:**
-  * **heading** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **level** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
-  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **heading** (*str*)
+  * **level** (*int*)
+  * **content** (*str*)
 
 <a id="eutaxis.instructions.models.Section.heading"></a>
 
-#### heading *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### heading *: str*
 
 <a id="eutaxis.instructions.models.Section.level"></a>
 
-#### level *: [int](https://docs.python.org/3/builtins/functions.html#int)*
+#### level *: int*
 
 <a id="eutaxis.instructions.models.Section.content"></a>
 
-#### content *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+#### content *: str*
 
 <a id="module-eutaxis.instructions.exceptions"></a>
 
@@ -1464,7 +1549,7 @@ Exceptions for instruction-file assembly.
 
 ### *exception* eutaxis.instructions.exceptions.InstructionError
 
-Bases: [`Exception`](https://docs.python.org/3/builtins/exceptions.html#Exception)
+Bases: `Exception`
 
 Base exception for instruction assembly errors.
 
@@ -1507,7 +1592,7 @@ Bases: [`InstructionError`](#eutaxis.instructions.exceptions.InstructionError)
 Raised under `strict_rule_labels` when a module holds a rejected label line.
 
 * **Parameters:**
-  **locations** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+  **locations** (*list* *[**str* *]*)
 * **Return type:**
   None
 
@@ -1524,9 +1609,9 @@ Bases: [`InstructionError`](#eutaxis.instructions.exceptions.InstructionError)
 Raised when a rendered output exceeds its configured byte budget.
 
 * **Parameters:**
-  * **agent_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **size** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
-  * **limit** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **agent_name** (*str*)
+  * **size** (*int*)
+  * **limit** (*int*)
 * **Return type:**
   None
 
@@ -1543,12 +1628,31 @@ Bases: [`InstructionError`](#eutaxis.instructions.exceptions.InstructionError)
 Raised when a global-plus-project instruction chain exceeds its budget.
 
 * **Parameters:**
-  * **chain_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
-  * **size** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
-  * **limit** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **chain_name** (*str*)
+  * **size** (*int*)
+  * **limit** (*int*)
 * **Return type:**
   None
 
 <a id="eutaxis.instructions.exceptions.InstructionChainBudgetExceededError.exit_code"></a>
+
+#### exit_code *= 1*
+
+<a id="eutaxis.instructions.exceptions.DeclarationResolutionError"></a>
+
+### *exception* eutaxis.instructions.exceptions.DeclarationResolutionError(manifest, detail, \*, exit_code=1)
+
+Bases: [`InstructionError`](#eutaxis.instructions.exceptions.InstructionError)
+
+Report a structured artifact that plan or check could not resolve.
+
+* **Parameters:**
+  * **manifest** (*str*)
+  * **detail** (*str*)
+  * **exit_code** (*int*)
+* **Return type:**
+  None
+
+<a id="eutaxis.instructions.exceptions.DeclarationResolutionError.exit_code"></a>
 
 #### exit_code *= 1*

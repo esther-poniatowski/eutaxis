@@ -24,7 +24,7 @@ Assemble agent instruction files from modular sources.
 
 Eutaxis assembles agent instruction files from one configuration. The same rules reach every supported agent and every project that references them, without manual duplication and without per-agent forks.
 
-The current implementation consumes Markdown modules. The target architecture instead stores canonical YAML records in a typed, queryable catalog. Adapters render Markdown for hosts that require it. The [work sequence for structured sources](docs/internals/structured-declaration-system-plan.md) introduces this target without changing the current command contract prematurely.
+Eutaxis supports the established Markdown-module route and the canonical YAML declaration route. Structured declarations are validated, resolved under typed context, queried through deterministic catalogs and portable query packets, then rendered as Markdown or native Skill artifacts when a host requires them. The [structured-source work sequence](docs/internals/structured-declaration-system-plan.md) records the remaining migration and command work.
 
 ### Motivation
 
@@ -32,7 +32,7 @@ Coding-assistant agents read their guidance from on-disk files specific to each 
 
 ### Advantages
 
-- **Single source of truth.** Each rule is currently authored once as a Markdown module. The configuration declares where it appears; the tool propagates the change.
+- **Single source of truth.** Each unit is authored once in the canonical format selected for its route. Configuration and manifests declare where it appears; the tool propagates the change.
 - **Agent-neutral authoring.** Modules describe what the agent must do; the per-agent translation (file path, frontmatter, marker conventions) is handled by adapters.
 - **Two activation regimes.** Always-on rules compile into the cumulative instruction file each agent loads on every turn; on-demand rule sets compile into native Agent Skill artifacts loaded only when their description matches the active task.
 - **Drift detection.** Configuration, sources, and on-disk targets are kept in sync by explicit drift checks usable in CI.
@@ -63,6 +63,7 @@ Eutaxis currently ships the checked features. The unchecked features remain plan
 - [X] **Project scaffolding** — initialise a starter instruction layout in a project.
 - [X] **Prompt-writing methodology** — reference notes on agent instruction design under `docs/prompt-writing-methods/`.
 - [X] **Structured declaration validation** — validate version-1 YAML sources, typed facets, and links between records.
+- [X] **Structured query packets** — emit canonical JSON containing a certified unit, complete candidate declarations, decision, typed contract, control and resource closure, acquisition-derived record locations and content digests, context, selection explanations, trace, hashes, and content revisions.
 - [ ] **Prompt composition framework** — planned. Compose prompts from shells, local fragments, and parameterised bundles.
 - [ ] **Prompt validator** — planned. Enforce family-profile requirements.
 - [ ] **Golden-file output** — planned. Render composed prompts for diff-based review.
@@ -75,7 +76,7 @@ A project's instruction layout is declared in the configuration file `config/too
 
 ```yaml
 # eutaxis.yml
-_schema: eutaxis:configuration@1
+_schema: eutaxis:configuration@2
 
 common_sources:
   - path: docs/instructions/file-authority.md

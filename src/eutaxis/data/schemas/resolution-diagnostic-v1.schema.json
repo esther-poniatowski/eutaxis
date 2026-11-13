@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eutaxis.dev/schemas/resolution-diagnostic-v1.schema.json",
+  "title": "Eutaxis resolution diagnostic version 1",
+  "type": "object",
+  "required": ["_schema", "completion", "sources", "error", "trace"],
+  "properties": {
+    "_schema": {"const": "eutaxis:resolution-diagnostic@1"},
+    "completion": {"const": "failed"},
+    "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
+    "error": {"$ref": "#/$defs/error"},
+    "trace": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/trace"}]}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "document-path": {
+      "type": "array",
+      "items": {"oneOf": [{"type": "string"}, {"type": "integer", "minimum": 0}]}
+    },
+    "source": {
+      "type": "object",
+      "required": ["namespace", "path", "sha256"],
+      "properties": {
+        "namespace": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "record-source": {
+      "type": "object",
+      "required": ["namespace", "path", "sha256", "document-path"],
+      "properties": {
+        "namespace": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "document-path": {"$ref": "#/$defs/document-path"}
+      },
+      "additionalProperties": false
+    },
+    "failure-source": {
+      "type": "object",
+      "required": ["namespace", "path", "sha256", "document-path", "line", "column"],
+      "properties": {
+        "namespace": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "document-path": {"$ref": "#/$defs/document-path"},
+        "line": {"type": "integer", "minimum": 1},
+        "column": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "applicability": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["predicate-path", "operator", "facet", "result", "observed-present", "observed", "expected"],
+          "properties": {
+            "predicate-path": {"$ref": "#/$defs/document-path"},
+            "operator": {"enum": ["exists", "equals", "in"]},
+            "facet": {"type": "string", "minLength": 1},
+            "result": {"enum": ["true", "false", "unknown"]},
+            "observed-present": {"type": "boolean"},
+            "observed": {},
+            "expected": {}
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["predicate-path", "operator", "result", "children"],
+          "properties": {
+            "predicate-path": {"$ref": "#/$defs/document-path"},
+            "operator": {"enum": ["all", "any", "not"]},
+            "result": {"enum": ["true", "false", "unknown"]},
+            "children": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/applicability"}}
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "anchor": {
+      "type": "object",
+      "required": ["section", "rank"],
+      "properties": {
+        "section": {"type": "string", "minLength": 1},
+        "rank": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["ordinal", "kind", "declaration", "source", "causes"],
+      "properties": {
+        "ordinal": {"type": "integer", "minimum": 0},
+        "kind": {"enum": ["manifest-evaluated", "manifest-selected", "rule-set-member-expanded", "rule-set-member-inactive", "dependency-discovered", "policy-result-discovered", "declaration-evaluated", "conflict-detected", "policy-evaluated", "conflict-resolved", "declaration-excluded", "alias-created", "declaration-effective", "norm-evaluated", "exception-evaluated", "norm-removed", "norm-substituted", "norm-effective", "criterion-effective", "criterion-inactive", "unit-issued"]},
+        "declaration": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/$defs/record-source"},
+        "causes": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "anchor": {"$ref": "#/$defs/anchor"},
+        "relation": {"type": "string", "minLength": 1},
+        "dependant": {"type": "string", "minLength": 1},
+        "policy": {"type": "string", "minLength": 1},
+        "exception": {"type": "string", "minLength": 1},
+        "norm": {"type": "string", "minLength": 1},
+        "criterion": {"type": "string", "minLength": 1},
+        "conflict": {"type": "array", "prefixItems": [{"type": "string", "minLength": 1}, {"type": "string", "minLength": 1}], "items": false},
+        "replacement": {"type": "string", "minLength": 1},
+        "truth": {"enum": ["true", "false", "unknown"]},
+        "applicability": {"$ref": "#/$defs/applicability"}
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "detail"],
+      "properties": {
+        "code": {"enum": ["unknown-manifest", "manifest-wrong-kind", "manifest-inactive", "manifest-inapplicable", "manifest-applicability-indeterminate", "dependency-inapplicable", "dependency-applicability-indeterminate", "dependency-unsatisfied", "unresolved-conflict", "conflict-policy-indeterminate", "ambiguous-policy-alias", "policy-substitute-inapplicable", "policy-substitute-indeterminate", "policy-combine-result-inapplicable", "policy-combine-result-indeterminate", "policy-result-excluded", "exception-substitute-inapplicable", "exception-substitute-indeterminate", "partial-criterion-applicability"]},
+        "detail": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/$defs/failure-source"},
+        "truth": {"enum": ["true", "false", "unknown"]},
+        "applicability": {"$ref": "#/$defs/applicability"}
+      },
+      "additionalProperties": false
+    },
+    "trace": {
+      "type": "object",
+      "required": ["manifest", "facet-registry", "facet-content-revision", "events"],
+      "properties": {
+        "manifest": {"type": "string", "minLength": 1},
+        "facet-registry": {"type": "string", "minLength": 1},
+        "facet-content-revision": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "events": {"type": "array", "items": {"$ref": "#/$defs/event"}}
+      },
+      "additionalProperties": false
+    }
+  }
+}

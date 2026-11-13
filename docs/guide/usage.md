@@ -34,7 +34,7 @@ The command writes a starter configuration file `eutaxis.yml`, an `AGENTS.md` pl
 A configuration may also be written by hand, as `eutaxis.yml` at the project root or as `config/tools/eutaxis.yml`. The configuration file declares its format in the first key `_schema`; the [format identifier](configuration.md#format-identifier) states the rule. The minimal configuration below declares two shared sources and one cumulative-file target:
 
 ```yaml
-_schema: eutaxis:configuration@1
+_schema: eutaxis:configuration@2
 
 common_sources:
   - path: docs/instructions/file-authority.md
@@ -98,7 +98,7 @@ Two deployment patterns differ only in the repository that holds the configurati
 The configuration below illustrates the global pattern with two agent outputs:
 
 ```yaml
-_schema: eutaxis:configuration@1
+_schema: eutaxis:configuration@2
 
 common_sources:
   - modules/global/file-authority.md

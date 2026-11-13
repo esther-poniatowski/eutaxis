@@ -17,7 +17,7 @@ from .byte_carriers import (
     _verified_carrier_context,
 )
 from .composite_facets import CompositeFacetRegistry
-from .exceptions import AcquisitionContractError
+from .exceptions import AcquisitionAuthorityError
 from .external_acquisition import (
     _ExternalAcquisitionStage,
     _ExternalAcquisitionStageState,
@@ -479,4 +479,4 @@ def _retire_external_result_tree(result: object) -> None:
 
 
 def _fail(location: str, message: str) -> NoReturn:
-    raise AcquisitionContractError(location, message)
+    raise AcquisitionAuthorityError(location, message)

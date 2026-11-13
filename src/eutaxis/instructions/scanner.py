@@ -34,7 +34,8 @@ def collect_registered_paths(config: InstructionConfig) -> list[Path]:
     """Return the resolved paths of every instruction file the config registers."""
     paths: list[Path] = []
     for source in config.common_sources:
-        paths.append(config.resolve(source.path))
+        if isinstance(source, SourceFile):
+            paths.append(config.resolve(source.path))
     for module in config.task_modules:
         paths.append(config.resolve(module.path))
     return paths
@@ -51,13 +52,16 @@ def declared_sources(
     declared several times appears once per declaration.
     """
     declared: list[tuple[Path, SourceFile | None]] = [
-        (config.resolve(source.path), source) for source in config.common_sources
+        (config.resolve(source.path), source)
+        for source in config.common_sources
+        if isinstance(source, SourceFile)
     ]
     declared.extend((config.resolve(module.path), None) for module in config.task_modules)
     declared.extend(
         (config.resolve(source.path), source)
         for agent in config.agents
         for source in agent.sources
+        if isinstance(source, SourceFile)
     )
     return declared
 

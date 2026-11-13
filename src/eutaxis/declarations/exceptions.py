@@ -246,6 +246,10 @@ class AcquisitionContractError(Exception):
         self.detail = message
 
 
+class AcquisitionAuthorityError(AcquisitionContractError):
+    """Report invalidated external-acquisition authority during one operation."""
+
+
 class ByteCarrierError(Exception):
     """Report a descriptor-bound directory or byte-carrier failure."""
 
@@ -354,6 +358,14 @@ class CompositionError(Exception):
 
 class DeclarationCatalogError(Exception):
     """Report a static catalog construction or serialization failure."""
+
+
+class QueryPacketError(Exception):
+    """Report an invalid query-packet projection or serialization."""
+
+
+class ResolutionDiagnosticError(Exception):
+    """Report a malformed failed-resolution diagnostic projection."""
 
 
 class FacetRegistryError(Exception):

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from ..declarations.models import JsonValue
 
 from .exceptions import ConfigurationError
 
@@ -65,6 +68,14 @@ class SkillLoadingUnit:
 
 
 @dataclass(frozen=True)
+class RequiredLoadingRoute:
+    """One loading unit that must be published to a specific owner Skill."""
+
+    name: str
+    owner: str
+
+
+@dataclass(frozen=True)
 class InstructionChain:
     """A generated global output and its project-level instruction files."""
 
@@ -72,6 +83,20 @@ class InstructionChain:
     agent: str
     sources: tuple[Path, ...]
     max_bytes: int
+
+
+@dataclass(frozen=True)
+class DeclarationSource:
+    """One structured cumulative source resolved before instruction assembly."""
+
+    module: str
+    acquisition_manifest: Path
+    acquisition_lock: Path
+    composition_manifest: str
+    context: Mapping[str, JsonValue]
+
+
+InstructionSource = SourceFile | DeclarationSource
 
 
 @dataclass(frozen=True)
@@ -92,7 +117,7 @@ class AgentConfig:
 
     name: str
     target: TargetConfig
-    sources: list[SourceFile] = field(default_factory=list)
+    sources: list[InstructionSource] = field(default_factory=list)
     enabled: bool = True
     max_bytes: int | None = None
 
@@ -104,13 +129,14 @@ class InstructionConfig:
     root: Path
     config_path: Path
     agents: list[AgentConfig] = field(default_factory=list)
-    common_sources: list[SourceFile] = field(default_factory=list)
+    common_sources: list[InstructionSource] = field(default_factory=list)
     task_modules: list[TaskModule] = field(default_factory=list)
     task_modules_heading: str = "Task modules"
     task_modules_intro: str = ""
     task_modules_router_enabled: bool = True
     skill_entrypoint_max_bytes: int | None = None
     skill_loading_units: list[SkillLoadingUnit] = field(default_factory=list)
+    required_loading_routes: tuple[RequiredLoadingRoute, ...] = ()
     instruction_chains: list[InstructionChain] = field(default_factory=list)
     reference_docs: list[ReferenceDoc] = field(default_factory=list)
     reference_docs_heading: str = "Reference docs"

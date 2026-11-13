@@ -75,6 +75,7 @@ from .external_result import (
     acquire_external_declarations_from_path,
 )
 from .exceptions import (
+    AcquisitionAuthorityError,
     AcquisitionContractError,
     AttentionPlanningError,
     ByteCarrierError,
@@ -105,6 +106,8 @@ from .exceptions import (
     ProcedureEvaluationPlanningError,
     ProcedureObservationError,
     ProcedureRunPlanningError,
+    QueryPacketError,
+    ResolutionDiagnosticError,
     RuleEvidenceError,
 )
 from .catalog import (
@@ -391,8 +394,38 @@ from .resolution import (
     resolve_compilation_unit,
 )
 from .external_resolution import (
+    ExternalResolutionError,
     ExternalResolutionResult,
     resolve_external_compilation_unit,
+)
+from .facade_report import (
+    ResolvedArtifactSelection,
+    ResolvedCumulativeSource,
+    resolve_external_cumulative_source_from_path,
+    resolved_artifact_selection,
+)
+from .query_packet import (
+    QUERY_PACKET_SCHEMA,
+    QueryPacket,
+    QuerySelection,
+    QuerySelectionOutcome,
+    QuerySourceRevision,
+    build_external_query_packet,
+    query_packet_json_bytes,
+)
+from .query_packet_schema import (
+    query_packet_schema,
+    query_packet_schema_path,
+    validate_query_packet_payload,
+)
+from .resolution_diagnostic import (
+    RESOLUTION_DIAGNOSTIC_SCHEMA,
+    external_resolution_failure_json_bytes,
+)
+from .resolution_diagnostic_schema import (
+    resolution_diagnostic_schema,
+    resolution_diagnostic_schema_path,
+    validate_resolution_diagnostic_payload,
 )
 from .external_composition import (
     ExternalCumulativeArtifact,
@@ -430,6 +463,7 @@ from .static_query import StaticCatalogQuery, StaticField, StaticPredicate
 __all__ = [
     "Action",
     "AcquisitionContractError",
+    "AcquisitionAuthorityError",
     "AcquisitionKind",
     "AcquisitionLock",
     "AcquisitionManifest",
@@ -558,6 +592,8 @@ __all__ = [
     "FacetRegistryView",
     "MigrationBaseline",
     "MigrationBaselineError",
+    "QueryPacketError",
+    "ResolutionDiagnosticError",
     "MigrationBaselineFinding",
     "MigrationBaselineRegistry",
     "MigrationBaselineSelection",
@@ -677,6 +713,13 @@ __all__ = [
     "ResolutionPolicyDeclaration",
     "ResolutionResult",
     "ExternalResolutionResult",
+    "ExternalResolutionError",
+    "ResolvedArtifactSelection",
+    "ResolvedCumulativeSource",
+    "QueryPacket",
+    "QuerySelection",
+    "QuerySelectionOutcome",
+    "QuerySourceRevision",
     "ExternalCumulativeArtifact",
     "ExternalCumulativeCompositionPlan",
     "ExternalAttentionRequirements",
@@ -732,6 +775,9 @@ __all__ = [
     "create_procedure_execution_session",
     "create_rule_evidence_session",
     "catalog_json_bytes",
+    "QUERY_PACKET_SCHEMA",
+    "RESOLUTION_DIAGNOSTIC_SCHEMA",
+    "build_external_query_packet",
     "catalog_index_schema",
     "catalog_index_schema_path",
     "declaration_schema",
@@ -770,6 +816,14 @@ __all__ = [
     "prepare_procedure_run",
     "resolve_compilation_unit",
     "resolve_external_compilation_unit",
+    "resolve_external_cumulative_source_from_path",
+    "resolved_artifact_selection",
+    "query_packet_json_bytes",
+    "query_packet_schema",
+    "query_packet_schema_path",
+    "external_resolution_failure_json_bytes",
+    "resolution_diagnostic_schema",
+    "resolution_diagnostic_schema_path",
     "plan_external_cumulative_composition",
     "plan_structured_skill",
     "render_structured_skill",
@@ -777,6 +831,8 @@ __all__ = [
     "render_external_cumulative_markdown",
     "select_migration_baselines",
     "schema_path",
+    "validate_query_packet_payload",
+    "validate_resolution_diagnostic_payload",
     "compare_external_declarations",
     "validate_document",
 ]

@@ -11,7 +11,7 @@ installed as a script. Subcommands:
 - ``init`` — scaffold prompt composition into a project (planned).
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 import typer
 from . import info as pkg_info, __version__
@@ -23,7 +23,8 @@ from .ops._cli import ops_app
 from .rule_query._cli import rule_app
 
 if TYPE_CHECKING:
-    from .instructions import InstructionConfig, InstructionGenerator
+    from .declarations import ResolvedCumulativeSource
+    from .instructions import DeclarationSource, InstructionConfig, InstructionGenerator
 
 _CONFIG_HELP = (
     "Configuration file, relative to the current folder. Default: "
@@ -68,7 +69,10 @@ def cli_generate(
     plan: bool = typer.Option(
         False,
         "--plan",
-        help="With --dry-run, report target drift and all cumulative budgets.",
+        help=(
+            "With --dry-run, report structured selections, target drift, "
+            "cumulative budgets and final command state."
+        ),
     ),
     ignore_budget: bool = typer.Option(
         False,
@@ -85,24 +89,38 @@ def cli_generate(
     from .instructions import InstructionError, InstructionGenerator
 
     if plan and not dry_run:
-        typer.echo("Error: --plan requires --dry-run.", err=True)
-        raise typer.Exit(code=2)
+        _exit_artifact_command(ValueError("--plan requires --dry-run"), code=2)
 
     try:
         loaded = _load_settings(config, root)
         generator = InstructionGenerator(loaded)
+        resolution_reports = (
+            generator.declaration_resolution_report(agent_name=agent) if plan else []
+        )
         _echo_rejected_labels(generator)
         paths = generator.write_all(
             agent_name=agent,
             dry_run=dry_run,
             enforce_budget=not ignore_budget,
         )
+        report_lines = None
+        if plan:
+            report_lines = _declaration_resolution_report_lines(resolution_reports)
+            report_lines.extend(_generation_plan_lines(generator, agent_name=agent))
+            report_lines.append("[COMMAND  ] complete")
     except InstructionError as exc:
+        if plan:
+            _exit_artifact_command(exc, code=exc.exit_code)
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=exc.exit_code) from exc
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        if plan:
+            _exit_artifact_command(exc, code=2)
+        raise
 
     if plan:
-        _echo_generation_plan(generator, agent_name=agent)
+        assert report_lines is not None
+        _write_artifact_command_report(report_lines)
         return
 
     verb = "Would generate" if dry_run else "Generated"
@@ -111,12 +129,13 @@ def cli_generate(
         typer.echo(f"  - {path}")
 
 
-def _echo_generation_plan(
+def _generation_plan_lines(
     generator: "InstructionGenerator",
     *,
     agent_name: str | None,
-) -> None:
+) -> list[str]:
     """Report cumulative target drift and budgets without printing full files."""
+    lines: list[str] = []
     budgets = {
         agent.name: (size, limit)
         for agent, size, limit in generator.budget_report(agent_name=agent_name)
@@ -131,7 +150,7 @@ def _echo_generation_plan(
         if differs:
             added, removed = _line_changes(generator.unified_diff(agent.name))
             change_text = f", +{added}/-{removed} lines"
-        typer.echo(
+        lines.append(
             f"[{status:9}] {agent.name} [{size}/{limit_text} B{change_text}]: "
             f"{path}"
         )
@@ -147,7 +166,7 @@ def _echo_generation_plan(
             if diff:
                 added, removed = _line_changes(diff)
                 change_text = f", +{added}/-{removed} lines"
-            typer.echo(
+            lines.append(
                 f"[{status:9}] rule-index "
                 f"[{len(content.encode('utf-8'))} B{change_text}]: {path}"
             )
@@ -155,10 +174,49 @@ def _echo_generation_plan(
     for chain, size, limit in generator.instruction_chain_budget_report(
         agent_name=agent_name
     ):
-        typer.echo(
+        lines.append(
             f"[CHAIN    ] {chain.name} [{size}/{limit} B]: "
             f"{chain.agent} + {len(chain.sources)} project file(s)"
         )
+    return lines
+
+
+def _declaration_resolution_report_lines(
+    reports: list[tuple["DeclarationSource", "ResolvedCumulativeSource"]],
+) -> list[str]:
+    """Report each resolved artifact and its ordered effective records."""
+    lines: list[str] = []
+    for source, resolved in reports:
+        report = resolved.selection
+        lines.append(
+            f"[SELECT   ] {source.module} <= {report.manifest} "
+            f"[{report.mechanism}, {report.scope}, {report.target}, "
+            f"{resolved.sha256}]"
+        )
+        if report.records:
+            for record in report.records:
+                lines.append(f"  - {record}")
+        else:
+            lines.append("  - <none>")
+    return lines
+
+
+def _write_artifact_command_report(lines: list[str]) -> None:
+    """Publish one complete report or return an operational failure."""
+    try:
+        typer.echo("\n".join(lines))
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        _exit_artifact_command(exc, code=2)
+
+
+def _exit_artifact_command(error: BaseException, *, code: int) -> NoReturn:
+    """Report one failed artifact command on the remaining usable stream."""
+    try:
+        typer.echo(f"Error: {error}", err=True)
+        typer.echo("[COMMAND  ] failed", err=True)
+    except Exception:  # pragma: no cover - no usable output stream remains.
+        pass
+    raise typer.Exit(code=code) from error
 
 
 def _line_changes(diff: str) -> tuple[int, int]:
@@ -205,23 +263,47 @@ def cli_check(
     try:
         loaded = _load_settings(config, root)
         generator = InstructionGenerator(loaded)
+        resolution_reports = generator.declaration_resolution_report(
+            agent_name=agent
+        )
         _echo_rejected_labels(generator)
         generator.enforce_rule_labels()
-        diff_reports = list(generator.diff_report(agent_name=agent))
-        budget_reports = {
-            entry[0].name: (entry[1], entry[2])
-            for entry in generator.budget_report(agent_name=agent)
-        }
-        chain_reports = list(
-            generator.instruction_chain_budget_report(agent_name=agent)
-        )
-        standalone_report = (
-            generator.standalone_rule_index_diff() if agent is None else None
+        lines, findings = _check_report_lines(
+            generator,
+            resolution_reports,
+            agent_name=agent,
+            show_diff=diff,
+            ignore_budget=ignore_budget,
         )
     except InstructionError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=exc.exit_code) from exc
+        _exit_artifact_command(exc, code=exc.exit_code)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        _exit_artifact_command(exc, code=2)
 
+    _write_artifact_command_report(lines)
+    if findings:
+        raise typer.Exit(code=1)
+
+
+def _check_report_lines(
+    generator: "InstructionGenerator",
+    resolution_reports: list[tuple["DeclarationSource", "ResolvedCumulativeSource"]],
+    *,
+    agent_name: str | None,
+    show_diff: bool,
+    ignore_budget: bool,
+) -> tuple[list[str], bool]:
+    """Construct one complete check report before any standard-output write."""
+    diff_reports = list(generator.diff_report(agent_name=agent_name))
+    budget_reports = {
+        entry[0].name: (entry[1], entry[2])
+        for entry in generator.budget_report(agent_name=agent_name)
+    }
+    chain_reports = list(generator.instruction_chain_budget_report(agent_name=agent_name))
+    standalone_report = (
+        generator.standalone_rule_index_diff() if agent_name is None else None
+    )
+    lines = _declaration_resolution_report_lines(resolution_reports)
     stale = False
     over_budget = False
     for agent_config, path, differs in diff_reports:
@@ -235,34 +317,34 @@ def cli_check(
         else:
             flag = "OVER" if over else "ok"
             size_note = f"{size}/{limit} B {flag}"
-        typer.echo(f"[{status:8}] {agent_config.name} [{size_note}]: {path}")
+        lines.append(f"[{status:8}] {agent_config.name} [{size_note}]: {path}")
         stale = stale or differs
-        if diff and differs:
-            typer.echo(generator.unified_diff(agent_config.name))
+        if show_diff and differs:
+            lines.append(generator.unified_diff(agent_config.name).rstrip("\n"))
 
     if standalone_report is not None:
         path, content, standalone_diff = standalone_report
         differs = bool(standalone_diff)
         status = "OUTDATED" if differs else "OK"
-        typer.echo(
+        lines.append(
             f"[{status:8}] rule-index [{len(content.encode('utf-8'))} B]: {path}"
         )
         stale = stale or differs
-        if diff and differs:
-            typer.echo(standalone_diff)
+        if show_diff and differs:
+            lines.append(standalone_diff.rstrip("\n"))
 
     for chain, size, limit in chain_reports:
         over = size > limit
         if over and not ignore_budget:
             over_budget = True
         flag = "OVER" if over else "ok"
-        typer.echo(
+        lines.append(
             f"[CHAIN   ] {chain.name} [{size}/{limit} B {flag}]: "
             f"{chain.agent} + {len(chain.sources)} project file(s)"
         )
 
-    if stale or over_budget:
-        raise typer.Exit(code=1)
+    lines.append("[COMMAND  ] complete")
+    return lines, stale or over_budget
 
 
 def _echo_rejected_labels(generator: "InstructionGenerator") -> None:
@@ -294,7 +376,7 @@ def cli_list(
     root: str | None = root_option(_ROOT_HELP),
 ) -> None:
     """List configured instruction outputs and their source counts."""
-    from .instructions import InstructionError
+    from .instructions import DeclarationSource, InstructionError
 
     try:
         loaded = _load_settings(config, root)
@@ -307,7 +389,13 @@ def cli_list(
     typer.echo("")
     typer.echo("Common sources:")
     for source in loaded.common_sources:
-        typer.echo(f"  - {source.path}")
+        if isinstance(source, DeclarationSource):
+            typer.echo(
+                f"  - declaration {source.composition_manifest} "
+                f"as {source.module}"
+            )
+        else:
+            typer.echo(f"  - {source.path}")
     typer.echo("")
     typer.echo("Agents:")
     for agent_config in loaded.agents:
@@ -315,7 +403,13 @@ def cli_list(
         target = loaded.resolve(agent_config.target.path)
         typer.echo(f"  - {agent_config.name} ({status}) -> {target}")
         for source in agent_config.sources:
-            typer.echo(f"      source: {source.path}")
+            if isinstance(source, DeclarationSource):
+                typer.echo(
+                    f"      declaration: {source.composition_manifest} "
+                    f"as {source.module}"
+                )
+            else:
+                typer.echo(f"      source: {source.path}")
 
 
 @app.command("scan")

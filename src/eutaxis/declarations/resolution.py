@@ -193,6 +193,7 @@ class ResolutionResult:
 
     registry: DeclarationRegistry = field(compare=False, repr=False)
     manifest_record: RegisteredDeclaration = field(compare=False, repr=False)
+    context: Mapping[str, JsonValue] = field(compare=False, repr=False)
     unit: ResolvedCompilationUnit
     trace: ResolutionTrace
     _facet_registry_state: object = field(compare=False, repr=False)
@@ -286,6 +287,8 @@ def _capture_resolution_authority_state(
         identity_value_state(manifest.id),
         identity_value_state(manifest.owner),
         manifest.kind.value,
+        id(result.context),
+        identity_value_state(result.context),
         id(unit.components),
         tuple(components),
         id(unit.dependencies),
@@ -501,7 +504,13 @@ class _Resolver:
         )
         trace = self._trace()
         assert trace.events[unit_event].kind is ResolutionEventKind.UNIT_ISSUED
-        return _issue_result(self.registry, self.manifest_record, unit, trace)
+        return _issue_result(
+            self.registry,
+            self.manifest_record,
+            self.context,
+            unit,
+            trace,
+        )
 
     def _resolve_manifest(self) -> None:
         record = self.registry.records.get(self.manifest_id)
@@ -1357,6 +1366,7 @@ def _issue_compilation_unit(
 def _issue_result(
     registry: DeclarationRegistry,
     manifest_record: RegisteredDeclaration,
+    context: Mapping[str, JsonValue],
     unit: ResolvedCompilationUnit,
     trace: ResolutionTrace,
 ) -> ResolutionResult:
@@ -1364,6 +1374,7 @@ def _issue_result(
     result = object.__new__(ResolutionResult)
     object.__setattr__(result, "registry", registry)
     object.__setattr__(result, "manifest_record", manifest_record)
+    object.__setattr__(result, "context", context)
     object.__setattr__(result, "unit", unit)
     object.__setattr__(result, "trace", trace)
     object.__setattr__(

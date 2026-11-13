@@ -27,7 +27,7 @@ The ancestor search of step 3 lets a command run from any subfolder of a project
 
 The configuration file is named `eutaxis.yml`. Without the configuration option `--config` (`-c`), a command reads `config/tools/eutaxis.yml` or `eutaxis.yml` below the root. The command stops with an error that names both files when both exist, and with an error that names both places when neither exists: Eutaxis declares every source and every output in the configuration file, so it has no built-in defaults.
 
-A path given on the command line, including the value of `--config`, is relative to the current folder. A path written in the configuration file is relative to the root, so the file moves between the root and `config/tools/` without an edit. A configuration file that declares the retired key `root` is a configuration error. A configuration file whose key `_schema` is absent or differs from `eutaxis:configuration@1` is a configuration error too, and the message names the value to write; see [Configuration: format identifier](configuration.md#format-identifier).
+A path given on the command line, including the value of `--config`, is relative to the current folder. A path written in the configuration file is relative to the root, so the file moves between the root and `config/tools/` without an edit. A configuration file that declares the retired key `root` is a configuration error. A configuration file whose key `_schema` is absent or unsupported is a configuration error too, and the message names the current value; see [Configuration: format identifier](configuration.md#format-identifier).
 
 ## Exit statuses
 
@@ -35,7 +35,7 @@ Every command exits with one of three statuses:
 
 - `0` -- the command succeeded, and its check, if any, found no problem;
 - `1` -- a check or a validation found a problem: an outdated output, a drifted artifact, an exceeded budget, a rejected label under `strict_rule_labels`, or a source that the [failure-mode gate](../adr/failure-mode-as-source-field.md) rejects;
-- `2` -- a usage or configuration error prevented the command from running as asked: an unknown option or name, an invalid or missing configuration file, a configuration file without the identifier `eutaxis:configuration@1`, a declared source that is missing or malformed, a corrupted state file, a file that only `--force` may replace, or a missing confirmation.
+- `2` -- a usage or configuration error prevented the command from running as asked: an unknown option or name, an invalid or missing configuration file, a configuration file without the identifier `eutaxis:configuration@2`, a declared source that is missing or malformed, a corrupted state file, a file that only `--force` may replace, or a missing confirmation.
 
 ## Files and confirmations
 
@@ -71,20 +71,20 @@ eutaxis generate [-c <config-file>] [--root <folder>]
 | `--root` | `-r` | [resolved root](#root-and-configuration-file) | Folder below which the configuration file is looked up and against which its paths resolve. |
 | `--agent` | `-a` | all enabled agents | Generate only one configured agent output. |
 | `--dry-run` | | `false` | Show output targets without writing files. |
-| `--plan` | | `false` | With `--dry-run`, summarize cumulative-file drift and budgets. |
+| `--plan` | | `false` | With `--dry-run`, report structured selections, cumulative-file drift and budgets. |
 | `--ignore-budget` | | `false` | Skip generated-target and cumulative-chain budget failures. |
 
 The generator reads the configuration file, resolves all source paths relative to the root, and writes one output file per enabled agent. See [Configuration](configuration.md) for the full schema.
 
-The command `eutaxis generate --dry-run --plan` reports the planned state of each target. For a changed target, it reports added and removed line counts without printing the complete generated file. The report also gives every generated-target and cumulative-chain byte budget.
+The command `eutaxis generate --dry-run --plan` reports the planned state of each target. For a changed target, it reports added and removed line counts without printing the complete generated file. The report also gives every generated-target and cumulative-chain byte budget. For each declaration source used by a selected output, it first reports the module, composition manifest, artifact mechanism, scope, target, candidate digest and ordered final-effective record identifiers. The same candidate bytes produce the target plan. The last line is `[COMMAND  ] complete`; a failed plan writes `[COMMAND  ] failed` to standard error and does not report a certified selection for the failed resolution.
 
 A label line that violates the [label grammar](concepts.md#rule-blocks) defines no rule, so the rule index omits that line. Each such line of a declared module is reported on standard error, with its file, its line and the violated part of the grammar. Under the configuration key `strict_rule_labels: true`, a rejected line fails the command before any file is written.
 
 Exit statuses:
 
 - `0` -- all agent files were generated, or, under `--dry-run`, would be generated.
-- `1` -- a generated target or a cumulative instruction chain exceeds its configured budget, or a label line is rejected under `strict_rule_labels`.
-- `2` -- the configuration file or a declared source cannot be read.
+- `1` -- a generated target or cumulative instruction chain exceeds its budget, a label line is rejected under `strict_rule_labels`, or a configured declaration corpus or semantic resolution is invalid.
+- `2` -- the configuration file, context or a declared source cannot be read or used.
 
 ---
 
@@ -104,7 +104,9 @@ eutaxis check [-c <config-file>] [--root <folder>]
 | `--diff` | | `false` | Print unified diffs for stale outputs. |
 | `--ignore-budget` | | `false` | Report budget overruns without making them fail the check. |
 
-Exit status `0` means all selected outputs are current and within budget. Without an agent filter, the selected outputs include the standalone rule index. Exit status `1` means that an output differs from its generated content or exceeds a configured budget. The command reports rejected label lines in the same form as `generate`. With `strict_rule_labels: true`, a rejected label also fails the check.
+For each declaration source used by a selected output, the command reports the same candidate digest and ordered final-effective records as `generate --dry-run --plan`. The `--agent` filter restricts both output rows and declaration sources. The last line records command completion independently of the check verdict: stale or over-budget outputs still end with `[COMMAND  ] complete` and exit with status `1`, because the comparison completed. A resolution or operational failure writes `[COMMAND  ] failed` and emits no certified selection for the failed resolution.
+
+Exit status `0` means all selected outputs are current and within budget. Without an agent filter, the selected outputs include the standalone rule index. Exit status `1` means that an output differs from its generated content, exceeds a configured budget, fails strict label validation, or has an invalid configured declaration resolution. Status `2` means configuration, context, source access or another operation prevented the check from completing. The command reports rejected label lines in the same form as `generate`.
 
 ---
 
@@ -270,6 +272,36 @@ Exit statuses:
 
 ---
 
+### `declarations`
+
+The `declarations` command validates, locks and resolves canonical declaration corpora.
+
+| Subcommand | Use it to |
+|------------|-----------|
+| `check` | Validate a manifest-defined corpus and write a Static Analysis Results Interchange Format (SARIF) report. |
+| `lock` | Generate, compare or create a canonical acquisition lock. |
+| `explain` | Resolve a composition manifest and write canonical JavaScript Object Notation (JSON) that explains the result. |
+
+The `explain` subcommand requires an acquisition manifest, its matching lock and the identifier of a composition manifest. The manifest and lock paths resolve from the current folder and must remain inside the selected root. The context option `--context` may be repeated. Each occurrence supplies a typed facet as `KEY=JSON_VALUE`. Therefore, quotation marks remain necessary around a JSON string value.
+
+```sh
+eutaxis declarations explain \
+  --manifest declarations/acquisition.yaml \
+  --lock declarations/acquisition.lock.json \
+  --manifest-id oikos/global-agent-instructions \
+  --context context.available=true \
+  --context 'task.kind="programming"'
+```
+
+The output and exit status distinguish four outcomes:
+
+- Status `0` writes a query packet whose completion field is `complete`.
+- Status `1` writes a distinct diagnostic whose completion field is `failed`. The diagnostic contains the failure code, portable source coordinates and every resolver event produced before the failure.
+- Status `2` reports invalid command input.
+- Status `3` reports an unavailable acquisition boundary, invalidated authority, cleanup failure or output failure.
+
+---
+
 ### `validate` (stub)
 
 Validate prompt family layouts and configuration files.
@@ -300,7 +332,7 @@ eutaxis init --template codex-project --root <folder>
 | `--template` | | `codex-project` | Template directory under `eutaxis/data/templates`. |
 | `--force` | | `false` | Overwrite existing scaffold files. |
 
-The command copies tracked starter files from the selected template into the root, including the configuration file `eutaxis.yml`, whose first key is `_schema: eutaxis:configuration@1`. A scaffold file may hold edits, so an existing file is overwritten only under `--force`; without it, the command stops with status `2` and names the file.
+The command copies tracked starter files from the selected template into the root, including the configuration file `eutaxis.yml`, whose first key is `_schema: eutaxis:configuration@2`. A scaffold file may hold edits, so an existing file is overwritten only under `--force`; without it, the command stops with status `2` and names the file.
 
 ---
 

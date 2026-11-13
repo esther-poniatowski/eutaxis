@@ -23,7 +23,7 @@ generator.write_all()
 
 ## Configuration loading
 
-`load_config(config_path, root=None)` loads a YAML instruction config and returns an `InstructionConfig`. The file must declare `_schema: eutaxis:configuration@1`, the value of the constant `CONFIG_SCHEMA`; without this exact value, `load_config` raises `ConfigurationError`. The relative source and target paths of the file resolve against `root`. Without `root`, they resolve against the root implied by the place of the file, returned by `settings_root(config_path)`: the folder that holds `config/` for a file in `config/tools/`, and the folder of the file otherwise.
+`load_config(config_path, root=None)` loads a YAML instruction config and returns an `InstructionConfig`. The current format is `_schema: eutaxis:configuration@2`, the value of `CONFIG_SCHEMA`. The reader also accepts legacy version 1 files, but only version 2 admits declaration sources. The relative source and target paths of the file resolve against `root`. Without `root`, they resolve against the root implied by the place of the file, returned by `settings_root(config_path)`: the folder that holds `config/` for a file in `config/tools/`, and the folder of the file otherwise.
 
 ```python
 from pathlib import Path

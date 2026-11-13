@@ -15,9 +15,12 @@ from .loading_units import validate_loading_units
 from .markdown import parse_frontmatter
 from .models import (
     AgentConfig,
+    DeclarationSource,
     InstructionChain,
     InstructionConfig,
+    InstructionSource,
     ReferenceDoc,
+    RequiredLoadingRoute,
     SkillLoadingMember,
     SkillLoadingUnit,
     SourceFile,
@@ -29,8 +32,9 @@ from .models import (
 class ConfigLoader:
     """Load and validate instruction assembly configuration.
 
-    The configuration file declares its format in the key ``_schema``, whose
-    value must equal ``CONFIG_SCHEMA`` as a whole string. The relative paths of
+    The configuration file declares its format in the key ``_schema``. Version
+    1 admits Markdown sources; version 2 also admits structured declaration
+    sources. The relative paths of
     the configuration file resolve against ``root``, or, when ``root`` is
     absent, against ``settings_root(config_path)``. The retired key ``root`` is
     rejected.
@@ -39,6 +43,7 @@ class ConfigLoader:
     def __init__(self, config_path: Path, root: Path | None = None) -> None:
         self.config_path = config_path.expanduser().resolve()
         self.root = root.expanduser().resolve() if root else None
+        self._schema = ""
 
     def load(self) -> InstructionConfig:
         """Load a YAML configuration file."""
@@ -56,7 +61,7 @@ class ConfigLoader:
 
         if not isinstance(raw, dict):
             raise ConfigurationError("Configuration must be a YAML mapping")
-        self._check_schema(raw)
+        self._schema = self._check_schema(raw)
 
         config = InstructionConfig(
             root=self._resolve_root(raw),
@@ -76,6 +81,9 @@ class ConfigLoader:
             ),
             skill_loading_units=self._parse_skill_loading_units(
                 raw.get("skill_loading_units", [])
+            ),
+            required_loading_routes=self._parse_required_loading_routes(
+                raw.get("required_loading_routes", {})
             ),
             instruction_chains=self._parse_instruction_chains(
                 raw.get("instruction_chains", [])
@@ -104,24 +112,58 @@ class ConfigLoader:
         validate_loading_units(
             config.skill_loading_units,
             (module.id for module in config.task_modules),
+            config.required_loading_routes,
         )
         self._validate_instruction_chains(config)
+        self._validate_declaration_sources(config)
         return config
 
-    def _check_schema(self, raw: dict[str, Any]) -> None:
-        """Reject a file whose ``_schema`` is absent or differs from ``CONFIG_SCHEMA``."""
+    @staticmethod
+    def _validate_declaration_sources(config: InstructionConfig) -> None:
+        """Reject ambiguous structured source identities across all outputs."""
+        sources = [
+            source
+            for source in config.common_sources
+            if isinstance(source, DeclarationSource)
+        ]
+        sources.extend(
+            source
+            for agent in config.agents
+            for source in agent.sources
+            if isinstance(source, DeclarationSource)
+        )
+        by_manifest: dict[str, DeclarationSource] = {}
+        by_module: dict[str, DeclarationSource] = {}
+        for source in sources:
+            prior_manifest = by_manifest.setdefault(
+                source.composition_manifest, source
+            )
+            if prior_manifest != source:
+                raise ConfigurationError(
+                    "Composition manifest is configured with different source "
+                    f"inputs: {source.composition_manifest}"
+                )
+            prior_module = by_module.setdefault(source.module, source)
+            if prior_module != source:
+                raise ConfigurationError(
+                    f"Declaration module is ambiguous: {source.module}"
+                )
+
+    def _check_schema(self, raw: dict[str, Any]) -> str:
+        """Return one supported configuration schema identifier."""
         if SCHEMA_KEY not in raw:
             raise ConfigurationError(
                 f"{self.config_path} declares no key '{SCHEMA_KEY}'. Write "
                 f"'{SCHEMA_KEY}: {CONFIG_SCHEMA}' as the first key of the file."
             )
         value = raw[SCHEMA_KEY]
-        if value != CONFIG_SCHEMA:
+        if value not in CONFIG_SCHEMAS:
             raise ConfigurationError(
                 f"{self.config_path} declares {SCHEMA_KEY}: {value}, which is "
-                "not the format of an Eutaxis configuration file. Write "
-                f"'{SCHEMA_KEY}: {CONFIG_SCHEMA}' as the first key of the file."
+                "not a supported Eutaxis configuration format. Write "
+                f"'{SCHEMA_KEY}: {CONFIG_SCHEMA}' for the current format."
             )
+        return value
 
     def _resolve_root(self, raw: dict[str, Any]) -> Path:
         if "root" in raw:
@@ -138,7 +180,7 @@ class ConfigLoader:
             return self.root
         return settings_root(self.config_path)
 
-    def _parse_sources(self, raw_sources: Any) -> list[SourceFile]:
+    def _parse_sources(self, raw_sources: Any) -> list[InstructionSource]:
         if raw_sources is None:
             return []
         if not isinstance(raw_sources, list):
@@ -146,12 +188,22 @@ class ConfigLoader:
 
         return [self._parse_source(source) for source in raw_sources]
 
-    def _parse_source(self, raw: Any) -> SourceFile:
+    def _parse_source(self, raw: Any) -> InstructionSource:
         if isinstance(raw, str):
             return SourceFile(path=Path(raw))
 
         if not isinstance(raw, dict):
             raise ConfigurationError(f"Invalid source specification: {raw!r}")
+        if "declaration" in raw:
+            if set(raw) != {"declaration"}:
+                raise ConfigurationError(
+                    "A declaration source entry admits only the 'declaration' key"
+                )
+            if self._schema != CONFIG_SCHEMA:
+                raise ConfigurationError(
+                    f"Declaration sources require {SCHEMA_KEY}: {CONFIG_SCHEMA}"
+                )
+            return self._parse_declaration_source(raw["declaration"])
         if "path" not in raw:
             raise ConfigurationError("Source entries must specify 'path'")
 
@@ -167,6 +219,64 @@ class ConfigLoader:
                 raw.get("strip_frontmatter", True),
                 "strip_frontmatter",
             ),
+        )
+
+    def _parse_declaration_source(self, raw: Any) -> DeclarationSource:
+        """Parse one exact structured cumulative source."""
+        if not isinstance(raw, dict):
+            raise ConfigurationError("A declaration source must be a mapping")
+        fields = {
+            "module",
+            "acquisition_manifest",
+            "acquisition_lock",
+            "composition_manifest",
+            "context",
+        }
+        missing = fields - set(raw)
+        extra = set(raw) - fields
+        if missing:
+            raise ConfigurationError(
+                "A declaration source is missing: " + ", ".join(sorted(missing))
+            )
+        if extra:
+            raise ConfigurationError(
+                "A declaration source has unknown fields: "
+                + ", ".join(sorted(extra))
+            )
+
+        module = self._nonempty_string(raw["module"], "declaration.module")
+        manifest = self._nonempty_string(
+            raw["composition_manifest"], "declaration.composition_manifest"
+        )
+        acquisition_manifest = self._safe_relative_path(
+            raw["acquisition_manifest"], "declaration.acquisition_manifest"
+        )
+        acquisition_lock = self._safe_relative_path(
+            raw["acquisition_lock"], "declaration.acquisition_lock"
+        )
+        context = raw["context"]
+        if not isinstance(context, dict) or any(
+            not isinstance(key, str) or not key for key in context
+        ):
+            raise ConfigurationError(
+                "declaration.context must be a mapping with non-empty string keys"
+            )
+        try:
+            from ..declarations.models import freeze_json
+
+            frozen_context = freeze_json(context)
+        except (TypeError, ValueError) as exc:
+            raise ConfigurationError(
+                f"declaration.context must contain only JSON values: {exc}"
+            ) from exc
+        if not isinstance(frozen_context, Mapping):
+            raise ConfigurationError("declaration.context must be a mapping")
+        return DeclarationSource(
+            module=module,
+            acquisition_manifest=acquisition_manifest,
+            acquisition_lock=acquisition_lock,
+            composition_manifest=manifest,
+            context=frozen_context,
         )
 
     def _parse_agents(self, raw_agents: Any) -> list[AgentConfig]:
@@ -310,6 +420,38 @@ class ConfigLoader:
                 )
             )
         return loading_units
+
+    def _parse_required_loading_routes(
+        self, raw_routes: Any
+    ) -> tuple[RequiredLoadingRoute, ...]:
+        if raw_routes is None:
+            return ()
+        if not isinstance(raw_routes, dict):
+            raise ConfigurationError("required_loading_routes must be a mapping")
+
+        routes: list[RequiredLoadingRoute] = []
+        seen_casefolded: set[str] = set()
+        for raw_name, raw_owner in raw_routes.items():
+            name = str(raw_name)
+            owner = str(raw_owner)
+            folded_name = name.casefold()
+            if folded_name in seen_casefolded:
+                raise ConfigurationError(
+                    f"Duplicate required loading route name: {name}"
+                )
+            if not is_safe_slug(name):
+                raise ConfigurationError(
+                    f"Invalid required loading route name {name!r}; expected a "
+                    "safe lowercase slug"
+                )
+            if not is_safe_slug(owner):
+                raise ConfigurationError(
+                    f"Invalid required loading route owner {owner!r}; expected a "
+                    "safe lowercase slug"
+                )
+            seen_casefolded.add(folded_name)
+            routes.append(RequiredLoadingRoute(name=name, owner=owner))
+        return tuple(routes)
 
     def _parse_skill_loading_members(
         self, raw_members: Any, unit_name: str
@@ -483,6 +625,22 @@ class ConfigLoader:
             return tuple(str(item) for item in value)
         raise ConfigurationError(f"Expected string or list of strings, got {value!r}")
 
+    @staticmethod
+    def _nonempty_string(value: Any, field: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ConfigurationError(f"Field '{field}' must be a non-empty string")
+        return value
+
+    @classmethod
+    def _safe_relative_path(cls, value: Any, field: str) -> Path:
+        text = cls._nonempty_string(value, field)
+        path = Path(text)
+        if path.is_absolute() or ".." in path.parts:
+            raise ConfigurationError(
+                f"Field '{field}' must stay below the command root"
+            )
+        return path
+
     def _as_bool(self, value: Any, field: str) -> bool:
         if isinstance(value, bool):
             return value
@@ -521,8 +679,14 @@ CONFIG_FILENAME = "eutaxis.yml"
 SCHEMA_KEY = "_schema"
 """Key that declares the format of the configuration file."""
 
-CONFIG_SCHEMA = "eutaxis:configuration@1"
-"""Format identifier that the configuration file declares in ``_schema``."""
+CONFIG_SCHEMA_V1 = "eutaxis:configuration@1"
+"""Legacy format identifier for Markdown-only instruction sources."""
+
+CONFIG_SCHEMA = "eutaxis:configuration@2"
+"""Current format identifier, including structured declaration sources."""
+
+CONFIG_SCHEMAS = frozenset({CONFIG_SCHEMA_V1, CONFIG_SCHEMA})
+"""Configuration formats admitted by this reader."""
 
 CONFIG_SEARCH_PATHS: tuple[Path, ...] = (
     Path("config") / "tools" / CONFIG_FILENAME,

@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 from typing import NamedTuple, NoReturn
 
-from ._authority import IdentityAuthorityStore
-from .exceptions import AcquisitionContractError
+from ._authority import IdentityAuthorityStore, identity_value_state
+from .exceptions import AcquisitionAuthorityError
 from .external_result import (
+    AcquisitionSourceCoordinate,
     ExternalAcquisitionResult,
     _ExternalAcquisitionResultState,
     _issued_external_result_state,
 )
 from .resolution import (
+    ResolutionError,
     ResolutionResult,
     ResolutionTrace,
     ResolvedCompilationUnit,
@@ -28,6 +31,30 @@ class _ExternalResolutionState(NamedTuple):
     acquisition: ExternalAcquisitionResult
     acquisition_state: _ExternalAcquisitionResultState
     resolution: ResolutionResult
+    source_coordinates_by_path: tuple[tuple[Path, AcquisitionSourceCoordinate], ...]
+
+
+class _ExternalResolutionFailureState(NamedTuple):
+    """Bind one resolver failure to its exact acquisition authority."""
+
+    acquisition: ExternalAcquisitionResult
+    acquisition_state: _ExternalAcquisitionResultState
+    error: ResolutionError
+    error_snapshot: tuple[object, ...]
+    source_coordinates_by_path: tuple[tuple[Path, AcquisitionSourceCoordinate], ...]
+
+
+class ExternalResolutionError(ResolutionError):
+    """Report one acquisition-bound external semantic-resolution failure."""
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        raise TypeError("external resolution errors must be issued")
+
+    def __reduce__(self) -> NoReturn:
+        raise TypeError("external resolution errors cannot be serialized")
+
+    def __reduce_ex__(self, _protocol: object) -> NoReturn:
+        raise TypeError("external resolution errors cannot be serialized")
 
 
 class ExternalResolutionResult:
@@ -68,6 +95,7 @@ _EXTERNAL_RESOLUTION_AUTHORITIES: IdentityAuthorityStore[object] = (
     IdentityAuthorityStore()
 )
 _EXTERNAL_RESOLUTION_OWNERS: IdentityAuthorityStore[object] = IdentityAuthorityStore()
+_EXTERNAL_FAILURE_AUTHORITIES: IdentityAuthorityStore[object] = IdentityAuthorityStore()
 
 
 def resolve_external_compilation_unit(
@@ -77,10 +105,19 @@ def resolve_external_compilation_unit(
 ) -> ExternalResolutionResult:
     """Resolve one manifest while retaining its exact acquisition authority."""
     acquisition_state = _issued_external_result_state(acquisition)
+    source_coordinates = _snapshot_acquisition_source_coordinates(acquisition_state)
     registry = acquisition_state.external_registry_state.registry
     resolution: ResolutionResult | None = None
     try:
         resolution = resolve_compilation_unit(registry, manifest_id, context)
+    except ResolutionError as error:
+        _raise_changed_acquisition(acquisition, acquisition_state, error)
+        raise _issue_external_resolution_error(
+            acquisition,
+            acquisition_state,
+            error,
+            source_coordinates,
+        ) from error
     except BaseException as error:
         _raise_changed_acquisition(acquisition, acquisition_state, error)
         raise
@@ -90,6 +127,7 @@ def resolve_external_compilation_unit(
             acquisition,
             acquisition_state,
             resolution,
+            source_coordinates,
         )
     except BaseException as error:
         _RESOLUTION_AUTHORITIES.retire(resolution)
@@ -101,6 +139,7 @@ def _issue_external_resolution(
     acquisition: ExternalAcquisitionResult,
     acquisition_state: _ExternalAcquisitionResultState,
     resolution: ResolutionResult,
+    source_coordinates: tuple[tuple[Path, AcquisitionSourceCoordinate], ...],
 ) -> ExternalResolutionResult:
     if not _is_issued_resolution_result(resolution):
         _fail("$", "internal resolution result is not issued here")
@@ -111,6 +150,7 @@ def _issue_external_resolution(
         acquisition,
         acquisition_state,
         resolution,
+        source_coordinates,
     )
     try:
         owner_token = _EXTERNAL_RESOLUTION_OWNERS.issue(result, (resolution,))
@@ -122,6 +162,89 @@ def _issue_external_resolution(
     except BaseException:
         _retire_external_resolution(result)
         raise
+
+
+def _issue_external_resolution_error(
+    acquisition: ExternalAcquisitionResult,
+    acquisition_state: _ExternalAcquisitionResultState,
+    error: ResolutionError,
+    source_coordinates: tuple[tuple[Path, AcquisitionSourceCoordinate], ...],
+) -> ExternalResolutionError:
+    """Issue one opaque failure bound to the attempted external resolution."""
+    issued = Exception.__new__(ExternalResolutionError)
+    Exception.__init__(issued, *error.args)
+    for name in (
+        "code",
+        "detail",
+        "source",
+        "trace",
+        "truth",
+        "applicability",
+    ):
+        setattr(issued, name, getattr(error, name))
+    state = _ExternalResolutionFailureState(
+        acquisition,
+        acquisition_state,
+        error,
+        _resolution_error_snapshot(error),
+        source_coordinates,
+    )
+    _EXTERNAL_FAILURE_AUTHORITIES.issue(issued, state)
+    _issued_external_resolution_error_state(issued)
+    return issued
+
+
+def _issued_external_resolution_error_state(
+    error: object,
+) -> _ExternalResolutionFailureState:
+    """Authenticate one external failure and its retained resolver evidence."""
+    if type(error) is not ExternalResolutionError:
+        _fail("$", "external resolution error is not issued here")
+    state = _EXTERNAL_FAILURE_AUTHORITIES.state(error)
+    if type(state) is not _ExternalResolutionFailureState:
+        _fail("$", "external resolution error is not issued here")
+    _require_same_acquisition(state.acquisition, state.acquisition_state)
+    original = state.error
+    if _resolution_error_snapshot(original) != state.error_snapshot:
+        _fail("$", "original resolution error state changed")
+    for name in (
+        "code",
+        "detail",
+        "source",
+        "trace",
+        "truth",
+        "applicability",
+    ):
+        if getattr(error, name) is not getattr(original, name):
+            _fail("$", f"external resolution error {name} changed")
+    if error.args != original.args:
+        _fail("$", "external resolution error message changed")
+    by_path = dict(state.source_coordinates_by_path)
+    if len(by_path) != len(state.source_coordinates_by_path):
+        _fail("$.sources", "external resolution failure sources changed")
+    for source in (
+        *((event.source for event in original.trace.events) if original.trace else ()),
+        *((original.source,) if original.source is not None else ()),
+    ):
+        if source.path not in by_path:
+            _fail("$.trace", "resolution failure source binding changed")
+    return state
+
+
+def _resolution_error_snapshot(error: ResolutionError) -> tuple[object, ...]:
+    """Capture the complete identity and value state of resolver failure evidence."""
+    return (
+        error.code,
+        error.detail,
+        id(error.source),
+        identity_value_state(error.source),
+        id(error.trace),
+        identity_value_state(error.trace),
+        error.truth,
+        id(error.applicability),
+        identity_value_state(error.applicability),
+        error.args,
+    )
 
 
 def _issued_external_resolution_state(result: object) -> _ExternalResolutionState:
@@ -161,7 +284,39 @@ def _authenticate_external_resolution_state(
         is not state.acquisition_state.external_registry_state.registry
     ):
         _fail("$", "resolution registry differs from the acquired registry")
+    _validate_resolution_source_coordinates(state)
     return state
+
+
+def _snapshot_acquisition_source_coordinates(
+    acquisition: _ExternalAcquisitionResultState,
+) -> tuple[tuple[Path, AcquisitionSourceCoordinate], ...]:
+    """Bind current source paths before semantic resolution begins."""
+    by_path: dict[Path, AcquisitionSourceCoordinate] = {}
+    for loaded, coordinate in acquisition.source_map:
+        path = loaded.path.resolve()
+        prior = by_path.get(path)
+        if prior is not None and prior != coordinate:
+            _fail("$.sources", f"duplicate resolved source path {path}")
+        by_path[path] = coordinate
+    return tuple(sorted(by_path.items(), key=lambda item: str(item[0])))
+
+
+def _validate_resolution_source_coordinates(state: _ExternalResolutionState) -> None:
+    """Require every retained resolver path to keep one acquired coordinate."""
+    coordinates = state.acquisition_state.source_coordinates
+    by_path = dict(state.source_coordinates_by_path)
+    if (
+        len(by_path) != len(state.source_coordinates_by_path)
+        or any(
+            not any(coordinate is issued for issued in coordinates)
+            for coordinate in by_path.values()
+        )
+        or any(
+            event.source.path not in by_path for event in state.resolution.trace.events
+        )
+    ):
+        _fail("$.trace", "resolution source-coordinate binding changed")
 
 
 def _retire_external_resolution(result: object) -> None:
@@ -222,4 +377,4 @@ def _raise_changed_acquisition(
 
 
 def _fail(location: str, message: str) -> NoReturn:
-    raise AcquisitionContractError(location, message)
+    raise AcquisitionAuthorityError(location, message)
