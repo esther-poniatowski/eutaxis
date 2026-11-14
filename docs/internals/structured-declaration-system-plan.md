@@ -735,8 +735,8 @@ debt.
 This phase ensures that no legacy unit or consumer remains unaccounted for.
 
 - [x] Discover every legacy source and consumer projection through the production gate. Bind each verdict to unchanged source and evaluator inputs, rendered artifacts, and declaration membership.
-- [ ] Freeze the reviewed repository scope and record exactly one admitted outcome for every legacy unit.
+- [x] Freeze the reviewed repository scope and record exactly one admitted outcome for every legacy unit.
 - [ ] Compare modality, applicability, exceptions, criteria, evaluator, and every rendered consumer before and after migration.
-- [ ] Require zero unaccounted units and prove the ledger gate fails when a planted legacy unit is omitted.
+- [x] Require zero unaccounted units and prove the ledger gate fails when a planted legacy unit is omitted.
 
 **Exit evidence:** every legacy unit and consumer projection is accounted for, and rollback restores the last reviewed generated release.
