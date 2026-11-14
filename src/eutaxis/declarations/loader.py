@@ -293,6 +293,8 @@ def _build_rule(
                 str(identifier)
                 for identifier in cast(list[object], item.get("substitutes", []))
             ),
+            rationale=str(item["rationale"]) if "rationale" in item else None,
+            authored_when=_frozen_mapping(_mapping(item["when"])),
         )
         for item in map(_mapping, cast(list[object], document.get("exceptions", [])))
     )

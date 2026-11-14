@@ -184,6 +184,8 @@ class ExceptionClause:
     disposition: str
     affects: tuple[str, ...]
     substitutes: tuple[str, ...]
+    rationale: str | None = None
+    authored_when: Mapping[str, JsonValue] | None = None
 
 
 @dataclass(frozen=True)

@@ -522,6 +522,114 @@ def test_agent_profile_uses_local_labels_and_omits_evaluator_metadata(
     assert "✓ Agent MUST retain every required field before rendering." in artifact.text
 
 
+def test_agent_profile_renders_closed_rule_exceptions(tmp_path: Path) -> None:
+    rule_set = RULE_SET.replace(
+        b"    criteria:\n",
+        b"    exceptions:\n"
+        b"      - id: frame-exception\n"
+        b"        when: {facet: projection.optional, operator: equals, value: false}\n"
+        b"        disposition: waive\n"
+        b"        affects: [preserve-frame]\n"
+        b"        rationale: The optional frame is intentionally absent\n"
+        b"    criteria:\n",
+    )
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="projection",
+        declaration_files=(
+            ("declarations/rule-set.yaml", rule_set),
+            ("declarations/manifest.yaml", RULE_SET_MANIFEST),
+        ),
+        facet_bytes=FACETS,
+    )
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    resolution = resolve_external_compilation_unit(
+        acquisition,
+        "projection/rule-set-manifest",
+        {
+            "context.available": True,
+            "projection.enabled": True,
+            "projection.optional": False,
+            "projection.stable": True,
+            "projection.done": False,
+        },
+    )
+    artifact = render_external_cumulative_markdown(
+        plan_external_cumulative_composition(resolution),
+        profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+    )
+
+    assert "*Exception.* `frame-exception`:" in artifact.text
+    assert (
+        'When `{"facet":"projection.optional","operator":"equals","value":false}`'
+        in artifact.text
+    )
+    assert (
+        "- `preserve-frame`: Agent MUST preserve the rule-set frame."
+        in artifact.text
+    )
+    assert artifact.text.count("Agent MUST preserve the rule-set frame.") == 1
+    assert "The optional frame is intentionally absent" in artifact.text
+
+
+def test_agent_profile_renders_active_substitute_exception(tmp_path: Path) -> None:
+    rule_set = RULE_SET.replace(
+        b"    criteria:\n",
+        b"      - id: preserve-substitute\n"
+        b"        modality: must\n"
+        b"        subject: agent\n"
+        b"        action: {verb: retain, object: the substitute frame}\n"
+        b"    exceptions:\n"
+        b"      - id: substitute-frame\n"
+        b"        when: {facet: projection.optional, operator: equals, value: false}\n"
+        b"        disposition: substitute\n"
+        b"        affects: [preserve-frame]\n"
+        b"        substitutes: [preserve-substitute]\n"
+        b"    criteria:\n",
+    )
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="projection",
+        declaration_files=(
+            ("declarations/rule-set.yaml", rule_set),
+            ("declarations/manifest.yaml", RULE_SET_MANIFEST),
+        ),
+        facet_bytes=FACETS,
+    )
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    resolution = resolve_external_compilation_unit(
+        acquisition,
+        "projection/rule-set-manifest",
+        {
+            "context.available": True,
+            "projection.enabled": True,
+            "projection.optional": False,
+            "projection.stable": True,
+            "projection.done": False,
+        },
+    )
+    artifact = render_external_cumulative_markdown(
+        plan_external_cumulative_composition(resolution),
+        profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+    )
+
+    assert "*Exception.* `substitute-frame`:" in artifact.text
+    assert (
+        "- `preserve-frame`: Agent MUST preserve the rule-set frame."
+        in artifact.text
+    )
+    assert (
+        "With:\n- `preserve-substitute`: Agent MUST retain the substitute frame."
+        in artifact.text
+    )
+    assert artifact.text.count("Agent MUST preserve the rule-set frame.") == 1
+    assert artifact.text.count("Agent MUST retain the substitute frame.") == 2
+
+
 def test_agent_profile_renders_containing_rule_set_once(tmp_path: Path) -> None:
     artifact = render_external_cumulative_markdown(
         _rule_set_plan(tmp_path),

@@ -46,6 +46,7 @@ rules:
           value: false
         disposition: waive
         affects: [support-claim]
+        rationale: A missing source prevents direct citation
     criteria:
       - id: claims-have-evidence
         norms: [support-claim]

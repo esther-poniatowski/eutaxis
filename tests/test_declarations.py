@@ -19,6 +19,7 @@ from eutaxis.declarations import (
     DeclarationSchemaError,
     DeclarationSemanticError,
     EvaluatorDeclaration,
+    ExceptionClause,
     LiteralBinding,
     OperationDeclaration,
     ParameterBinding,
@@ -512,7 +513,26 @@ def test_rule_set_contains_typed_rules() -> None:
     assert tuple(rule.norms[0].applicability) == ("all",)
     assert rule.norms[0].guidance is not None
     assert rule.exceptions[0].affects == ("support-claim",)
+    assert rule.exceptions[0].rationale == "A missing source prevents direct citation"
     assert tuple(rule.exceptions[0].when) == ("all",)
+    assert tuple(rule.exceptions[0].authored_when or ()) == (
+        "facet",
+        "operator",
+        "value",
+    )
+
+
+def test_exception_clause_preserves_the_legacy_constructor() -> None:
+    clause = ExceptionClause(
+        "source-unavailable",
+        {"facet": "source.available", "operator": "equals", "value": False},
+        "waive",
+        ("support-claim",),
+        (),
+    )
+
+    assert clause.rationale is None
+    assert clause.authored_when is None
 
 
 def test_rule_set_is_a_selection_only_container(tmp_path: Path) -> None:

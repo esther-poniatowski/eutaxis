@@ -19,6 +19,7 @@ from .models import (
     Criterion,
     CumulativeMarkdownProfile,
     DeclarationKind,
+    ExceptionClause,
     LiteralBinding,
     Norm,
     OperationDeclaration,
@@ -203,6 +204,9 @@ def _render_rule(
             blocks.append(f"*Decision criterion.* {norm.decision_criterion}")
     if rule.rationale is not None:
         blocks.append(f"*Why.* {rule.rationale}")
+    blocks.extend(
+        _render_exception(exception, norms=norms) for exception in rule.exceptions
+    )
     if profile is CumulativeMarkdownProfile.AUDITABLE and projection.criteria:
         lines = ["*Success criteria.*"]
         lines.extend(
@@ -210,6 +214,48 @@ def _render_rule(
             for identifier in projection.criteria
         )
         blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def _render_exception(
+    exception: ExceptionClause,
+    *,
+    norms: Mapping[str, Norm],
+) -> str:
+    """Render one closed conditional exception for agent consumption."""
+    displayed_when = (
+        exception.authored_when
+        if exception.authored_when is not None
+        else exception.when
+    )
+    condition = _code_span(
+        json.dumps(
+            _thaw_json(displayed_when),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+    if exception.disposition == "waive":
+        lines = [f"*Exception.* `{exception.id}`: When {condition}, waive:"]
+        lines.extend(
+            f"- `{identifier}`: {_norm_statement(norms[identifier])}."
+            for identifier in exception.affects
+        )
+    else:
+        lines = [f"*Exception.* `{exception.id}`: When {condition}, replace:"]
+        lines.extend(
+            f"- `{identifier}`: {_norm_statement(norms[identifier])}."
+            for identifier in exception.affects
+        )
+        lines.append("With:")
+        lines.extend(
+            f"- `{identifier}`: {_norm_statement(norms[identifier])}."
+            for identifier in exception.substitutes
+        )
+    blocks = ["\n".join(lines)]
+    if exception.rationale is not None:
+        blocks.append(f"*Why.* {exception.rationale}")
     return "\n\n".join(blocks)
 
 
@@ -238,14 +284,21 @@ def _render_rule_set(
 
 def _render_norm(norm: Norm, profile: CumulativeMarkdownProfile) -> str:
     """Render one BCP 14 norm as one labelled instruction line."""
-    marker, keyword = _MODALITY[norm.modality]
+    marker, _keyword = _MODALITY[norm.modality]
+    statement = _norm_statement(norm)
+    if profile is CumulativeMarkdownProfile.AGENT_INSTRUCTIONS:
+        return f"{marker} {statement}."
+    return f"{marker} `{norm.id}`: {statement}."
+
+
+def _norm_statement(norm: Norm) -> str:
+    """Return one norm as an actionable BCP 14 statement."""
+    _marker, keyword = _MODALITY[norm.modality]
     subject = norm.subject[0].upper() + norm.subject[1:]
     statement = f"{subject} {keyword} {norm.action.verb} {norm.action.object}"
     if norm.action.timing is not None:
         statement += f" {norm.action.timing}"
-    if profile is CumulativeMarkdownProfile.AGENT_INSTRUCTIONS:
-        return f"{marker} {statement}."
-    return f"{marker} `{norm.id}`: {statement}."
+    return statement
 
 
 def _projection_label(

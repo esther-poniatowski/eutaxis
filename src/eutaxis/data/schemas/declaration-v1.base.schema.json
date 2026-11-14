@@ -425,6 +425,11 @@
             "$ref": "#/$defs/id"
           },
           "x-kind": "list"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "x-kind": "markdown"
         }
       },
       "allOf": [
