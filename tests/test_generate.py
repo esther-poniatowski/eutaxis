@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 import eutaxis.cli as cli_module
@@ -1074,6 +1075,83 @@ def test_report_includes_common_source_used_by_standalone_rule_index(
     assert len(reports) == 1
     assert reports[0][1].selection.records == ("resolution/purpose",)
     assert generator.render_standalone_rule_index() is not None
+    assert generator.standalone_rule_index_declarations() == ("resolution/purpose",)
+
+
+def test_standalone_index_excludes_agent_only_structured_records(
+    tmp_path: Path,
+) -> None:
+    private_rule = RULE.replace(
+        b"id: resolution/purpose", b"id: resolution/private"
+    )
+    private_manifest = MANIFEST.replace(
+        b"id: resolution/manifest", b"id: resolution/private-manifest"
+    ).replace(
+        b"declarations: [resolution/purpose]",
+        b"declarations: [resolution/private]",
+    )
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+            ("declarations/private-rule.yaml", private_rule),
+            ("declarations/private-manifest.yaml", private_manifest),
+        ),
+    )
+    context = _context()
+    common_source = {
+        "declaration": {
+            "module": "purpose",
+            "acquisition_manifest": manifest_path,
+            "acquisition_lock": lock_path,
+            "composition_manifest": "resolution/manifest",
+            "context": context,
+        }
+    }
+    private_source = {
+        "declaration": {
+            "module": "private",
+            "acquisition_manifest": manifest_path,
+            "acquisition_lock": lock_path,
+            "composition_manifest": "resolution/private-manifest",
+            "context": context,
+        }
+    }
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        yaml.safe_dump(
+            {
+                "_schema": "eutaxis:configuration@2",
+                "common_sources": [common_source],
+                "rule_index_enabled": True,
+                "rule_index_target": {"path": "rule-index.md"},
+                "agents": [
+                    {
+                        "name": "codex",
+                        "target": "AGENTS.md",
+                        "sources": [private_source],
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    generator = InstructionGenerator(load_config(config))
+
+    reports = generator.declaration_resolution_report()
+    rendered = generator.render_standalone_rule_index()
+
+    assert {resolved.selection.records for _source, resolved in reports} == {
+        ("resolution/purpose",),
+        ("resolution/private",),
+    }
+    assert rendered is not None
+    assert "purpose" in rendered[1]
+    assert "private" not in rendered[1]
+    assert generator.standalone_rule_index_declarations() == ("resolution/purpose",)
 
 
 def test_one_generator_binds_report_and_output_to_one_candidate(

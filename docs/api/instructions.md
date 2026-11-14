@@ -315,6 +315,15 @@ Return (path, content) for the standalone rule-index file, if any.
 * **Return type:**
   tuple[*Path*, str] | None
 
+<a id="eutaxis.instructions.generator.InstructionGenerator.standalone_rule_index_declarations"></a>
+
+#### standalone_rule_index_declarations()
+
+Return structured records whose labels enter the standalone index.
+
+* **Return type:**
+  tuple[str, ...]
+
 <a id="module-eutaxis.instructions.instruction_budgets"></a>
 
 <a id="instruction-budgets"></a>

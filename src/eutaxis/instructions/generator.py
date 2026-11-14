@@ -462,15 +462,25 @@ class InstructionGenerator:
             parts.append(target.footer.strip())
         return target_path, "\n\n".join(parts).rstrip() + "\n"
 
+    def standalone_rule_index_declarations(self) -> tuple[str, ...]:
+        """Return structured records whose labels enter the standalone index."""
+        if not self.config.rule_index_enabled or self.config.rule_index_target is None:
+            return ()
+        identifiers: list[str] = []
+        for source in self.config.common_sources:
+            if not isinstance(source, DeclarationSource):
+                continue
+            _labels, records = self._declaration_rule_index_members(source)
+            identifiers.extend(records)
+        return tuple(dict.fromkeys(identifiers))
+
     def _scan_rule_index_entries(
         self, target_dir: Path
     ) -> list[tuple[str, list[str]]]:
         entries: list[tuple[str, list[str]]] = []
         for source in self.config.common_sources:
             if isinstance(source, DeclarationSource):
-                labels = self._label_pattern.findall(
-                    self._resolve_declaration_source(source).text
-                )
+                labels, _records = self._declaration_rule_index_members(source)
                 if labels:
                     entries.append((source.module, labels))
             else:
@@ -490,6 +500,20 @@ class InstructionGenerator:
             if labels:
                 entries.append((path.stem, labels))
         return entries
+
+    def _declaration_rule_index_members(
+        self, source: DeclarationSource
+    ) -> tuple[list[str], tuple[str, ...]]:
+        """Return labels and exact structured records admitted from one source."""
+        resolved = self._resolve_declaration_source(source)
+        labels = self._label_pattern.findall(resolved.text)
+        admitted = frozenset(labels)
+        records = tuple(
+            identifier
+            for identifier in resolved.selection.records
+            if identifier.rsplit("/", 1)[-1] in admitted
+        )
+        return labels, records
 
     def _render_rule_index_section(
         self, entries: list[tuple[str, list[str]]]
