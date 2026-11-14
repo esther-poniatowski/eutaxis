@@ -8,15 +8,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Mapping, TypeAlias, cast
 
-JsonValue: TypeAlias = (
-    None
-    | bool
-    | int
-    | float
-    | str
-    | tuple["JsonValue", ...]
-    | Mapping[str, "JsonValue"]
-)
+from ..json_types import JsonValue
 
 
 def freeze_json(value: object) -> JsonValue:

@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..declarations.models import JsonValue
+from ..json_types import JsonValue
 
 from .exceptions import ConfigurationError
 

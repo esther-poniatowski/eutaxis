@@ -32,6 +32,9 @@ from dataclasses import dataclass
 LABEL_PATTERN = re.compile(r"^\*\*([a-z][a-z0-9-]*)\*\*:\s*$", re.MULTILINE)
 """Grammar of a label line. Shared with the rule index of the generator."""
 
+RULE_PARSER_CONTRACT = "eutaxis.instructions.rules.parse_module@1"
+"""Versioned behavior contract used by frozen instruction inventories."""
+
 _LABEL_SHAPE = re.compile(r"^(?P<indent>\s*)\*\*(?P<token>[^*\s][^*]*?)\*\*:\s*$")
 _HEADING = re.compile(r"^(#{1,6})\s+(.+)$")
 FENCE_PATTERN = re.compile(r"^\s*(```|~~~)")

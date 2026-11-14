@@ -37,6 +37,7 @@ from .models import (
 )
 from .rules import (
     LABEL_PATTERN,
+    RULE_PARSER_CONTRACT,
     ParsedModule,
     RejectedLabel,
     Rule,
@@ -58,6 +59,7 @@ __all__ = [
     "CONFIG_SEARCH_PATHS",
     "LABEL_PATTERN",
     "ROOT_ENV_VAR",
+    "RULE_PARSER_CONTRACT",
     "AgentConfig",
     "BudgetExceededError",
     "ConfigLoader",

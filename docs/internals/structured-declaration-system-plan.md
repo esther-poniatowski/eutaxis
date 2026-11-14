@@ -165,6 +165,8 @@ carrier mutation.
 
 ## Decision log and open prerequisites
 
+Eutaxis now follows the settled design but must still close the release boundaries named here.
+
 - YAML is canonical; tagged Markdown is only an evidence-triggered fallback.
 - Procedures are a declaration kind, separate from the three rule axes.
 - Semantic resolution, deterministic artifact composition, and host scope precedence are separate layers.
@@ -175,7 +177,7 @@ carrier mutation.
   - generates and validates canonical locks through the general command;
   - proves semantic comparison and rollback through general commands; and
   - emits the selected query packet and consumer artifacts.
-- The workspace-only Oikos pilot may proceed through the reviewed Git bridge specified by the [acquisition contract](../adr/external-declaration-identity-and-acquisition.md#^reviewed-declaration-releases), but still requires its accountability ledger and consumer artifacts.
+- The workspace-only Oikos pilot proceeds through the reviewed Git bridge specified by the [acquisition contract](../adr/external-declaration-identity-and-acquisition.md#^reviewed-declaration-releases). Its pilot ledger and consumer artifacts are complete; the repository-wide migration records remain pending.
 - SQLite remains conditional on measured JSON-index performance.
 
 ## Work sequence
@@ -294,7 +296,7 @@ This phase gives each host the smallest artifact that preserves the complete res
 
 - [x] Render authenticated cumulative Markdown from live catalog records, with complete effective rule and procedure contracts and reviewed golden bytes.
 - [x] Add an explicit compact agent-instruction profile that preserves effective norms and rule-set framing, maps canonical identifiers to collision-checked host labels, and leaves evaluator metadata in queryable records.
-- [ ] Render the first compact structured procedure Skill under the [separate-directory contract](../adr/structured-procedure-skill-projection.md):
+- [x] Render the first procedure as a compact structured Skill under the [separate-directory contract](../adr/structured-procedure-skill-projection.md):
   - [x] Acquire locked UTF-8 support resources separately from declaration YAML and retain their verified carriers in the issued external result.
   - [x] Derive and authenticate the operation-owned resource closure from the resolved procedure and live catalog in the structured-Skill planner.
   - [x] Emit a bounded `SKILL.md`, the complete contract reference and the authenticated resource closure through the existing multi-file artifact model.
@@ -354,7 +356,7 @@ This phase gives each host the smallest artifact that preserves the complete res
 
 The shared revision and serialization slice, both private source observers, candidate assembly, sealed semantic validation, safe lock-file boundaries, and the public lock command are implemented and adversarially accepted. The packaged observer permits production issuance only inside the no-argument running-distribution bootstrap. The workspace observer reads only manifest-declared paths, completes every authoritative read before verification, and rebinds every source identity and carrier sequence to the original live workspace and manifest at consumption. Candidate assembly retains those observations, constructs the complete lock, serializes exact canonical bytes, parses those bytes again, and authenticates the complete relation before single-use consumption. The validation transaction repeats ordinary locked acquisition, builds the complete semantic registry, exposes no authority outside the transaction, and returns exact bytes only after retiring its candidate and receipt. The command then writes those bytes to standard output, checks an existing lock without repair, or creates an absent lock through verified no-replace publication. The typed comparator now reports deterministic changes across authenticated corpora without treating transport metadata as semantics. Git proof remains deferred to transport generalization. The workspace-only Oikos pilot can now use the reviewed Git commit-and-revert bridge. Eutaxis still must append and validate capsule records for the general release path.
 - [x] Emit normalized query packets selected by the pilot; the generic packet is validated against the Oikos process-core declarations.
-- [ ] Pilot one coherent Oikos rule set and one procedure through the complete external-source path.
+- [x] Pilot one coherent Oikos rule set and one procedure through the complete external-source path.
 - [ ] Convert additional sources only after the pilot passes.
 
 Each implementation item closes only after an independent adversarial review,
@@ -720,16 +722,20 @@ The external resolution and composition checks report:
 - Sphinx regenerates the API reference with zero warnings
 - `git diff --check` passes
 
-The workspace-only pilot now must produce its accountability ledger and
-consumer projections. Its reviewed Git commit retains the current output as the
-golden baseline and rollback target. General capsule commands remain parallel
-release-system debt.
+The workspace-only pilot now has its accountability ledger and consumer
+projections. For this pilot, the reviewed Git commit retains the current output
+as the golden baseline and rollback target. However, the repository-wide scope
+and ledger remain pending. General capsule commands form separate release-system
+debt.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 
 ### Migration accountability
 
-- [ ] Produce a ledger mapping every legacy unit to a new identifier, an explicitly named merge target, a retired rationale, or a deferred owner and prerequisite.
+This phase ensures that no legacy unit or consumer remains unaccounted for.
+
+- [x] Discover every legacy source and consumer projection through the production gate. Bind each verdict to unchanged source and evaluator inputs, rendered artifacts, and declaration membership.
+- [ ] Freeze the reviewed repository scope and record exactly one admitted outcome for every legacy unit.
 - [ ] Compare modality, applicability, exceptions, criteria, evaluator, and every rendered consumer before and after migration.
 - [ ] Require zero unaccounted units and prove the ledger gate fails when a planted legacy unit is omitted.
 
