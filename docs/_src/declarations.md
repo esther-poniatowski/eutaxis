@@ -59,7 +59,7 @@ Upon failure, the external resolver issues an acquisition-bound `ExternalResolut
 
 ## Artifact-facade source
 
-The facade source binds the authenticated source revisions and certified component sequence to the exact cumulative candidate bytes and their digest before acquisition authority is retired.
+The facade source binds the authenticated source revisions, certified component sequence and exact contributing declarations to the cumulative candidate bytes and their digest before acquisition authority is retired.
 
 ```{eval-rst}
 .. automodule:: eutaxis.declarations.facade_report

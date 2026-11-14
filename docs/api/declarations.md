@@ -612,6 +612,12 @@ Return the authenticated canonical artifact bytes.
 
 Decode the authenticated canonical bytes as strict UTF-8.
 
+<a id="eutaxis.declarations.external_composition.ExternalCumulativeArtifact.contributors"></a>
+
+#### *property* contributors *: tuple[str, ...]*
+
+Return declarations that supplied the artifact’s visible content.
+
 <a id="eutaxis.declarations.external_composition.plan_external_cumulative_composition"></a>
 
 ### eutaxis.declarations.external_composition.plan_external_cumulative_composition(resolution)
@@ -651,7 +657,7 @@ Render one external cumulative plan for a declared consumer profile.
 
 ## Artifact-facade source
 
-The facade source binds the authenticated source revisions and certified component sequence to the exact cumulative candidate bytes and their digest before acquisition authority is retired.
+The facade source binds the authenticated source revisions, certified component sequence and exact contributing declarations to the cumulative candidate bytes and their digest before acquisition authority is retired.
 
 <a id="module-eutaxis.declarations.facade_report"></a>
 
@@ -694,7 +700,7 @@ Identify one resolved artifact and its ordered effective records.
 
 <a id="eutaxis.declarations.facade_report.ResolvedCumulativeSource"></a>
 
-### *class* eutaxis.declarations.facade_report.ResolvedCumulativeSource(selection, source_revisions, content, sha256)
+### *class* eutaxis.declarations.facade_report.ResolvedCumulativeSource(selection, source_revisions, content, sha256, contributors=())
 
 Bases: `object`
 
@@ -705,6 +711,7 @@ Bind certified inputs and selection to exact cumulative candidate bytes.
   * **source_revisions** (*tuple* *[*[*QuerySourceRevision*](#eutaxis.declarations.query_packet.QuerySourceRevision) *,*  *...* *]*)
   * **content** (*bytes*)
   * **sha256** (*str*)
+  * **contributors** (*tuple* *[**str* *,*  *...* *]*)
 
 <a id="eutaxis.declarations.facade_report.ResolvedCumulativeSource.selection"></a>
 
@@ -721,6 +728,10 @@ Bind certified inputs and selection to exact cumulative candidate bytes.
 <a id="eutaxis.declarations.facade_report.ResolvedCumulativeSource.sha256"></a>
 
 #### sha256 *: str*
+
+<a id="eutaxis.declarations.facade_report.ResolvedCumulativeSource.contributors"></a>
+
+#### contributors *: tuple[str, ...]* *= ()*
 
 <a id="eutaxis.declarations.facade_report.ResolvedCumulativeSource.text"></a>
 

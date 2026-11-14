@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 from ..names import SAFE_SLUG_PATTERN
 from .catalog import DeclarationCatalog
@@ -39,12 +40,44 @@ _MODALITY = {
 }
 
 
+@dataclass(frozen=True)
+class _RenderedCumulativeMarkdown:
+    """Bind cumulative bytes to declarations that supplied visible content."""
+
+    artifact: CumulativeArtifact
+    contributors: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _RenderedProcedure:
+    """Bind one procedure fragment to its embedded operation contracts."""
+
+    text: str
+    operations: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _RenderedComponent:
+    """Bind one planned component fragment to its visible contributors."""
+
+    text: str
+    contributors: tuple[str, ...]
+
+
+@dataclass
+class _ProjectionRenderState:
+    """Track cross-component labels and emitted rule-set frames."""
+
+    projected_labels: dict[str, str]
+    rendered_rule_sets: set[str]
+
+
 def _render_cumulative_markdown(
     catalog: DeclarationCatalog,
     unit: ResolvedCompilationUnit,
     plan: CumulativeCompositionPlan,
     profile: CumulativeMarkdownProfile,
-) -> CumulativeArtifact:
+) -> _RenderedCumulativeMarkdown:
     """Render one authenticated catalog and resolved cumulative plan."""
     if type(profile) is not CumulativeMarkdownProfile:
         raise CompositionError(
@@ -55,56 +88,97 @@ def _render_cumulative_markdown(
         projection.declaration: projection for projection in unit.rule_projections
     }
     fragments: dict[str, str] = {}
-    projected_labels: dict[str, str] = {}
-    rendered_rule_sets: set[str] = set()
+    render_state = _ProjectionRenderState({}, set())
+    contributors: list[str] = []
+    seen_contributors: set[str] = set()
     for component in plan.components:
         identifier = component.declaration
-        record = catalog.get(identifier)
-        if record is None:
+        rendered = _render_cumulative_component(
+            catalog,
+            projections,
+            identifier,
+            profile,
+            render_state,
+        )
+        fragments[identifier] = rendered.text
+        for contributor in rendered.contributors:
+            _append_contributor(contributors, seen_contributors, contributor)
+    return _RenderedCumulativeMarkdown(
+        artifact=assemble_cumulative_artifact(plan, fragments),
+        contributors=tuple(contributors),
+    )
+
+
+def _render_cumulative_component(
+    catalog: DeclarationCatalog,
+    projections: Mapping[str, ResolvedRuleProjection],
+    identifier: str,
+    profile: CumulativeMarkdownProfile,
+    render_state: _ProjectionRenderState,
+) -> _RenderedComponent:
+    """Render one planned component and report its visible contributors."""
+    record = catalog.get(identifier)
+    if record is None:
+        raise CompositionError(
+            _component_location(identifier),
+            f"catalog has no declaration {identifier!r}",
+        )
+    declaration = record.declaration
+    label = _projection_label(identifier, profile)
+    _claim_projected_label(render_state.projected_labels, label, identifier)
+    if isinstance(declaration, RuleDeclaration):
+        projection = projections.get(identifier)
+        if projection is None:
             raise CompositionError(
                 _component_location(identifier),
-                f"catalog has no declaration {identifier!r}",
+                f"resolved unit has no rule projection for {identifier!r}",
             )
-        declaration = record.declaration
-        label = _projection_label(identifier, profile)
-        _claim_projected_label(projected_labels, label, identifier)
-        if isinstance(declaration, RuleDeclaration):
-            projection = projections.get(identifier)
-            if projection is None:
-                raise CompositionError(
-                    _component_location(identifier),
-                    f"resolved unit has no rule projection for {identifier!r}",
-                )
-            blocks: list[str] = []
-            rule_set = record.containing_rule_set
-            if (
-                profile is CumulativeMarkdownProfile.AGENT_INSTRUCTIONS
-                and rule_set is not None
-                and rule_set not in rendered_rule_sets
-            ):
-                blocks.append(_render_rule_set(catalog, rule_set))
-                rendered_rule_sets.add(rule_set)
-            blocks.append(
-                _render_rule(
-                    declaration,
-                    projection,
-                    profile=profile,
-                    label=label,
-                )
-            )
-            fragments[identifier] = "\n\n".join(blocks)
-        elif isinstance(declaration, ProcedureDeclaration):
-            fragments[identifier] = _render_procedure(
-                catalog,
+        blocks: list[str] = []
+        component_contributors: list[str] = []
+        rule_set = record.containing_rule_set
+        if (
+            profile is CumulativeMarkdownProfile.AGENT_INSTRUCTIONS
+            and rule_set is not None
+            and rule_set not in render_state.rendered_rule_sets
+        ):
+            blocks.append(_render_rule_set(catalog, rule_set))
+            render_state.rendered_rule_sets.add(rule_set)
+            component_contributors.append(rule_set)
+        blocks.append(
+            _render_rule(
                 declaration,
+                projection,
+                profile=profile,
                 label=label,
             )
-        else:
-            raise CompositionError(
-                _component_location(identifier),
-                f"declaration {identifier!r} is not renderable instruction content",
-            )
-    return assemble_cumulative_artifact(plan, fragments)
+        )
+        component_contributors.append(identifier)
+        return _RenderedComponent("\n\n".join(blocks), tuple(component_contributors))
+    if isinstance(declaration, ProcedureDeclaration):
+        rendered = _render_procedure_with_contributors(
+            catalog,
+            declaration,
+            label=label,
+        )
+        return _RenderedComponent(
+            rendered.text,
+            (identifier, *rendered.operations),
+        )
+    raise CompositionError(
+        _component_location(identifier),
+        f"declaration {identifier!r} is not renderable instruction content",
+    )
+
+
+def _append_contributor(
+    contributors: list[str],
+    seen: set[str],
+    identifier: str,
+) -> None:
+    """Append one declaration identifier at its first visible contribution."""
+    if identifier not in seen:
+        contributors.append(identifier)
+        seen.add(identifier)
 
 
 def _render_rule(
@@ -220,6 +294,22 @@ def _render_procedure(
     allow_support_resources: bool = False,
 ) -> str:
     """Render one finite procedure and its exact operation contracts."""
+    return _render_procedure_with_contributors(
+        catalog,
+        procedure,
+        label=label,
+        allow_support_resources=allow_support_resources,
+    ).text
+
+
+def _render_procedure_with_contributors(
+    catalog: DeclarationCatalog,
+    procedure: ProcedureDeclaration,
+    *,
+    label: str | None = None,
+    allow_support_resources: bool = False,
+) -> _RenderedProcedure:
+    """Render one procedure and identify its embedded operation contracts."""
     blocks = [
         f"**{label or procedure.id}**:",
         "*Kind.* Procedure.",
@@ -286,7 +376,10 @@ def _render_procedure(
         for reference in operation_references
     )
     blocks.append("\n\n".join(operation_blocks))
-    return "\n\n".join(blocks)
+    return _RenderedProcedure(
+        text="\n\n".join(blocks),
+        operations=tuple(reference.id for reference in operation_references),
+    )
 
 
 def _render_predicates(title: str, predicates: tuple[Predicate, ...]) -> str:

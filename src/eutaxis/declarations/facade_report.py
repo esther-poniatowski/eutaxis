@@ -47,6 +47,7 @@ class ResolvedCumulativeSource:
     source_revisions: tuple[QuerySourceRevision, ...]
     content: bytes
     sha256: str
+    contributors: tuple[str, ...] = ()
 
     @property
     def text(self) -> str:
@@ -105,6 +106,7 @@ def resolve_external_cumulative_source_from_path(
             source_revisions=source_revisions,
             content=content,
             sha256="sha256:" + hashlib.sha256(content).hexdigest(),
+            contributors=artifact.contributors,
         )
     finally:
         _retire_external_result_tree(acquisition)

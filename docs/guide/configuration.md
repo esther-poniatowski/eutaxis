@@ -76,7 +76,7 @@ common_sources:
 | `composition_manifest` | non-empty string | yes | Composition manifest resolved for this source. |
 | `context` | mapping of JSON values | yes | Complete typed applicability context supplied to semantic resolution. |
 
-The declaration source resolves and renders once per command. Its immutable candidate bytes then occupy that exact position in every applicable generated output. Plan and check use the same candidate for their content comparison and selection report. The report includes the candidate digest and the ordered final-effective record identifiers. A valid source with no effective records is reported explicitly. Excluded, inapplicable and inactive candidates remain available through `declarations explain`; they are not selected records in the artifact facade.
+The declaration source resolves and renders once per command. Its immutable candidate bytes then occupy that exact position in every applicable generated output. Plan and check use the same candidate for their content comparison and selection report. The report includes the candidate digest and the ordered final-effective record identifiers. The Python facade separately exposes every declaration that contributes to the candidate bytes, including a rule-set frame rendered around its effective members. A valid source with no effective records is reported explicitly. Excluded, inapplicable and inactive candidates remain available through `declarations explain`; they are not selected records in the artifact facade.
 
 ## Task module entries
 

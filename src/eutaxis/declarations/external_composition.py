@@ -44,6 +44,7 @@ class _ExternalArtifactState(NamedTuple):
     plan_state: _ExternalPlanState
     artifact: CumulativeArtifact
     artifact_state: object
+    contributors: tuple[str, ...]
 
 
 class ExternalCumulativeCompositionPlan:
@@ -126,6 +127,11 @@ class ExternalCumulativeArtifact:
         """Decode the authenticated canonical bytes as strict UTF-8."""
         return self.content.decode("utf-8", errors="strict")
 
+    @property
+    def contributors(self) -> tuple[str, ...]:
+        """Return declarations that supplied the artifact's visible content."""
+        return _issued_external_artifact_state(self).contributors
+
     def __copy__(self) -> NoReturn:
         raise TypeError("external cumulative artifacts cannot be copied")
 
@@ -187,6 +193,7 @@ def assemble_external_cumulative_artifact(
             plan,
             plan_state,
             artifact,
+            tuple(component.declaration for component in plan_state.plan.components),
         )
     except BaseException as error:
         _raise_changed_plan(plan, plan_state, error)
@@ -203,9 +210,9 @@ def render_external_cumulative_markdown(
     acquisition = plan_state.resolution_state.acquisition
     catalog = build_declaration_catalog(acquisition)
     catalog_state = _issued_catalog_state(catalog)
-    artifact: CumulativeArtifact | None = None
+    rendered = None
     try:
-        artifact = _render_cumulative_markdown(
+        rendered = _render_cumulative_markdown(
             catalog,
             plan_state.resolution_state.resolution.unit,
             plan_state.plan,
@@ -218,7 +225,12 @@ def render_external_cumulative_markdown(
     try:
         _require_same_plan(plan, plan_state)
         _require_same_catalog(catalog, catalog_state)
-        return _issue_external_artifact(plan, plan_state, artifact)
+        return _issue_external_artifact(
+            plan,
+            plan_state,
+            rendered.artifact,
+            rendered.contributors,
+        )
     except BaseException as error:
         _raise_changed_plan(plan, plan_state, error)
         _raise_changed_catalog(catalog, catalog_state, error)
@@ -251,6 +263,7 @@ def _issue_external_artifact(
     plan: ExternalCumulativeCompositionPlan,
     plan_state: _ExternalPlanState,
     artifact: CumulativeArtifact,
+    contributors: tuple[str, ...],
 ) -> ExternalCumulativeArtifact:
     result = object.__new__(ExternalCumulativeArtifact)
     state = _ExternalArtifactState(
@@ -258,6 +271,7 @@ def _issue_external_artifact(
         plan_state,
         artifact,
         identity_value_state(artifact),
+        contributors,
     )
     try:
         token = _EXTERNAL_ARTIFACT_AUTHORITIES.issue(result, state)
