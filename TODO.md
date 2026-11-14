@@ -29,6 +29,7 @@ The following work is complete.
 
 ## Next steps
 
+- [ ] Let a consumer repository, such as Geonexus, hold `decision` declarations. Validate them with `eutaxis declarations check` outside Oikos, and render a Markdown reading view of each, showing its drivers, its options, the assessment of each option and its verdict. Geonexus migrates its decision records once both work.
 - [ ] Stabilize the prompt-family layout and starter templates
 - [ ] Implement scaffold CLI command for prompt-composition projects
 - [ ] Extend `generate` beyond plain concatenation
