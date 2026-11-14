@@ -263,7 +263,7 @@ eutaxis rule show calibrate-assertion --part exception
 eutaxis rule show calibrate-assertion --root .
 ```
 
-The first form runs from any working directory. The second form identifies the source file and line range to edit. The configuration may select only part of a source. In that case, only the rules from the selected part appear.
+The first form reads deployed Skills from any working directory. The second form reports a Markdown source file and line range, or a declaration-manifest identifier and line range in authenticated rendered Markdown. When a Markdown entry limits its scope, the command reports only admitted rules.
 
 The command `eutaxis rule list` prints every label with its first ✓ line. Malformed label lines appear on standard error. The flag `--loading-unit <name> -c <config>` restricts the checklist to one declared route. The [rule command](cli-reference.md#^rule-command) defines its flags and part keys.
 

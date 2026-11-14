@@ -165,12 +165,14 @@ Return the parts of `rule` whose key equals `part`.
 
 Build rule catalogs from configured modules or from deployed skills.
 
-Two sources are supported:
+The query reads two source families:
 
 - an instruction-assembly configuration, whose `common_sources`, agent
-  `sources` and `task_modules` name the authored modules; line numbers
-  then refer to the authored files. A source entry that selects sections
-  contributes only the rules and the rejected lines inside its selection;
+  `sources` and `task_modules` name Markdown or structured declaration
+  modules. For Markdown, line numbers refer to the authored files. For a
+  structured record, the displayed synthetic location names the authenticated
+  cumulative artifact and its line range. When a Markdown source limits its
+  scope, only the admitted rules and rejected lines enter the catalog;
 - a skills directory, such as the user-scope directory of an adapter, whose
   eutaxis-owned skills are read as deployed. A skill compiled with
   `disclosure: progressive` is read through its index: each indexed rule

@@ -1,11 +1,13 @@
 """Build rule catalogs from configured modules or from deployed skills.
 
-Two sources are supported:
+The query reads two source families:
 
 - an instruction-assembly configuration, whose ``common_sources``, agent
-  ``sources`` and ``task_modules`` name the authored modules; line numbers
-  then refer to the authored files. A source entry that selects sections
-  contributes only the rules and the rejected lines inside its selection;
+  ``sources`` and ``task_modules`` name Markdown or structured declaration
+  modules. For Markdown, line numbers refer to the authored files. For a
+  structured record, the displayed synthetic location names the authenticated
+  cumulative artifact and its line range. When a Markdown source limits its
+  scope, only the admitted rules and rejected lines enter the catalog;
 - a skills directory, such as the user-scope directory of an adapter, whose
   eutaxis-owned skills are read as deployed. A skill compiled with
   ``disclosure: progressive`` is read through its index: each indexed rule
@@ -26,7 +28,8 @@ from ..commands.installer import is_eutaxis_owned
 from ..commands.rendering import ENTRYPOINT_FILENAME
 from ..instructions.config import load_config
 from ..instructions.markdown import MarkdownAssembler
-from ..instructions.models import SourceFile
+from ..instructions.generator import InstructionGenerator
+from ..instructions.models import DeclarationSource, SourceFile
 from ..instructions.rules import (
     HeadingBlock,
     ParsedModule,
@@ -88,6 +91,27 @@ def catalog_from_config(config_path: Path, root: Path | None = None) -> RuleCata
             for item in parsed.rejected
             if selected is None or item.line_number in selected
         )
+    generator = InstructionGenerator(config)
+    structured_sources = [
+        source
+        for source in config.common_sources
+        if isinstance(source, DeclarationSource)
+    ]
+    structured_sources.extend(
+        source
+        for agent in config.agents
+        for source in agent.sources
+        if isinstance(source, DeclarationSource)
+    )
+    unique_structured_sources: list[DeclarationSource] = []
+    for source in structured_sources:
+        if source not in unique_structured_sources:
+            unique_structured_sources.append(source)
+    for source in unique_structured_sources:
+        rendered = generator.render_declaration_source(source)
+        parsed = parse_module(rendered, module=source.module)
+        location = Path(f"<declaration:{source.composition_manifest}>")
+        _collect(parsed, location, rules, rejected)
     return RuleCatalog(
         origin=f"the modules of {config.config_path}",
         rules=tuple(rules),

@@ -29,7 +29,9 @@ Preserve its paragraph boundary.
 - `discouraged-check` [eutaxis/manual-judgment@1]: The discouraged form is absent when its criterion wins
 - `permitted-check` [eutaxis/manual-judgment@1]: The discretionary choice remains explicit
 
-**projection/branching-procedure** (procedure):
+**projection/branching-procedure**:
+
+*Kind.* Procedure.
 
 Exercises a graph whose entry is not its first authored node
 

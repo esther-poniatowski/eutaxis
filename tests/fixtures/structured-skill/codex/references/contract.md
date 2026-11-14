@@ -1,6 +1,8 @@
 # Complete procedure contract
 
-**oikos/complete-module** (procedure):
+**oikos/complete-module**:
+
+*Kind.* Procedure.
 
 Complete one module through guarded index publication
 

@@ -1,7 +1,7 @@
 ---
 description: Complete one module through guarded index publication
 name: complete-module
-x-eutaxis-owned: 3dd4bc6e625901b6
+x-eutaxis-owned: 9f62611fd7d851bd
 ---
 
 # complete-module

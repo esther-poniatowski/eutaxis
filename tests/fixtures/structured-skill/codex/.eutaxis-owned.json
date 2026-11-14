@@ -1,11 +1,11 @@
 {
   "_schema": "eutaxis:skill-ownership@1",
   "adapter": "codex",
-  "content_hash": "3dd4bc6e625901b6",
+  "content_hash": "9f62611fd7d851bd",
   "files": [
     {
       "path": "SKILL.md",
-      "sha256": "155159f87fdcca9fb9775028e9f0c9abb24ee2f85af1b84a1f4a7117573c7885"
+      "sha256": "5ab97127a0b0a5c5b74572aa532d59d5d89ed280b411209eef63610bfb171ea5"
     },
     {
       "path": "agents/openai.yaml",
@@ -13,7 +13,7 @@
     },
     {
       "path": "references/contract.md",
-      "sha256": "50548f3822d88cb63ea74c5ff994dfaa8f86f2bd492f1b92714a36296d8deff1"
+      "sha256": "a2aefcda12b942a8729a4be319293bb8b2f76f637c2d2bb5f1327ecded5324f9"
     },
     {
       "path": "scripts/publish-index.py",

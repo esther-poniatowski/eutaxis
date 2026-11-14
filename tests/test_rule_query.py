@@ -10,6 +10,8 @@ import yaml
 from typer.testing import CliRunner
 
 from eutaxis.cli import app
+from tests.test_external_acquisition import _write_contract
+from tests.test_external_resolution import MANIFEST, RULE, _context
 
 STYLE = dedent("""\
     ---
@@ -340,3 +342,144 @@ def test_config_whole_module_entry_overrides_a_section_selection(workspace) -> N
         "short-sentences",
         "topic-first",
     ]
+
+
+def test_config_query_includes_structured_declaration_source(tmp_path: Path) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    context = _context()
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "common_sources:\n"
+        "  - declaration:\n"
+        "      module: structured-purpose\n"
+        f"      acquisition_manifest: {manifest_path}\n"
+        f"      acquisition_lock: {lock_path}\n"
+        "      composition_manifest: resolution/manifest\n"
+        "      context:\n"
+        f"        context.available: {str(context['context.available']).lower()}\n"
+        f"        resolution.enabled: {str(context['resolution.enabled']).lower()}\n"
+        "agents: []\n",
+        encoding="utf-8",
+    )
+
+    listing = _run("list", "-c", str(config), "-m", "structured-purpose")
+    shown = _run(
+        "show",
+        "purpose",
+        "-c",
+        str(config),
+        "-m",
+        "structured-purpose",
+    )
+
+    assert listing.exit_code == 0, listing.output
+    assert listing.stdout.split()[0] == "purpose"
+    assert shown.exit_code == 0, shown.output
+    assert (
+        "<declaration:resolution/manifest>" in shown.stdout.splitlines()[0]
+    )
+    assert "✓ Agent MUST state the reader-facing purpose." in shown.stdout
+
+
+def test_config_query_coalesces_exact_repeated_structured_source(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    context = _context()
+    source = {
+        "declaration": {
+            "module": "structured-purpose",
+            "acquisition_manifest": manifest_path,
+            "acquisition_lock": lock_path,
+            "composition_manifest": "resolution/manifest",
+            "context": context,
+        }
+    }
+    config = tmp_path / "repeated.yml"
+    config.write_text(
+        yaml.safe_dump(
+            {
+                "_schema": "eutaxis:configuration@2",
+                "common_sources": [source],
+                "agents": [
+                    {
+                        "name": "codex",
+                        "target": "AGENTS.md",
+                        "sources": [source],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    listing = _run("list", "-c", str(config), "-m", "structured-purpose")
+
+    assert listing.exit_code == 0, listing.output
+    assert [line.split()[0] for line in listing.stdout.splitlines()] == ["purpose"]
+
+
+def test_config_query_rejects_one_structured_module_under_two_contexts(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    first_context = _context()
+    second_context = {**first_context, "resolution.enabled": False}
+
+    def source(context: dict[str, object]) -> dict[str, object]:
+        return {
+            "declaration": {
+                "module": "structured-purpose",
+                "acquisition_manifest": manifest_path,
+                "acquisition_lock": lock_path,
+                "composition_manifest": "resolution/manifest",
+                "context": context,
+            }
+        }
+
+    config = tmp_path / "ambiguous.yml"
+    config.write_text(
+        yaml.safe_dump(
+            {
+                "_schema": "eutaxis:configuration@2",
+                "common_sources": [source(first_context)],
+                "agents": [
+                    {
+                        "name": "codex",
+                        "target": "AGENTS.md",
+                        "sources": [source(second_context)],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run("list", "-c", str(config), "-m", "structured-purpose")
+
+    assert result.exit_code == 2
+    assert "Composition manifest is configured with different source inputs" in (
+        result.stderr
+    )

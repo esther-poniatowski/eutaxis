@@ -217,7 +217,7 @@ Exit statuses of `budget` and `loading-unit`:
 ### `rule`
 ^rule-command
 
-Print one rule of an instruction module, or one part of that rule, without reading the whole module. Each rule spans one [rule block](concepts.md#rule-blocks), and each part is one statement or field of that block.
+Print one labeled block of an instruction module, or one part of that block. Both Markdown and structured records use the same consumer label grammar. Each result contains the complete selected content.
 
 ```sh
 eutaxis rule show <label> [--part <key>] [--module <name>] [-c <config-file>] [--root <folder>]
@@ -236,7 +236,7 @@ eutaxis rule list [--module <name> | --loading-unit <name>] [--skills-dir <dir> 
 | `--part` | `-p` | whole rule | Key of the part to print, from the part keys listed below. |
 | `--module` | `-m` | all modules | Module or Skill that holds the rule. Required when several modules define the label. |
 | `--loading-unit` | | none | Loading unit whose authored modules supply the list. Requires `--config` and cannot be combined with another source or module filter. |
-| `--config` | `-c` | none | Configuration file whose modules are read: `common_sources`, agent `sources` and `task_modules`. A source entry that selects sections contributes only the rules inside those sections. |
+| `--config` | `-c` | none | Configuration file whose modules are read: `common_sources`, agent `sources` and `task_modules`. Structured sources are resolved through their authenticated acquisition lock. When a Markdown entry limits its scope, only admitted rules enter the catalog. |
 | `--root` | `-r` | [resolved root](#root-and-configuration-file) with `--config` | Folder below which the configuration file is looked up and against which its paths resolve. Given alone, it selects the authored modules of that configuration file. |
 | `--skills-dir` | | none | Directory whose eutaxis-owned Skills are read. |
 | `--agent` | `-a` | `claude` | Adapter whose user-scope skill directory is read when none of `--config`, `--root` and `--skills-dir` is given. |
@@ -252,7 +252,7 @@ The part keys select the statements, the lead or the fields of a rule:
 
 The default source is the deployed Skills, so the query runs from any working directory. Always-on modules compile into the cumulative instruction file, so their rules are absent from the Skills and are read with `--config` or `--root`.
 
-The query below prints the exception clause of one rule from the authored modules:
+This command prints one Markdown rule's exception clause:
 
 ```sh
 eutaxis rule show warnings-have-a-zero-baseline --part exception --root .

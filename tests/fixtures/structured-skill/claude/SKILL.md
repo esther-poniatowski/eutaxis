@@ -2,7 +2,7 @@
 description: Complete one module through guarded index publication
 disable-model-invocation: true
 name: complete-module
-x-eutaxis-owned: 1b4a78d98f2b0149
+x-eutaxis-owned: af00d9ff3bbae6c4
 ---
 
 # complete-module

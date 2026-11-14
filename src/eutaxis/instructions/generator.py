@@ -191,6 +191,14 @@ class InstructionGenerator:
             reports.append((source, self._resolve_declaration_source(source)))
         return reports
 
+    def render_declaration_source(self, source: DeclarationSource) -> str:
+        """Return the authenticated cumulative Markdown for one source.
+
+        This narrow public boundary lets read-only consumers, such as the rule
+        query, inspect the same projection used by instruction generation.
+        """
+        return self._resolve_declaration_source(source).text
+
     def _resolve_declaration_source(
         self,
         source: DeclarationSource,

@@ -220,7 +220,11 @@ def _render_procedure(
     allow_support_resources: bool = False,
 ) -> str:
     """Render one finite procedure and its exact operation contracts."""
-    blocks = [f"**{label or procedure.id}** (procedure):", procedure.purpose]
+    blocks = [
+        f"**{label or procedure.id}**:",
+        "*Kind.* Procedure.",
+        procedure.purpose,
+    ]
     if procedure.rationale is not None:
         blocks.append(f"*Why.* {procedure.rationale}")
     blocks.extend(

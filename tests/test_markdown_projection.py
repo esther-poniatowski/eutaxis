@@ -19,6 +19,7 @@ from eutaxis.declarations import (
     resolve_external_compilation_unit,
 )
 from eutaxis.declarations.catalog import _CATALOG_AUTHORITIES
+from eutaxis.instructions.rules import parse_module
 from tests.test_external_acquisition import _write_contract
 
 GOLDEN = Path(__file__).parent / "fixtures" / "projection" / "cumulative-markdown.md"
@@ -510,7 +511,11 @@ def test_agent_profile_uses_local_labels_and_omits_evaluator_metadata(
     )
 
     assert "**all-modalities**:" in artifact.text
-    assert "**branching-procedure** (procedure):" in artifact.text
+    assert "**branching-procedure**:" in artifact.text
+    assert "*Kind.* Procedure." in artifact.text
+    assert parse_module(artifact.text, module="projected").rule(
+        "branching-procedure"
+    ) is not None
     assert "projection/all-modalities" not in artifact.text
     assert "*Success criteria.*" not in artifact.text
     assert "[eutaxis/manual-judgment@1]" not in artifact.text
