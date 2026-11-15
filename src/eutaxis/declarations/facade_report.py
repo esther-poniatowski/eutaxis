@@ -113,14 +113,10 @@ def resolve_external_cumulative_source(
             plan,
             profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
         )
-        source_revisions = build_external_query_packet(result).source_revisions
-        content = bytes(artifact.content)
-        return ResolvedCumulativeSource(
-            selection=resolved_artifact_selection(result),
-            source_revisions=source_revisions,
-            content=content,
-            sha256="sha256:" + hashlib.sha256(content).hexdigest(),
-            contributors=artifact.contributors,
+        return _resolved_cumulative_source(
+            result,
+            artifact,
+            build_external_query_packet(result).source_revisions,
         )
 
     return _authenticated_external_result_operation(acquisition, resolve)
@@ -157,8 +153,13 @@ def _resolve_external_cumulative_sources(
         plans,
         profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
     )
+    source_revisions = (
+        ()
+        if not resolutions
+        else build_external_query_packet(resolutions[0]).source_revisions
+    )
     return tuple(
-        _resolved_cumulative_source(resolution, artifact)
+        _resolved_cumulative_source(resolution, artifact, source_revisions)
         for resolution, artifact in zip(resolutions, artifacts, strict=True)
     )
 
@@ -166,12 +167,13 @@ def _resolve_external_cumulative_sources(
 def _resolved_cumulative_source(
     result: ExternalResolutionResult,
     artifact: ExternalCumulativeArtifact,
+    source_revisions: tuple[QuerySourceRevision, ...],
 ) -> ResolvedCumulativeSource:
     """Project one detached cumulative-source report from issued objects."""
     content = bytes(artifact.content)
     return ResolvedCumulativeSource(
         selection=resolved_artifact_selection(result),
-        source_revisions=build_external_query_packet(result).source_revisions,
+        source_revisions=source_revisions,
         content=content,
         sha256="sha256:" + hashlib.sha256(content).hexdigest(),
         contributors=artifact.contributors,

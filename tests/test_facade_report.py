@@ -167,6 +167,115 @@ def test_cumulative_source_batch_preserves_order_and_equivalence(
     )
 
 
+def test_cumulative_source_batch_builds_one_query_packet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path, lock_path = _two_manifest_contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    original = facade_module.build_external_query_packet
+    calls = 0
+
+    def build(result):
+        nonlocal calls
+        calls += 1
+        return original(result)
+
+    monkeypatch.setattr(facade_module, "build_external_query_packet", build)
+    try:
+        actual = resolve_external_cumulative_sources(
+            acquisition,
+            (
+                ExternalCumulativeSourceRequest(
+                    "resolution/manifest", _context()
+                ),
+                ExternalCumulativeSourceRequest(
+                    "resolution/second-manifest", _context()
+                ),
+            ),
+        )
+    finally:
+        _retire_external_result_tree(acquisition)
+
+    assert calls == 1
+    assert actual[0].source_revisions == actual[1].source_revisions
+
+
+def test_empty_cumulative_source_batch_builds_no_query_packet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path, lock_path = _contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+
+    def reject(_result):
+        raise AssertionError("empty batch must not build a query packet")
+
+    monkeypatch.setattr(facade_module, "build_external_query_packet", reject)
+    try:
+        assert resolve_external_cumulative_sources(acquisition, ()) == ()
+    finally:
+        _retire_external_result_tree(acquisition)
+
+
+def test_cumulative_source_batch_still_authenticates_each_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path, lock_path = _two_manifest_contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    original = facade_module.resolved_artifact_selection
+    calls = 0
+
+    def select(result):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            object.__setattr__(result, "_token", object())
+        return original(result)
+
+    monkeypatch.setattr(facade_module, "resolved_artifact_selection", select)
+    with pytest.raises(AcquisitionContractError, match="not issued here"):
+        resolve_external_cumulative_sources(
+            acquisition,
+            (
+                ExternalCumulativeSourceRequest(
+                    "resolution/manifest", _context()
+                ),
+                ExternalCumulativeSourceRequest(
+                    "resolution/second-manifest", _context()
+                ),
+            ),
+        )
+
+
+def test_cumulative_source_packet_error_prioritizes_acquisition_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path, lock_path = _contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+
+    def fail(_result):
+        object.__setattr__(acquisition.source_coordinates[-1], "path", "forged.yaml")
+        raise RuntimeError("packet failed")
+
+    monkeypatch.setattr(facade_module, "build_external_query_packet", fail)
+
+    with pytest.raises(
+        AcquisitionContractError, match="coordinate state changed"
+    ) as captured:
+        resolve_external_cumulative_sources(
+            acquisition,
+            (ExternalCumulativeSourceRequest("resolution/manifest", _context()),),
+        )
+    assert isinstance(captured.value.__cause__, RuntimeError)
+
+
 def test_cumulative_source_batch_authenticates_acquisition_twice(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
