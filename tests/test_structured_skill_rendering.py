@@ -6,12 +6,14 @@ from pathlib import Path
 
 import pytest
 
+import eutaxis.declarations.catalog as catalog_module
 import eutaxis.declarations.external_result as external_result_module
 import eutaxis.declarations.structured_skill_rendering as rendering_module
 from eutaxis.commands import get_adapter
 from eutaxis.declarations import (
     AcquisitionContractError,
     CompositionError,
+    DeclarationCatalogError,
     StructuredSkillPlan,
     plan_structured_skill,
     render_structured_skill,
@@ -68,6 +70,30 @@ def test_direct_skill_operations_authenticate_twice(
         entrypoint_max_bytes=100_000,
         artifact_max_bytes=1_000_000,
     )
+    assert call_count == 2
+
+
+def test_skill_render_authenticates_catalog_twice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _plan(tmp_path)
+    original = catalog_module._authenticate_catalog_state
+    call_count = 0
+
+    def authenticate(value: object):
+        nonlocal call_count
+        call_count += 1
+        return original(value)
+
+    monkeypatch.setattr(catalog_module, "_authenticate_catalog_state", authenticate)
+
+    render_structured_skill(
+        plan,
+        get_adapter("claude"),
+        entrypoint_max_bytes=100_000,
+        artifact_max_bytes=1_000_000,
+    )
+
     assert call_count == 2
 
 
@@ -206,6 +232,59 @@ def test_structured_skill_reauthenticates_plan_after_assembly(
             entrypoint_max_bytes=100_000,
             artifact_max_bytes=1_000_000,
         )
+
+
+def test_structured_skill_reauthenticates_catalog_after_assembly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _plan(tmp_path)
+    catalog = rendering_module._structured_skill_plan_authority_state(plan).catalog
+    original = rendering_module.assemble_skill
+
+    def hostile_assembly(source, adapter):
+        artifact = original(source, adapter)
+        object.__setattr__(catalog, "revision", 99)
+        return artifact
+
+    monkeypatch.setattr(rendering_module, "assemble_skill", hostile_assembly)
+
+    with pytest.raises(
+        DeclarationCatalogError,
+        match="catalog projection state changed",
+    ):
+        render_structured_skill(
+            plan,
+            get_adapter("claude"),
+            entrypoint_max_bytes=100_000,
+            artifact_max_bytes=1_000_000,
+        )
+
+
+def test_catalog_corruption_precedes_later_skill_rendering_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _plan(tmp_path)
+    catalog = rendering_module._structured_skill_plan_authority_state(plan).catalog
+
+    def hostile_assembly(source, adapter):
+        object.__setattr__(catalog, "revision", 99)
+        raise RuntimeError("later rendering failure")
+
+    monkeypatch.setattr(rendering_module, "assemble_skill", hostile_assembly)
+
+    with pytest.raises(
+        DeclarationCatalogError,
+        match="catalog projection state changed",
+    ) as raised:
+        render_structured_skill(
+            plan,
+            get_adapter("claude"),
+            entrypoint_max_bytes=100_000,
+            artifact_max_bytes=1_000_000,
+        )
+
+    assert isinstance(raised.value.__cause__, RuntimeError)
+    assert str(raised.value.__cause__) == "later rendering failure"
 
 
 def test_structured_skill_authenticates_before_budget_validation() -> None:

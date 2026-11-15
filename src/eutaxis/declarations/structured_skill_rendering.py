@@ -7,6 +7,7 @@ from types import MappingProxyType
 from ..commands.adapters import AgentAdapter
 from ..commands.models import ArtifactFile, RenderedArtifact, SkillRenderInput
 from ..commands.rendering import ENTRYPOINT_FILENAME, assemble_skill
+from .catalog import _AuthenticatedCatalogView
 from .exceptions import CompositionError
 from .external_result import _authenticated_external_result_operation
 from .markdown_projection import _render_procedure
@@ -56,7 +57,11 @@ def _render_structured_skill_operation(
     try:
         _require_positive_budget(entrypoint_max_bytes, "entrypoint-max-bytes")
         _require_positive_budget(artifact_max_bytes, "artifact-max-bytes")
-        source = _render_input(state)
+        catalog_view = _AuthenticatedCatalogView(
+            declarations=state.catalog.declarations,
+            contracts=state.catalog.contracts,
+        )
+        source = _render_input(state, catalog_view)
         artifact = assemble_skill(source, adapter)
         _check_budgets(
             artifact,
@@ -91,12 +96,15 @@ def _raise_changed_plan(
         raise authority_error from error
 
 
-def _render_input(state: _StructuredSkillPlanState) -> SkillRenderInput:
+def _render_input(
+    state: _StructuredSkillPlanState,
+    catalog_view: _AuthenticatedCatalogView,
+) -> SkillRenderInput:
     """Project one authenticated plan into the shared artifact input."""
     contract = (
         "# Complete procedure contract\n\n"
         + _render_procedure(
-            state.catalog,
+            catalog_view,
             state.procedure,
             allow_support_resources=True,
         ).rstrip()

@@ -9,6 +9,7 @@ from ..names import is_portable_skill_name
 from ._authority import IdentityAuthorityStore, identity_value_state
 from .byte_carriers import VerifiedByteCarrier
 from .catalog import (
+    _AuthenticatedCatalogView,
     DeclarationCatalog,
     _CatalogAuthorityState,
     _issued_catalog_state,
@@ -515,6 +516,10 @@ def _authenticate_structured_skill_plan_state(
         state.catalog,
         state.catalog_state,
     )
+    catalog_view = _AuthenticatedCatalogView(
+        declarations=state.catalog.declarations,
+        contracts=state.catalog.contracts,
+    )
     if (
         _plan_projection_state(
             state.manifest,
@@ -528,7 +533,7 @@ def _authenticate_structured_skill_plan_state(
     current_manifest = state.resolution_state.resolution.manifest_record.declaration
     if current_manifest is not state.manifest:
         raise CompositionError("$.manifest", "structured Skill manifest changed")
-    procedure_record = state.catalog.get(state.procedure.id)
+    procedure_record = catalog_view.get(state.procedure.id)
     if procedure_record is None or procedure_record.declaration is not state.procedure:
         raise CompositionError("$.procedure", "structured Skill procedure changed")
     acquisition_state = state.resolution_state.acquisition_state
@@ -538,7 +543,7 @@ def _authenticate_structured_skill_plan_state(
     for index, (reference, operation) in enumerate(
         zip(state.operation_references, state.operations, strict=True)
     ):
-        record = state.catalog.get_contract(
+        record = catalog_view.get_contract(
             DeclarationKind.OPERATION,
             reference.id,
             reference.version,
