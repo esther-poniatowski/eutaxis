@@ -165,7 +165,7 @@ Instruction-file generation and stale-output checks.
 
 <a id="eutaxis.instructions.generator.InstructionGenerator"></a>
 
-### *class* eutaxis.instructions.generator.InstructionGenerator(config, assembler=None)
+### *class* eutaxis.instructions.generator.InstructionGenerator(config, assembler=None, \*, declaration_source_resolver=None)
 
 Bases: `object`
 
@@ -174,6 +174,7 @@ Generate, write and compare instruction outputs.
 * **Parameters:**
   * **config** ([*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig))
   * **assembler** ([*MarkdownAssembler*](#eutaxis.instructions.markdown.MarkdownAssembler) *|* *None*)
+  * **declaration_source_resolver** (*DeclarationSourceResolver* *|* *None*)
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.generate_all"></a>
 
@@ -241,6 +242,20 @@ Return structured sources used by the selected generated artifacts.
   **agent_name** (*str* *|* *None*)
 * **Return type:**
   list[tuple[[DeclarationSource](#eutaxis.instructions.models.DeclarationSource), ‘ResolvedCumulativeSource’]]
+
+<a id="eutaxis.instructions.generator.InstructionGenerator.render_declaration_source"></a>
+
+#### render_declaration_source(source)
+
+Return the authenticated cumulative Markdown for one source.
+
+This narrow public boundary lets read-only consumers, such as the rule
+query, inspect the same projection used by instruction generation.
+
+* **Parameters:**
+  **source** ([*DeclarationSource*](#eutaxis.instructions.models.DeclarationSource))
+* **Return type:**
+  str
 
 <a id="eutaxis.instructions.generator.InstructionGenerator.enforce_rule_labels"></a>
 
@@ -322,7 +337,7 @@ Return (path, content) for the standalone rule-index file, if any.
 Return structured records whose labels enter the standalone index.
 
 * **Return type:**
-  tuple[str, ...]
+  tuple[str, …]
 
 <a id="module-eutaxis.instructions.instruction_budgets"></a>
 
@@ -604,6 +619,12 @@ at 1 on the first line of the text given, frontmatter included.
 ### eutaxis.instructions.rules.LABEL_PATTERN *= re.compile('^\\\\\*\\\\\*([a-z][a-z0-9-]\*)\\\\\*\\\\\*:\\\\s\*$', re.MULTILINE)*
 
 Grammar of a label line. Shared with the rule index of the generator.
+
+<a id="eutaxis.instructions.rules.RULE_PARSER_CONTRACT"></a>
+
+### eutaxis.instructions.rules.RULE_PARSER_CONTRACT *= 'eutaxis.instructions.rules.parse_module@1'*
+
+Versioned behavior contract used by frozen instruction inventories.
 
 <a id="eutaxis.instructions.rules.FENCE_PATTERN"></a>
 

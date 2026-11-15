@@ -4,15 +4,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+import eutaxis.declarations.facade_report as facade_module
 from eutaxis.declarations import (
     ResolvedArtifactSelection,
     ResolvedCumulativeSource,
     acquire_external_declarations_from_path,
+    build_declaration_catalog,
+    resolve_external_cumulative_source,
     resolve_external_cumulative_source_from_path,
     resolve_external_compilation_unit,
     resolved_artifact_selection,
 )
 from eutaxis.declarations.external_result import _retire_external_result_tree
+from eutaxis.declarations.exceptions import AcquisitionContractError
 from tests.test_external_acquisition import _write_contract
 from tests.test_external_resolution import MANIFEST, RULE, _context
 from tests.test_query_packet import RULE_SET
@@ -80,6 +86,117 @@ def test_path_facade_acquires_resolves_and_returns_detached_report(
     assert all(row.content_revision for row in source.source_revisions)
     assert b"**purpose**:" in source.content
     assert source.sha256.startswith("sha256:")
+
+
+def test_caller_owned_facade_returns_detached_equivalent_report(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    catalog = build_declaration_catalog(acquisition)
+    source = resolve_external_cumulative_source(
+        acquisition,
+        "resolution/manifest",
+        _context(),
+    )
+    _retire_external_result_tree(acquisition)
+
+    expected = resolve_external_cumulative_source_from_path(
+        str(tmp_path),
+        manifest_path,
+        lock_path,
+        "resolution/manifest",
+        _context(),
+    )
+
+    assert source == expected
+    assert source.text == expected.text
+    with pytest.raises(Exception, match="not issued"):
+        catalog.get("resolution/purpose")
+
+
+def test_caller_owned_facade_preserves_clean_body_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, lock_path = _contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+
+    def fail(_resolution):
+        raise RuntimeError("resolution failed")
+
+    monkeypatch.setattr(facade_module, "plan_external_cumulative_composition", fail)
+    try:
+        with pytest.raises(RuntimeError, match="resolution failed"):
+            resolve_external_cumulative_source(
+                acquisition,
+                "resolution/manifest",
+                _context(),
+            )
+        assert acquisition.source_coordinates
+    finally:
+        _retire_external_result_tree(acquisition)
+
+
+def test_caller_owned_facade_rejects_success_with_nested_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, lock_path = _contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    construct = facade_module.ResolvedCumulativeSource
+
+    def mutate(*args, **kwargs):
+        source = construct(*args, **kwargs)
+        object.__setattr__(acquisition.source_coordinates[-1], "path", "forged.yaml")
+        return source
+
+    monkeypatch.setattr(facade_module, "ResolvedCumulativeSource", mutate)
+
+    with pytest.raises(AcquisitionContractError, match="coordinate state changed"):
+        resolve_external_cumulative_source(
+            acquisition,
+            "resolution/manifest",
+            _context(),
+        )
+
+
+def test_caller_owned_facade_prioritizes_mutation_over_body_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, lock_path = _contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+
+    def mutate_and_fail(_resolution):
+        object.__setattr__(acquisition.source_coordinates[-1], "path", "forged.yaml")
+        raise RuntimeError("resolution failed")
+
+    monkeypatch.setattr(
+        facade_module,
+        "plan_external_cumulative_composition",
+        mutate_and_fail,
+    )
+
+    with pytest.raises(
+        AcquisitionContractError, match="coordinate state changed"
+    ) as captured:
+        resolve_external_cumulative_source(
+            acquisition,
+            "resolution/manifest",
+            _context(),
+        )
+
+    assert isinstance(captured.value.__cause__, RuntimeError)
+    assert str(captured.value.__cause__) == "resolution failed"
 
 
 def test_cumulative_source_preserves_previous_constructor_shape() -> None:

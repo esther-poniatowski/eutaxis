@@ -21,6 +21,7 @@ from eutaxis.declarations import (
     ExternalAcquisitionResult,
     acquire_external_declarations,
     acquire_external_declarations_from_path,
+    open_external_declaration_acquisition_from_path,
 )
 from eutaxis.declarations._external_evidence import _EVIDENCE_AUTHORITIES
 from eutaxis.declarations.acquisition_contract import PACKAGED_DECLARATION_PATHS
@@ -61,6 +62,78 @@ def _acquire(tmp_path: Path) -> ExternalAcquisitionResult:
         manifest_path,
         lock_path,
     )
+
+
+def test_scoped_acquisition_authenticates_and_retires_clean_success(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(tmp_path)
+    retained = None
+
+    with open_external_declaration_acquisition_from_path(
+        str(tmp_path), manifest_path, lock_path
+    ) as result:
+        retained = result
+        assert _issued_external_result_state(result)
+
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        _issued_external_result_state(retained)
+
+
+def test_scoped_acquisition_authenticates_and_retires_clean_failure(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(tmp_path)
+    retained = None
+
+    with pytest.raises(RuntimeError, match="body failed"):
+        with open_external_declaration_acquisition_from_path(
+            str(tmp_path), manifest_path, lock_path
+        ) as result:
+            retained = result
+            raise RuntimeError("body failed")
+
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        _issued_external_result_state(retained)
+
+
+def test_scoped_acquisition_rejects_success_with_nested_mutation(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(tmp_path)
+    retained = None
+
+    with pytest.raises(AcquisitionContractError, match="coordinate state changed"):
+        with open_external_declaration_acquisition_from_path(
+            str(tmp_path), manifest_path, lock_path
+        ) as result:
+            retained = result
+            object.__setattr__(result.source_coordinates[-1], "path", "forged.yaml")
+
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        _issued_external_result_state(retained)
+
+
+def test_scoped_acquisition_prioritizes_mutation_over_body_failure(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(tmp_path)
+    retained = None
+
+    with pytest.raises(
+        AcquisitionContractError, match="coordinate state changed"
+    ) as captured:
+        with open_external_declaration_acquisition_from_path(
+            str(tmp_path), manifest_path, lock_path
+        ) as result:
+            retained = result
+            object.__setattr__(result.source_coordinates[-1], "path", "forged.yaml")
+            raise RuntimeError("body failed")
+
+    assert isinstance(captured.value.__cause__, RuntimeError)
+    assert str(captured.value.__cause__) == "body failed"
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        _issued_external_result_state(retained)
 
 
 def _nested_authorities(stage):
@@ -308,6 +381,7 @@ def test_public_boundary_exports_only_the_result_surface() -> None:
         "ExternalAcquisitionResult",
         "acquire_external_declarations",
         "acquire_external_declarations_from_path",
+        "open_external_declaration_acquisition_from_path",
     ):
         assert getattr(declarations_api, name) is not None
     for name in (

@@ -17,8 +17,9 @@ from .external_resolution import (
     resolve_external_compilation_unit,
 )
 from .external_result import (
-    _retire_external_result_tree,
-    acquire_external_declarations_from_path,
+    ExternalAcquisitionResult,
+    _authenticated_external_result_operation,
+    open_external_declaration_acquisition_from_path,
 )
 from .models import (
     CompositionManifestDeclaration,
@@ -75,20 +76,14 @@ def resolved_artifact_selection(
     )
 
 
-def resolve_external_cumulative_source_from_path(
-    workspace: str,
-    acquisition_manifest: str,
-    acquisition_lock: str,
+def resolve_external_cumulative_source(
+    acquisition: ExternalAcquisitionResult,
     composition_manifest: str,
     context: Mapping[str, JsonValue],
 ) -> ResolvedCumulativeSource:
-    """Issue one immutable candidate plan before retiring source authority."""
-    acquisition = acquire_external_declarations_from_path(
-        workspace,
-        acquisition_manifest,
-        acquisition_lock,
-    )
-    try:
+    """Project one cumulative source from a caller-owned acquisition."""
+
+    def resolve() -> ResolvedCumulativeSource:
         result = resolve_external_compilation_unit(
             acquisition,
             composition_manifest,
@@ -108,5 +103,25 @@ def resolve_external_cumulative_source_from_path(
             sha256="sha256:" + hashlib.sha256(content).hexdigest(),
             contributors=artifact.contributors,
         )
-    finally:
-        _retire_external_result_tree(acquisition)
+
+    return _authenticated_external_result_operation(acquisition, resolve)
+
+
+def resolve_external_cumulative_source_from_path(
+    workspace: str,
+    acquisition_manifest: str,
+    acquisition_lock: str,
+    composition_manifest: str,
+    context: Mapping[str, JsonValue],
+) -> ResolvedCumulativeSource:
+    """Issue one immutable candidate plan from one bounded acquisition."""
+    with open_external_declaration_acquisition_from_path(
+        workspace,
+        acquisition_manifest,
+        acquisition_lock,
+    ) as acquisition:
+        return resolve_external_cumulative_source(
+            acquisition,
+            composition_manifest,
+            context,
+        )

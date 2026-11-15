@@ -6,7 +6,7 @@ External declaration acquisition: verifies one external corpus and exposes its p
 
 ```{eval-rst}
 .. automodule:: eutaxis.declarations.external_result
-   :members: AcquiredResource, AcquisitionSourceCoordinate, ExternalAcquisitionResult, acquire_external_declarations, acquire_external_declarations_from_path
+   :members: AcquiredResource, AcquisitionSourceCoordinate, ExternalAcquisitionResult, acquire_external_declarations, acquire_external_declarations_from_path, open_external_declaration_acquisition_from_path
    :show-inheritance:
 ```
 
@@ -63,7 +63,7 @@ The facade source binds the authenticated source revisions, certified component 
 
 ```{eval-rst}
 .. automodule:: eutaxis.declarations.facade_report
-   :members: ResolvedArtifactSelection, ResolvedCumulativeSource, resolve_external_cumulative_source_from_path
+   :members: ResolvedArtifactSelection, ResolvedCumulativeSource, resolve_external_cumulative_source, resolve_external_cumulative_source_from_path
    :show-inheritance:
 ```
 

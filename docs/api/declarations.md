@@ -148,6 +148,19 @@ Acquire external declarations through an exact workspace path.
 * **Return type:**
   [*ExternalAcquisitionResult*](#eutaxis.declarations.external_result.ExternalAcquisitionResult)
 
+<a id="eutaxis.declarations.external_result.open_external_declaration_acquisition_from_path"></a>
+
+### eutaxis.declarations.external_result.open_external_declaration_acquisition_from_path(workspace_path, manifest_path, lock_path)
+
+Retain one authenticated acquisition for a bounded group of operations.
+
+* **Parameters:**
+  * **workspace_path** (*str*)
+  * **manifest_path** (*str*)
+  * **lock_path** (*str*)
+* **Return type:**
+  *Iterator*[[*ExternalAcquisitionResult*](#eutaxis.declarations.external_result.ExternalAcquisitionResult)]
+
 <a id="module-eutaxis.declarations.external_resolution"></a>
 
 <a id="external-resolution"></a>
@@ -750,11 +763,24 @@ Return the concise facade projection of an authenticated resolution.
 * **Return type:**
   [*ResolvedArtifactSelection*](#eutaxis.declarations.facade_report.ResolvedArtifactSelection)
 
+<a id="eutaxis.declarations.facade_report.resolve_external_cumulative_source"></a>
+
+### eutaxis.declarations.facade_report.resolve_external_cumulative_source(acquisition, composition_manifest, context)
+
+Project one cumulative source from a caller-owned acquisition.
+
+* **Parameters:**
+  * **acquisition** ([*ExternalAcquisitionResult*](#eutaxis.declarations.external_result.ExternalAcquisitionResult))
+  * **composition_manifest** (*str*)
+  * **context** (*Mapping* *[**str* *,* *None* *|* *bool* *|* *int* *|* *float* *|* *str* *|* *tuple* *[**None* *|* *bool* *|* *int* *|* *float* *|* *str* *|* *tuple* *[**JsonValue* *,*  *...* *]*  *|* *Mapping* *[**str* *,* *JsonValue* *]* *,*  *...* *]*  *|* *Mapping* *[**str* *,* *None* *|* *bool* *|* *int* *|* *float* *|* *str* *|* *tuple* *[**JsonValue* *,*  *...* *]*  *|* *Mapping* *[**str* *,* *JsonValue* *]* *]* *]*)
+* **Return type:**
+  [*ResolvedCumulativeSource*](#eutaxis.declarations.facade_report.ResolvedCumulativeSource)
+
 <a id="eutaxis.declarations.facade_report.resolve_external_cumulative_source_from_path"></a>
 
 ### eutaxis.declarations.facade_report.resolve_external_cumulative_source_from_path(workspace, acquisition_manifest, acquisition_lock, composition_manifest, context)
 
-Issue one immutable candidate plan before retiring source authority.
+Issue one immutable candidate plan from one bounded acquisition.
 
 * **Parameters:**
   * **workspace** (*str*)

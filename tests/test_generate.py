@@ -1193,6 +1193,67 @@ def test_one_generator_binds_report_and_output_to_one_candidate(
         InstructionGenerator(load_config(config)).generate_all()
 
 
+def test_generator_reuses_injected_declaration_resolver(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "common_sources:\n"
+        "  - declaration:\n"
+        "      module: purpose\n"
+        f"      acquisition_manifest: {manifest_path}\n"
+        f"      acquisition_lock: {lock_path}\n"
+        "      composition_manifest: resolution/manifest\n"
+        "      context:\n"
+        "        context.available: true\n"
+        "        resolution.enabled: true\n"
+        "agents:\n"
+        "  - name: codex\n"
+        "    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+    loaded = load_config(config)
+    expected = InstructionGenerator(loaded).declaration_resolution_report()[0][1]
+    calls = []
+
+    def resolve(source):
+        calls.append(source)
+        return expected
+
+    generator = InstructionGenerator(
+        loaded,
+        declaration_source_resolver=resolve,
+    )
+    report = generator.declaration_resolution_report()
+    first = generator.generate_all()["codex"]
+    second = generator.generate_all()["codex"]
+
+    assert report[0][1] is expected
+    assert first == second == expected.text
+    assert calls == [report[0][0]]
+
+    def fail(_source):
+        raise OSError("injected resolution failed")
+
+    broken = InstructionGenerator(
+        loaded,
+        declaration_source_resolver=fail,
+    )
+    with pytest.raises(DeclarationResolutionError) as captured:
+        broken.generate_all()
+    assert captured.value.exit_code == 2
+    assert "injected resolution failed" in str(captured.value)
+
+
 def test_plan_maps_operational_failure_to_failed_command(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -73,6 +73,7 @@ from .external_result import (
     ExternalAcquisitionResult,
     acquire_external_declarations,
     acquire_external_declarations_from_path,
+    open_external_declaration_acquisition_from_path,
 )
 from .exceptions import (
     AcquisitionAuthorityError,
@@ -401,6 +402,7 @@ from .external_resolution import (
 from .facade_report import (
     ResolvedArtifactSelection,
     ResolvedCumulativeSource,
+    resolve_external_cumulative_source,
     resolve_external_cumulative_source_from_path,
     resolved_artifact_selection,
 )
@@ -494,6 +496,7 @@ __all__ = [
     "acquire_packaged_internal_source",
     "acquire_external_declarations",
     "acquire_external_declarations_from_path",
+    "open_external_declaration_acquisition_from_path",
     "acquisition_lock_schema",
     "acquisition_lock_schema_path",
     "acquisition_manifest_schema",
@@ -816,6 +819,7 @@ __all__ = [
     "prepare_procedure_run",
     "resolve_compilation_unit",
     "resolve_external_compilation_unit",
+    "resolve_external_cumulative_source",
     "resolve_external_cumulative_source_from_path",
     "resolved_artifact_selection",
     "query_packet_json_bytes",

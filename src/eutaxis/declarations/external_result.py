@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import NamedTuple, NoReturn, SupportsIndex, cast
+from typing import NamedTuple, NoReturn, SupportsIndex, TypeVar, cast
 
 from ._authority import IdentityAuthorityStore, identity_value_state
 from ._external_evidence import (
@@ -35,6 +37,8 @@ from .external_registry import (
 )
 from .loader import LoadedDeclarationSource
 from .registry import DeclarationRegistry
+
+_T = TypeVar("_T")
 
 
 @dataclass(frozen=True)
@@ -155,6 +159,30 @@ def acquire_external_declarations_from_path(
     return _publish_external_result(stage)
 
 
+@contextmanager
+def open_external_declaration_acquisition_from_path(
+    workspace_path: str,
+    manifest_path: str,
+    lock_path: str,
+) -> Iterator[ExternalAcquisitionResult]:
+    """Retain one authenticated acquisition for a bounded group of operations."""
+    result = acquire_external_declarations_from_path(
+        workspace_path,
+        manifest_path,
+        lock_path,
+    )
+    state = _issued_external_result_state(result)
+    try:
+        try:
+            yield result
+        except BaseException as error:
+            _raise_changed_external_result(result, state, error)
+            raise
+        _require_same_external_result(result, state)
+    finally:
+        _retire_external_result_tree(result)
+
+
 def _publish_external_result(
     stage: _ExternalAcquisitionStage,
 ) -> ExternalAcquisitionResult:
@@ -269,6 +297,42 @@ def _authenticate_external_result_state(
     _validate_source_coordinates(state, expected)
     _validate_resources(state)
     return state
+
+
+def _authenticated_external_result_operation(
+    result: ExternalAcquisitionResult,
+    operation: Callable[[], _T],
+) -> _T:
+    """Bracket one caller-owned operation with complete authentication."""
+    state = _issued_external_result_state(result)
+    try:
+        value = operation()
+    except BaseException as error:
+        _raise_changed_external_result(result, state, error)
+        raise
+    _require_same_external_result(result, state)
+    return value
+
+
+def _require_same_external_result(
+    result: ExternalAcquisitionResult,
+    expected: _ExternalAcquisitionResultState,
+) -> None:
+    """Require one acquisition to retain its exact issued authority state."""
+    if _issued_external_result_state(result) is not expected:
+        _fail("$", "external acquisition authority state changed")
+
+
+def _raise_changed_external_result(
+    result: ExternalAcquisitionResult,
+    expected: _ExternalAcquisitionResultState,
+    error: BaseException,
+) -> None:
+    """Give acquisition corruption precedence over one operation failure."""
+    try:
+        _require_same_external_result(result, expected)
+    except BaseException as authority_error:
+        raise authority_error from error
 
 
 def _derive_source_coordinates(

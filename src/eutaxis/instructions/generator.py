@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import difflib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator
 
@@ -36,6 +36,8 @@ from .models import (
 from .rules import LABEL_PATTERN, RejectedLabel, parse_module
 from .scanner import declared_sources
 
+DeclarationSourceResolver = Callable[[DeclarationSource], "ResolvedCumulativeSource"]
+
 
 class InstructionGenerator:
     """Generate, write and compare instruction outputs."""
@@ -44,9 +46,12 @@ class InstructionGenerator:
         self,
         config: InstructionConfig,
         assembler: MarkdownAssembler | None = None,
+        *,
+        declaration_source_resolver: DeclarationSourceResolver | None = None,
     ) -> None:
         self.config = config
         self.assembler = assembler or MarkdownAssembler()
+        self._declaration_source_resolver = declaration_source_resolver
         self._declaration_source_cache: dict[
             tuple[object, ...], ResolvedCumulativeSource
         ] = {}
@@ -221,13 +226,16 @@ class InstructionGenerator:
         if cached is not None:
             return cached
         try:
-            resolved = resolve_external_cumulative_source_from_path(
-                str(self.config.root),
-                source.acquisition_manifest.as_posix(),
-                source.acquisition_lock.as_posix(),
-                source.composition_manifest,
-                source.context,
-            )
+            if self._declaration_source_resolver is None:
+                resolved = resolve_external_cumulative_source_from_path(
+                    str(self.config.root),
+                    source.acquisition_manifest.as_posix(),
+                    source.acquisition_lock.as_posix(),
+                    source.composition_manifest,
+                    source.context,
+                )
+            else:
+                resolved = self._declaration_source_resolver(source)
         except FacetContextError as exc:
             raise DeclarationResolutionError(
                 source.composition_manifest,
