@@ -13,6 +13,7 @@ import yaml
 from eutaxis.declarations import (
     DeclarationKind,
     DeclarationRegistryError,
+    DeclarationSchemaError,
     load_declaration_registry,
     load_facet_registry,
 )
@@ -244,7 +245,7 @@ def test_relation_target_must_be_effective_content(tmp_path: Path, facets) -> No
         ),
     ],
 )
-def test_inactive_content_cannot_assert_operative_relations(
+def test_inactive_content_cannot_assert_semantic_relations(
     tmp_path: Path,
     facets,
     filename: str,
@@ -261,7 +262,165 @@ def test_inactive_content_cannot_assert_operative_relations(
     error = _assert_registry_error(
         directory, facets, location="$.status", filename=filename
     )
-    assert "operative relations must be active" in str(error)
+    assert "semantic relations must be active" in str(error)
+
+
+def test_reciprocal_references_are_retained_without_dependency_edges(
+    tmp_path: Path, facets
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    _mutate(
+        directory,
+        "alternate-rule.yaml",
+        lambda document: document.update(
+            {"relations": [{"type": "references", "target": "content/combined"}]}
+        ),
+    )
+    _mutate(
+        directory,
+        "combined-rule.yaml",
+        lambda document: document.update(
+            {"relations": [{"type": "references", "target": "content/alternate"}]}
+        ),
+    )
+
+    registry = load_declaration_registry(_paths(directory), facets)
+
+    assert registry.records["content/alternate"].declaration.relations[0].type == (
+        "references"
+    )
+    assert registry.conflicts == {("content/alternate", "content/refined")}
+
+
+@pytest.mark.parametrize(
+    "target",
+    ("missing/rule", "content/package", "registry/format-decision", "registry/manual"),
+)
+def test_reference_target_must_be_indexed_effective_content(
+    tmp_path: Path, facets, target: str
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    if target == "registry/format-decision":
+        _add_decision(directory)
+    _mutate(
+        directory,
+        "alternate-rule.yaml",
+        lambda document: document.update(
+            {"relations": [{"type": "references", "target": target}]}
+        ),
+    )
+
+    _assert_registry_error(
+        directory,
+        facets,
+        location="$.relations[0].target",
+        filename="alternate-rule.yaml",
+    )
+
+
+@pytest.mark.parametrize("status", ("proposed", "superseded", "retired"))
+def test_reference_target_must_be_active(tmp_path: Path, facets, status: str) -> None:
+    directory = _copy_corpus(tmp_path)
+    _mutate(
+        directory,
+        "alternate-rule.yaml",
+        lambda document: document.update(
+            {"relations": [{"type": "references", "target": "content/combined"}]}
+        ),
+    )
+    _mutate(
+        directory,
+        "combined-rule.yaml",
+        lambda document: document.update({"status": status}),
+    )
+
+    _assert_registry_error(
+        directory,
+        facets,
+        location="$.relations[0].target",
+        filename="alternate-rule.yaml",
+    )
+
+
+@pytest.mark.parametrize("status", ("proposed", "superseded", "retired"))
+def test_reference_source_must_be_active(tmp_path: Path, facets, status: str) -> None:
+    directory = _copy_corpus(tmp_path)
+    _mutate(
+        directory,
+        "alternate-rule.yaml",
+        lambda document: document.update(
+            {
+                "status": status,
+                "relations": [{"type": "references", "target": "content/combined"}],
+            }
+        ),
+    )
+
+    error = _assert_registry_error(
+        directory, facets, location="$.status", filename="alternate-rule.yaml"
+    )
+    assert "semantic relations must be active" in str(error)
+
+
+@pytest.mark.parametrize(
+    "filename",
+    (
+        "rule-set.yaml",
+        "manifest.yaml",
+        "policy.yaml",
+        "operation.yaml",
+        "decision.yaml",
+    ),
+)
+def test_non_content_source_cannot_assert_a_reference(
+    tmp_path: Path, facets, filename: str
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    if filename == "decision.yaml":
+        _add_decision(directory)
+    _mutate(
+        directory,
+        filename,
+        lambda document: document.update(
+            {"relations": [{"type": "references", "target": "content/combined"}]}
+        ),
+    )
+
+    with pytest.raises((DeclarationRegistryError, DeclarationSchemaError)):
+        load_declaration_registry(_paths(directory), facets)
+
+
+def test_reference_rejects_self_link_and_duplicate_triple(
+    tmp_path: Path, facets
+) -> None:
+    directory = _copy_corpus(tmp_path)
+    _mutate(
+        directory,
+        "alternate-rule.yaml",
+        lambda document: document.update(
+            {"relations": [{"type": "references", "target": "content/alternate"}]}
+        ),
+    )
+    _assert_registry_error(
+        directory,
+        facets,
+        location="$.relations[0].target",
+        filename="alternate-rule.yaml",
+    )
+
+    directory = _copy_corpus(tmp_path / "duplicate")
+    relation = {"type": "references", "target": "content/combined"}
+    _mutate(
+        directory,
+        "alternate-rule.yaml",
+        lambda document: document.update({"relations": [relation, relation]}),
+    )
+    _assert_registry_error(
+        directory,
+        facets,
+        location="$.relations[1].target",
+        filename="alternate-rule.yaml",
+    )
 
 
 def test_reciprocal_conflict_fails_at_the_later_canonical_source(

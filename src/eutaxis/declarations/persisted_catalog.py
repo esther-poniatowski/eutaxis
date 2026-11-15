@@ -484,7 +484,7 @@ def _validate_entry_integrity(
                 _fail(
                     source,
                     f"{entry_location}.status",
-                    "a row with operative relations must be active",
+                    "a row with semantic relations must be active",
                 )
             if target.kind not in _EFFECTIVE_KINDS:
                 _fail(

@@ -293,7 +293,7 @@ class _RegistryBuilder:
                         self._raise(
                             record,
                             ("status",),
-                            "a declaration with operative relations must be active",
+                            "a declaration with semantic relations must be active",
                         )
                     target = self._effective_content(record, relation.target, path)
                 if target.declaration.id == declaration.id:

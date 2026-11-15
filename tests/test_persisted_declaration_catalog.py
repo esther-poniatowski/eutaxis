@@ -535,7 +535,7 @@ def test_loader_rejects_an_orphaned_superseded_row() -> None:
         ),
     ],
 )
-def test_loader_rejects_operative_relations_from_inactive_rows(
+def test_loader_rejects_semantic_relations_from_inactive_rows(
     identifier: str,
     status: str,
     relations: list[dict[str, str]],
@@ -546,8 +546,152 @@ def test_loader_rejects_operative_relations_from_inactive_rows(
     row["relations"] = relations
 
     with pytest.raises(
-        DeclarationCatalogError, match="operative relations must be active"
+        DeclarationCatalogError, match="semantic relations must be active"
     ):
+        _load_document(document)
+
+
+@pytest.mark.parametrize("golden", [GOLDEN_INDEX, V2_GOLDEN_INDEX])
+def test_loader_accepts_a_retained_nonoperative_reference(golden: Path) -> None:
+    document = cast(dict[str, object], json.loads(golden.read_bytes()))
+    content = [
+        row
+        for row in _declarations(document)
+        if row["kind"] in {"rule", "procedure"} and row["status"] == "active"
+    ]
+    source, target = content[:2]
+    cast(list[object], source["relations"]).append(
+        {"type": "references", "target": target["id"]}
+    )
+
+    catalog = _load_document(document)
+
+    loaded = catalog.declarations[cast(str, source["id"])]
+    assert ("references", target["id"]) in {
+        (relation.type, relation.target) for relation in loaded.relations
+    }
+
+
+@pytest.mark.parametrize("golden", [GOLDEN_INDEX, V2_GOLDEN_INDEX])
+def test_catalog_schema_rejects_an_unknown_relation_type(golden: Path) -> None:
+    document = cast(dict[str, object], json.loads(golden.read_bytes()))
+    source = next(
+        row
+        for row in _declarations(document)
+        if row["kind"] in {"rule", "procedure"} and row["status"] == "active"
+    )
+    source["relations"] = [{"type": "unknown", "target": source["id"]}]
+
+    with pytest.raises(DeclarationCatalogError):
+        _load_document(document)
+
+
+@pytest.mark.parametrize(
+    ("target", "target_mutation"),
+    [
+        ("missing/rule", None),
+        ("content/package", None),
+        ("content/combined", {"kind": "decision"}),
+        ("registry/manual", None),
+    ],
+)
+def test_persisted_reference_target_must_be_indexed_effective_content(
+    target: str, target_mutation: dict[str, str] | None
+) -> None:
+    document = _document()
+    if target_mutation is not None:
+        target_row = _entry(document, target)
+        target_row.update(target_mutation)
+        target_row["query"] = {"outcome": "selected"}
+    _entry(document, "content/alternate")["relations"] = [
+        {"type": "references", "target": target}
+    ]
+
+    with pytest.raises(DeclarationCatalogError, match="not .*content"):
+        _load_document(document)
+
+
+@pytest.mark.parametrize("status", ("proposed", "superseded", "retired"))
+def test_persisted_reference_target_must_be_active(status: str) -> None:
+    document = _document()
+    _entry(document, "content/alternate")["relations"] = [
+        {"type": "references", "target": "content/combined"}
+    ]
+    _entry(document, "content/combined")["status"] = status
+
+    with pytest.raises(DeclarationCatalogError, match="is not active"):
+        _load_document(document)
+
+
+@pytest.mark.parametrize("status", ("proposed", "superseded", "retired"))
+def test_persisted_reference_source_must_be_active(status: str) -> None:
+    document = _document()
+    source = _entry(document, "content/alternate")
+    source["status"] = status
+    source["relations"] = [{"type": "references", "target": "content/combined"}]
+
+    with pytest.raises(
+        DeclarationCatalogError, match="semantic relations must be active"
+    ):
+        _load_document(document)
+
+
+@pytest.mark.parametrize(
+    "identifier", ("content/package", "registry/manifest", "registry/prefer-refined")
+)
+def test_persisted_non_content_source_cannot_assert_a_reference(
+    identifier: str,
+) -> None:
+    document = _document()
+    _entry(document, identifier)["relations"] = [
+        {"type": "references", "target": "content/combined"}
+    ]
+
+    with pytest.raises(DeclarationCatalogError, match="admit only supersedes"):
+        _load_document(document)
+
+
+def test_persisted_decision_source_cannot_assert_a_reference() -> None:
+    document = _document()
+    source = _entry(document, "content/combined")
+    source["kind"] = "decision"
+    source["query"] = {"outcome": "selected"}
+    source["relations"] = [{"type": "references", "target": "content/alternate"}]
+
+    with pytest.raises(DeclarationCatalogError, match="admit only supersedes"):
+        _load_document(document)
+
+
+def test_persisted_exact_contract_source_cannot_assert_a_reference() -> None:
+    document = _document()
+    _contracts(document)[0]["relations"] = [
+        {"type": "references", "target": "content/alternate"}
+    ]
+
+    with pytest.raises(DeclarationCatalogError):
+        _load_document(document)
+
+
+@pytest.mark.parametrize(
+    ("relations", "message"),
+    [
+        ([{"type": "references", "target": "content/alternate"}], "itself"),
+        (
+            [
+                {"type": "references", "target": "content/combined"},
+                {"type": "references", "target": "content/combined"},
+            ],
+            "duplicate relation",
+        ),
+    ],
+)
+def test_persisted_reference_rejects_self_link_and_duplicate_triple(
+    relations: list[dict[str, str]], message: str
+) -> None:
+    document = _document()
+    _entry(document, "content/alternate")["relations"] = relations
+
+    with pytest.raises(DeclarationCatalogError, match=message):
         _load_document(document)
 
 

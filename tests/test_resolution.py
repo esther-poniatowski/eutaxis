@@ -284,6 +284,35 @@ def test_rule_set_members_retain_authored_order_through_composition(
     )
 
 
+def test_reference_preserves_manifest_order_without_a_dependency(
+    tmp_path: Path,
+) -> None:
+    root = _mutable_fixture(tmp_path)
+    alternate = _document(root, "alternate-rule.yaml")
+    referenced = copy.deepcopy(alternate)
+    referenced["id"] = "resolution/referenced"
+    referenced["relations"] = []
+    _write_document(root, "referenced-rule.yaml", referenced)
+    alternate["relations"] = [{"type": "references", "target": "resolution/referenced"}]
+    _write_document(root, "alternate-rule.yaml", alternate)
+    manifest = _document(root, "manifest.yaml")
+    manifest["sections"][0]["declarations"] = [  # type: ignore[index]
+        "resolution/alternate",
+        "resolution/referenced",
+    ]
+    manifest["policies"] = []
+    _write_document(root, "manifest.yaml", manifest)
+
+    result = _resolve(root)
+    plan = plan_cumulative_composition(_registry(root), result.unit)
+
+    assert result.unit.dependencies == ()
+    assert tuple(component.declaration for component in plan.components) == (
+        "resolution/alternate",
+        "resolution/referenced",
+    )
+
+
 def test_composer_rejects_a_projection_for_an_effective_procedure() -> None:
     result = _resolve()
     unit = object.__new__(ResolvedCompilationUnit)

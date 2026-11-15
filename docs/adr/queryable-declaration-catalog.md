@@ -72,7 +72,8 @@ One packaged schema validates both emitted and loaded index payloads. The loader
 - every listed source has a row, and each source coordinate occurs once
 - top-level rows use the source root, while each embedded rule shares a source with its root rule set and uses a `rules` sequence coordinate
 - active content rows may link to active indexed content
-- inactive content rows cannot carry operative links
+- `references` links retain semantic cross-references but enter no dependency, conflict, supersession, selection, or ordering graph
+- inactive content rows cannot carry semantic links
 - a non-content row may only use `supersedes`, from an active source to a superseded target of the same kind
 - exact contracts admit no links
 - each superseded unversioned row has an incoming `supersedes` link

@@ -66,9 +66,11 @@ Authors must provide the field explicitly. The opaque `target` remains independe
 
 Rules and procedures are the only effective-content kinds. Each kind admits the following links:
 
-- rules and procedures may use `requires`, `refines`, `incompatible-with`, and `supersedes`
+- rules and procedures may use `requires`, `refines`, `references`, `incompatible-with`, and `supersedes`
 - rule sets, resolution policies, composition manifests, and decisions may use only `supersedes`
 - evaluators and operations admit no relations because their positive integer `version` supplies their replacement lineage
+
+`references` records a semantic cross-reference to active effective content. It does not select its target or create a dependency, conflict, supersession, or ordering edge.
 
 During resolution, a rule set expands to its active member rules. The rule set never enters a candidate, required, excluded, effective, or certified set.
 

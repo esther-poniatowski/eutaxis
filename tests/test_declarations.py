@@ -66,6 +66,35 @@ def _line_containing(path: Path, text: str) -> int:
     )
 
 
+def test_rule_schema_accepts_a_reference_relation(tmp_path: Path) -> None:
+    path = _write_variant(
+        tmp_path,
+        "rule.yaml",
+        lambda document: document.update(
+            {"relations": [{"type": "references", "target": "prose/other"}]}
+        ),
+    )
+
+    declaration = load_declaration(path)
+
+    assert declaration.relations[0].type == "references"
+
+
+def test_rule_schema_rejects_an_unknown_relation_type(tmp_path: Path) -> None:
+    path = _write_variant(
+        tmp_path,
+        "rule.yaml",
+        lambda document: document.update(
+            {"relations": [{"type": "unknown", "target": "prose/other"}]}
+        ),
+    )
+
+    with pytest.raises(DeclarationSchemaError) as captured:
+        load_declaration(path)
+
+    assert captured.value.location == "$.relations[0].type"
+
+
 @pytest.mark.parametrize(
     ("filename", "expected_type"),
     [

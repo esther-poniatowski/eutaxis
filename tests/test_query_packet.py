@@ -26,12 +26,21 @@ from eutaxis.declarations.canonical_json import jcs_bytes
 from tests.test_external_acquisition import _write_contract
 
 
-def _rule(identifier: str, *, applicable: bool, conflicts: str | None = None) -> bytes:
-    relations = (
-        f"[{{type: incompatible-with, target: packet/{conflicts}}}]"
-        if conflicts is not None
-        else "[]"
-    )
+def _rule(
+    identifier: str,
+    *,
+    applicable: bool,
+    conflicts: str | None = None,
+    references: str | None = None,
+) -> bytes:
+    relation_items = []
+    if conflicts is not None:
+        relation_items.append(
+            f"{{type: incompatible-with, target: packet/{conflicts}}}"
+        )
+    if references is not None:
+        relation_items.append(f"{{type: references, target: packet/{references}}}")
+    relations = f"[{', '.join(relation_items)}]"
     return f"""\
 _schema: eutaxis:declaration@1
 id: packet/{identifier}
@@ -128,14 +137,28 @@ def _acquire(
     *,
     facet_bytes: bytes | None = None,
     workspace_path: str | None = None,
+    reference_target: bool = False,
 ):
+    primary = _rule(
+        "primary",
+        applicable=True,
+        conflicts="alternate",
+        references="referenced" if reference_target else None,
+    )
     files = (
-        (
-            "declarations/primary.yaml",
-            _rule("primary", applicable=True, conflicts="alternate"),
-        ),
+        ("declarations/primary.yaml", primary),
         ("declarations/alternate.yaml", _rule("alternate", applicable=True)),
         ("declarations/contextual.yaml", _rule("contextual", applicable=False)),
+        *(
+            (
+                (
+                    "declarations/referenced.yaml",
+                    _rule("referenced", applicable=True),
+                ),
+            )
+            if reference_target
+            else ()
+        ),
         ("declarations/package.yaml", RULE_SET),
         ("declarations/policy.yaml", POLICY),
         ("declarations/manifest.yaml", MANIFEST),
@@ -224,6 +247,33 @@ def test_packet_explains_every_considered_declaration(tmp_path: Path) -> None:
         item["declaration"]: item["reason-events"] for item in payload["selections"]
     }
     assert all(reasons.values())
+
+
+def test_packet_retains_reference_without_selecting_its_target(tmp_path: Path) -> None:
+    acquisition = _acquire(tmp_path, reference_target=True)
+    resolution = resolve_external_compilation_unit(
+        acquisition,
+        "packet/manifest",
+        {"context.available": True, "packet.enabled": True},
+    )
+    payload = json.loads(
+        query_packet_json_bytes(build_external_query_packet(resolution))
+    )
+
+    primary = next(
+        item for item in payload["declarations"] if item["id"] == "packet/primary"
+    )
+    assert {"type": "references", "target": "packet/referenced"} in primary["document"][
+        "relations"
+    ]
+    assert "packet/referenced" not in {
+        item["declaration"] for item in payload["selections"]
+    }
+    assert all(
+        event["kind"] != "dependency-discovered"
+        or event["declaration"] != "packet/referenced"
+        for event in payload["trace"]
+    )
 
 
 def test_packet_is_relocatable_and_deterministic(tmp_path: Path) -> None:

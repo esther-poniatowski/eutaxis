@@ -191,6 +191,7 @@
           "enum": [
             "requires",
             "refines",
+            "references",
             "incompatible-with",
             "supersedes"
           ],
