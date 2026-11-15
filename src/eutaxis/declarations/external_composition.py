@@ -8,8 +8,9 @@ from typing import NamedTuple, NoReturn
 from ._authority import IdentityAuthorityStore, identity_value_state
 from .catalog import (
     DeclarationCatalog,
+    _AuthenticatedCatalogView,
+    _build_declaration_catalog_with_state,
     _issued_catalog_state,
-    build_declaration_catalog,
 )
 from .composition import (
     CumulativeArtifact,
@@ -208,12 +209,15 @@ def render_external_cumulative_markdown(
     """Render one external cumulative plan for a declared consumer profile."""
     plan_state = _issued_external_plan_state(plan)
     acquisition = plan_state.resolution_state.acquisition
-    catalog = build_declaration_catalog(acquisition)
-    catalog_state = _issued_catalog_state(catalog)
+    catalog, catalog_state = _build_declaration_catalog_with_state(acquisition)
+    catalog_view = _AuthenticatedCatalogView(
+        declarations=catalog.declarations,
+        contracts=catalog.contracts,
+    )
     rendered = None
     try:
         rendered = _render_cumulative_markdown(
-            catalog,
+            catalog_view,
             plan_state.resolution_state.resolution.unit,
             plan_state.plan,
             profile,
@@ -222,9 +226,9 @@ def render_external_cumulative_markdown(
         _raise_changed_plan(plan, plan_state, error)
         _raise_changed_catalog(catalog, catalog_state, error)
         raise
+    _require_same_plan(plan, plan_state)
+    _require_same_catalog(catalog, catalog_state)
     try:
-        _require_same_plan(plan, plan_state)
-        _require_same_catalog(catalog, catalog_state)
         return _issue_external_artifact(
             plan,
             plan_state,

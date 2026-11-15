@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from ..names import SAFE_SLUG_PATTERN
-from .catalog import DeclarationCatalog
+from .catalog import _CatalogRead
 from .composition import (
     CumulativeArtifact,
     CumulativeCompositionPlan,
@@ -74,7 +74,7 @@ class _ProjectionRenderState:
 
 
 def _render_cumulative_markdown(
-    catalog: DeclarationCatalog,
+    catalog: _CatalogRead,
     unit: ResolvedCompilationUnit,
     plan: CumulativeCompositionPlan,
     profile: CumulativeMarkdownProfile,
@@ -111,7 +111,7 @@ def _render_cumulative_markdown(
 
 
 def _render_cumulative_component(
-    catalog: DeclarationCatalog,
+    catalog: _CatalogRead,
     projections: Mapping[str, ResolvedRuleProjection],
     identifier: str,
     profile: CumulativeMarkdownProfile,
@@ -260,7 +260,7 @@ def _render_exception(
 
 
 def _render_rule_set(
-    catalog: DeclarationCatalog,
+    catalog: _CatalogRead,
     identifier: str,
 ) -> str:
     """Render one selected rule-set frame before its first effective rule."""
@@ -340,7 +340,7 @@ def _render_criterion(criterion: Criterion) -> str:
 
 
 def _render_procedure(
-    catalog: DeclarationCatalog,
+    catalog: _CatalogRead,
     procedure: ProcedureDeclaration,
     *,
     label: str | None = None,
@@ -356,7 +356,7 @@ def _render_procedure(
 
 
 def _render_procedure_with_contributors(
-    catalog: DeclarationCatalog,
+    catalog: _CatalogRead,
     procedure: ProcedureDeclaration,
     *,
     label: str | None = None,
@@ -515,7 +515,7 @@ def _longest_backtick_run(value: str) -> int:
 
 
 def _render_operation(
-    catalog: DeclarationCatalog,
+    catalog: _CatalogRead,
     reference: VersionedReference,
     *,
     allow_support_resources: bool = False,

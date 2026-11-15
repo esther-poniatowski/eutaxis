@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Callable, NamedTuple, TypeVar, cast
+from typing import Callable, NamedTuple, Protocol, TypeVar, cast
 
 from ._authority import IdentityAuthorityStore, identity_value_state
 from .catalog_schema import validate_catalog_index_payload
@@ -193,6 +193,44 @@ class DeclarationCatalog:
         return record.declaration
 
 
+class _CatalogRead(Protocol):
+    """Expose only the lookups admitted inside one authenticated traversal."""
+
+    def get(self, identifier: str) -> RegisteredDeclaration | None:
+        """Return one unversioned record when present."""
+
+    def get_contract(
+        self,
+        kind: DeclarationKind,
+        identifier: str,
+        version: int,
+    ) -> RegisteredDeclaration | None:
+        """Return one exact evaluator or operation contract when present."""
+
+
+@dataclass(frozen=True)
+class _AuthenticatedCatalogView:
+    """Read immutable catalog maps inside an outer authority bracket."""
+
+    declarations: Mapping[str, RegisteredDeclaration]
+    contracts: Mapping[ExactContractKey, RegisteredDeclaration]
+
+    def get(self, identifier: str) -> RegisteredDeclaration | None:
+        """Return one unversioned record without reopening the outer bracket."""
+        return self.declarations.get(identifier)
+
+    def get_contract(
+        self,
+        kind: DeclarationKind,
+        identifier: str,
+        version: int,
+    ) -> RegisteredDeclaration | None:
+        """Return one admitted exact contract without reopening the bracket."""
+        if kind not in EXACT_CONTRACT_KINDS:
+            raise ValueError(f"{kind.value!r} is not an exact contract kind")
+        return self.contracts.get(ExactContractKey(kind, identifier, version))
+
+
 class _CatalogAuthorityState(NamedTuple):
     """Bind one catalog identity to its complete private authority graph."""
 
@@ -210,6 +248,14 @@ def build_declaration_catalog(
     result: ExternalAcquisitionResult,
 ) -> DeclarationCatalog:
     """Build revision 2 lookups from one issued external acquisition result."""
+    catalog, _state = _build_declaration_catalog_with_state(result)
+    return catalog
+
+
+def _build_declaration_catalog_with_state(
+    result: ExternalAcquisitionResult,
+) -> tuple[DeclarationCatalog, _CatalogAuthorityState]:
+    """Build and authenticate one catalog while retaining its issued state."""
     state = _issued_external_result_state(result)
     catalog: DeclarationCatalog | None = None
     try:
@@ -227,11 +273,11 @@ def build_declaration_catalog(
             raise DeclarationCatalogError(
                 "external acquisition authority state changed"
             )
-        _issued_catalog_state(catalog)
+        catalog_state = _issued_catalog_state(catalog)
     except BaseException:
         _CATALOG_AUTHORITIES.retire(catalog)
         raise
-    return catalog
+    return catalog, catalog_state
 
 
 def _build_external_catalog(
@@ -336,7 +382,13 @@ def _build_declaration_catalog_from_registry(
         )
         for path in registry.paths
     )
-    return _issue_catalog(catalog, None, None, source_map)
+    catalog = _issue_catalog(catalog, None, None, source_map)
+    try:
+        _issued_catalog_state(catalog)
+        return catalog
+    except BaseException:
+        _CATALOG_AUTHORITIES.retire(catalog)
+        raise
 
 
 def _issue_catalog(
@@ -355,7 +407,6 @@ def _issue_catalog(
     )
     try:
         _CATALOG_AUTHORITIES.issue(catalog, state)
-        _issued_catalog_state(catalog)
         return catalog
     except BaseException:
         _CATALOG_AUTHORITIES.retire(catalog)

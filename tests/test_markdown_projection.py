@@ -7,13 +7,18 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+import eutaxis.declarations.catalog as catalog_module
 import eutaxis.declarations.external_composition as external_composition_module
 from eutaxis.cli import app
 from eutaxis.declarations import (
+    AcquisitionAuthorityError,
+    AcquisitionContractError,
     CumulativeMarkdownProfile,
     CompositionError,
     DeclarationCatalogError,
+    DeclarationKind,
     acquire_external_declarations_from_path,
+    build_declaration_catalog,
     plan_external_cumulative_composition,
     render_external_cumulative_markdown,
     resolve_external_compilation_unit,
@@ -642,6 +647,140 @@ def test_agent_profile_renders_containing_rule_set_once(tmp_path: Path) -> None:
     assert "**framed-rule**:" in artifact.text
 
 
+@pytest.mark.parametrize("profile", list(CumulativeMarkdownProfile))
+def test_cumulative_render_authenticates_catalog_exactly_twice(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    profile: CumulativeMarkdownProfile,
+) -> None:
+    _acquisition, plan = _plan(tmp_path)
+    authenticate = catalog_module._authenticate_catalog_state
+    calls = 0
+
+    def count(catalog):
+        nonlocal calls
+        calls += 1
+        return authenticate(catalog)
+
+    monkeypatch.setattr(catalog_module, "_authenticate_catalog_state", count)
+    render_external_cumulative_markdown(plan, profile=profile)
+
+    assert calls == 2
+
+
+def test_authenticated_view_preserves_exact_contract_validation(tmp_path: Path) -> None:
+    acquisition, _plan_value = _plan(tmp_path)
+    catalog = build_declaration_catalog(acquisition)
+    view = catalog_module._AuthenticatedCatalogView(
+        declarations=catalog.declarations,
+        contracts=catalog.contracts,
+    )
+
+    with pytest.raises(ValueError, match="not an exact contract kind"):
+        view.get_contract(DeclarationKind.RULE, "projection/all-modalities", 1)
+
+
+def test_cumulative_render_rejects_mutation_before_traversal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _acquisition, plan = _plan(tmp_path)
+    build = external_composition_module._build_declaration_catalog_with_state
+    catalogs = []
+
+    def mutate(acquisition):
+        catalog, state = build(acquisition)
+        catalogs.append(catalog)
+        object.__setattr__(catalog, "conflicts", (("a", "b"),))
+        return catalog, state
+
+    monkeypatch.setattr(
+        external_composition_module,
+        "_build_declaration_catalog_with_state",
+        mutate,
+    )
+    with pytest.raises(DeclarationCatalogError, match="projection state changed"):
+        render_external_cumulative_markdown(plan)
+    assert len(catalogs) == 1
+    assert _CATALOG_AUTHORITIES.state(catalogs[0]) is None
+
+
+def test_cumulative_render_rejects_nested_mutation_during_traversal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _acquisition, plan = _plan(tmp_path)
+    lookup = catalog_module._AuthenticatedCatalogView.get
+    changed = False
+
+    def mutate(view, identifier):
+        nonlocal changed
+        record = lookup(view, identifier)
+        if record is not None and not changed:
+            changed = True
+            object.__setattr__(record.declaration, "status", "retired")
+        return record
+
+    monkeypatch.setattr(catalog_module._AuthenticatedCatalogView, "get", mutate)
+    with pytest.raises(AcquisitionContractError, match="state changed"):
+        render_external_cumulative_markdown(plan)
+
+
+def test_cumulative_render_rejects_acquisition_mutation_during_traversal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    acquisition, plan = _plan(tmp_path)
+    lookup = catalog_module._AuthenticatedCatalogView.get
+    changed = False
+
+    def mutate(view, identifier):
+        nonlocal changed
+        record = lookup(view, identifier)
+        if not changed:
+            changed = True
+            object.__setattr__(
+                acquisition.source_coordinates[-1], "path", "forged.yaml"
+            )
+        return record
+
+    monkeypatch.setattr(catalog_module._AuthenticatedCatalogView, "get", mutate)
+    with pytest.raises(AcquisitionAuthorityError, match="coordinate state changed"):
+        render_external_cumulative_markdown(plan)
+
+
+def test_cumulative_render_preserves_plain_rendering_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _acquisition, plan = _plan(tmp_path)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("render failed first")
+
+    monkeypatch.setattr(
+        external_composition_module, "_render_cumulative_markdown", fail
+    )
+    with pytest.raises(RuntimeError, match="render failed first"):
+        render_external_cumulative_markdown(plan)
+
+
+def test_cumulative_render_authority_failure_preserves_rendering_cause(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    acquisition, plan = _plan(tmp_path)
+
+    def fail(*_args, **_kwargs):
+        object.__setattr__(acquisition.source_coordinates[-1], "path", "forged.yaml")
+        raise RuntimeError("render failed first")
+
+    monkeypatch.setattr(
+        external_composition_module, "_render_cumulative_markdown", fail
+    )
+    with pytest.raises(
+        AcquisitionAuthorityError, match="coordinate state changed"
+    ) as captured:
+        render_external_cumulative_markdown(plan)
+    assert isinstance(captured.value.__cause__, RuntimeError)
+    assert str(captured.value.__cause__) == "render failed first"
+
+
 def test_default_profile_does_not_add_rule_set_frame(tmp_path: Path) -> None:
     artifact = render_external_cumulative_markdown(_rule_set_plan(tmp_path))
 
@@ -700,12 +839,24 @@ def test_catalog_retirement_after_projection_blocks_publication(
 ) -> None:
     _acquisition, plan = _plan(tmp_path)
     original = external_composition_module._render_cumulative_markdown
+    build = external_composition_module._build_declaration_catalog_with_state
+    catalogs = []
 
-    def hostile_render(catalog, unit, internal_plan, profile):
-        artifact = original(catalog, unit, internal_plan, profile)
-        _CATALOG_AUTHORITIES.retire(catalog)
+    def capture(acquisition):
+        catalog, state = build(acquisition)
+        catalogs.append(catalog)
+        return catalog, state
+
+    def hostile_render(view, unit, internal_plan, profile):
+        artifact = original(view, unit, internal_plan, profile)
+        _CATALOG_AUTHORITIES.retire(catalogs[0])
         return artifact
 
+    monkeypatch.setattr(
+        external_composition_module,
+        "_build_declaration_catalog_with_state",
+        capture,
+    )
     monkeypatch.setattr(
         external_composition_module,
         "_render_cumulative_markdown",
