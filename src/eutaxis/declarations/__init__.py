@@ -438,6 +438,7 @@ from .external_composition import (
     assemble_external_cumulative_artifact,
     plan_external_cumulative_composition,
     render_external_cumulative_markdown,
+    render_external_cumulative_markdowns,
 )
 from .external_attention import (
     ExternalAttentionRequirements,
@@ -839,6 +840,7 @@ __all__ = [
     "render_structured_skill",
     "assemble_external_cumulative_artifact",
     "render_external_cumulative_markdown",
+    "render_external_cumulative_markdowns",
     "select_migration_baselines",
     "schema_path",
     "validate_query_packet_payload",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import NamedTuple, NoReturn
 
 from ._authority import IdentityAuthorityStore, identity_value_state
@@ -27,7 +27,9 @@ from .external_resolution import (
     _issued_external_resolution_state,
 )
 from .external_result import (
+    ExternalAcquisitionResult,
     _authenticated_external_result_operation_from_state,
+    _issued_external_result_state,
     _register_provisional_authority,
 )
 from .markdown_projection import _render_cumulative_markdown
@@ -250,6 +252,89 @@ def render_external_cumulative_markdown(
     )
 
 
+def render_external_cumulative_markdowns(
+    acquisition: ExternalAcquisitionResult,
+    plans: Iterable[ExternalCumulativeCompositionPlan],
+    *,
+    profile: CumulativeMarkdownProfile = CumulativeMarkdownProfile.AUDITABLE,
+) -> tuple[ExternalCumulativeArtifact, ...]:
+    """Render ordered plans from one authenticated catalog snapshot."""
+    acquisition_state = _issued_external_result_state(acquisition)
+    observed: list[
+        tuple[ExternalCumulativeCompositionPlan, _ExternalPlanState]
+    ] = []
+    catalog_owner: list[tuple[DeclarationCatalog, object]] = []
+    issued: list[ExternalCumulativeArtifact] = []
+    input_failure: list[BaseException] = []
+
+    def render() -> tuple[ExternalCumulativeArtifact, ...]:
+        for plan in plans:
+            if type(plan) is not ExternalCumulativeCompositionPlan:
+                _fail("$", "external composition plan is not issued here")
+            plan_state = _issued_external_plan_state(plan)
+            if (
+                plan_state.resolution_state.acquisition is not acquisition
+                or plan_state.resolution_state.acquisition_state
+                is not acquisition_state
+            ):
+                _fail("$", "external composition plan belongs to another acquisition")
+            observed.append((plan, plan_state))
+        if not observed:
+            return ()
+
+        catalog, catalog_state = _build_declaration_catalog_with_state(acquisition)
+        catalog_owner.append((catalog, catalog_state))
+        catalog_view = _AuthenticatedCatalogView(
+            declarations=catalog.declarations,
+            contracts=catalog.contracts,
+        )
+        rendered = tuple(
+            _render_cumulative_markdown(
+                catalog_view,
+                plan_state.resolution_state.resolution.unit,
+                plan_state.plan,
+                profile,
+            )
+            for _plan, plan_state in observed
+        )
+        try:
+            _validate_external_batch_inputs(observed, catalog_owner)
+        except BaseException as error:
+            input_failure.append(error)
+            raise
+        try:
+            for (plan, plan_state), item in zip(observed, rendered, strict=True):
+                artifact = _issue_external_artifact(
+                    plan,
+                    plan_state,
+                    item.artifact,
+                    item.contributors,
+                )
+                issued.append(artifact)
+                _validate_external_artifact_success(artifact, plan, plan_state)
+        except BaseException:
+            _retire_external_artifact_batch(issued)
+            raise
+        return tuple(issued)
+
+    return _authenticated_external_result_operation_from_state(
+        acquisition,
+        acquisition_state,
+        render,
+        lambda artifacts: _validate_external_artifact_batch_success(
+            artifacts,
+            observed,
+            catalog_owner,
+        ),
+        lambda error: _validate_external_artifact_batch_error(
+            error,
+            observed,
+            catalog_owner,
+            input_failure,
+        ),
+    )
+
+
 def _render_external_cumulative_markdown(
     plan: ExternalCumulativeCompositionPlan,
     plan_state: _ExternalPlanState,
@@ -280,6 +365,53 @@ def _render_external_cumulative_markdown(
         rendered.artifact,
         rendered.contributors,
     )
+
+
+def _validate_external_batch_inputs(
+    observed: list[tuple[ExternalCumulativeCompositionPlan, _ExternalPlanState]],
+    catalog_owner: list[tuple[DeclarationCatalog, object]],
+) -> None:
+    """Authenticate the shared catalog and every observed plan in order."""
+    if catalog_owner:
+        _require_same_catalog(*catalog_owner[0])
+    for plan, plan_state in observed:
+        _require_same_plan(plan, plan_state)
+
+
+def _validate_external_artifact_batch_success(
+    artifacts: tuple[ExternalCumulativeArtifact, ...],
+    observed: list[tuple[ExternalCumulativeCompositionPlan, _ExternalPlanState]],
+    catalog_owner: list[tuple[DeclarationCatalog, object]],
+) -> None:
+    """Authenticate one complete ordered artifact batch after its lease."""
+    _validate_external_batch_inputs(observed, catalog_owner)
+    if len(artifacts) != len(observed):
+        _fail("$", "external cumulative artifact batch length changed")
+    for artifact, (plan, plan_state) in zip(artifacts, observed, strict=True):
+        _validate_external_artifact_success(artifact, plan, plan_state)
+
+
+def _validate_external_artifact_batch_error(
+    error: BaseException,
+    observed: list[tuple[ExternalCumulativeCompositionPlan, _ExternalPlanState]],
+    catalog_owner: list[tuple[DeclarationCatalog, object]],
+    input_failure: list[BaseException],
+) -> None:
+    """Prefer shared-input authority failures over one batch body error."""
+    if input_failure and error is input_failure[0]:
+        return
+    try:
+        _validate_external_batch_inputs(observed, catalog_owner)
+    except BaseException as authority_error:
+        raise authority_error from error
+
+
+def _retire_external_artifact_batch(
+    artifacts: list[ExternalCumulativeArtifact],
+) -> None:
+    """Retire every public artifact issued before a batch failure."""
+    for artifact in artifacts:
+        _EXTERNAL_ARTIFACT_AUTHORITIES.retire(artifact)
 
 
 def _validate_external_artifact_success(

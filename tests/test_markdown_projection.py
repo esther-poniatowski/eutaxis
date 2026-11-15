@@ -21,6 +21,7 @@ from eutaxis.declarations import (
     build_declaration_catalog,
     plan_external_cumulative_composition,
     render_external_cumulative_markdown,
+    render_external_cumulative_markdowns,
     resolve_external_compilation_unit,
 )
 from eutaxis.declarations.catalog import _CATALOG_AUTHORITIES
@@ -666,6 +667,231 @@ def test_cumulative_render_authenticates_catalog_exactly_twice(
     render_external_cumulative_markdown(plan, profile=profile)
 
     assert calls == 2
+
+
+def test_cumulative_render_batch_reuses_one_catalog_in_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    acquisition, plan = _plan(tmp_path)
+    build = external_composition_module._build_declaration_catalog_with_state
+    build_calls = 0
+
+    def count(actual_acquisition):
+        nonlocal build_calls
+        build_calls += 1
+        assert actual_acquisition is acquisition
+        return build(actual_acquisition)
+
+    monkeypatch.setattr(
+        external_composition_module,
+        "_build_declaration_catalog_with_state",
+        count,
+    )
+
+    artifacts = render_external_cumulative_markdowns(acquisition, (plan, plan))
+
+    assert build_calls == 1
+    assert tuple(item.content for item in artifacts) == (
+        GOLDEN.read_bytes(),
+        GOLDEN.read_bytes(),
+    )
+
+
+def test_cumulative_render_batch_returns_empty_batch(
+    tmp_path: Path,
+) -> None:
+    acquisition, _plan_value = _plan(tmp_path)
+
+    assert render_external_cumulative_markdowns(acquisition, ()) == ()
+
+
+def test_cumulative_render_batch_rejects_cross_acquisition_before_render(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+    first_root.mkdir()
+    second_root.mkdir()
+    acquisition, _first_plan = _plan(first_root)
+    _other_acquisition, other_plan = _plan(second_root)
+    calls = 0
+
+    def render(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        raise AssertionError("render must not run")
+
+    monkeypatch.setattr(
+        external_composition_module,
+        "_render_cumulative_markdown",
+        render,
+    )
+
+    with pytest.raises(AcquisitionContractError, match="another acquisition"):
+        render_external_cumulative_markdowns(acquisition, (other_plan,))
+    assert calls == 0
+
+
+def test_cumulative_render_batch_issues_nothing_before_all_renders_succeed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    acquisition, plan = _plan(tmp_path)
+    original_render = external_composition_module._render_cumulative_markdown
+    issue_calls = 0
+    render_calls = 0
+
+    def render(*args, **kwargs):
+        nonlocal render_calls
+        render_calls += 1
+        if render_calls == 2:
+            raise RuntimeError("second render failed")
+        return original_render(*args, **kwargs)
+
+    def issue(*_args, **_kwargs):
+        nonlocal issue_calls
+        issue_calls += 1
+        raise AssertionError("artifact issued before every render succeeded")
+
+    monkeypatch.setattr(
+        external_composition_module,
+        "_render_cumulative_markdown",
+        render,
+    )
+    monkeypatch.setattr(external_composition_module, "_issue_external_artifact", issue)
+
+    with pytest.raises(RuntimeError, match="second render failed"):
+        render_external_cumulative_markdowns(acquisition, (plan, plan))
+    assert issue_calls == 0
+
+
+def test_cumulative_render_batch_retires_partial_issuance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    acquisition, plan = _plan(tmp_path)
+    original_issue = external_composition_module._issue_external_artifact
+    captured = []
+    calls = 0
+
+    def issue(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("second issue failed")
+        artifact = original_issue(*args, **kwargs)
+        captured.append(artifact)
+        return artifact
+
+    monkeypatch.setattr(external_composition_module, "_issue_external_artifact", issue)
+
+    with pytest.raises(RuntimeError, match="second issue failed"):
+        render_external_cumulative_markdowns(acquisition, (plan, plan))
+    assert len(captured) == 1
+    assert external_composition_module._EXTERNAL_ARTIFACT_AUTHORITIES.state(
+        captured[0]
+    ) is None
+
+
+def test_cumulative_render_batch_prioritizes_hostile_iterator_mutation(
+    tmp_path: Path,
+) -> None:
+    acquisition, _plan_value = _plan(tmp_path)
+
+    def plans():
+        object.__setattr__(acquisition.source_coordinates[-1], "path", "forged.yaml")
+        raise RuntimeError("iterator failed")
+        yield  # pragma: no cover
+
+    with pytest.raises(
+        AcquisitionAuthorityError, match="coordinate state changed"
+    ) as captured:
+        render_external_cumulative_markdowns(acquisition, plans())
+    assert isinstance(captured.value.__cause__, RuntimeError)
+
+
+def test_cumulative_render_batch_prioritizes_plan_mutation_on_render_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    acquisition, plan = _plan(tmp_path)
+    plan_state = external_composition_module._issued_external_plan_state(plan)
+
+    def fail(*_args, **_kwargs):
+        object.__setattr__(plan_state.plan, "target", "changed.md")
+        raise RuntimeError("render failed")
+
+    monkeypatch.setattr(
+        external_composition_module,
+        "_render_cumulative_markdown",
+        fail,
+    )
+
+    with pytest.raises(AcquisitionContractError, match="plan state changed") as captured:
+        render_external_cumulative_markdowns(acquisition, (plan,))
+    assert isinstance(captured.value.__cause__, RuntimeError)
+
+
+def test_cumulative_render_batch_rejects_catalog_mutation_before_issuance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    acquisition, plan = _plan(tmp_path)
+    build = external_composition_module._build_declaration_catalog_with_state
+    original_render = external_composition_module._render_cumulative_markdown
+    catalogs = []
+
+    def capture(actual_acquisition):
+        catalog, state = build(actual_acquisition)
+        catalogs.append(catalog)
+        return catalog, state
+
+    def mutate(*args, **kwargs):
+        rendered = original_render(*args, **kwargs)
+        object.__setattr__(catalogs[0], "conflicts", (("a", "b"),))
+        return rendered
+
+    monkeypatch.setattr(
+        external_composition_module,
+        "_build_declaration_catalog_with_state",
+        capture,
+    )
+    monkeypatch.setattr(
+        external_composition_module,
+        "_render_cumulative_markdown",
+        mutate,
+    )
+
+    with pytest.raises(DeclarationCatalogError, match="projection state changed"):
+        render_external_cumulative_markdowns(acquisition, (plan,))
+
+
+def test_cumulative_render_batch_catalog_mutation_precedes_render_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    acquisition, plan = _plan(tmp_path)
+    build = external_composition_module._build_declaration_catalog_with_state
+    catalogs = []
+
+    def capture(actual_acquisition):
+        catalog, state = build(actual_acquisition)
+        catalogs.append(catalog)
+        return catalog, state
+
+    def fail(*_args, **_kwargs):
+        object.__setattr__(catalogs[0], "conflicts", (("a", "b"),))
+        raise RuntimeError("render failed")
+
+    monkeypatch.setattr(
+        external_composition_module,
+        "_build_declaration_catalog_with_state",
+        capture,
+    )
+    monkeypatch.setattr(
+        external_composition_module,
+        "_render_cumulative_markdown",
+        fail,
+    )
+
+    with pytest.raises(DeclarationCatalogError, match="projection state changed") as captured:
+        render_external_cumulative_markdowns(acquisition, (plan,))
+    assert isinstance(captured.value.__cause__, RuntimeError)
 
 
 def test_authenticated_view_preserves_exact_contract_validation(tmp_path: Path) -> None:

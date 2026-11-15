@@ -213,14 +213,14 @@ def test_cumulative_source_batch_snapshots_nested_contexts(
         str(tmp_path), manifest_path, lock_path
     )
     nested = {"nested": {"value": 1}}
-    sentinel = object()
+    original = facade_module.resolve_external_compilation_unit
 
-    def resolve(_acquisition, _manifest, context):
+    def resolve(actual_acquisition, manifest, context):
         nested["nested"]["value"] = 2
         assert context["nested"]["value"] == 1
-        return sentinel
+        return original(actual_acquisition, manifest, _context())
 
-    monkeypatch.setattr(facade_module, "resolve_external_cumulative_source", resolve)
+    monkeypatch.setattr(facade_module, "resolve_external_compilation_unit", resolve)
     try:
         actual = resolve_external_cumulative_sources(
             acquisition,
@@ -229,7 +229,7 @@ def test_cumulative_source_batch_snapshots_nested_contexts(
     finally:
         _retire_external_result_tree(acquisition)
 
-    assert actual == (sentinel,)
+    assert len(actual) == 1
 
 
 def test_cumulative_source_batch_rejects_success_with_mutation(
@@ -240,11 +240,14 @@ def test_cumulative_source_batch_rejects_success_with_mutation(
         str(tmp_path), manifest_path, lock_path
     )
 
-    def resolve(_acquisition, _manifest, _context):
-        object.__setattr__(acquisition.source_coordinates[-1], "path", "forged.yaml")
-        return object()
+    original = facade_module.render_external_cumulative_markdowns
 
-    monkeypatch.setattr(facade_module, "resolve_external_cumulative_source", resolve)
+    def render(actual_acquisition, plans, *, profile):
+        artifacts = original(actual_acquisition, plans, profile=profile)
+        object.__setattr__(acquisition.source_coordinates[-1], "path", "forged.yaml")
+        return artifacts
+
+    monkeypatch.setattr(facade_module, "render_external_cumulative_markdowns", render)
 
     with pytest.raises(AcquisitionContractError, match="coordinate state changed"):
         resolve_external_cumulative_sources(

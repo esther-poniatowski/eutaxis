@@ -8,8 +8,10 @@ import hashlib
 from typing import cast
 
 from .external_composition import (
+    ExternalCumulativeArtifact,
     plan_external_cumulative_composition,
     render_external_cumulative_markdown,
+    render_external_cumulative_markdowns,
 )
 from .external_resolution import (
     ExternalResolutionResult,
@@ -141,13 +143,38 @@ def _resolve_external_cumulative_sources(
 ) -> tuple[ResolvedCumulativeSource, ...]:
     """Snapshot every request before resolving any member of the batch."""
     snapshots = tuple(_snapshot_cumulative_source_request(item) for item in requests)
-    return tuple(
-        resolve_external_cumulative_source(
+    resolutions = tuple(
+        resolve_external_compilation_unit(
             acquisition,
             item.composition_manifest,
             item.context,
         )
         for item in snapshots
+    )
+    plans = tuple(plan_external_cumulative_composition(item) for item in resolutions)
+    artifacts = render_external_cumulative_markdowns(
+        acquisition,
+        plans,
+        profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+    )
+    return tuple(
+        _resolved_cumulative_source(resolution, artifact)
+        for resolution, artifact in zip(resolutions, artifacts, strict=True)
+    )
+
+
+def _resolved_cumulative_source(
+    result: ExternalResolutionResult,
+    artifact: ExternalCumulativeArtifact,
+) -> ResolvedCumulativeSource:
+    """Project one detached cumulative-source report from issued objects."""
+    content = bytes(artifact.content)
+    return ResolvedCumulativeSource(
+        selection=resolved_artifact_selection(result),
+        source_revisions=build_external_query_packet(result).source_revisions,
+        content=content,
+        sha256="sha256:" + hashlib.sha256(content).hexdigest(),
+        contributors=artifact.contributors,
     )
 
 
