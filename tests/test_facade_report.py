@@ -7,12 +7,15 @@ from pathlib import Path
 import pytest
 
 import eutaxis.declarations.facade_report as facade_module
+import eutaxis.declarations.external_result as external_result_module
 from eutaxis.declarations import (
+    ExternalCumulativeSourceRequest,
     ResolvedArtifactSelection,
     ResolvedCumulativeSource,
     acquire_external_declarations_from_path,
     build_declaration_catalog,
     resolve_external_cumulative_source,
+    resolve_external_cumulative_sources,
     resolve_external_cumulative_source_from_path,
     resolve_external_compilation_unit,
     resolved_artifact_selection,
@@ -40,6 +43,22 @@ def _contract(tmp_path: Path) -> tuple[str, str]:
         declaration_files=(
             ("declarations/rule.yaml", RULE),
             ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+
+
+def _two_manifest_contract(tmp_path: Path) -> tuple[str, str]:
+    second_manifest = MANIFEST.replace(
+        b"id: resolution/manifest",
+        b"id: resolution/second-manifest",
+    ).replace(b"target: AGENTS.md", b"target: SECOND.md")
+    return _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+            ("declarations/second-manifest.yaml", second_manifest),
         ),
     )
 
@@ -115,6 +134,148 @@ def test_caller_owned_facade_returns_detached_equivalent_report(
     assert source.text == expected.text
     with pytest.raises(Exception, match="not issued"):
         catalog.get("resolution/purpose")
+
+
+def test_cumulative_source_batch_preserves_order_and_equivalence(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _two_manifest_contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    requests = (
+        ExternalCumulativeSourceRequest("resolution/second-manifest", _context()),
+        ExternalCumulativeSourceRequest("resolution/manifest", _context()),
+    )
+    try:
+        actual = resolve_external_cumulative_sources(acquisition, requests)
+        expected = tuple(
+            resolve_external_cumulative_source(
+                acquisition,
+                request.composition_manifest,
+                request.context,
+            )
+            for request in requests
+        )
+    finally:
+        _retire_external_result_tree(acquisition)
+
+    assert actual == expected
+    assert tuple(item.selection.manifest for item in actual) == (
+        "resolution/second-manifest",
+        "resolution/manifest",
+    )
+
+
+def test_cumulative_source_batch_authenticates_acquisition_twice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path, lock_path = _two_manifest_contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    original = external_result_module._authenticate_external_result_state
+    call_count = 0
+
+    def authenticate(value: object):
+        nonlocal call_count
+        call_count += 1
+        return original(value)
+
+    monkeypatch.setattr(
+        external_result_module,
+        "_authenticate_external_result_state",
+        authenticate,
+    )
+    try:
+        resolve_external_cumulative_sources(
+            acquisition,
+            (
+                ExternalCumulativeSourceRequest(
+                    "resolution/manifest", _context()
+                ),
+                ExternalCumulativeSourceRequest(
+                    "resolution/second-manifest", _context()
+                ),
+            ),
+        )
+    finally:
+        _retire_external_result_tree(acquisition)
+
+    assert call_count == 2
+
+
+def test_cumulative_source_batch_snapshots_nested_contexts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path, lock_path = _contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+    nested = {"nested": {"value": 1}}
+    sentinel = object()
+
+    def resolve(_acquisition, _manifest, context):
+        nested["nested"]["value"] = 2
+        assert context["nested"]["value"] == 1
+        return sentinel
+
+    monkeypatch.setattr(facade_module, "resolve_external_cumulative_source", resolve)
+    try:
+        actual = resolve_external_cumulative_sources(
+            acquisition,
+            (ExternalCumulativeSourceRequest("resolution/manifest", nested),),
+        )
+    finally:
+        _retire_external_result_tree(acquisition)
+
+    assert actual == (sentinel,)
+
+
+def test_cumulative_source_batch_rejects_success_with_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path, lock_path = _contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+
+    def resolve(_acquisition, _manifest, _context):
+        object.__setattr__(acquisition.source_coordinates[-1], "path", "forged.yaml")
+        return object()
+
+    monkeypatch.setattr(facade_module, "resolve_external_cumulative_source", resolve)
+
+    with pytest.raises(AcquisitionContractError, match="coordinate state changed"):
+        resolve_external_cumulative_sources(
+            acquisition,
+            (ExternalCumulativeSourceRequest("resolution/manifest", _context()),),
+        )
+
+
+def test_cumulative_source_batch_prioritizes_hostile_iterator_mutation(
+    tmp_path: Path,
+) -> None:
+    manifest_path, lock_path = _contract(tmp_path)
+    acquisition = acquire_external_declarations_from_path(
+        str(tmp_path), manifest_path, lock_path
+    )
+
+    class HostileRequests:
+        def __iter__(self):
+            object.__setattr__(
+                acquisition.source_coordinates[-1], "path", "forged.yaml"
+            )
+            raise RuntimeError("request iteration failed")
+
+    with pytest.raises(
+        AcquisitionContractError,
+        match="coordinate state changed",
+    ) as captured:
+        resolve_external_cumulative_sources(acquisition, HostileRequests())
+
+    assert isinstance(captured.value.__cause__, RuntimeError)
+    assert str(captured.value.__cause__) == "request iteration failed"
 
 
 def test_caller_owned_facade_preserves_clean_body_failure(

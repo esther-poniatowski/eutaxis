@@ -216,6 +216,7 @@ from .models import (
     RuleSetDeclaration,
     SupportResourceReference,
     VersionedReference,
+    freeze_json,
 )
 from .operations import (
     OperationFailure,
@@ -400,9 +401,11 @@ from .external_resolution import (
     resolve_external_compilation_unit,
 )
 from .facade_report import (
+    ExternalCumulativeSourceRequest,
     ResolvedArtifactSelection,
     ResolvedCumulativeSource,
     resolve_external_cumulative_source,
+    resolve_external_cumulative_sources,
     resolve_external_cumulative_source_from_path,
     resolved_artifact_selection,
 )
@@ -717,6 +720,7 @@ __all__ = [
     "ResolutionResult",
     "ExternalResolutionResult",
     "ExternalResolutionError",
+    "ExternalCumulativeSourceRequest",
     "ResolvedArtifactSelection",
     "ResolvedCumulativeSource",
     "QueryPacket",
@@ -791,6 +795,7 @@ __all__ = [
     "declaration_registry_checker_binding",
     "evaluate_applicability",
     "evaluate_applicability_with_trace",
+    "freeze_json",
     "eligible_finding_digest",
     "execute_checker",
     "execute_detector",
@@ -820,6 +825,7 @@ __all__ = [
     "resolve_compilation_unit",
     "resolve_external_compilation_unit",
     "resolve_external_cumulative_source",
+    "resolve_external_cumulative_sources",
     "resolve_external_cumulative_source_from_path",
     "resolved_artifact_selection",
     "query_packet_json_bytes",

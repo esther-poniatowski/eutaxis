@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 import hashlib
 from typing import cast
@@ -25,6 +25,7 @@ from .models import (
     CompositionManifestDeclaration,
     CumulativeMarkdownProfile,
     JsonValue,
+    freeze_json,
 )
 from .query_packet import QuerySourceRevision, build_external_query_packet
 
@@ -54,6 +55,22 @@ class ResolvedCumulativeSource:
     def text(self) -> str:
         """Decode the certified candidate as strict UTF-8."""
         return self.content.decode("utf-8", errors="strict")
+
+
+@dataclass(frozen=True)
+class ExternalCumulativeSourceRequest:
+    """Describe one cumulative source to snapshot at batch entry."""
+
+    composition_manifest: str
+    context: Mapping[str, JsonValue]
+
+
+@dataclass(frozen=True)
+class _FrozenExternalCumulativeSourceRequest:
+    """Retain one validated request snapshot inside an acquisition operation."""
+
+    composition_manifest: str
+    context: Mapping[str, JsonValue]
 
 
 def resolved_artifact_selection(
@@ -105,6 +122,50 @@ def resolve_external_cumulative_source(
         )
 
     return _authenticated_external_result_operation(acquisition, resolve)
+
+
+def resolve_external_cumulative_sources(
+    acquisition: ExternalAcquisitionResult,
+    requests: Iterable[ExternalCumulativeSourceRequest],
+) -> tuple[ResolvedCumulativeSource, ...]:
+    """Resolve ordered cumulative sources under one acquisition boundary."""
+    return _authenticated_external_result_operation(
+        acquisition,
+        lambda: _resolve_external_cumulative_sources(acquisition, requests),
+    )
+
+
+def _resolve_external_cumulative_sources(
+    acquisition: ExternalAcquisitionResult,
+    requests: Iterable[ExternalCumulativeSourceRequest],
+) -> tuple[ResolvedCumulativeSource, ...]:
+    """Snapshot every request before resolving any member of the batch."""
+    snapshots = tuple(_snapshot_cumulative_source_request(item) for item in requests)
+    return tuple(
+        resolve_external_cumulative_source(
+            acquisition,
+            item.composition_manifest,
+            item.context,
+        )
+        for item in snapshots
+    )
+
+
+def _snapshot_cumulative_source_request(
+    request: ExternalCumulativeSourceRequest,
+) -> _FrozenExternalCumulativeSourceRequest:
+    """Deep-freeze one exact batch request inside its authority bracket."""
+    if type(request) is not ExternalCumulativeSourceRequest:
+        raise TypeError("cumulative source request has an invalid type")
+    if type(request.composition_manifest) is not str or not request.composition_manifest:
+        raise ValueError("cumulative source request manifest must be a non-empty string")
+    frozen_context = freeze_json(request.context)
+    if not isinstance(frozen_context, Mapping):
+        raise TypeError("cumulative source request context must be a mapping")
+    return _FrozenExternalCumulativeSourceRequest(
+        composition_manifest=request.composition_manifest,
+        context=cast(Mapping[str, JsonValue], frozen_context),
+    )
 
 
 def resolve_external_cumulative_source_from_path(

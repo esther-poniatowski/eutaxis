@@ -39,6 +39,31 @@ from .scanner import declared_sources
 DeclarationSourceResolver = Callable[[DeclarationSource], "ResolvedCumulativeSource"]
 
 
+def declaration_source_identity(source: DeclarationSource) -> tuple[object, ...]:
+    """Return an opaque semantic identity for comparison and deduplication."""
+    return (
+        source.module,
+        source.acquisition_manifest,
+        source.acquisition_lock,
+        source.composition_manifest,
+        _json_value_identity(source.context),
+    )
+
+
+def _json_value_identity(value: object) -> object:
+    """Return one immutable structural identity for a JSON-compatible value."""
+    if isinstance(value, Mapping):
+        return tuple(
+            sorted(
+                (str(key), _json_value_identity(member))
+                for key, member in value.items()
+            )
+        )
+    if isinstance(value, tuple):
+        return tuple(_json_value_identity(item) for item in value)
+    return (type(value), value)
+
+
 class InstructionGenerator:
     """Generate, write and compare instruction outputs."""
 
@@ -189,7 +214,7 @@ class InstructionGenerator:
         reports: list[tuple[DeclarationSource, ResolvedCumulativeSource]] = []
         seen: set[tuple[object, ...]] = set()
         for source in sources:
-            key = self._declaration_source_key(source)
+            key = declaration_source_identity(source)
             if key in seen:
                 continue
             seen.add(key)
@@ -221,7 +246,7 @@ class InstructionGenerator:
             resolve_external_cumulative_source_from_path,
         )
 
-        key = self._declaration_source_key(source)
+        key = declaration_source_identity(source)
         cached = self._declaration_source_cache.get(key)
         if cached is not None:
             return cached
@@ -271,33 +296,6 @@ class InstructionGenerator:
             ) from exc
         self._declaration_source_cache[key] = resolved
         return resolved
-
-    @staticmethod
-    def _declaration_source_key(source: DeclarationSource) -> tuple[object, ...]:
-        """Return the immutable semantic identity of one configured source."""
-        return (
-            source.module,
-            source.acquisition_manifest,
-            source.acquisition_lock,
-            source.composition_manifest,
-            InstructionGenerator._json_key(source.context),
-        )
-
-    @staticmethod
-    def _json_key(value: object) -> object:
-        if isinstance(value, Mapping):
-            return tuple(
-                sorted(
-                    (
-                        str(key),
-                        InstructionGenerator._json_key(member),
-                    )
-                    for key, member in value.items()
-                )
-            )
-        if isinstance(value, tuple):
-            return tuple(InstructionGenerator._json_key(item) for item in value)
-        return (type(value), value)
 
     def enforce_rule_labels(self) -> None:
         """Raise when ``strict_rule_labels`` is set and a label line is rejected.

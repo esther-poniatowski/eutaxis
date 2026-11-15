@@ -20,7 +20,7 @@ from .exceptions import (
     RejectedLabelError,
     SourceNotFoundError,
 )
-from .generator import InstructionGenerator
+from .generator import InstructionGenerator, declaration_source_identity
 from .markdown import MarkdownAssembler, parse_frontmatter
 from .models import (
     AgentConfig,
@@ -88,6 +88,7 @@ __all__ = [
     "TaskModule",
     "collect_registered_paths",
     "declared_sources",
+    "declaration_source_identity",
     "field_key",
     "find_config",
     "format_registration_snippet",
