@@ -12,6 +12,7 @@ from .external_result import (
     AcquisitionSourceCoordinate,
     ExternalAcquisitionResult,
     _ExternalAcquisitionResultState,
+    _authenticated_external_result_operation_from_state,
     _issued_external_result_state,
     _register_provisional_authority,
 )
@@ -106,34 +107,88 @@ def resolve_external_compilation_unit(
 ) -> ExternalResolutionResult:
     """Resolve one manifest while retaining its exact acquisition authority."""
     acquisition_state = _issued_external_result_state(acquisition)
+    return _authenticated_external_result_operation_from_state(
+        acquisition,
+        acquisition_state,
+        lambda: _resolve_external_compilation_unit(
+            acquisition,
+            acquisition_state,
+            manifest_id,
+            context,
+        ),
+        lambda result: _validate_resolution_operation_success(
+            result,
+            acquisition,
+            acquisition_state,
+        ),
+        lambda error: _validate_resolution_operation_error(
+            error,
+            acquisition,
+            acquisition_state,
+        ),
+    )
+
+
+def _resolve_external_compilation_unit(
+    acquisition: ExternalAcquisitionResult,
+    acquisition_state: _ExternalAcquisitionResultState,
+    manifest_id: str,
+    context: Mapping[str, object],
+) -> ExternalResolutionResult:
+    """Resolve one unit inside an exact acquisition operation."""
     source_coordinates = _snapshot_acquisition_source_coordinates(acquisition_state)
     registry = acquisition_state.external_registry_state.registry
     resolution: ResolutionResult | None = None
     try:
         resolution = resolve_compilation_unit(registry, manifest_id, context)
     except ResolutionError as error:
-        _raise_changed_acquisition(acquisition, acquisition_state, error)
         raise _issue_external_resolution_error(
             acquisition,
             acquisition_state,
             error,
             source_coordinates,
         ) from error
-    except BaseException as error:
-        _raise_changed_acquisition(acquisition, acquisition_state, error)
-        raise
     try:
-        _require_same_acquisition(acquisition, acquisition_state)
         return _issue_external_resolution(
             acquisition,
             acquisition_state,
             resolution,
             source_coordinates,
         )
-    except BaseException as error:
+    except BaseException:
         _RESOLUTION_AUTHORITIES.retire(resolution)
-        _raise_changed_acquisition(acquisition, acquisition_state, error)
         raise
+
+
+def _validate_resolution_operation_success(
+    result: ExternalResolutionResult,
+    acquisition: ExternalAcquisitionResult,
+    acquisition_state: _ExternalAcquisitionResultState,
+) -> None:
+    """Authenticate one returned resolution after its lease is revoked."""
+    state = _issued_external_resolution_state(result)
+    if (
+        state.acquisition is not acquisition
+        or state.acquisition_state is not acquisition_state
+    ):
+        _fail("$", "external resolution belongs to another acquisition")
+
+
+def _validate_resolution_operation_error(
+    error: BaseException,
+    acquisition: ExternalAcquisitionResult,
+    acquisition_state: _ExternalAcquisitionResultState,
+) -> None:
+    """Authenticate an issued failure or its original acquisition owner."""
+    if type(error) is ExternalResolutionError:
+        state = _issued_external_resolution_error_state(error)
+        if (
+            state.acquisition is not acquisition
+            or state.acquisition_state is not acquisition_state
+        ):
+            _fail("$", "external resolution error belongs to another acquisition")
+        return
+    _require_same_acquisition(acquisition, acquisition_state)
 
 
 def _issue_external_resolution(
@@ -374,17 +429,6 @@ def _require_same_acquisition(
 ) -> None:
     if _issued_external_result_state(acquisition) is not expected:
         _fail("$", "external acquisition authority state changed")
-
-
-def _raise_changed_acquisition(
-    acquisition: ExternalAcquisitionResult,
-    expected: _ExternalAcquisitionResultState,
-    error: BaseException,
-) -> None:
-    try:
-        _require_same_acquisition(acquisition, expected)
-    except BaseException as authority_error:
-        raise authority_error from error
 
 
 def _fail(location: str, message: str) -> NoReturn:

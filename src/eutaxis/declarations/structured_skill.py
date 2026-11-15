@@ -20,7 +20,11 @@ from .external_resolution import (
     _ExternalResolutionState,
     _issued_external_resolution_state,
 )
-from .external_result import AcquiredResource, _register_provisional_authority
+from .external_result import (
+    AcquiredResource,
+    _authenticated_external_result_operation_from_state,
+    _register_provisional_authority,
+)
 from .models import (
     CompositionMechanism,
     CompositionManifestDeclaration,
@@ -137,47 +141,117 @@ def plan_structured_skill(
 ) -> StructuredSkillPlan:
     """Close one resolved procedure over exact operations and support resources."""
     resolution_state = _issued_external_resolution_state(resolution)
+    return _authenticated_external_result_operation_from_state(
+        resolution_state.acquisition,
+        resolution_state.acquisition_state,
+        lambda: _plan_structured_skill(resolution, resolution_state),
+        lambda result: _validate_structured_skill_plan_success(
+            result,
+            resolution,
+            resolution_state,
+        ),
+        lambda _error: _require_same_resolution_owner(
+            resolution,
+            resolution_state,
+        ),
+    )
+
+
+def _plan_structured_skill(
+    resolution: ExternalResolutionResult,
+    resolution_state: _ExternalResolutionState,
+) -> StructuredSkillPlan:
+    """Plan one structured Skill inside an exact acquisition operation."""
     catalog = build_declaration_catalog(resolution_state.acquisition)
     catalog_state = _issued_catalog_state(catalog)
     try:
-        manifest_record = resolution_state.resolution.manifest_record
-        manifest = _require_manifest(manifest_record)
-        procedure_record = _require_root_procedure(
-            catalog,
-            manifest_record,
-            manifest,
-            resolution_state,
-        )
-        procedure = cast(ProcedureDeclaration, procedure_record.declaration)
-        operation_references, operations = _resolve_operations(catalog, procedure)
-        support_resources, evidence = _close_support_resources(
-            resolution_state,
-            operation_references,
-            operations,
-            catalog,
-        )
-        _require_same_inputs(resolution, resolution_state, catalog, catalog_state)
-        return _issue_structured_skill_plan(
+        return _plan_structured_skill_from_catalog(
             resolution,
             resolution_state,
             catalog,
             catalog_state,
-            manifest,
-            procedure,
-            operation_references,
-            operations,
-            support_resources,
-            evidence,
         )
     except BaseException as error:
-        _raise_changed_inputs(
-            resolution,
-            resolution_state,
-            catalog,
-            catalog_state,
-            error,
-        )
+        _raise_changed_catalog(catalog, catalog_state, error)
         raise
+
+
+def _plan_structured_skill_from_catalog(
+    resolution: ExternalResolutionResult,
+    resolution_state: _ExternalResolutionState,
+    catalog: DeclarationCatalog,
+    catalog_state: _CatalogAuthorityState,
+) -> StructuredSkillPlan:
+    """Close one Skill plan over an already authenticated catalog."""
+    manifest_record = resolution_state.resolution.manifest_record
+    manifest = _require_manifest(manifest_record)
+    procedure_record = _require_root_procedure(
+        catalog,
+        manifest_record,
+        manifest,
+        resolution_state,
+    )
+    procedure = cast(ProcedureDeclaration, procedure_record.declaration)
+    operation_references, operations = _resolve_operations(catalog, procedure)
+    support_resources, evidence = _close_support_resources(
+        resolution_state,
+        operation_references,
+        operations,
+        catalog,
+    )
+    return _issue_structured_skill_plan(
+        resolution,
+        resolution_state,
+        catalog,
+        catalog_state,
+        manifest,
+        procedure,
+        operation_references,
+        operations,
+        support_resources,
+        evidence,
+    )
+
+
+def _raise_changed_catalog(
+    catalog: DeclarationCatalog,
+    expected: _CatalogAuthorityState,
+    error: BaseException,
+) -> None:
+    """Give temporary catalog corruption precedence over a planning failure."""
+    try:
+        current = _issued_catalog_state(catalog)
+    except BaseException as authority_error:
+        raise authority_error from error
+    if current is not expected:
+        raise CompositionError(
+            "$", "declaration catalog authority state changed"
+        ) from error
+
+
+def _validate_structured_skill_plan_success(
+    result: StructuredSkillPlan,
+    resolution: ExternalResolutionResult,
+    resolution_state: _ExternalResolutionState,
+) -> None:
+    """Authenticate one returned Skill plan after its lease is revoked."""
+    state = _issued_structured_skill_plan_state(result)
+    if (
+        state.resolution is not resolution
+        or state.resolution_state is not resolution_state
+    ):
+        raise CompositionError(
+            "$", "structured Skill plan belongs to another resolution"
+        )
+
+
+def _require_same_resolution_owner(
+    resolution: ExternalResolutionResult,
+    expected: _ExternalResolutionState,
+) -> None:
+    """Require one resolution to retain its exact issued state."""
+    if _issued_external_resolution_state(resolution) is not expected:
+        raise CompositionError("$", "external resolution authority state changed")
 
 
 def _require_manifest(
@@ -434,14 +508,7 @@ def _issued_structured_skill_plan_state(
 def _authenticate_structured_skill_plan_state(
     plan: object,
 ) -> _StructuredSkillPlanState:
-    if type(plan) is not StructuredSkillPlan:
-        raise CompositionError("$", "structured Skill plan is not issued here")
-    issued = _STRUCTURED_SKILL_PLAN_AUTHORITIES.lookup(plan)
-    if issued is None or getattr(plan, "_token", None) is not issued[0]:
-        raise CompositionError("$", "structured Skill plan is not issued here")
-    state = issued[1]
-    if type(state) is not _StructuredSkillPlanState:
-        raise CompositionError("$", "structured Skill plan is not issued here")
+    state = _structured_skill_plan_authority_state(plan)
     _require_same_inputs(
         state.resolution,
         state.resolution_state,
@@ -494,6 +561,21 @@ def _authenticate_structured_skill_plan_state(
     return state
 
 
+def _structured_skill_plan_authority_state(
+    plan: object,
+) -> _StructuredSkillPlanState:
+    """Return one plan's exact private state without traversing its owners."""
+    if type(plan) is not StructuredSkillPlan:
+        raise CompositionError("$", "structured Skill plan is not issued here")
+    issued = _STRUCTURED_SKILL_PLAN_AUTHORITIES.lookup(plan)
+    if issued is None or getattr(plan, "_token", None) is not issued[0]:
+        raise CompositionError("$", "structured Skill plan is not issued here")
+    state = issued[1]
+    if type(state) is not _StructuredSkillPlanState:
+        raise CompositionError("$", "structured Skill plan is not issued here")
+    return state
+
+
 def _plan_projection_state(
     manifest: CompositionManifestDeclaration,
     procedure: ProcedureDeclaration,
@@ -522,19 +604,6 @@ def _require_same_inputs(
         or catalog_state.result_state is not resolution_state.acquisition_state
     ):
         raise CompositionError("$", "catalog belongs to another acquisition")
-
-
-def _raise_changed_inputs(
-    resolution: ExternalResolutionResult,
-    resolution_state: _ExternalResolutionState,
-    catalog: DeclarationCatalog,
-    catalog_state: _CatalogAuthorityState,
-    error: BaseException,
-) -> None:
-    try:
-        _require_same_inputs(resolution, resolution_state, catalog, catalog_state)
-    except BaseException as authority_error:
-        raise authority_error from error
 
 
 def _record_error(

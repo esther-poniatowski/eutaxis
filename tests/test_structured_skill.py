@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+import eutaxis.declarations.structured_skill as structured_skill_module
 from eutaxis.declarations import (
     AcquisitionContractError,
     AcquiredResource,
@@ -19,6 +20,7 @@ from eutaxis.declarations import (
     plan_structured_skill,
     resolve_external_compilation_unit,
 )
+from eutaxis.declarations.exceptions import DeclarationCatalogError
 from eutaxis.declarations.structured_skill import (
     _STRUCTURED_SKILL_PLAN_AUTHORITIES,
     _issued_structured_skill_plan_state,
@@ -459,6 +461,32 @@ def test_plan_rejects_multiple_root_procedures(tmp_path: Path) -> None:
 
     with pytest.raises(CompositionError, match="exactly one root procedure"):
         plan_structured_skill(resolution)
+
+
+def test_catalog_corruption_precedes_later_planning_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _acquisition, resolution = _pipeline(tmp_path)
+
+    def corrupt_catalog(*args):
+        catalog = args[-1]
+        object.__setattr__(catalog, "revision", 99)
+        raise RuntimeError("later planning failure")
+
+    monkeypatch.setattr(
+        structured_skill_module,
+        "_close_support_resources",
+        corrupt_catalog,
+    )
+
+    with pytest.raises(
+        DeclarationCatalogError,
+        match="catalog projection state changed",
+    ) as raised:
+        plan_structured_skill(resolution)
+
+    assert isinstance(raised.value.__cause__, RuntimeError)
+    assert str(raised.value.__cause__) == "later planning failure"
 
 
 def test_plan_rejects_non_skill_manifest(tmp_path: Path) -> None:

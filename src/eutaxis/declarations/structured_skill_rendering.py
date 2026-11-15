@@ -8,11 +8,13 @@ from ..commands.adapters import AgentAdapter
 from ..commands.models import ArtifactFile, RenderedArtifact, SkillRenderInput
 from ..commands.rendering import ENTRYPOINT_FILENAME, assemble_skill
 from .exceptions import CompositionError
+from .external_result import _authenticated_external_result_operation
 from .markdown_projection import _render_procedure
 from .structured_skill import (
     StructuredSkillPlan,
     _StructuredSkillPlanState,
     _issued_structured_skill_plan_state,
+    _structured_skill_plan_authority_state,
 )
 
 CONTRACT_FILENAME = "references/contract.md"
@@ -26,10 +28,34 @@ def render_structured_skill(
     artifact_max_bytes: int,
 ) -> RenderedArtifact:
     """Render one issued plan within explicit entrypoint and artifact limits."""
+    state = _structured_skill_plan_authority_state(plan)
+    return _authenticated_external_result_operation(
+        state.resolution_state.acquisition,
+        lambda: _render_structured_skill_operation(
+            plan,
+            state,
+            adapter,
+            entrypoint_max_bytes=entrypoint_max_bytes,
+            artifact_max_bytes=artifact_max_bytes,
+        ),
+    )
+
+
+def _render_structured_skill_operation(
+    plan: StructuredSkillPlan,
+    expected: _StructuredSkillPlanState,
+    adapter: AgentAdapter,
+    *,
+    entrypoint_max_bytes: int,
+    artifact_max_bytes: int,
+) -> RenderedArtifact:
+    """Render one Skill artifact inside an exact acquisition operation."""
     state = _issued_structured_skill_plan_state(plan)
-    _require_positive_budget(entrypoint_max_bytes, "entrypoint-max-bytes")
-    _require_positive_budget(artifact_max_bytes, "artifact-max-bytes")
+    if state is not expected:
+        raise CompositionError("$", "structured Skill plan authority changed")
     try:
+        _require_positive_budget(entrypoint_max_bytes, "entrypoint-max-bytes")
+        _require_positive_budget(artifact_max_bytes, "artifact-max-bytes")
         source = _render_input(state)
         artifact = assemble_skill(source, adapter)
         _check_budgets(
@@ -40,9 +66,29 @@ def render_structured_skill(
     except BaseException as error:
         _raise_changed_plan(plan, state, error)
         raise
-    if _issued_structured_skill_plan_state(plan) is not state:
-        raise CompositionError("$", "structured Skill plan authority changed")
+    _require_same_skill_plan(plan, state)
     return artifact
+
+
+def _require_same_skill_plan(
+    plan: StructuredSkillPlan,
+    expected: _StructuredSkillPlanState,
+) -> None:
+    """Require one Skill plan to retain its exact issued state."""
+    if _issued_structured_skill_plan_state(plan) is not expected:
+        raise CompositionError("$", "structured Skill plan authority changed")
+
+
+def _raise_changed_plan(
+    plan: StructuredSkillPlan,
+    expected: _StructuredSkillPlanState,
+    error: BaseException,
+) -> None:
+    """Give plan-authority failure precedence over a rendering failure."""
+    try:
+        _require_same_skill_plan(plan, expected)
+    except BaseException as authority_error:
+        raise authority_error from error
 
 
 def _render_input(state: _StructuredSkillPlanState) -> SkillRenderInput:
@@ -144,19 +190,3 @@ def _require_positive_budget(value: object, field: str) -> None:
             f"$.budgets.{field}",
             "budget must be an exact positive integer",
         )
-
-
-def _raise_changed_plan(
-    plan: StructuredSkillPlan,
-    expected: _StructuredSkillPlanState,
-    error: BaseException,
-) -> None:
-    """Give plan-authority failure precedence over a rendering failure."""
-    try:
-        current = _issued_structured_skill_plan_state(plan)
-    except BaseException as authority_error:
-        raise authority_error from error
-    if current is not expected:
-        raise CompositionError(
-            "$", "structured Skill plan authority changed"
-        ) from error

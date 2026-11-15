@@ -11,6 +11,7 @@ import pytest
 
 import eutaxis.declarations.external_composition as external_composition_module
 import eutaxis.declarations.external_resolution as external_resolution_module
+import eutaxis.declarations.external_result as external_result_module
 from eutaxis.declarations import (
     CumulativeMarkdownProfile,
     AcquisitionContractError,
@@ -138,6 +139,40 @@ def test_resolves_an_authenticated_external_corpus(tmp_path: Path) -> None:
     )
     assert not hasattr(resolved, "registry")
     assert not hasattr(resolved, "_external_result_state")
+
+
+def test_direct_cumulative_operations_authenticate_twice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    acquisition = _acquire(tmp_path)
+    original = external_result_module._authenticate_external_result_state
+    call_count = 0
+
+    def authenticate(value: object):
+        nonlocal call_count
+        call_count += 1
+        return original(value)
+
+    monkeypatch.setattr(
+        external_result_module,
+        "_authenticate_external_result_state",
+        authenticate,
+    )
+
+    resolution = resolve_external_compilation_unit(
+        acquisition,
+        "resolution/manifest",
+        _context(),
+    )
+    assert call_count == 2
+
+    call_count = 0
+    plan = plan_external_cumulative_composition(resolution)
+    assert call_count == 2
+
+    call_count = 0
+    render_external_cumulative_markdown(plan)
+    assert call_count == 2
 
 
 def test_resolution_remains_bound_to_acquisition_authority(tmp_path: Path) -> None:

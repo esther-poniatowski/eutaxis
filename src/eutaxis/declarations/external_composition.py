@@ -26,7 +26,10 @@ from .external_resolution import (
     _ExternalResolutionState,
     _issued_external_resolution_state,
 )
-from .external_result import _register_provisional_authority
+from .external_result import (
+    _authenticated_external_result_operation_from_state,
+    _register_provisional_authority,
+)
 from .markdown_projection import _render_cumulative_markdown
 
 
@@ -158,23 +161,48 @@ def plan_external_cumulative_composition(
 ) -> ExternalCumulativeCompositionPlan:
     """Plan one external cumulative unit through its private registry."""
     resolution_state = _issued_external_resolution_state(resolution)
-    registry = resolution_state.acquisition_state.external_registry_state.registry
-    plan: CumulativeCompositionPlan | None = None
-    try:
-        plan = plan_cumulative_composition(registry, resolution_state.resolution.unit)
-    except BaseException as error:
-        _raise_changed_resolution(resolution, resolution_state, error)
-        raise
-    try:
-        _require_same_resolution(resolution, resolution_state)
-        return _issue_external_plan(
+    return _authenticated_external_result_operation_from_state(
+        resolution_state.acquisition,
+        resolution_state.acquisition_state,
+        lambda: _plan_external_cumulative_composition(
             resolution,
             resolution_state,
-            plan,
-        )
-    except BaseException as error:
-        _raise_changed_resolution(resolution, resolution_state, error)
-        raise
+        ),
+        lambda result: _validate_external_plan_success(
+            result,
+            resolution,
+            resolution_state,
+        ),
+        lambda _error: _require_same_resolution(resolution, resolution_state),
+    )
+
+
+def _plan_external_cumulative_composition(
+    resolution: ExternalResolutionResult,
+    resolution_state: _ExternalResolutionState,
+) -> ExternalCumulativeCompositionPlan:
+    """Plan one cumulative unit inside an exact acquisition operation."""
+    registry = resolution_state.acquisition_state.external_registry_state.registry
+    plan = plan_cumulative_composition(registry, resolution_state.resolution.unit)
+    return _issue_external_plan(
+        resolution,
+        resolution_state,
+        plan,
+    )
+
+
+def _validate_external_plan_success(
+    result: ExternalCumulativeCompositionPlan,
+    resolution: ExternalResolutionResult,
+    resolution_state: _ExternalResolutionState,
+) -> None:
+    """Authenticate one returned plan after its lease is revoked."""
+    state = _issued_external_plan_state(result)
+    if (
+        state.resolution is not resolution
+        or state.resolution_state is not resolution_state
+    ):
+        _fail("$", "external composition plan belongs to another resolution")
 
 
 def assemble_external_cumulative_artifact(
@@ -209,6 +237,25 @@ def render_external_cumulative_markdown(
 ) -> ExternalCumulativeArtifact:
     """Render one external cumulative plan for a declared consumer profile."""
     plan_state = _issued_external_plan_state(plan)
+    return _authenticated_external_result_operation_from_state(
+        plan_state.resolution_state.acquisition,
+        plan_state.resolution_state.acquisition_state,
+        lambda: _render_external_cumulative_markdown(plan, plan_state, profile),
+        lambda result: _validate_external_artifact_success(
+            result,
+            plan,
+            plan_state,
+        ),
+        lambda _error: _require_same_plan(plan, plan_state),
+    )
+
+
+def _render_external_cumulative_markdown(
+    plan: ExternalCumulativeCompositionPlan,
+    plan_state: _ExternalPlanState,
+    profile: CumulativeMarkdownProfile,
+) -> ExternalCumulativeArtifact:
+    """Render one plan inside an exact acquisition operation."""
     acquisition = plan_state.resolution_state.acquisition
     catalog, catalog_state = _build_declaration_catalog_with_state(acquisition)
     catalog_view = _AuthenticatedCatalogView(
@@ -224,22 +271,26 @@ def render_external_cumulative_markdown(
             profile,
         )
     except BaseException as error:
-        _raise_changed_plan(plan, plan_state, error)
         _raise_changed_catalog(catalog, catalog_state, error)
         raise
-    _require_same_plan(plan, plan_state)
     _require_same_catalog(catalog, catalog_state)
-    try:
-        return _issue_external_artifact(
-            plan,
-            plan_state,
-            rendered.artifact,
-            rendered.contributors,
-        )
-    except BaseException as error:
-        _raise_changed_plan(plan, plan_state, error)
-        _raise_changed_catalog(catalog, catalog_state, error)
-        raise
+    return _issue_external_artifact(
+        plan,
+        plan_state,
+        rendered.artifact,
+        rendered.contributors,
+    )
+
+
+def _validate_external_artifact_success(
+    result: ExternalCumulativeArtifact,
+    plan: ExternalCumulativeCompositionPlan,
+    plan_state: _ExternalPlanState,
+) -> None:
+    """Authenticate one returned artifact after its lease is revoked."""
+    state = _issued_external_artifact_state(result)
+    if state.plan is not plan or state.plan_state is not plan_state:
+        _fail("$", "external cumulative artifact belongs to another plan")
 
 
 def _issue_external_plan(
@@ -363,17 +414,6 @@ def _require_same_plan(
 def _require_same_catalog(catalog: DeclarationCatalog, expected: object) -> None:
     if _issued_catalog_state(catalog) is not expected:
         _fail("$", "declaration catalog authority state changed")
-
-
-def _raise_changed_resolution(
-    resolution: ExternalResolutionResult,
-    expected: _ExternalResolutionState,
-    error: BaseException,
-) -> None:
-    try:
-        _require_same_resolution(resolution, expected)
-    except BaseException as authority_error:
-        raise authority_error from error
 
 
 def _raise_changed_plan(

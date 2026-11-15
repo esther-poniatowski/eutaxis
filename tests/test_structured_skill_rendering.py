@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import eutaxis.declarations.external_result as external_result_module
 import eutaxis.declarations.structured_skill_rendering as rendering_module
 from eutaxis.commands import get_adapter
 from eutaxis.declarations import (
@@ -37,6 +38,37 @@ def _plan(tmp_path: Path, *, scope: str = "project"):
 
 def _files(artifact) -> dict[str, str]:
     return {file.relative_path: file.content for file in artifact.files}
+
+
+def test_direct_skill_operations_authenticate_twice(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _acquisition, resolution = _pipeline(tmp_path)
+    original = external_result_module._authenticate_external_result_state
+    call_count = 0
+
+    def authenticate(value: object):
+        nonlocal call_count
+        call_count += 1
+        return original(value)
+
+    monkeypatch.setattr(
+        external_result_module,
+        "_authenticate_external_result_state",
+        authenticate,
+    )
+
+    plan = plan_structured_skill(resolution)
+    assert call_count == 2
+
+    call_count = 0
+    render_structured_skill(
+        plan,
+        get_adapter("claude"),
+        entrypoint_max_bytes=100_000,
+        artifact_max_bytes=1_000_000,
+    )
+    assert call_count == 2
 
 
 @pytest.mark.parametrize("adapter_name", ("claude", "codex"))

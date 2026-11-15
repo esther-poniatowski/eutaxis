@@ -368,6 +368,115 @@ def _authenticated_external_result_operation(
     return value
 
 
+def _authenticated_external_result_operation_from_state(
+    result: ExternalAcquisitionResult,
+    state: _ExternalAcquisitionResultState,
+    operation: Callable[[], _T],
+    validate_success: Callable[[_T], None],
+    validate_error: Callable[[BaseException], None],
+) -> _T:
+    """Run one controlled operation from an already authenticated owner."""
+    active = _active_result_lease(result)
+    if active is not None:
+        if active.state is not state:
+            _fail("$", "external acquisition authority state changed")
+        return _run_validated_nested_operation(
+            operation,
+            validate_success,
+            validate_error,
+        )
+
+    issued = _RESULT_AUTHORITIES.lookup(result)
+    if issued is None or issued[1] is not state:
+        _fail("$", "external acquisition authority state changed")
+    lease = _AuthenticatedResultLease(
+        result=result,
+        state=state,
+        authority_token=issued[0],
+        thread_id=threading.get_ident(),
+        task=_current_async_task(),
+    )
+    token = _AUTHENTICATED_RESULT_LEASES.set(
+        (*_AUTHENTICATED_RESULT_LEASES.get(), lease)
+    )
+    try:
+        try:
+            value = operation()
+        except BaseException as error:
+            _revoke_result_lease(lease, token)
+            try:
+                _validate_after_result_authentication(
+                    result,
+                    state,
+                    lambda: validate_error(error),
+                )
+            except BaseException as authority_error:
+                _retire_provisional_authorities(lease)
+                raise authority_error from error
+            raise
+    except BaseException:
+        if lease.active:
+            _revoke_result_lease(lease, token)
+        raise
+    _revoke_result_lease(lease, token)
+    try:
+        _validate_after_result_authentication(
+            result,
+            state,
+            lambda: validate_success(value),
+        )
+    except BaseException:
+        _retire_provisional_authorities(lease)
+        raise
+    return value
+
+
+def _run_validated_nested_operation(
+    operation: Callable[[], _T],
+    validate_success: Callable[[_T], None],
+    validate_error: Callable[[BaseException], None],
+) -> _T:
+    """Validate one nested capability while its outer lease remains active."""
+    try:
+        value = operation()
+    except BaseException as error:
+        try:
+            validate_error(error)
+        except BaseException as authority_error:
+            raise authority_error from error
+        raise
+    validate_success(value)
+    return value
+
+
+def _validate_after_result_authentication(
+    result: ExternalAcquisitionResult,
+    expected: _ExternalAcquisitionResultState,
+    validate: Callable[[], None],
+) -> None:
+    """Validate one owner after a single complete result authentication."""
+    state = _issued_external_result_state(result)
+    if state is not expected:
+        _fail("$", "external acquisition authority state changed")
+    issued = _RESULT_AUTHORITIES.lookup(result)
+    if issued is None or issued[1] is not state:
+        _fail("$", "external acquisition authority state changed")
+    lease = _AuthenticatedResultLease(
+        result=result,
+        state=state,
+        authority_token=issued[0],
+        thread_id=threading.get_ident(),
+        task=_current_async_task(),
+    )
+    token = _AUTHENTICATED_RESULT_LEASES.set(
+        (*_AUTHENTICATED_RESULT_LEASES.get(), lease)
+    )
+    try:
+        validate()
+    finally:
+        _revoke_result_lease(lease, token)
+
+
 def _register_provisional_authority(
     result: ExternalAcquisitionResult,
     authority: object,
