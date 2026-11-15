@@ -13,6 +13,7 @@ from .external_result import (
     ExternalAcquisitionResult,
     _ExternalAcquisitionResultState,
     _issued_external_result_state,
+    _register_provisional_authority,
 )
 from .resolution import (
     ResolutionError,
@@ -158,6 +159,11 @@ def _issue_external_resolution(
         token = _EXTERNAL_RESOLUTION_AUTHORITIES.issue(result, state)
         object.__setattr__(result, "_token", token)
         _issued_external_resolution_state(result)
+        _register_provisional_authority(
+            acquisition,
+            result,
+            lambda: _retire_external_resolution(result),
+        )
         return result
     except BaseException:
         _retire_external_resolution(result)
@@ -191,6 +197,11 @@ def _issue_external_resolution_error(
     )
     _EXTERNAL_FAILURE_AUTHORITIES.issue(issued, state)
     _issued_external_resolution_error_state(issued)
+    _register_provisional_authority(
+        acquisition,
+        issued,
+        lambda: _EXTERNAL_FAILURE_AUTHORITIES.retire(issued),
+    )
     return issued
 
 

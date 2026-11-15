@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from contextvars import ContextVar, Token
+from dataclasses import dataclass, field
+import threading
 from typing import NamedTuple, NoReturn, SupportsIndex, TypeVar, cast
 
 from ._authority import IdentityAuthorityStore, identity_value_state
@@ -39,6 +42,20 @@ from .loader import LoadedDeclarationSource
 from .registry import DeclarationRegistry
 
 _T = TypeVar("_T")
+
+
+@dataclass
+class _AuthenticatedResultLease:
+    """Limit one authenticated-result fast path to its exact execution owner."""
+
+    result: ExternalAcquisitionResult
+    state: _ExternalAcquisitionResultState
+    authority_token: object
+    thread_id: int
+    task: object | None
+    active: bool = True
+    provisional: list[tuple[int, Callable[[], object]]] = field(default_factory=list)
+    provisional_ids: set[int] = field(default_factory=set)
 
 
 @dataclass(frozen=True)
@@ -133,6 +150,9 @@ class ExternalAcquisitionResult:
 
 
 _RESULT_AUTHORITIES: IdentityAuthorityStore[object] = IdentityAuthorityStore()
+_AUTHENTICATED_RESULT_LEASES: ContextVar[
+    tuple[_AuthenticatedResultLease, ...]
+] = ContextVar("eutaxis_authenticated_result_leases", default=())
 
 
 def acquire_external_declarations(
@@ -265,6 +285,9 @@ def _issued_external_result_state(
     result: object,
 ) -> _ExternalAcquisitionResultState:
     """Authenticate a public result and every private aggregate it retains."""
+    lease = _active_result_lease(result)
+    if lease is not None:
+        return lease.state
     try:
         return _authenticate_external_result_state(result)
     except BaseException:
@@ -304,14 +327,106 @@ def _authenticated_external_result_operation(
     operation: Callable[[], _T],
 ) -> _T:
     """Bracket one caller-owned operation with complete authentication."""
+    if _active_result_lease(result) is not None:
+        return operation()
+
     state = _issued_external_result_state(result)
+    issued = _RESULT_AUTHORITIES.lookup(result)
+    if issued is None or issued[1] is not state:
+        _fail("$", "external acquisition authority state changed")
+    lease = _AuthenticatedResultLease(
+        result=result,
+        state=state,
+        authority_token=issued[0],
+        thread_id=threading.get_ident(),
+        task=_current_async_task(),
+    )
+    token = _AUTHENTICATED_RESULT_LEASES.set(
+        (*_AUTHENTICATED_RESULT_LEASES.get(), lease)
+    )
     try:
-        value = operation()
+        try:
+            value = operation()
+        except BaseException as error:
+            _revoke_result_lease(lease, token)
+            try:
+                _require_same_external_result(result, state)
+            except BaseException as authority_error:
+                _retire_provisional_authorities(lease)
+                raise authority_error from error
+            raise
     except BaseException as error:
-        _raise_changed_external_result(result, state, error)
+        if lease.active:
+            _revoke_result_lease(lease, token)
         raise
-    _require_same_external_result(result, state)
+    _revoke_result_lease(lease, token)
+    try:
+        _require_same_external_result(result, state)
+    except BaseException:
+        _retire_provisional_authorities(lease)
+        raise
     return value
+
+
+def _register_provisional_authority(
+    result: ExternalAcquisitionResult,
+    authority: object,
+    retire: Callable[[], object],
+) -> None:
+    """Retain cleanup for one capability until its operation authenticates."""
+    lease = _active_result_lease(result)
+    if lease is None:
+        return
+    authority_id = id(authority)
+    if authority_id in lease.provisional_ids:
+        return
+    lease.provisional_ids.add(authority_id)
+    lease.provisional.append((authority_id, retire))
+
+
+def _active_result_lease(result: object) -> _AuthenticatedResultLease | None:
+    """Return an exact active lease owned by the current execution context."""
+    thread_id = threading.get_ident()
+    task = _current_async_task()
+    for lease in reversed(_AUTHENTICATED_RESULT_LEASES.get()):
+        issued = _RESULT_AUTHORITIES.lookup(result)
+        if (
+            lease.active
+            and lease.result is result
+            and lease.thread_id == thread_id
+            and lease.task is task
+            and issued is not None
+            and issued[0] is lease.authority_token
+            and issued[1] is lease.state
+        ):
+            return lease
+    return None
+
+
+def _current_async_task() -> object | None:
+    """Identify the running asynchronous task without requiring an event loop."""
+    try:
+        return asyncio.current_task()
+    except RuntimeError:
+        return None
+
+
+def _revoke_result_lease(
+    lease: _AuthenticatedResultLease,
+    token: Token[tuple[_AuthenticatedResultLease, ...]],
+) -> None:
+    """Revoke one lease before restoring its preceding context."""
+    lease.active = False
+    _AUTHENTICATED_RESULT_LEASES.reset(token)
+
+
+def _retire_provisional_authorities(lease: _AuthenticatedResultLease) -> None:
+    """Retire every capability issued before failed final authentication."""
+    for _authority_id, retire in reversed(lease.provisional):
+        try:
+            retire()
+        except BaseException:
+            pass
 
 
 def _require_same_external_result(

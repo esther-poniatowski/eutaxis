@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 import os
 import pickle
 from dataclasses import FrozenInstanceError, replace
@@ -134,6 +137,220 @@ def test_scoped_acquisition_prioritizes_mutation_over_body_failure(
     assert str(captured.value.__cause__) == "body failed"
     with pytest.raises(AcquisitionContractError, match="not issued"):
         _issued_external_result_state(retained)
+
+
+def test_authenticated_operation_reuses_only_its_exact_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = _acquire(tmp_path / "first")
+    second = _acquire(tmp_path / "second")
+    original = result_module._authenticate_external_result_state
+    calls: list[object] = []
+
+    def authenticate(result: object):
+        calls.append(result)
+        return original(result)
+
+    monkeypatch.setattr(
+        result_module,
+        "_authenticate_external_result_state",
+        authenticate,
+    )
+
+    def operation() -> object:
+        for _index in range(5):
+            assert _issued_external_result_state(first)
+        assert _issued_external_result_state(second)
+        return object()
+
+    result_module._authenticated_external_result_operation(first, operation)
+
+    assert calls == [first, second, first]
+
+
+def test_nested_authenticated_operation_reuses_the_outer_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = _acquire(tmp_path)
+    original = result_module._authenticate_external_result_state
+    call_count = 0
+
+    def authenticate(value: object):
+        nonlocal call_count
+        call_count += 1
+        return original(value)
+
+    monkeypatch.setattr(
+        result_module,
+        "_authenticate_external_result_state",
+        authenticate,
+    )
+
+    result_module._authenticated_external_result_operation(
+        result,
+        lambda: result_module._authenticated_external_result_operation(
+            result,
+            lambda: _issued_external_result_state(result),
+        ),
+    )
+
+    assert call_count == 2
+
+
+def test_same_state_reissue_defeats_the_active_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = _acquire(tmp_path)
+    original = result_module._authenticate_external_result_state
+    call_count = 0
+
+    def authenticate(value: object):
+        nonlocal call_count
+        call_count += 1
+        return original(value)
+
+    monkeypatch.setattr(
+        result_module,
+        "_authenticate_external_result_state",
+        authenticate,
+    )
+
+    def operation() -> None:
+        state = result_module._RESULT_AUTHORITIES.retire(result)
+        assert state is not None
+        result_module._RESULT_AUTHORITIES.issue(result, state)
+        _issued_external_result_state(result)
+
+    result_module._authenticated_external_result_operation(result, operation)
+
+    assert call_count == 3
+
+
+def test_copied_context_cannot_retain_a_revoked_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = _acquire(tmp_path)
+    original = result_module._authenticate_external_result_state
+    call_count = 0
+
+    def authenticate(value: object):
+        nonlocal call_count
+        call_count += 1
+        return original(value)
+
+    monkeypatch.setattr(
+        result_module,
+        "_authenticate_external_result_state",
+        authenticate,
+    )
+    copied = result_module._authenticated_external_result_operation(
+        result,
+        copy_context,
+    )
+    assert call_count == 2
+
+    copied.run(_issued_external_result_state, result)
+
+    assert call_count == 3
+
+
+def test_child_task_cannot_retain_a_revoked_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = _acquire(tmp_path)
+    original = result_module._authenticate_external_result_state
+    call_count = 0
+
+    def authenticate(value: object):
+        nonlocal call_count
+        call_count += 1
+        return original(value)
+
+    monkeypatch.setattr(
+        result_module,
+        "_authenticate_external_result_state",
+        authenticate,
+    )
+
+    async def exercise() -> None:
+        async def authenticate_after_parent_returns() -> None:
+            _issued_external_result_state(result)
+
+        task = result_module._authenticated_external_result_operation(
+            result,
+            lambda: asyncio.create_task(authenticate_after_parent_returns()),
+        )
+        assert call_count == 2
+        await task
+
+    asyncio.run(exercise())
+
+    assert call_count == 3
+
+
+def test_cross_thread_access_does_not_use_an_active_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = _acquire(tmp_path)
+    original = result_module._authenticate_external_result_state
+    call_count = 0
+
+    def authenticate(value: object):
+        nonlocal call_count
+        call_count += 1
+        return original(value)
+
+    monkeypatch.setattr(
+        result_module,
+        "_authenticate_external_result_state",
+        authenticate,
+    )
+
+    def operation() -> None:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            executor.submit(_issued_external_result_state, result).result()
+
+    result_module._authenticated_external_result_operation(result, operation)
+
+    assert call_count == 3
+
+
+def test_failed_final_authentication_retires_in_reverse_without_masking(
+    tmp_path: Path,
+) -> None:
+    result = _acquire(tmp_path)
+    events: list[str] = []
+    first_authority = object()
+    second_authority = object()
+
+    def first_cleanup() -> None:
+        events.append("first")
+
+    def failing_second_cleanup() -> None:
+        events.append("second")
+        raise RuntimeError("cleanup failed")
+
+    def operation() -> None:
+        result_module._register_provisional_authority(
+            result,
+            first_authority,
+            first_cleanup,
+        )
+        result_module._register_provisional_authority(
+            result,
+            second_authority,
+            failing_second_cleanup,
+        )
+        object.__setattr__(
+            result.source_coordinates[-1],
+            "path",
+            "forged.yaml",
+        )
+
+    with pytest.raises(AcquisitionContractError, match="coordinate state changed"):
+        result_module._authenticated_external_result_operation(result, operation)
+
+    assert events == ["second", "first"]
 
 
 def _nested_authorities(stage):

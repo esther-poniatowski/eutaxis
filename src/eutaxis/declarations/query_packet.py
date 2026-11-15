@@ -17,7 +17,11 @@ from .external_resolution import (
     ExternalResolutionResult,
     _issued_external_resolution_state,
 )
-from .external_result import AcquiredResource, AcquisitionSourceCoordinate
+from .external_result import (
+    AcquiredResource,
+    AcquisitionSourceCoordinate,
+    _register_provisional_authority,
+)
 from .exceptions import QueryPacketError
 from .models import (
     CompositionManifestDeclaration,
@@ -199,6 +203,11 @@ def build_external_query_packet(result: ExternalResolutionResult) -> QueryPacket
             Mapping[str, JsonValue],
             _freeze_packet(validate_query_packet_payload(payload)),
         )
+    )
+    _register_provisional_authority(
+        state.acquisition,
+        packet,
+        lambda: _QUERY_PACKET_AUTHORITIES.retire(packet),
     )
     _issued_external_resolution_state(result)
     return packet

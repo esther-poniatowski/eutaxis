@@ -20,7 +20,7 @@ from .external_resolution import (
     _ExternalResolutionState,
     _issued_external_resolution_state,
 )
-from .external_result import AcquiredResource
+from .external_result import AcquiredResource, _register_provisional_authority
 from .models import (
     CompositionMechanism,
     CompositionManifestDeclaration,
@@ -409,6 +409,11 @@ def _issue_structured_skill_plan(
         token = _STRUCTURED_SKILL_PLAN_AUTHORITIES.issue(result, state)
         object.__setattr__(result, "_token", token)
         _issued_structured_skill_plan_state(result)
+        _register_provisional_authority(
+            resolution_state.acquisition,
+            result,
+            lambda: _STRUCTURED_SKILL_PLAN_AUTHORITIES.retire(result),
+        )
         return result
     except BaseException:
         _STRUCTURED_SKILL_PLAN_AUTHORITIES.retire(result)

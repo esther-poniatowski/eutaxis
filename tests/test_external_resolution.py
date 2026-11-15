@@ -23,7 +23,10 @@ from eutaxis.declarations import (
     render_external_cumulative_markdown,
     resolve_external_compilation_unit,
 )
-from eutaxis.declarations.external_result import _retire_external_result_tree
+from eutaxis.declarations.external_result import (
+    _authenticated_external_result_operation,
+    _retire_external_result_tree,
+)
 from eutaxis.declarations.resolution import _is_issued_resolution_result
 from tests.test_external_acquisition import _write_contract
 
@@ -178,6 +181,79 @@ def test_post_resolution_authority_failure_retires_result(
 
     assert len(captured) == 1
     assert not _is_issued_resolution_result(captured[0])
+
+
+def test_outer_authentication_failure_retires_issued_resolution(
+    tmp_path: Path,
+) -> None:
+    acquisition = _acquire(tmp_path)
+    captured: list[ExternalResolutionResult] = []
+
+    def operation() -> ExternalResolutionResult:
+        resolution = resolve_external_compilation_unit(
+            acquisition,
+            "resolution/manifest",
+            _context(),
+        )
+        captured.append(resolution)
+        object.__setattr__(
+            acquisition.source_coordinates[-1],
+            "path",
+            "forged.yaml",
+        )
+        return resolution
+
+    with pytest.raises(AcquisitionContractError, match="coordinate state changed"):
+        _authenticated_external_result_operation(acquisition, operation)
+
+    assert len(captured) == 1
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        _ = captured[0].unit
+
+
+def test_outer_authentication_failure_retires_issued_resolution_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    acquisition = _acquire(tmp_path)
+    captured: list[BaseException] = []
+    original = external_resolution_module._issue_external_resolution_error
+
+    def issue_then_mutate(*args, **kwargs):
+        issued = original(*args, **kwargs)
+        captured.append(issued)
+        object.__setattr__(
+            acquisition.source_coordinates[-1],
+            "path",
+            "forged.yaml",
+        )
+        return issued
+
+    monkeypatch.setattr(
+        external_resolution_module,
+        "_issue_external_resolution_error",
+        issue_then_mutate,
+    )
+
+    with pytest.raises(
+        AcquisitionContractError,
+        match="coordinate state changed",
+    ) as raised:
+        _authenticated_external_result_operation(
+            acquisition,
+            lambda: resolve_external_compilation_unit(
+                acquisition,
+                "resolution/manifest",
+                {"context.available": True, "resolution.enabled": False},
+            ),
+        )
+
+    assert len(captured) == 1
+    assert raised.value.__cause__ is captured[0]
+    with pytest.raises(AcquisitionContractError, match="not issued"):
+        external_resolution_module._issued_external_resolution_error_state(
+            captured[0]
+        )
 
 
 def test_external_composition_stays_bound_through_artifact(

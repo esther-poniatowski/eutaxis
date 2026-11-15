@@ -23,6 +23,7 @@ from .external_result import (
     ExternalAcquisitionResult,
     _ExternalAcquisitionResultState,
     _issued_external_result_state,
+    _register_provisional_authority,
 )
 from .loader import LoadedDeclarationSource
 from .models import (
@@ -277,6 +278,11 @@ def _build_declaration_catalog_with_state(
     except BaseException:
         _CATALOG_AUTHORITIES.retire(catalog)
         raise
+    _register_provisional_authority(
+        result,
+        catalog,
+        lambda: _CATALOG_AUTHORITIES.retire(catalog),
+    )
     return catalog, catalog_state
 
 

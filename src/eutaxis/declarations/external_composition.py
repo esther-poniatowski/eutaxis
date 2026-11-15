@@ -26,6 +26,7 @@ from .external_resolution import (
     _ExternalResolutionState,
     _issued_external_resolution_state,
 )
+from .external_result import _register_provisional_authority
 from .markdown_projection import _render_cumulative_markdown
 
 
@@ -257,6 +258,11 @@ def _issue_external_plan(
         token = _EXTERNAL_PLAN_AUTHORITIES.issue(result, state)
         object.__setattr__(result, "_token", token)
         _issued_external_plan_state(result)
+        _register_provisional_authority(
+            resolution_state.acquisition,
+            result,
+            lambda: _EXTERNAL_PLAN_AUTHORITIES.retire(result),
+        )
         return result
     except BaseException:
         _EXTERNAL_PLAN_AUTHORITIES.retire(result)
@@ -281,6 +287,11 @@ def _issue_external_artifact(
         token = _EXTERNAL_ARTIFACT_AUTHORITIES.issue(result, state)
         object.__setattr__(result, "_token", token)
         _issued_external_artifact_state(result)
+        _register_provisional_authority(
+            plan_state.resolution_state.acquisition,
+            result,
+            lambda: _EXTERNAL_ARTIFACT_AUTHORITIES.retire(result),
+        )
         return result
     except BaseException:
         _EXTERNAL_ARTIFACT_AUTHORITIES.retire(result)
