@@ -200,9 +200,7 @@ def test_configured_plan_matches_cli_order_without_writing(tmp_path: Path) -> No
         for line in preview.output.splitlines()
         if line.startswith("[")
     ]
-    assert reported == [
-        (action.action, action.name) for action in prepared.actions
-    ]
+    assert reported == [(action.action, action.name) for action in prepared.actions]
     assert not (home / ".claude" / "skills").exists()
     assert not (home / ".eutaxis").exists()
 
@@ -1104,6 +1102,7 @@ def test_successful_update_surfaces_retained_recovery_target(tmp_path: Path) -> 
     prepared = _prepare(
         [_source("alpha", "updated body\n")], home=home, project_root=tmp_path
     )
+    receipts = []
 
     outcomes = apply_prepared_skill_sync(
         prepared,
@@ -1111,17 +1110,150 @@ def test_successful_update_surfaces_retained_recovery_target(tmp_path: Path) -> 
         project_root=tmp_path,
         home=home,
         registry=registry,
+        before_commit=lambda value: receipts.extend(value),
     )
 
     warning = next(
         item for item in outcomes[0].warnings if item.startswith("Prior Skill retained")
     )
     recovery = Path(warning.split(": ", 1)[1])
+    assert len(receipts) == 1
+    assert receipts[0].target == prepared.actions[0].path
+    assert receipts[0].retained_path == recovery
+    assert receipts[0].published_state.kind == "directory"
+    assert receipts[0].retained_state == prepared.actions[0].target_observation
     assert recovery.is_dir()
     assert "original body" in (recovery / "SKILL.md").read_text(encoding="utf-8")
-    assert "updated body" in (
-        prepared.actions[0].path / "SKILL.md"
-    ).read_text(encoding="utf-8")
+    assert "updated body" in (prepared.actions[0].path / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_precommit_receipt_failure_rolls_back_publication(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(
+        [_source("alpha", "original body\n")], home=home, project_root=tmp_path
+    )
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    prepared = _prepare(
+        [_source("alpha", "updated body\n")], home=home, project_root=tmp_path
+    )
+
+    with pytest.raises(RuntimeError, match="receipt persistence failed"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+            before_commit=lambda value: (_ for _ in ()).throw(
+                RuntimeError("receipt persistence failed")
+            ),
+        )
+
+    assert "original body" in (prepared.actions[0].path / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert not tuple(prepared.actions[0].path.parent.glob(".*.eutaxis-stage-*"))
+
+
+def test_publication_receipts_cover_create_update_and_remove(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    adapter = get_adapter("claude")
+    create = _prepare([_source("alpha", "first\n")], home=home, project_root=tmp_path)
+    receipts = []
+    apply_prepared_skill_sync(
+        create,
+        selected=create.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+        before_commit=lambda value: receipts.extend(value),
+    )
+    update = _prepare([_source("alpha", "second\n")], home=home, project_root=tmp_path)
+    apply_prepared_skill_sync(
+        update,
+        selected=update.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+        before_commit=lambda value: receipts.extend(value),
+    )
+    remove = prepare_skill_sync(
+        [],
+        [adapter],
+        scope="user",
+        project_root=tmp_path,
+        home=home,
+        managed_names_by_adapter={"claude": {"alpha"}},
+    )
+    apply_prepared_skill_sync(
+        remove,
+        selected=remove.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+        before_commit=lambda value: receipts.extend(value),
+    )
+
+    assert [receipt.published_state.kind for receipt in receipts] == [
+        "directory",
+        "directory",
+        "absent",
+    ]
+    assert receipts[0].retained_path is None
+    assert receipts[0].retained_state is None
+    assert receipts[1].retained_path is not None
+    assert receipts[1].retained_state == update.actions[0].target_observation
+    assert receipts[2].retained_path is not None
+    assert receipts[2].retained_state == remove.actions[0].target_observation
+
+
+def test_precommit_registry_mutation_is_rejected(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare([_source("alpha", "first\n")], home=home, project_root=tmp_path)
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    update = _prepare([_source("alpha", "second\n")], home=home, project_root=tmp_path)
+
+    def corrupt_registry(value) -> None:
+        registry.remove(
+            name="alpha",
+            adapter="claude",
+            scope="user",
+        )
+
+    with pytest.raises(OwnershipError, match="registry row differs"):
+        apply_prepared_skill_sync(
+            update,
+            selected=update.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+            before_commit=corrupt_registry,
+        )
+
+    assert "first" in (update.actions[0].path / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert registry.find(name="alpha", adapter="claude", scope="user") is not None
 
 
 def test_target_observation_rejects_file_and_root_replacement(

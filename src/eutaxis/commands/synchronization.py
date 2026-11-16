@@ -172,6 +172,16 @@ class SkillTargetObservation:
     digest: str
 
 
+@dataclass(frozen=True)
+class SkillPublicationReceipt:
+    """Exact published state and displaced tree for one changed Skill."""
+
+    target: Path
+    published_state: SkillTargetObservation
+    retained_path: Path | None
+    retained_state: SkillTargetObservation | None
+
+
 @dataclass(frozen=True, eq=False)
 class SkillSyncAction:
     """One planned change to an installed Skill."""
@@ -396,6 +406,7 @@ def apply_prepared_skill_sync(
     finalize: Callable[[], None] | None = None,
     rollback_files: Collection[Path] = (),
     externally_locked: bool = False,
+    before_commit: Callable[[tuple[SkillPublicationReceipt, ...]], None] | None = None,
 ) -> tuple[SkillSyncAction, ...]:
     """Apply exactly the selected prepared actions after rejecting drift.
 
@@ -516,6 +527,16 @@ def apply_prepared_skill_sync(
                     registry=registry,
                 )
             journal.verify_for_commit()
+            receipts = journal.publication_receipts()
+            if before_commit is not None:
+                before_commit(receipts)
+                _verify_selected_post_state(
+                    selected_actions,
+                    project_root=project_root,
+                    home=home,
+                    registry=registry,
+                )
+                journal.verify_for_commit()
     retained = journal.retained_backups()
     if retained:
         outcomes = [
@@ -996,6 +1017,18 @@ class _SkillWriteJournal:
             for path, publication in self._publications.items()
             if publication.backup is not None
         }
+
+    def publication_receipts(self) -> tuple[SkillPublicationReceipt, ...]:
+        """Return typed poststates before the journal commits its publications."""
+        return tuple(
+            SkillPublicationReceipt(
+                target=path,
+                published_state=publication.published_state,
+                retained_path=publication.backup,
+                retained_state=publication.backup_state,
+            )
+            for path, publication in self._publications.items()
+        )
 
     def rollback_decision(self, path: Path) -> tuple[bool, str | None]:
         """Restore an atomic replacement unless its published state changed."""

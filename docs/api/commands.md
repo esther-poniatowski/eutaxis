@@ -1083,6 +1083,36 @@ Digest of one complete Skill target tree at planning time.
 
 #### digest *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
+<a id="eutaxis.commands.synchronization.SkillPublicationReceipt"></a>
+
+### *class* eutaxis.commands.synchronization.SkillPublicationReceipt(target, published_state, retained_path, retained_state)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Exact published state and displaced tree for one changed Skill.
+
+* **Parameters:**
+  * **target** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **published_state** ([*SkillTargetObservation*](#eutaxis.commands.synchronization.SkillTargetObservation))
+  * **retained_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
+  * **retained_state** ([*SkillTargetObservation*](#eutaxis.commands.synchronization.SkillTargetObservation) *|* *None*)
+
+<a id="eutaxis.commands.synchronization.SkillPublicationReceipt.target"></a>
+
+#### target *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
+
+<a id="eutaxis.commands.synchronization.SkillPublicationReceipt.published_state"></a>
+
+#### published_state *: [SkillTargetObservation](#eutaxis.commands.synchronization.SkillTargetObservation)*
+
+<a id="eutaxis.commands.synchronization.SkillPublicationReceipt.retained_path"></a>
+
+#### retained_path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path) | [None](https://docs.python.org/3/builtins/constants.html#None)*
+
+<a id="eutaxis.commands.synchronization.SkillPublicationReceipt.retained_state"></a>
+
+#### retained_state *: [SkillTargetObservation](#eutaxis.commands.synchronization.SkillTargetObservation) | [None](https://docs.python.org/3/builtins/constants.html#None)*
+
 <a id="eutaxis.commands.synchronization.SkillSyncAction"></a>
 
 ### *class* eutaxis.commands.synchronization.SkillSyncAction(action, name, adapter, scope, path, source=None, artifact=None, target_observation=None, warnings=())
@@ -1212,7 +1242,7 @@ Apply one failure-atomic Skill plan and return the resulting states.
 
 <a id="eutaxis.commands.synchronization.apply_prepared_skill_sync"></a>
 
-### eutaxis.commands.synchronization.apply_prepared_skill_sync(prepared, \*, selected, project_root, home, registry, finalize=None, rollback_files=(), externally_locked=False)
+### eutaxis.commands.synchronization.apply_prepared_skill_sync(prepared, \*, selected, project_root, home, registry, finalize=None, rollback_files=(), externally_locked=False, before_commit=None)
 
 Apply exactly the selected prepared actions after rejecting drift.
 
@@ -1237,6 +1267,7 @@ may remove that directory after reconciling concurrent-editor state.
   * **finalize** ([*Callable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable) *[* *[* *]* *,* *None* *]*  *|* *None*)
   * **rollback_files** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*)
   * **externally_locked** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **before_commit** ([*Callable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable) *[* *[*[*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*SkillPublicationReceipt*](#eutaxis.commands.synchronization.SkillPublicationReceipt) *,*  *...* *]* *]* *,* *None* *]*  *|* *None*)
 * **Return type:**
   [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction), …]
 
