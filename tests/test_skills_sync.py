@@ -19,6 +19,7 @@ from eutaxis.commands import (
     PreparedSkillSync,
     Registry,
     get_adapter,
+    prepare_configured_skill_sync,
     verify_artifact,
 )
 from eutaxis.commands import synchronization as synchronization_module
@@ -127,6 +128,82 @@ def test_skills_sync_previews_without_writing(tmp_path: Path) -> None:
     assert "[CREATE   ] alpha@claude" in result.output
     assert "Preview only" in result.output
     assert not (home / ".claude" / "skills" / "alpha").exists()
+    assert not (home / ".eutaxis").exists()
+
+
+def test_configured_plan_matches_cli_order_without_writing(tmp_path: Path) -> None:
+    for name in ("owner", "dependency"):
+        _write_module(
+            tmp_path / "instructions" / f"{name}.md",
+            name,
+            body=f"# {name.title()}\n\n**{name}-rule**:\n\n✓ Apply {name}.\n",
+        )
+        module = tmp_path / "instructions" / f"{name}.md"
+        module.write_text(
+            module.read_text(encoding="utf-8").replace(
+                "failure-mode: visible\n",
+                "failure-mode: visible\ndisclosure: progressive\n",
+            ),
+            encoding="utf-8",
+        )
+    config = tmp_path / "eutaxis.yml"
+    payload = {
+        "_schema": "eutaxis:configuration@1",
+        "common_sources": [],
+        "task_modules": [
+            {
+                "id": name,
+                "title": name.title(),
+                "path": f"instructions/{name}.md",
+                "trigger": f"on {name}",
+            }
+            for name in ("owner", "dependency")
+        ],
+        "skill_loading_units": [
+            {
+                "name": "dependency-batch",
+                "max_bytes": 10000,
+                "members": [{"module": "dependency", "rules": ["dependency-rule"]}],
+            },
+            {
+                "name": "owner-route",
+                "max_bytes": 20000,
+                "members": [{"module": "owner", "include_entrypoint": True}],
+                "includes": ["dependency-batch"],
+                "publish_to": "owner",
+            },
+        ],
+        "agents": [],
+    }
+    config.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    home = tmp_path / "home"
+    home.mkdir()
+
+    prepared = prepare_configured_skill_sync(
+        config,
+        [get_adapter("claude")],
+        scope="user",
+        root=tmp_path,
+        project_root=tmp_path,
+        home=home,
+        state_dir=home / ".eutaxis" / "state",
+    )
+    preview = _skills(home, "sync", "-c", str(config))
+
+    assert [action.name for action in prepared.actions] == ["dependency", "owner"]
+    assert preview.exit_code == 0, preview.output
+    reported = [
+        (
+            line[1 : line.index("]")].strip().lower(),
+            line.split("] ", 1)[1].split("@", 1)[0],
+        )
+        for line in preview.output.splitlines()
+        if line.startswith("[")
+    ]
+    assert reported == [
+        (action.action, action.name) for action in prepared.actions
+    ]
+    assert not (home / ".claude" / "skills").exists()
     assert not (home / ".eutaxis").exists()
 
 

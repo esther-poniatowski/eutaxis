@@ -1263,6 +1263,36 @@ target changed after the journal’s atomic publication.
 * **Return type:**
   [*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator)[ *\_SkillWriteJournal*]
 
+<a id="module-eutaxis.commands.configured_synchronization"></a>
+
+<a id="configured-synchronization"></a>
+
+## Configured Synchronization
+
+Prepare Skill synchronization plans from instruction configurations.
+
+<a id="eutaxis.commands.configured_synchronization.prepare_configured_skill_sync"></a>
+
+### eutaxis.commands.configured_synchronization.prepare_configured_skill_sync(config_path, adapters, \*, scope, root, project_root, home, state_dir)
+
+Prepare the complete ordered Skill plan declared by a configuration.
+
+This function reads configuration, source, manifest, and installed Skill
+state without modifying any of them. A caller that will apply the result
+must hold the synchronization-manifest lock across this call and the
+subsequent application.
+
+* **Parameters:**
+  * **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **adapters** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[**AgentAdapter* *]*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **state_dir** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+* **Return type:**
+  [*PreparedSkillSync*](#eutaxis.commands.synchronization.PreparedSkillSync)
+
 <a id="module-eutaxis.commands.skill_budgets"></a>
 
 <a id="loading-budgets"></a>

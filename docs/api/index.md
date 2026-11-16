@@ -32,6 +32,7 @@
   * [Templating](commands.md#module-eutaxis.commands.templating)
   * [Installer](commands.md#module-eutaxis.commands.installer)
   * [Synchronization](commands.md#module-eutaxis.commands.synchronization)
+  * [Configured Synchronization](commands.md#module-eutaxis.commands.configured_synchronization)
   * [Loading Budgets](commands.md#module-eutaxis.commands.skill_budgets)
   * [Data Models](commands.md#module-eutaxis.commands.models)
   * [Exceptions](commands.md#module-eutaxis.commands.exceptions)

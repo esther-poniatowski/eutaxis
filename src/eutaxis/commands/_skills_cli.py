@@ -26,14 +26,14 @@ from . import (
     CommandNotFoundError,
     SkillSyncManifest,
     all_adapters,
-    apply_skill_sync,
+    apply_prepared_skill_sync,
     diff_command,
     get_adapter,
     install_command,
     is_eutaxis_owned,
     load_from_instruction_config,
     measure_skill_budgets,
-    plan_skill_sync,
+    prepare_configured_skill_sync,
     render_command,
 )
 from .installer import _uninstall_command
@@ -41,6 +41,7 @@ from .disclosure import DISCLOSURE_INLINE
 from .adapters import AgentAdapter
 from .loading_unit_publication import (
     LoadingUnitPublication,
+    order_published_skill_sources,
     prepare_published_loading_units,
     sources_by_module,
 )
@@ -321,7 +322,7 @@ def cli_install(
                     adapter_name=adapter.name,
                 )
             )
-            sources = _published_install_order(loaded, prepared, selected_modules)
+            sources = order_published_skill_sources(loaded, prepared, selected_modules)
             scopes = _installation_scopes(
                 loaded,
                 prepared,
@@ -537,48 +538,24 @@ def cli_sync(
         settings = _settings(config, root)
         config_path, base = settings
         project = _target_project(target_project, settings)
-        loaded = load_config(config_path, root=base)
-        raw_sources = _load(config_path, base)
         adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
         home = Path.home()
-        sources, _ = prepare_published_loading_units(
-            loaded,
-            raw_sources,
-            adapters,
-            project_root=project,
-            home=home,
-        )
-        sources = _published_install_order(loaded, sources, None)
-        registry = Registry(default_state_dir(home))
+        state_dir = default_state_dir(home)
+        registry = Registry(state_dir)
         registry.load()
-        manifest = SkillSyncManifest(default_state_dir(home), config_path)
+        manifest = SkillSyncManifest(state_dir, config_path)
         sync_lock = manifest.locked() if apply else nullcontext()
         with sync_lock:
-            managed_names = {
-                adapter.name: manifest.managed_names(
-                    adapter=adapter.name,
-                    scope=scope,
-                    project_root=project,
-                )
-                for adapter in adapters
-            }
-            protected_names = {
-                adapter.name: manifest.names_managed_by_other_configs(
-                    adapter=adapter.name,
-                    scope=scope,
-                    project_root=project,
-                )
-                for adapter in adapters
-            }
-            actions = plan_skill_sync(
-                sources,
+            prepared = prepare_configured_skill_sync(
+                config_path,
                 adapters,
                 scope=scope,
+                root=base,
                 project_root=project,
                 home=home,
-                managed_names_by_adapter=managed_names,
-                protected_names_by_adapter=protected_names,
+                state_dir=state_dir,
             )
+            actions = prepared.actions
             if apply:
                 expected_names = {
                     adapter.name: {
@@ -589,8 +566,9 @@ def cli_sync(
                     }
                     for adapter in adapters
                 }
-                actions = apply_skill_sync(
-                    actions,
+                actions = apply_prepared_skill_sync(
+                    prepared,
+                    selected=actions,
                     project_root=project,
                     home=home,
                     registry=registry,
@@ -793,51 +771,6 @@ def _publication_closure_modules(
                 required_modules.update(expanded)
                 changed = True
     return required_modules
-
-
-def _published_install_order(
-    config: InstructionConfig,
-    sources: list[CommandSource],
-    selected_modules: set[str] | None,
-) -> list[CommandSource]:
-    """Order dependencies before every owner whose manifest links to them."""
-    by_module = sources_by_module(config, sources)
-    selected = selected_modules or set(by_module)
-    dependencies: dict[str, set[str]] = {module: set() for module in selected}
-    module_order = {
-        module.id: index for index, module in enumerate(config.task_modules)
-    }
-    for unit in config.skill_loading_units:
-        if unit.publish_to not in selected:
-            continue
-        dependencies[unit.publish_to].update(
-            member.module
-            for member in expand_loading_unit(unit, config.skill_loading_units)
-            if member.module in selected and member.module != unit.publish_to
-        )
-    ordered: list[str] = []
-    active: set[str] = set()
-    complete: set[str] = set()
-
-    def visit(module: str) -> None:
-        if module in complete:
-            return
-        if module in active:
-            raise CommandError(
-                "Published Skill routes form an install dependency cycle"
-            )
-        active.add(module)
-        for dependency in sorted(
-            dependencies[module], key=lambda item: module_order[item]
-        ):
-            visit(dependency)
-        active.remove(module)
-        complete.add(module)
-        ordered.append(module)
-
-    for module in (item.id for item in config.task_modules if item.id in selected):
-        visit(module)
-    return [by_module[module] for module in ordered]
 
 
 def _installation_scopes(

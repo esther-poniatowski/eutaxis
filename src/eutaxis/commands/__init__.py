@@ -41,6 +41,7 @@ from .adapters import (
     register_adapter,
 )
 from .skill_budgets import SkillBudgetMeasurement, measure_skill_budgets
+from .configured_synchronization import prepare_configured_skill_sync
 from .exceptions import (
     CommandError,
     CommandNotFoundError,
@@ -119,6 +120,7 @@ __all__ = [
     "verify_artifact",
     "plan_skill_sync",
     "prepare_skill_sync",
+    "prepare_configured_skill_sync",
     "register_adapter",
     "render_command",
     "skill_write_transaction",

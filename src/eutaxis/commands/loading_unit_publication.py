@@ -222,6 +222,51 @@ def sources_by_module(
     return resolved
 
 
+def order_published_skill_sources(
+    config: InstructionConfig,
+    sources: list[CommandSource],
+    selected_modules: set[str] | None = None,
+) -> list[CommandSource]:
+    """Order dependencies before each Skill whose manifest links to them."""
+    by_module = sources_by_module(config, sources)
+    selected = selected_modules or set(by_module)
+    dependencies: dict[str, set[str]] = {module: set() for module in selected}
+    module_order = {
+        module.id: index for index, module in enumerate(config.task_modules)
+    }
+    for unit in config.skill_loading_units:
+        if unit.publish_to not in selected:
+            continue
+        dependencies[unit.publish_to].update(
+            member.module
+            for member in expand_loading_unit(unit, config.skill_loading_units)
+            if member.module in selected and member.module != unit.publish_to
+        )
+    ordered: list[str] = []
+    active: set[str] = set()
+    complete: set[str] = set()
+
+    def visit(module: str) -> None:
+        if module in complete:
+            return
+        if module in active:
+            raise CommandRenderError(
+                "Published Skill routes form an install dependency cycle"
+            )
+        active.add(module)
+        for dependency in sorted(
+            dependencies[module], key=lambda item: module_order[item]
+        ):
+            visit(dependency)
+        active.remove(module)
+        complete.add(module)
+        ordered.append(module)
+
+    for module in (item.id for item in config.task_modules if item.id in selected):
+        visit(module)
+    return [by_module[module] for module in ordered]
+
+
 def loading_unit_files(
     loading_unit: SkillLoadingUnit,
     loading_units: list[SkillLoadingUnit],
