@@ -87,7 +87,7 @@ The registry should support entries shaped like:
 components:
   - id: rule:prose-writing
     kind: rule
-    source: instructions/tasks/prose-writing.md
+    source: instructions/rules/prose-writing.md
     description: Prose-writing conventions.
     aliases:
       - prose

@@ -13,7 +13,7 @@ Accepted.
 
 ## Context
 
-The oikos `instructions/tasks/` rule sets are currently authored as free-form Markdown. Each file follows an *implicit* schema that has emerged by convention: a rule has a name (section header), a ✓ prescription block, a ✗ prohibition block, an optional **Why** line, an optional **How to apply** line, and optional valid / invalid example blocks. The same conventions appear across every file in the set.
+At the time of this decision, the oikos `instructions/tasks/` rule sets were authored as free-form Markdown. Each file followed an *implicit* schema that had emerged by convention: a rule had a name (section header), a ✓ prescription block, a ✗ prohibition block, an optional **Why** line, an optional **How to apply** line, and optional valid / invalid example blocks. The same conventions appeared across every file in the set.
 
 This authoring style has two attractive properties: it is the same artifact the agent reads at runtime (no compilation step), and the prose is dense and readable. It also has three structural defects that block the proposed rule infrastructure:
 
@@ -58,5 +58,5 @@ The decision aligns with the architectural posture already established by [adapt
 - A projection must be implemented per target surface. Native Markdown renderers and normalized query packets both derive from the catalog; the pattern reuses the slots established by [adapter-passthrough-source-schema](adapter-passthrough-source-schema.md).
 - Rule identifiers become referenceable surfaces with stability requirements equivalent to ADR identifiers; external sources follow [external declaration identity and acquisition](external-declaration-identity-and-acquisition.md).
 - File-level packaging follows [coherent rule-set packaging](coherent-rule-set-packaging.md).
-- A migration pass is required for the current oikos `instructions/tasks/` set. Each existing free-form rule is reauthored as a structured template entry. The migration is scoped to the always-on body and the on-demand skill body separately, per the placement rule of [silent-failure-rules-as-always-on](silent-failure-rules-as-always-on.md).
+- The oikos migration reauthors free-form rules as structured template entries. It treats the always-on body and the on-demand Skill body separately, according to the placement rule of [silent-failure-rules-as-always-on](silent-failure-rules-as-always-on.md).
 - Authoring is heavier than free-form Markdown. The cost is paid once per rule and recovered every time a rule is consumed by a new surface, mechanically validated, or composed into a skill.

@@ -19,18 +19,18 @@ _schema: eutaxis:configuration@2
 
 common_sources:
   # Instruction modules always loaded for every task. Replace the entries below.
-  - path: instructions/global/<module-1>.md
-  - path: instructions/global/<module-2>.md
+  - path: instructions/context/<context-module>.md
+  - path: instructions/rules/<always-on-rule-set>.md
 
 task_modules_intro: |
   Load the matching task module before doing the work. Read the file directly
   from disk; do not paraphrase from memory. Load only the modules that apply to
   the current task.
 task_modules:
-  # One entry per conditional task module. Replace the example below.
+  # One entry per conditional rule or procedure module. Replace the example below.
   - id: <module-id>
     title: <Module title>
-    path: instructions/tasks/<module-id>.md
+    path: instructions/rules/<module-id>.md
     trigger: when <condition under which this module applies>
     description: <one-line summary of what the module covers>
 

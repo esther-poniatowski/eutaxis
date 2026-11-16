@@ -26,13 +26,13 @@ The test is sound as a verbal criterion but is not yet operationalised. Three co
 2. **Compiler-side enforcement.** Can the compiler refuse to emit a skill that carries a silent-failure-prone rule, or is the classification purely advisory? If advisory, the gate exists only in author discipline.
 3. **Audit recoverability.** When a rule has been placed in a skill, how does a later reviewer verify that the placement was correct? Re-running the test from scratch requires reconstructing the failure mode, which is the part most likely to drift.
 
-## Current state
+## Resolution state
 
 - The verbal test is stated in [silent-failure-rules-as-always-on](../adr/silent-failure-rules-as-always-on.md).
-- No schema field on a rule carries the classification today; rule files in the oikos `instructions/tasks/` set do not declare a failure-mode field.
-- No checker in the cross-agent compiler inspects placement against classification.
+- Structured rules carry `failure-mode` and, when required, `required-visibility`. Markdown rule and procedure modules declare `failure-mode` in their frontmatter.
+- The compiler validates the classification and refuses a model-invoked Skill that carries a silent-failure rule.
 
-The legacy `generate` / `check` pipeline does not exercise this question because it routes every modular rule through the router-pointer pattern uniformly.
+The legacy router-only limitation described by this question no longer governs the Skills-compilation path.
 
 ## Architectural components that depend on this
 

@@ -259,7 +259,7 @@ eutaxis rule show warnings-have-a-zero-baseline --part exception --root .
 ```
 
 ```text
-verification > Verification > warnings-have-a-zero-baseline [exception] (<root>/instructions/global/verification.md:32-35)
+verification > Verification > warnings-have-a-zero-baseline [exception] (<root>/declarations/verification.yaml)
 
 *Exception.* Two constructions keep a non-zero count without failing:
 ...

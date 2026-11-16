@@ -36,7 +36,7 @@ A procedure is not a rule axis. It is a separate declaration kind with an extern
 
 ## Vocabulary
 
-The current oikos `instructions/tasks/` layout names its rule sets "tasks," which collides with the runtime sense of *task* (a user-issued instance of work). The vocabulary is hereby fixed:
+The former oikos `instructions/tasks/` layout named its rule sets "tasks," which collided with the runtime sense of *task* (a user-issued instance of work). The vocabulary is fixed as follows:
 
 | Term | Refers to | Example |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ The current oikos `instructions/tasks/` layout names its rule sets "tasks," whic
 | **Procedure** (or **workflow**) | A separate declaration whose finite action graph has externally observable effects | The git-commit-splitting workflow. Named for the trajectory it constrains. |
 | **Task** | A runtime invocation — what the user asked the agent to do in this session | "Refactor this module so the registry no longer holds mutable state." |
 
-The directory currently named `instructions/tasks/` is therefore better named `instructions/rules/` (or `instructions/rule-sets/`), with procedures living in a parallel `instructions/procedures/` location if and when they are authored. The current contents are predominantly rule sets, not procedures — they specify quality criteria the artifact must satisfy, not action sequences the agent must traverse.
+Oikos now applies this distinction directly: rule sets live in `instructions/rules/`, and authored procedures live in `instructions/procedures/`. The names describe what each module constrains rather than the runtime task that happens to load it.
 
 ## Within-axis discipline: reasoning targets, not reasoning traces
 

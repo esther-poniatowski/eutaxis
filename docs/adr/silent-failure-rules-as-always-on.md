@@ -20,7 +20,7 @@ The activation lifecycle of these two mechanisms is not symmetric. A skill is lo
 This raises a question that the regime partition alone does not answer: when a rule is **conditionally applicable** (it governs only certain tasks, not every turn), the temptation is to model it as on-demand. Two existing patterns embody this temptation:
 
 - **Skill conversion.** Move the rule body into a skill, let the model load it when the description matches.
-- **Router pointer.** Keep a stub in the always-on file that says "when doing X, read `instructions/tasks/X.md`", and let the model follow the pointer.
+- **Router pointer.** Keep a stub in the always-on file that says "when doing X, read `instructions/rules/X.md`", and let the model follow the pointer.
 
 Both reduce to *model-judgment-gated activation*: the rule is in scope only if the model first recognises that the current task is the one the rule governs.
 
@@ -29,7 +29,7 @@ Model-judgment-gated activation works for some rules and silently fails for othe
 - For a rule whose violation produces a **visibly suboptimal artifact** (missing summary table, no contrastive comparison, weaker pedagogy), the cost of late activation is a flagged or reviewable output. The user can correct it.
 - For a rule whose violation produces **silent damage** (wrong-env conda install, destructive git operation, scratch file written to the repo root, capability widening hidden in a long payload), the cost of late activation is irreversible state mutation. By the time the model recognises the task category, the violation has already shipped.
 
-The router-pointer pattern is the dominant mechanism in the current oikos `instructions/tasks/` layout and was the starting point for the session that produced this decision. The proposal to convert those modules wholesale into skills was reviewed against the asymmetry above.
+The router-pointer pattern was the dominant mechanism in the former oikos `instructions/tasks/` layout and was the starting point for the session that produced this decision. The proposal to convert those modules wholesale into skills was reviewed against the asymmetry above.
 
 ## Decision
 
@@ -68,7 +68,7 @@ The decision keeps three classes of authored content cleanly separated:
 ## Consequences
 
 - The router-pointer pattern remains in scope and is endorsed as a content-volume reduction tactic, not as an activation mechanism. Authors writing routers must keep the triggering predicate inline.
-- A migration policy is required for the current oikos `instructions/tasks/` set: each rule is classified by the silent-failure test before any conversion to skills. The classification records the activation path and the first irreversible action, because explicit user invocation and model-judgment activation have different visibility guarantees. Rules that are needed before activation stay in the always-on body. Rules that govern only the invoked procedure can move with that procedure when the skill body loads before the risky action.
+- The oikos migration classifies each rule by the silent-failure test before conversion to a Skill. The classification records the activation path and the first irreversible action, because explicit user invocation and model-judgment activation have different visibility guarantees. Rules needed before activation stay in the always-on body. Rules governing only an invoked procedure can move with that procedure when the Skill body loads before the risky action.
 - The silent-failure test is currently judgment-based. [silent-failure-classification](../open-questions/silent-failure-classification.md) tracks the work to operationalise it.
 - The always-on regime on the Claude side depends on `CLAUDE.md` cumulative-loading behaviour to support modular authoring without pre-concatenation; [claude-md-cumulative-loading-semantics](../open-questions/claude-md-cumulative-loading-semantics.md) tracks the gap in vendor documentation.
 - The capability regime is unaffected: capability sources continue to follow [two-source-kinds-instruction-vs-capability](two-source-kinds-instruction-vs-capability.md) and [open-questions/capability-regime-split](../open-questions/capability-regime-split.md).
