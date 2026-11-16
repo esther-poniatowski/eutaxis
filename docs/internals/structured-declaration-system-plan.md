@@ -323,7 +323,7 @@ This phase gives each host the smallest artifact that preserves the complete res
   - [x] Reject a plan when a retained member or rule projection changes.
   - [x] Plant failures for the entrypoint and complete-artifact budgets.
   - [x] Prove that the shared check facade rejects each rule forbidden by the matrix before any artifact is generated.
-  - [ ] Prove that a failed Skill write restores every changed file and registry entry to its pre-write value.
+  - [x] Prove that a failed Skill write restores every changed file and registry entry to its pre-write value.
   - [ ] Confirm that structured `testing` triggers and stays inactive in the same contexts as the legacy Skill, with the same permitted invocation routes.
   - [ ] Apply `testing` only after preview, golden and adversarial gates pass.
   - [ ] After applying, independently compare the live artifact with the reviewed bytes.
