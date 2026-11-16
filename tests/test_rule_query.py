@@ -193,6 +193,236 @@ def test_list_filters_by_loading_unit(workspace) -> None:
     assert "constraint-scan" not in result.stdout
 
 
+def test_loading_unit_filter_does_not_read_unselected_markdown(workspace) -> None:
+    (workspace["root"] / "global" / "verification.md").unlink()
+
+    result = _run(
+        "list",
+        "-c",
+        str(workspace["config"]),
+        "--loading-unit",
+        "style-route",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "topic-first" in result.stdout
+    assert "constraint-scan" not in result.stdout
+
+
+def test_loading_unit_filter_does_not_render_unselected_declarations(
+    workspace,
+) -> None:
+    raw = yaml.safe_load(workspace["config"].read_text(encoding="utf-8"))
+    raw["_schema"] = "eutaxis:configuration@2"
+    raw["task_modules"].append(
+        {
+            "id": "testing",
+            "title": "Testing",
+            "description": "Testing rules.",
+            "path": "tasks/testing.md",
+            "trigger": "when testing",
+            "rule_index_source": {
+                "declaration": {
+                    "module": "testing",
+                    "acquisition_manifest": "missing-acquisition.yaml",
+                    "acquisition_lock": "missing-lock.yaml",
+                    "composition_manifest": "testing/manifest",
+                    "context": {},
+                }
+            },
+        }
+    )
+    (workspace["root"] / "tasks" / "testing.md").write_text(
+        "# Testing\n", encoding="utf-8"
+    )
+    workspace["config"].write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    result = _run(
+        "list",
+        "-c",
+        str(workspace["config"]),
+        "--loading-unit",
+        "style-route",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "topic-first" in result.stdout
+
+
+def test_loading_unit_filter_does_not_render_unselected_agent_source(
+    workspace,
+) -> None:
+    raw = yaml.safe_load(workspace["config"].read_text(encoding="utf-8"))
+    raw["_schema"] = "eutaxis:configuration@2"
+    raw["agents"] = [
+        {
+            "name": "codex",
+            "target": "AGENTS.md",
+            "sources": [
+                {
+                    "declaration": {
+                        "module": "agent-only",
+                        "acquisition_manifest": "missing-acquisition.yaml",
+                        "acquisition_lock": "missing-lock.yaml",
+                        "composition_manifest": "agent/manifest",
+                        "context": {},
+                    }
+                }
+            ],
+        }
+    ]
+    workspace["config"].write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    result = _run(
+        "list",
+        "-c",
+        str(workspace["config"]),
+        "--loading-unit",
+        "style-route",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "topic-first" in result.stdout
+
+
+def test_loading_unit_uses_structured_task_override_by_task_id(
+    workspace,
+) -> None:
+    manifest_path, lock_path = _write_contract(
+        workspace["root"],
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    legacy = workspace["root"] / "tasks" / "writing.md"
+    legacy.write_text(
+        "# Legacy\n\n**legacy-only**:\n\n✓ Keep the legacy rule.\n",
+        encoding="utf-8",
+    )
+    context = _context()
+    raw = yaml.safe_load(workspace["config"].read_text(encoding="utf-8"))
+    raw["_schema"] = "eutaxis:configuration@2"
+    raw["task_modules"] = [
+        {
+            "id": "purpose",
+            "title": "Purpose",
+            "description": "Purpose rules.",
+            "path": "tasks/writing.md",
+            "trigger": "when defining purpose",
+            "rule_index_source": {
+                "declaration": {
+                    "module": "purpose",
+                    "acquisition_manifest": manifest_path,
+                    "acquisition_lock": lock_path,
+                    "composition_manifest": "resolution/manifest",
+                    "context": context,
+                }
+            },
+        }
+    ]
+    raw["skill_loading_units"][0]["members"] = [{"module": "purpose"}]
+    workspace["config"].write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    result = _run(
+        "list",
+        "-c",
+        str(workspace["config"]),
+        "--loading-unit",
+        "style-route",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.split()[0] == "purpose"
+    assert "legacy-only" not in result.stdout
+
+    legacy_shown = _run(
+        "show",
+        "legacy-only",
+        "-c",
+        str(workspace["config"]),
+        "--module",
+        "writing",
+    )
+    structured_shown = _run(
+        "show",
+        "purpose",
+        "-c",
+        str(workspace["config"]),
+        "--module",
+        "purpose",
+    )
+    full_listing = _run("list", "-c", str(workspace["config"]))
+
+    assert legacy_shown.exit_code == 0, legacy_shown.output
+    assert structured_shown.exit_code == 0, structured_shown.output
+    assert "legacy-only" in full_listing.stdout
+    assert "purpose" in full_listing.stdout
+
+
+def test_loading_unit_uses_markdown_task_override_by_task_id(workspace) -> None:
+    legacy = workspace["root"] / "tasks" / "writing.md"
+    legacy.write_text(
+        "# Legacy\n\n**legacy-only**:\n\n✓ Keep the legacy rule.\n",
+        encoding="utf-8",
+    )
+    indexes = workspace["root"] / "indexes"
+    indexes.mkdir()
+    (indexes / "current-rules.md").write_text(
+        "# Current\n\n**override-only**:\n\n✓ Use the override rule.\n",
+        encoding="utf-8",
+    )
+    raw = yaml.safe_load(workspace["config"].read_text(encoding="utf-8"))
+    raw["task_modules"] = [
+        {
+            "id": "style",
+            "title": "Style",
+            "description": "Style rules.",
+            "path": "tasks/writing.md",
+            "trigger": "when writing",
+            "rule_index_source": {"path": "indexes/current-rules.md"},
+        }
+    ]
+    workspace["config"].write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    result = _run(
+        "list",
+        "-c",
+        str(workspace["config"]),
+        "--loading-unit",
+        "style-route",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "override-only" in result.stdout
+    assert "style" in result.stdout
+    assert "legacy-only" not in result.stdout
+
+    legacy_shown = _run(
+        "show",
+        "legacy-only",
+        "-c",
+        str(workspace["config"]),
+        "--module",
+        "writing",
+    )
+    override_shown = _run(
+        "show",
+        "override-only",
+        "-c",
+        str(workspace["config"]),
+        "--module",
+        "current-rules",
+    )
+    full_listing = _run("list", "-c", str(workspace["config"]))
+
+    assert legacy_shown.exit_code == 0, legacy_shown.output
+    assert override_shown.exit_code == 0, override_shown.output
+    assert "legacy-only" in full_listing.stdout
+    assert "override-only" in full_listing.stdout
+
+
 def test_loading_unit_filter_requires_config(workspace) -> None:
     result = _run(
         "list",
@@ -383,9 +613,7 @@ def test_config_query_includes_structured_declaration_source(tmp_path: Path) -> 
     assert listing.exit_code == 0, listing.output
     assert listing.stdout.split()[0] == "purpose"
     assert shown.exit_code == 0, shown.output
-    assert (
-        "<declaration:resolution/manifest>" in shown.stdout.splitlines()[0]
-    )
+    assert "<declaration:resolution/manifest>" in shown.stdout.splitlines()[0]
     assert "✓ Agent MUST state the reader-facing purpose." in shown.stdout
 
 

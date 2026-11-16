@@ -69,39 +69,12 @@ Contributions to the codebase should be developed in a local clone of the reposi
 - Use the body to explain what and why (not how)
 - Add references to issues or other commits using [GitHub keywords](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/using-keywords-in-issues-and-pull-requests)
 
-## Configuration File Organization
+## Configuration file organization
 
-This project separates configuration concerns between two locations:
+The project configures its build, dependencies and active tools in the project file `pyproject.toml`:
 
-### `pyproject.toml` — Project Management
+- the table `[build-system]` selects the build backend;
+- the table `[project]` and its subtables declare package metadata, dependencies and entry points;
+- the tables `[tool.setuptools]`, `[tool.black]` and `[tool.pytest.ini_options]` configure their named tools.
 
-Contains only build system, package metadata, dependencies, entry points, and tool configurations that **must** reside in `pyproject.toml` (because the tool does not support external config paths):
-
-- `[build-system]` — Build backend (setuptools)
-- `[project]` — Name, version, authors, license, description, keywords, classifiers, URLs
-- `[project.dependencies]` — Runtime dependencies
-- `[project.optional-dependencies]` — Optional dependency groups
-- `[project.scripts]` — CLI entry points
-- `[tool.setuptools]` — Package discovery and source layout
-- `[tool.pytest.ini_options]` — Pytest settings (pytest does not support custom config paths)
-
-### `config/tools/` — Tool-Specific Settings
-
-Contains dedicated configuration files for each development tool. This achieves modular, tool-specific settings that are decoupled from the main project file:
-
-| File                  | Tool                   | Purpose                           |
-|-----------------------|------------------------|-----------------------------------|
-| `black.toml`          | Black                  | Code formatting rules             |
-| `mypy.ini`            | MyPy                   | Static type checking rules        |
-| `pylintrc.ini`        | Pylint                 | Linting rules (main code)         |
-| `pylintrc_tests.ini`  | Pylint                 | Linting rules (test code)         |
-
-### `config/dictionaries/` — Spell Checking
-
-Custom word lists for CSpell (VS Code spell checker):
-
-| File          | Contents                    |
-|---------------|-----------------------------|
-| `project.txt` | Project-specific terms      |
-| `python.txt`  | Python language terms       |
-| `tools.txt`   | Development tool names      |
+MyPy uses its defaults because no separate MyPy configuration file exists.

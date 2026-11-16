@@ -235,7 +235,7 @@ eutaxis rule list [--module <name> | --loading-unit <name>] [--skills-dir <dir> 
 |--------|-------|---------|-------------|
 | `--part` | `-p` | whole rule | Key of the part to print, from the part keys listed below. |
 | `--module` | `-m` | all modules | Module or Skill that holds the rule. Required when several modules define the label. |
-| `--loading-unit` | | none | Loading unit whose authored modules supply the list. Requires `--config` and cannot be combined with another source or module filter. |
+| `--loading-unit` | | none | Loading unit whose task rule-index sources supply the list. Each task uses `rule_index_source` when set and `path` otherwise. Requires `--config` and cannot be combined with another source or module filter. |
 | `--config` | `-c` | none | Configuration file whose modules are read: `common_sources`, agent `sources` and `task_modules`. Structured sources are resolved through their authenticated acquisition lock. When a Markdown entry limits its scope, only admitted rules enter the catalog. |
 | `--root` | `-r` | [resolved root](#root-and-configuration-file) with `--config` | Folder below which the configuration file is looked up and against which its paths resolve. Given alone, it selects the authored modules of that configuration file. |
 | `--skills-dir` | | none | Directory whose eutaxis-owned Skills are read. |

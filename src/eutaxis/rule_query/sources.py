@@ -20,6 +20,7 @@ This module holds the file-system reads; parsing is delegated to
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import replace
 from pathlib import Path
 
@@ -36,7 +37,6 @@ from ..instructions.rules import (
     TextBlock,
     parse_module,
 )
-from ..instructions.scanner import declared_sources
 from .catalog import LocatedRejection, LocatedRule, RuleCatalog
 from .exceptions import RuleSourceError
 
@@ -46,12 +46,17 @@ SKILLS_HINT = (
 )
 
 
-def catalog_from_config(config_path: Path, root: Path | None = None) -> RuleCatalog:
+def catalog_from_config(
+    config_path: Path,
+    root: Path | None = None,
+    *,
+    task_module_ids: Collection[str] | None = None,
+) -> RuleCatalog:
     """Collect the rules of every module that a configuration declares.
 
-    A module declared by several entries contributes the union of their
-    selections. An entry without ``sections`` or ``exclude_sections``, and
-    every ``task_modules`` entry, selects the whole module.
+    The complete catalog contains every configured source. A filtered task
+    module contributes its ``rule_index_source``, or its ``path`` when no
+    override is configured.
 
     Parameters
     ----------
@@ -60,6 +65,10 @@ def catalog_from_config(config_path: Path, root: Path | None = None) -> RuleCata
     root : Path, optional
         Folder against which the paths of the configuration resolve.
         Default: the root implied by the place of the file.
+    task_module_ids : collection of str, optional
+        Task module identifiers to collect through their rule-index sources.
+        Common and agent sources are omitted when this filter is present. The
+        complete catalog is collected by default.
 
     Raises
     ------
@@ -67,20 +76,54 @@ def catalog_from_config(config_path: Path, root: Path | None = None) -> RuleCata
         When a declared module is missing on disk.
     """
     config = load_config(config_path, root=root)
-    selections: dict[Path, list[SourceFile | None]] = {}
-    for path, source in declared_sources(config):
-        selections.setdefault(path, []).append(source)
+    selected_task_ids = None if task_module_ids is None else frozenset(task_module_ids)
+    selections: dict[tuple[Path, str], list[SourceFile | None]] = {}
+    structured_sources: list[DeclarationSource] = []
+
+    def add_source(
+        source: SourceFile | DeclarationSource,
+        *,
+        module_name: str | None = None,
+    ) -> None:
+        if isinstance(source, DeclarationSource):
+            structured_sources.append(source)
+            return
+        path = config.resolve(source.path)
+        selections.setdefault((path, module_name or path.stem), []).append(source)
+
+    if selected_task_ids is None:
+        for source in config.common_sources:
+            add_source(source)
+        for task_module in config.task_modules:
+            path = config.resolve(task_module.path)
+            selections.setdefault((path, path.stem), []).append(None)
+        for task_module in config.task_modules:
+            if task_module.rule_index_source is not None:
+                add_source(task_module.rule_index_source)
+        for agent in config.agents:
+            for source in agent.sources:
+                add_source(source)
+    else:
+        for task_module in config.task_modules:
+            if task_module.id not in selected_task_ids:
+                continue
+            task_source = task_module.rule_index_source
+            if task_source is None:
+                path = config.resolve(task_module.path)
+                selections.setdefault((path, path.stem), []).append(None)
+            else:
+                add_source(task_source, module_name=task_module.id)
     assembler = MarkdownAssembler()
     rules: list[LocatedRule] = []
     rejected: list[LocatedRejection] = []
-    for path, sources in selections.items():
+    for (path, module_name), sources in selections.items():
         if not path.is_file():
             raise RuleSourceError(
                 f"Module declared by {config.config_path} is missing: {path}"
             )
         text = path.read_text(encoding="utf-8")
         selected = _selected_lines(assembler, text, sources)
-        parsed = parse_module(text, module=path.stem)
+        parsed = parse_module(text, module=module_name)
         rules.extend(
             LocatedRule(rule=rule, path=path)
             for rule in parsed.rules
@@ -92,25 +135,14 @@ def catalog_from_config(config_path: Path, root: Path | None = None) -> RuleCata
             if selected is None or item.line_number in selected
         )
     generator = InstructionGenerator(config)
-    structured_sources = [
-        source
-        for source in config.common_sources
-        if isinstance(source, DeclarationSource)
-    ]
-    structured_sources.extend(
-        source
-        for agent in config.agents
-        for source in agent.sources
-        if isinstance(source, DeclarationSource)
-    )
     unique_structured_sources: list[DeclarationSource] = []
-    for source in structured_sources:
-        if source not in unique_structured_sources:
-            unique_structured_sources.append(source)
-    for source in unique_structured_sources:
-        rendered = generator.render_declaration_source(source)
-        parsed = parse_module(rendered, module=source.module)
-        location = Path(f"<declaration:{source.composition_manifest}>")
+    for structured_source in structured_sources:
+        if structured_source not in unique_structured_sources:
+            unique_structured_sources.append(structured_source)
+    for structured_source in unique_structured_sources:
+        rendered = generator.render_declaration_source(structured_source)
+        parsed = parse_module(rendered, module=structured_source.module)
+        location = Path(f"<declaration:{structured_source.composition_manifest}>")
         _collect(parsed, location, rules, rejected)
     return RuleCatalog(
         origin=f"the modules of {config.config_path}",

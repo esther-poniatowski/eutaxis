@@ -125,7 +125,7 @@ def cli_list(
     standard error, since the rule index and the queries omit them.
     """
     try:
-        selected_modules = _loading_unit_modules(
+        selected_task_ids = _loading_unit_task_ids(
             loading_unit,
             module=module,
             config=config,
@@ -133,7 +133,13 @@ def cli_list(
             skills_dir=skills_dir,
             agent=agent,
         )
-        catalog = _catalog(config, root, skills_dir, agent)
+        catalog = _catalog(
+            config,
+            root,
+            skills_dir,
+            agent,
+            task_module_ids=selected_task_ids,
+        )
         if module is not None and module not in catalog.modules:
             raise RuleQueryError(
                 f"Unknown module {module!r} in {catalog.origin}. "
@@ -141,11 +147,7 @@ def cli_list(
             )
     except (RuleQueryError, InstructionError, CommandError) as exc:
         _fail(exc)
-    rules = tuple(
-        item
-        for item in catalog.select(module)
-        if selected_modules is None or item.rule.module in selected_modules
-    )
+    rules = tuple(item for item in catalog.select(module))
     label_width = max((len(item.rule.label) for item in rules), default=0)
     module_width = max((len(item.rule.module) for item in rules), default=0)
     for item in rules:
@@ -156,11 +158,6 @@ def cli_list(
         )
     for rejected in catalog.rejected:
         if module is not None and rejected.rejection.module != module:
-            continue
-        if (
-            selected_modules is not None
-            and rejected.rejection.module not in selected_modules
-        ):
             continue
         typer.echo(
             f"warning: {rejected.path}:{rejected.rejection.line_number}: "
@@ -174,6 +171,8 @@ def _catalog(
     root: str | None,
     skills_dir: str | None,
     agent: str | None,
+    *,
+    task_module_ids: frozenset[str] | None = None,
 ) -> RuleCatalog:
     """Build the catalog of the source that the options select."""
     if (config is not None or root is not None) and (
@@ -188,13 +187,17 @@ def _catalog(
     if config is not None or root is not None:
         base = command_root(root)
         config_path = find_config(command_path(config), base)
-        return catalog_from_config(config_path, root=base)
+        return catalog_from_config(
+            config_path,
+            root=base,
+            task_module_ids=task_module_ids,
+        )
     if skills_dir is not None:
         return catalog_from_skills_dir(Path(skills_dir).expanduser().resolve())
     return catalog_from_skills_dir(_user_skills_dir(agent or DEFAULT_AGENT))
 
 
-def _loading_unit_modules(
+def _loading_unit_task_ids(
     loading_unit: str | None,
     *,
     module: str | None,
@@ -203,7 +206,7 @@ def _loading_unit_modules(
     skills_dir: str | None,
     agent: str | None,
 ) -> frozenset[str] | None:
-    """Resolve one loading unit to the authored module names in its config."""
+    """Resolve one loading unit to the task identifiers in its config."""
     if loading_unit is None:
         return None
     if config is None and root is None:
@@ -229,9 +232,8 @@ def _loading_unit_modules(
         raise RuleQueryError(
             f"Unknown Skill loading unit {loading_unit!r}. Units: {names}."
         )
-    task_modules = {item.id: item for item in loaded.task_modules}
     return frozenset(
-        loaded.resolve(task_modules[member.module].path).stem
+        member.module
         for member in expand_loading_unit(unit, loaded.skill_loading_units)
     )
 
