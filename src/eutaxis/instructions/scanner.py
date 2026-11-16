@@ -38,6 +38,8 @@ def collect_registered_paths(config: InstructionConfig) -> list[Path]:
             paths.append(config.resolve(source.path))
     for module in config.task_modules:
         paths.append(config.resolve(module.path))
+        if isinstance(module.rule_index_source, SourceFile):
+            paths.append(config.resolve(module.rule_index_source.path))
     return paths
 
 
@@ -56,7 +58,14 @@ def declared_sources(
         for source in config.common_sources
         if isinstance(source, SourceFile)
     ]
-    declared.extend((config.resolve(module.path), None) for module in config.task_modules)
+    declared.extend(
+        (config.resolve(module.path), None) for module in config.task_modules
+    )
+    declared.extend(
+        (config.resolve(module.rule_index_source.path), module.rule_index_source)
+        for module in config.task_modules
+        if isinstance(module.rule_index_source, SourceFile)
+    )
     declared.extend(
         (config.resolve(source.path), source)
         for agent in config.agents
@@ -85,9 +94,7 @@ def scan_instructions(
     if directory is not None:
         scan_dirs = [directory.expanduser().resolve()]
     else:
-        scan_dirs = sorted(
-            {path.parent for path in registered if path.parent.exists()}
-        )
+        scan_dirs = sorted({path.parent for path in registered if path.parent.exists()})
 
     discovered: set[Path] = set()
     for scan_dir in scan_dirs:
@@ -117,9 +124,7 @@ def scan_instructions(
     return report
 
 
-def format_registration_snippet(
-    config: InstructionConfig, paths: list[Path]
-) -> str:
+def format_registration_snippet(config: InstructionConfig, paths: list[Path]) -> str:
     """Return a YAML snippet registering the given files under ``common_sources``."""
     if not paths:
         return ""

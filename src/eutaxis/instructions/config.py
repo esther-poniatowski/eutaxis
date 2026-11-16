@@ -132,12 +132,15 @@ class ConfigLoader:
             for source in agent.sources
             if isinstance(source, DeclarationSource)
         )
+        sources.extend(
+            module.rule_index_source
+            for module in config.task_modules
+            if isinstance(module.rule_index_source, DeclarationSource)
+        )
         by_manifest: dict[str, DeclarationSource] = {}
         by_module: dict[str, DeclarationSource] = {}
         for source in sources:
-            prior_manifest = by_manifest.setdefault(
-                source.composition_manifest, source
-            )
+            prior_manifest = by_manifest.setdefault(source.composition_manifest, source)
             if prior_manifest != source:
                 raise ConfigurationError(
                     "Composition manifest is configured with different source "
@@ -240,8 +243,7 @@ class ConfigLoader:
             )
         if extra:
             raise ConfigurationError(
-                "A declaration source has unknown fields: "
-                + ", ".join(sorted(extra))
+                "A declaration source has unknown fields: " + ", ".join(sorted(extra))
             )
 
         module = self._nonempty_string(raw["module"], "declaration.module")
@@ -358,12 +360,25 @@ class ConfigLoader:
                 )
 
         description = raw.get("description")
+        rule_index_source = (
+            self._parse_source(raw["rule_index_source"])
+            if raw.get("rule_index_source") is not None
+            else None
+        )
+        if isinstance(
+            rule_index_source, DeclarationSource
+        ) and rule_index_source.module != str(raw["id"]):
+            raise ConfigurationError(
+                "A task module declaration used by the rule index must use "
+                f"the task module id: {raw['id']}"
+            )
         return TaskModule(
             id=str(raw["id"]),
             title=str(raw["title"]),
             path=Path(str(raw["path"])),
             trigger=str(raw["trigger"]),
             description=str(description) if description is not None else None,
+            rule_index_source=rule_index_source,
         )
 
     def _parse_skill_loading_units(self, raw_units: Any) -> list[SkillLoadingUnit]:
@@ -595,6 +610,7 @@ class ConfigLoader:
                     path=module.path,
                     trigger=module.trigger,
                     description=description,
+                    rule_index_source=module.rule_index_source,
                 )
             resolved.append(module)
         config.task_modules = resolved

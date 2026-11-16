@@ -98,8 +98,28 @@ task_modules:
 | `path` | string | yes | Path to the source Markdown file, relative to the configured root. |
 | `trigger` | string | yes | Plain-language activation hint, surfaced in the pointer section when emitted. |
 | `description` | string | no | One-line summary. When omitted, the loader reads it from the source file's YAML frontmatter. |
+| `rule_index_source` | source entry | no | Source used for this module's standalone rule-index row. Defaults to `path`. |
 
 Each referenced file must declare the source-schema frontmatter required by the Skills compiler (`invocation`, `failure-mode`, optionally `required-visibility`). The fields and their roles are documented in [Concepts: source schema](concepts.md). The Skill compiler refuses to emit an artifact from a file that omits any required field.
+
+The optional field `rule_index_source` accepts the same Markdown or declaration source grammar as the `common_sources` list. When this field holds a declaration source, its `module` must equal the task module `id`. The example keeps the Markdown file as the Skill source, while an authenticated manifest supplies the module's index labels:
+
+```yaml
+_schema: eutaxis:configuration@2
+task_modules:
+  - id: testing
+    title: Testing
+    path: docs/instructions/tasks/testing.md
+    trigger: when changing tested behavior
+    rule_index_source:
+      declaration:
+        module: testing
+        acquisition_manifest: declarations/acquisition.yaml
+        acquisition_lock: declarations/acquisition.lock.json
+        composition_manifest: example/testing-skill
+        context:
+          example.repository: true
+```
 
 The default cumulative file carries a pointer section that lists each `task_modules` entry. When the rule sets are also compiled to Skills via `eutaxis skills install`, the pointer section is redundant; suppress it by setting `task_modules_router_enabled: false` at the top level of the configuration.
 

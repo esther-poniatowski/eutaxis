@@ -179,3 +179,59 @@ agents:
 
     assert not report.has_issues
     assert len(report.registered_present) == 2
+
+
+def test_scan_registers_present_task_rule_index_source(tmp_path: Path) -> None:
+    instructions = tmp_path / "instructions"
+    indexes = tmp_path / "indexes"
+    instructions.mkdir()
+    indexes.mkdir()
+    (instructions / "task.md").write_text("# Task\n", encoding="utf-8")
+    (indexes / "task-index.md").write_text("# Index\n", encoding="utf-8")
+    config = _write_config(
+        tmp_path,
+        """
+_schema: eutaxis:configuration@1
+task_modules:
+  - id: task
+    title: Task
+    path: instructions/task.md
+    trigger: when working
+    description: Task rules.
+    rule_index_source: indexes/task-index.md
+agents: []
+""",
+    )
+
+    report = scan_instructions(load_config(config))
+
+    assert not report.has_issues
+    assert {path.name for path in report.registered_present} == {
+        "task.md",
+        "task-index.md",
+    }
+
+
+def test_scan_reports_missing_task_rule_index_source(tmp_path: Path) -> None:
+    instructions = tmp_path / "instructions"
+    instructions.mkdir()
+    (instructions / "task.md").write_text("# Task\n", encoding="utf-8")
+    config = _write_config(
+        tmp_path,
+        """
+_schema: eutaxis:configuration@1
+task_modules:
+  - id: task
+    title: Task
+    path: instructions/task.md
+    trigger: when working
+    description: Task rules.
+    rule_index_source: indexes/missing.md
+agents: []
+""",
+    )
+
+    report = scan_instructions(load_config(config))
+
+    assert [path.name for path in report.registered_missing] == ["missing.md"]
+    assert report.has_issues

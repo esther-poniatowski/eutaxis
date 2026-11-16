@@ -205,6 +205,12 @@ class InstructionGenerator:
                 for source in self.config.common_sources
                 if isinstance(source, DeclarationSource)
             )
+        if standalone_index_selected:
+            sources.extend(
+                module.rule_index_source
+                for module in self.config.task_modules
+                if isinstance(module.rule_index_source, DeclarationSource)
+            )
         sources.extend(
             source
             for agent in selected_agents
@@ -322,9 +328,7 @@ class InstructionGenerator:
             output_path = self.config.resolve(agent.target.path)
             expected = self.generate_for_agent(agent)
             existing = (
-                output_path.read_text(encoding="utf-8")
-                if output_path.is_file()
-                else ""
+                output_path.read_text(encoding="utf-8") if output_path.is_file() else ""
             )
             yield agent, output_path, existing != expected
 
@@ -404,9 +408,7 @@ class InstructionGenerator:
         return "\n".join(lines)
 
     def _render_task_module_bullet(self, module: TaskModule) -> str:
-        bullet = (
-            f"- **{module.title}.** Load `{module.path}` {module.trigger.strip()}."
-        )
+        bullet = f"- **{module.title}.** Load `{module.path}` {module.trigger.strip()}."
         description = (module.description or "").strip()
         if description:
             bullet = f"{bullet} {description}"
@@ -456,7 +458,9 @@ class InstructionGenerator:
             return None
 
         target_path = self.config.resolve(target.path)
-        entries = self._scan_rule_index_entries(target_path.parent)
+        entries = self._scan_rule_index_entries(
+            target_path.parent, use_task_overrides=True
+        )
         if not entries:
             return None
 
@@ -478,10 +482,16 @@ class InstructionGenerator:
                 continue
             _labels, records = self._declaration_rule_index_members(source)
             identifiers.extend(records)
+        for module in self.config.task_modules:
+            task_source = module.rule_index_source
+            if not isinstance(task_source, DeclarationSource):
+                continue
+            _labels, records = self._declaration_rule_index_members(task_source)
+            identifiers.extend(records)
         return tuple(dict.fromkeys(identifiers))
 
     def _scan_rule_index_entries(
-        self, target_dir: Path
+        self, target_dir: Path, *, use_task_overrides: bool = False
     ) -> list[tuple[str, list[str]]]:
         entries: list[tuple[str, list[str]]] = []
         for source in self.config.common_sources:
@@ -494,17 +504,24 @@ class InstructionGenerator:
                 labels = self._scan_labels(path)
                 if labels:
                     entries.append((path.stem, labels))
-        scan_paths: list[Path] = []
         for module in self.config.task_modules:
-            if module.path.is_absolute():
-                scan_paths.append(module.path)
+            task_source = module.rule_index_source if use_task_overrides else None
+            if isinstance(task_source, DeclarationSource):
+                labels, _records = self._declaration_rule_index_members(task_source)
+                entry_name = module.id
+            elif isinstance(task_source, SourceFile):
+                labels = self._scan_labels(self.config.resolve(task_source.path))
+                entry_name = module.id
             else:
-                scan_paths.append((target_dir / module.path).resolve())
-
-        for path in scan_paths:
-            labels = self._scan_labels(path)
+                path = (
+                    module.path
+                    if module.path.is_absolute()
+                    else (target_dir / module.path).resolve()
+                )
+                labels = self._scan_labels(path)
+                entry_name = path.stem
             if labels:
-                entries.append((path.stem, labels))
+                entries.append((entry_name, labels))
         return entries
 
     def _declaration_rule_index_members(
@@ -521,9 +538,7 @@ class InstructionGenerator:
         )
         return labels, records
 
-    def _render_rule_index_section(
-        self, entries: list[tuple[str, list[str]]]
-    ) -> str:
+    def _render_rule_index_section(self, entries: list[tuple[str, list[str]]]) -> str:
         lines = [f"## {self.config.rule_index_heading}"]
         intro = self.config.rule_index_intro.strip()
         if intro:

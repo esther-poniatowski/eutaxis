@@ -44,6 +44,7 @@ class TaskModule:
     path: Path
     trigger: str
     description: str | None = None
+    rule_index_source: SourceFile | DeclarationSource | None = None
 
 
 @dataclass(frozen=True)

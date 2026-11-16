@@ -55,7 +55,9 @@ def test_explicit_root_supports_global_instruction_outputs(tmp_path: Path) -> No
     codex_home = tmp_path / ".codex"
     project.mkdir()
     codex_home.mkdir()
-    (project / "shared.md").write_text("# Shared\n\nRead current files.\n", encoding="utf-8")
+    (project / "shared.md").write_text(
+        "# Shared\n\nRead current files.\n", encoding="utf-8"
+    )
 
     config = tmp_path / "global-instructions.yml"
     config.write_text(
@@ -366,13 +368,10 @@ agents:
     assert "## Reference docs\n" in output
     assert "Consult these authoritative docs." in output
     assert (
-        "- **Vitruv.** Consult for architecture and design tasks. "
-        "Design principles."
+        "- **Vitruv.** Consult for architecture and design tasks. " "Design principles."
     ) in output
     assert "  - Local (primary): `~/work/projects/vitruv`" in output
-    assert (
-        "  - GitHub (fallback): <https://github.com/example/vitruv>"
-    ) in output
+    assert ("  - GitHub (fallback): <https://github.com/example/vitruv>") in output
     assert "- **Hermeneia.** Consult for prose writing." in output
 
 
@@ -623,10 +622,7 @@ def test_task_module_description_falls_back_to_frontmatter(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "prog.md").write_text(
-        "---\n"
-        "description: How to write source code.\n"
-        "---\n\n"
-        "# Programming\n",
+        "---\n" "description: How to write source code.\n" "---\n\n" "# Programming\n",
         encoding="utf-8",
     )
     config = tmp_path / "eutaxis.yml"
@@ -653,10 +649,7 @@ agents:
 
 def test_config_description_overrides_frontmatter(tmp_path: Path) -> None:
     (tmp_path / "prog.md").write_text(
-        "---\n"
-        "description: Frontmatter wording.\n"
-        "---\n\n"
-        "# Programming\n",
+        "---\n" "description: Frontmatter wording.\n" "---\n\n" "# Programming\n",
         encoding="utf-8",
     )
     config = tmp_path / "eutaxis.yml"
@@ -732,7 +725,9 @@ def _rejected_label_workspace(tmp_path: Path, *, strict: bool | None) -> Path:
         "```\n**Fenced**:\n```\n",
         encoding="utf-8",
     )
-    strict_line = "" if strict is None else f"strict_rule_labels: {str(strict).lower()}\n"
+    strict_line = (
+        "" if strict is None else f"strict_rule_labels: {str(strict).lower()}\n"
+    )
     config = tmp_path / "eutaxis.yml"
     config.write_text(
         "_schema: eutaxis:configuration@1\n"
@@ -858,13 +853,13 @@ def test_plan_and_check_report_resolved_records_and_completion(
     assert plan.exit_code == 0, plan.output
     assert (
         "[SELECT   ] purpose <= resolution/manifest [cumulative, project, "
-        "AGENTS.md, sha256:"
-        in plan.output
+        "AGENTS.md, sha256:" in plan.output
     )
     assert "  - resolution/purpose" in plan.output
-    assert "**purpose**:" in InstructionGenerator(load_config(config)).generate_all()[
-        "codex"
-    ]
+    assert (
+        "**purpose**:"
+        in InstructionGenerator(load_config(config)).generate_all()["codex"]
+    )
     assert plan.output.rstrip().endswith("[COMMAND  ] complete")
     assert not (tmp_path / "AGENTS.md").exists()
 
@@ -980,12 +975,37 @@ def test_declaration_source_rejects_malformed_fields(
     config.write_text(
         "_schema: eutaxis:configuration@2\n"
         "common_sources:\n"
-        "  - declaration:\n"
-        + fields,
+        "  - declaration:\n" + fields,
         encoding="utf-8",
     )
 
     with pytest.raises(ConfigurationError, match=message):
+        load_config(config)
+
+
+def test_task_rule_index_declaration_must_match_module_id(tmp_path: Path) -> None:
+    source = tmp_path / "task.md"
+    source.write_text("# Task\n", encoding="utf-8")
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "task_modules:\n"
+        "  - id: testing\n"
+        "    title: Testing\n"
+        "    path: task.md\n"
+        "    trigger: when testing\n"
+        "    description: Testing rules.\n"
+        "    rule_index_source:\n"
+        "      declaration:\n"
+        "        module: another-module\n"
+        "        acquisition_manifest: declarations/acquisition.yaml\n"
+        "        acquisition_lock: declarations/acquisition.lock.json\n"
+        "        composition_manifest: example/testing\n"
+        "        context: {}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="must use the task module id"):
         load_config(config)
 
 
@@ -1078,12 +1098,94 @@ def test_report_includes_common_source_used_by_standalone_rule_index(
     assert generator.standalone_rule_index_declarations() == ("resolution/purpose",)
 
 
+def test_task_rule_index_uses_its_structured_source(tmp_path: Path) -> None:
+    manifest_path, lock_path = _write_contract(
+        tmp_path,
+        namespace="resolution",
+        declaration_files=(
+            ("declarations/rule.yaml", RULE),
+            ("declarations/manifest.yaml", MANIFEST),
+        ),
+    )
+    (tmp_path / "legacy.md").write_text(
+        "# Legacy\n\n**legacy-only**:\n\nDo not index this label.\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "task_modules:\n"
+        "  - id: purpose\n"
+        "    title: Purpose\n"
+        "    path: legacy.md\n"
+        "    trigger: when defining purpose\n"
+        "    description: Purpose rules.\n"
+        "    rule_index_source:\n"
+        "      declaration:\n"
+        "        module: purpose\n"
+        f"        acquisition_manifest: {manifest_path}\n"
+        f"        acquisition_lock: {lock_path}\n"
+        "        composition_manifest: resolution/manifest\n"
+        "        context:\n"
+        "          context.available: true\n"
+        "          resolution.enabled: true\n"
+        "rule_index_enabled: true\n"
+        "rule_index_target:\n"
+        "  path: rule-index.md\n"
+        "agents: []\n",
+        encoding="utf-8",
+    )
+
+    generator = InstructionGenerator(load_config(config))
+    rendered = generator.render_standalone_rule_index()
+
+    assert rendered is not None
+    assert "- **purpose**: purpose" in rendered[1]
+    assert "legacy-only" not in rendered[1]
+    assert generator.standalone_rule_index_declarations() == ("resolution/purpose",)
+    reports = generator.declaration_resolution_report()
+    assert len(reports) == 1
+    assert reports[0][1].selection.records == ("resolution/purpose",)
+
+
+def test_task_rule_index_override_does_not_enter_inline_output(tmp_path: Path) -> None:
+    (tmp_path / "legacy.md").write_text(
+        "# Legacy\n\n**legacy-only**:\n\nKeep this inline label.\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "task_modules:\n"
+        "  - id: purpose\n"
+        "    title: Purpose\n"
+        "    path: legacy.md\n"
+        "    trigger: when defining purpose\n"
+        "    description: Purpose rules.\n"
+        "    rule_index_source:\n"
+        "      declaration:\n"
+        "        module: purpose\n"
+        "        acquisition_manifest: absent/acquisition.yaml\n"
+        "        acquisition_lock: absent/acquisition.lock.json\n"
+        "        composition_manifest: absent/purpose\n"
+        "        context: {}\n"
+        "rule_index_enabled: true\n"
+        "agents:\n"
+        "  - name: codex\n"
+        "    target: AGENTS.md\n",
+        encoding="utf-8",
+    )
+
+    output = InstructionGenerator(load_config(config)).generate_all()["codex"]
+
+    assert "- **legacy**: legacy-only" in output
+    assert "absent/purpose" not in output
+
+
 def test_standalone_index_excludes_agent_only_structured_records(
     tmp_path: Path,
 ) -> None:
-    private_rule = RULE.replace(
-        b"id: resolution/purpose", b"id: resolution/private"
-    )
+    private_rule = RULE.replace(b"id: resolution/purpose", b"id: resolution/private")
     private_manifest = MANIFEST.replace(
         b"id: resolution/manifest", b"id: resolution/private-manifest"
     ).replace(
