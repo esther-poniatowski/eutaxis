@@ -1,0 +1,12 @@
+{
+  "_schema": "eutaxis:skill-ownership@1",
+  "adapter": "codex",
+  "content_hash": "497a2987ff532388",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "sha256": "3bcbdef5ca0d0db5582d6f400bfba8a189c56b40bcb90f636a13b5bff6399bc0"
+    }
+  ],
+  "name": "testing"
+}

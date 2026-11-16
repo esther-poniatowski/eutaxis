@@ -163,6 +163,17 @@ Load instruction configuration from disk.
 
 Instruction-file generation and stale-output checks.
 
+<a id="eutaxis.instructions.generator.declaration_source_identity"></a>
+
+### eutaxis.instructions.generator.declaration_source_identity(source)
+
+Return an opaque semantic identity for comparison and deduplication.
+
+* **Parameters:**
+  **source** ([*DeclarationSource*](#eutaxis.instructions.models.DeclarationSource))
+* **Return type:**
+  tuple[object, …]
+
 <a id="eutaxis.instructions.generator.InstructionGenerator"></a>
 
 ### *class* eutaxis.instructions.generator.InstructionGenerator(config, assembler=None, \*, declaration_source_resolver=None)

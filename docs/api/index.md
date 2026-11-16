@@ -19,6 +19,7 @@
   * [External cumulative composition](declarations.md#module-eutaxis.declarations.external_composition)
   * [Artifact-facade source](declarations.md#artifact-facade-source)
   * [Structured procedure Skill planning](declarations.md#structured-procedure-skill-planning)
+  * [Structured rule skill planning](declarations.md#structured-rule-skill-planning)
   * [Declaration catalog](declarations.md#module-eutaxis.declarations.catalog)
   * [Persisted catalog](declarations.md#module-eutaxis.declarations.persisted_catalog)
   * [Catalog schema](declarations.md#module-eutaxis.declarations.catalog_schema)

@@ -453,6 +453,7 @@ from .structured_rule_skill import (
     StructuredRuleSkillPlan,
     plan_structured_rule_skill,
 )
+from .structured_rule_skill_rendering import render_structured_rule_skill
 from .structured_skill_rendering import (
     CONTRACT_FILENAME,
     render_structured_skill,
@@ -777,6 +778,7 @@ __all__ = [
     "VersionedReference",
     "assemble_cumulative_artifact",
     "plan_structured_rule_skill",
+    "render_structured_rule_skill",
     "build_declaration_catalog",
     "conjoin_applicability",
     "build_checker_runner_registry",

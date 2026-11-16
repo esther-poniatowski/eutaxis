@@ -1777,7 +1777,7 @@ Raised when an install/uninstall target is not eutaxis-owned.
 
 ### *exception* eutaxis.commands.exceptions.FailureModeError
 
-Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError)
+Bases: [`CommandError`](#eutaxis.commands.exceptions.CommandError), `SkillPlacementError`
 
 Raised when a source’s failure-mode classification forbids the target regime.
 

@@ -282,6 +282,36 @@ def _render_rule_set(
     return "\n\n".join(blocks)
 
 
+def _render_rule_skill_body(
+    catalog: _CatalogRead,
+    rule_set: RuleSetDeclaration,
+    rules: tuple[RuleDeclaration, ...],
+    projections: tuple[ResolvedRuleProjection, ...],
+) -> str:
+    """Render one complete rule-set Skill body through the agent profile."""
+    if len(rules) != len(projections):
+        raise CompositionError("$.projections", "rule and projection counts differ")
+    blocks = [_render_rule_set(catalog, rule_set.id)]
+    labels: dict[str, str] = {}
+    for index, (rule, projection) in enumerate(zip(rules, projections, strict=True)):
+        if projection.declaration != rule.id:
+            raise CompositionError(
+                f"$.projections[{index}]",
+                "rule projection belongs to another declaration",
+            )
+        label = _projection_label(rule.id, CumulativeMarkdownProfile.AGENT_INSTRUCTIONS)
+        _claim_projected_label(labels, label, rule.id)
+        blocks.append(
+            _render_rule(
+                rule,
+                projection,
+                profile=CumulativeMarkdownProfile.AGENT_INSTRUCTIONS,
+                label=label,
+            )
+        )
+    return "\n\n".join(blocks).rstrip() + "\n"
+
+
 def _render_norm(norm: Norm, profile: CumulativeMarkdownProfile) -> str:
     """Render one BCP 14 norm as one labelled instruction line."""
     marker, _keyword = _MODALITY[norm.modality]

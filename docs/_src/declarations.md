@@ -82,6 +82,20 @@ The facade source binds the authenticated source revisions, certified component 
    :show-inheritance:
 ```
 
+## Structured rule skill planning
+
+The rule planner authenticates one rule set, and the renderer emits its bounded Skill.
+
+```{eval-rst}
+.. automodule:: eutaxis.declarations.structured_rule_skill
+   :members: StructuredRuleSkillPlan, plan_structured_rule_skill
+   :show-inheritance:
+
+.. automodule:: eutaxis.declarations.structured_rule_skill_rendering
+   :members: render_structured_rule_skill
+   :show-inheritance:
+```
+
 ## Declaration catalog
 
 ```{eval-rst}
