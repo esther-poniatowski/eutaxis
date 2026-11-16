@@ -7,12 +7,18 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Callable, Iterable, Mapping, NoReturn, TypeAlias, TypeGuard, cast
 
+from ..skill_placement import (
+    SkillPlacementCandidate,
+    SkillPlacementError,
+    validate_skill_placement,
+)
 from .embedded_schema import normalize_json_subschema, validate_json_subschema
 from .exceptions import DeclarationRegistryError
 from .facets import FacetRegistryView
 from .loader import LoadedDeclarationSource, load_declaration_source
 from .models import (
     AnyDeclaration,
+    CompositionMechanism,
     CompositionManifestDeclaration,
     DecisionDeclaration,
     DeclarationKind,
@@ -619,6 +625,7 @@ class _RegistryBuilder:
             if not isinstance(manifest, CompositionManifestDeclaration):
                 continue
             selected: set[str] = set()
+            selected_records: list[RegisteredDeclaration] = []
             for section_index, section in enumerate(manifest.sections):
                 for item_index, identifier in enumerate(section.declarations):
                     selection_path = (
@@ -634,11 +641,18 @@ class _RegistryBuilder:
                             f"duplicate manifest selection {identifier!r}",
                         )
                     selected.add(identifier)
-                    self._manifest_selectable(
-                        record,
-                        identifier,
-                        selection_path,
+                    selected_records.append(
+                        self._manifest_selectable(
+                            record,
+                            identifier,
+                            selection_path,
+                        )
                     )
+            self._validate_rule_skill_placements(
+                record,
+                manifest,
+                selected_records,
+            )
             seen_orders: set[tuple[ConflictPair, int]] = set()
             for index, identifier in enumerate(manifest.policies):
                 path = ("policies", index)
@@ -667,6 +681,40 @@ class _RegistryBuilder:
                         f"duplicate policy order {policy.order} for conflict {key[0]!r}",
                     )
                 seen_orders.add(key)
+
+    def _validate_rule_skill_placements(
+        self,
+        manifest_record: RegisteredDeclaration,
+        manifest: CompositionManifestDeclaration,
+        selected_records: Iterable[RegisteredDeclaration],
+    ) -> None:
+        """Apply the neutral placement matrix to selected rule-set Skills."""
+        if manifest.mechanism is not CompositionMechanism.SEPARATE_DIRECTORY:
+            return
+        for selected_record in selected_records:
+            rule_set = selected_record.declaration
+            if not isinstance(rule_set, RuleSetDeclaration):
+                continue
+            candidates: list[SkillPlacementCandidate] = []
+            for rule in rule_set.rules:
+                member_record = self.records.get(rule.id)
+                if (
+                    member_record is None
+                    or member_record.containing_rule_set != rule_set.id
+                ):
+                    raise AssertionError("indexed rule-set member is unavailable")
+                candidates.append(
+                    SkillPlacementCandidate(
+                        identifier=rule.id,
+                        source=str(member_record.source.path),
+                        failure_mode=rule.failure_mode,
+                        required_visibility=rule.required_visibility,
+                    )
+                )
+            try:
+                validate_skill_placement(candidates, manifest.invocation)
+            except SkillPlacementError as error:
+                self._raise(manifest_record, ("invocation",), str(error))
 
     def _manifest_selectable(
         self,

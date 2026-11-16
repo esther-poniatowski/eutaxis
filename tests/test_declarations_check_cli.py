@@ -90,6 +90,104 @@ def _write_workspace(root: Path) -> str:
     return manifest
 
 
+def _add_rule_skill(
+    root: Path,
+    *,
+    failure_mode: str,
+    required_visibility: str | None,
+    invocation: list[str],
+) -> None:
+    """Add one rule-set Skill candidate to the checked corpus."""
+    rule: dict[str, object] = {
+        "_schema": "eutaxis:declaration@1",
+        "id": "geonexus/skill-rule",
+        "kind": "rule",
+        "owner": "geonexus",
+        "status": "active",
+        "source-revision": "fixture-1",
+        "applicability": {
+            "facet": "geonexus.repository",
+            "operator": "equals",
+            "value": True,
+        },
+        "relations": [],
+        "axis": "reasoning-target",
+        "failure-mode": failure_mode,
+        "norms": [
+            {
+                "id": "preserve-skill",
+                "modality": "must",
+                "subject": "agent",
+                "action": {"verb": "preserve", "object": "the Skill boundary"},
+            }
+        ],
+        "criteria": [
+            {
+                "id": "skill-is-preserved",
+                "norms": ["preserve-skill"],
+                "evaluator": {"id": "eutaxis/manual-judgment", "version": 1},
+                "statement": "The Skill boundary remains intact",
+            }
+        ],
+    }
+    if required_visibility is not None:
+        rule["required-visibility"] = required_visibility
+    rule_set = {
+        "_schema": "eutaxis:declaration@1",
+        "id": "geonexus/skill-rules",
+        "kind": "rule-set",
+        "owner": "geonexus",
+        "status": "active",
+        "source-revision": "fixture-1",
+        "applicability": {
+            "facet": "geonexus.repository",
+            "operator": "equals",
+            "value": True,
+        },
+        "relations": [],
+        "purpose": "Preserve the tested Skill boundary",
+        "rules": [rule],
+    }
+    composition = {
+        "_schema": "eutaxis:declaration@1",
+        "id": "geonexus/skill-manifest",
+        "kind": "composition-manifest",
+        "owner": "geonexus",
+        "status": "active",
+        "source-revision": "fixture-1",
+        "applicability": {
+            "facet": "geonexus.repository",
+            "operator": "equals",
+            "value": True,
+        },
+        "relations": [],
+        "mechanism": "separate-directory",
+        "scope": "project",
+        "target": "testing",
+        "invocation": invocation,
+        "sections": [{"id": "rules", "declarations": ["geonexus/skill-rules"]}],
+        "policies": [],
+    }
+    declarations = root / "declarations"
+    (declarations / "skill-rules.yaml").write_text(
+        yaml.safe_dump(rule_set, sort_keys=False),
+        encoding="utf-8",
+    )
+    (declarations / "skill-manifest.yaml").write_text(
+        yaml.safe_dump(composition, sort_keys=False),
+        encoding="utf-8",
+    )
+    acquisition_path = declarations / "acquisition.yaml"
+    acquisition = yaml.safe_load(acquisition_path.read_text(encoding="utf-8"))
+    acquisition["sources"][0]["files"].extend(
+        ["declarations/skill-rules.yaml", "declarations/skill-manifest.yaml"]
+    )
+    acquisition_path.write_text(
+        yaml.safe_dump(acquisition, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
 def _invoke(root: Path, manifest: str):
     """Run the public corpus checker against one workspace manifest."""
     return CliRunner().invoke(
@@ -124,6 +222,64 @@ def test_check_accepts_consumer_facets_and_emits_clean_sarif(tmp_path: Path) -> 
     run = report["runs"][0]  # type: ignore[index]
     assert run["results"] == []
     assert run["invocations"] == [{"executionSuccessful": True}]
+
+
+@pytest.mark.parametrize(
+    ("failure_mode", "required_visibility", "invocation"),
+    [
+        ("visible", None, ["model", "user"]),
+        ("silent", "pre-action", ["user"]),
+    ],
+)
+def test_check_accepts_permitted_rule_skill_placement(
+    tmp_path: Path,
+    failure_mode: str,
+    required_visibility: str | None,
+    invocation: list[str],
+) -> None:
+    manifest = _write_workspace(tmp_path)
+    _add_rule_skill(
+        tmp_path,
+        failure_mode=failure_mode,
+        required_visibility=required_visibility,
+        invocation=invocation,
+    )
+
+    result = _invoke(tmp_path, manifest)
+
+    assert result.exit_code == 0
+    assert _sarif(result)["runs"][0]["results"] == []  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    ("required_visibility", "invocation", "message"),
+    [
+        ("pre-invocation", ["user"], "pre-invocation"),
+        ("pre-action", ["model", "user"], "model invocation"),
+    ],
+)
+def test_check_rejects_forbidden_rule_skill_placement(
+    tmp_path: Path,
+    required_visibility: str,
+    invocation: list[str],
+    message: str,
+) -> None:
+    manifest = _write_workspace(tmp_path)
+    _add_rule_skill(
+        tmp_path,
+        failure_mode="silent",
+        required_visibility=required_visibility,
+        invocation=invocation,
+    )
+
+    result = _invoke(tmp_path, manifest)
+
+    assert result.exit_code == 1
+    finding = _sarif(result)["runs"][0]["results"][0]  # type: ignore[index]
+    assert finding["ruleId"] == "eutaxis.declarations.registry"
+    assert finding["locations"][0]["logicalLocations"] == [{"name": "$.invocation"}]
+    assert "geonexus/skill-rule" in finding["message"]["text"]
+    assert message in finding["message"]["text"]
 
 
 def test_check_reports_a_located_declaration_schema_finding(tmp_path: Path) -> None:

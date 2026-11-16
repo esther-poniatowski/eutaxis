@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import eutaxis.declarations.registry as registry_module
 import eutaxis.declarations.structured_rule_skill as rule_skill_module
 from eutaxis.declarations import (
     AcquisitionContractError,
@@ -182,7 +183,9 @@ def test_plan_rejects_dependency_reordering(tmp_path: Path) -> None:
         plan_structured_rule_skill(resolution)
 
 
-def test_plan_rejects_forbidden_member_placement(tmp_path: Path) -> None:
+def test_plan_rejects_forbidden_member_placement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     rules = [
         _rule("oikos/visible"),
         _rule(
@@ -191,12 +194,23 @@ def test_plan_rejects_forbidden_member_placement(tmp_path: Path) -> None:
             required_visibility="pre-action",
         ),
     ]
-    _acquisition, resolution = _rule_pipeline(tmp_path, rule_set=_rule_set(rules=rules))
+    with monkeypatch.context() as bypass:
+        bypass.setattr(
+            registry_module,
+            "validate_skill_placement",
+            lambda _candidates, _invocation: None,
+        )
+        _acquisition, resolution = _rule_pipeline(
+            tmp_path,
+            rule_set=_rule_set(rules=rules),
+        )
     with pytest.raises(SkillPlacementError, match="oikos/silent"):
         plan_structured_rule_skill(resolution)
 
 
-def test_plan_rejects_pre_invocation_even_for_user_only(tmp_path: Path) -> None:
+def test_plan_rejects_pre_invocation_even_for_user_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     manifest = _manifest(target="testing", selected=["oikos/testing"])
     manifest["invocation"] = ["user"]
     rules = [
@@ -206,11 +220,17 @@ def test_plan_rejects_pre_invocation_even_for_user_only(tmp_path: Path) -> None:
             required_visibility="pre-invocation",
         )
     ]
-    _acquisition, resolution = _rule_pipeline(
-        tmp_path,
-        rule_set=_rule_set(rules=rules),
-        manifest=manifest,
-    )
+    with monkeypatch.context() as bypass:
+        bypass.setattr(
+            registry_module,
+            "validate_skill_placement",
+            lambda _candidates, _invocation: None,
+        )
+        _acquisition, resolution = _rule_pipeline(
+            tmp_path,
+            rule_set=_rule_set(rules=rules),
+            manifest=manifest,
+        )
     with pytest.raises(SkillPlacementError, match="pre-invocation"):
         plan_structured_rule_skill(resolution)
 
