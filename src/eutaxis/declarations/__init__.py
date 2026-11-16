@@ -449,6 +449,10 @@ from .structured_skill import (
     StructuredSkillPlan,
     plan_structured_skill,
 )
+from .structured_rule_skill import (
+    StructuredRuleSkillPlan,
+    plan_structured_rule_skill,
+)
 from .structured_skill_rendering import (
     CONTRACT_FILENAME,
     render_structured_skill,
@@ -758,6 +762,7 @@ __all__ = [
     "SupportResourceReference",
     "PlannedSupportResource",
     "StructuredSkillPlan",
+    "StructuredRuleSkillPlan",
     "CONTRACT_FILENAME",
     "SemanticChangeKind",
     "SemanticComparison",
@@ -771,6 +776,7 @@ __all__ = [
     "TruthValue",
     "VersionedReference",
     "assemble_cumulative_artifact",
+    "plan_structured_rule_skill",
     "build_declaration_catalog",
     "conjoin_applicability",
     "build_checker_runner_registry",

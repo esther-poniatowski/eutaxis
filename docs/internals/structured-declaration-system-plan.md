@@ -306,21 +306,21 @@ This phase gives each host the smallest artifact that preserves the complete res
   - [x] Publish all rendered host artifacts through one failure-atomic transaction that rejects aliased or nested targets and rolls back registry and finalized state changes.
   - [x] Activate the Oikos batch procedure after cross-agent golden, rollback and adversarial gates pass.
 - [ ] Generalize structured Skills from the first procedure consumer to the Oikos `testing` rule set:
-  - [ ] Issue a distinct authenticated rule plan while preserving the procedure plan and sharing only the helpers that authenticate and publish artifacts.
-  - [ ] Set `description` to the exact root rule-set purpose.
-  - [ ] Reject `description` unless it is non-empty trimmed text on one line of at most 1024 characters.
-  - [ ] Require the effective components to equal the root members and the resolved dependency order to equal their authored order.
+  - [x] Issue a distinct authenticated rule plan while preserving the procedure plan and sharing only the helpers that authenticate and publish artifacts.
+  - [x] Set `description` to the exact root rule-set purpose.
+  - [x] Reject `description` unless it is non-empty trimmed text on one line of at most 1024 characters.
+  - [x] Require the effective components to equal the root members and the resolved dependency order to equal their authored order.
   - [ ] Enforce the accepted [failure-mode and visibility matrix](../adr/failure-mode-as-source-field.md) with one neutral validator when legacy commands render, structured planners issue a plan and the shared check facade runs.
   - [ ] Render the rule-set frame and projected norms directly into `SKILL.md` through the existing projection path.
   - [ ] Render each norm's `guidance` and `rationale` fields in the same body.
   - [ ] Render `decision-criterion` and closed `exceptions` while keeping evaluator criteria queryable.
   - [ ] Set `contract_file` to null and `resources` to empty for every rule-set plan.
   - [ ] Approve golden artifacts for both hosts.
-  - [ ] Plant failures for a wrong or multiple root and an invalid purpose.
-  - [ ] Plant failures for incomplete or extra effective members and dependency-induced reordering.
-  - [ ] Plant every rejected placement-matrix case, including a mixed rule set with one forbidden member.
-  - [ ] Reject stale manifest, resolution and catalog state.
-  - [ ] Reject a plan when a retained member or rule projection changes.
+  - [x] Plant failures for a wrong or multiple root and an invalid purpose.
+  - [x] Plant failures for incomplete or extra effective members and dependency-induced reordering.
+  - [x] Plant every rejected placement-matrix case, including a mixed rule set with one forbidden member.
+  - [x] Reject stale manifest, resolution and catalog state.
+  - [x] Reject a plan when a retained member or rule projection changes.
   - [ ] Plant failures for the entrypoint and complete-artifact budgets.
   - [ ] Prove that the shared check facade rejects each rule forbidden by the matrix before any artifact is generated.
   - [ ] Prove that a failed Skill write restores every changed file and registry entry to its pre-write value.

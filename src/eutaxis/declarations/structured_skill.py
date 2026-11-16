@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import NamedTuple, NoReturn, SupportsIndex, cast
 
-from ..names import is_portable_skill_name
 from ._authority import IdentityAuthorityStore, identity_value_state
 from .byte_carriers import VerifiedByteCarrier
 from .catalog import (
@@ -27,7 +26,6 @@ from .external_result import (
     _register_provisional_authority,
 )
 from .models import (
-    CompositionMechanism,
     CompositionManifestDeclaration,
     DeclarationKind,
     OperationDeclaration,
@@ -35,7 +33,14 @@ from .models import (
     VersionedReference,
 )
 from .registry import RegisteredDeclaration
-from .source import DocumentPath, format_document_path, nearest_location
+from ._structured_skill_common import (
+    is_one_line_description as _is_one_line_description,
+    raise_changed_catalog as _raise_changed_catalog,
+    record_error as _record_error,
+    require_manifest as _require_manifest,
+    require_same_inputs as _require_same_inputs,
+    require_same_resolution_owner as _require_same_resolution_owner,
+)
 
 _RESERVED_DESTINATIONS = frozenset(
     {
@@ -45,7 +50,6 @@ _RESERVED_DESTINATIONS = frozenset(
         "references/contract.md",
     }
 )
-_MAX_DESCRIPTION_CHARACTERS = 1024
 
 
 @dataclass(frozen=True)
@@ -214,22 +218,6 @@ def _plan_structured_skill_from_catalog(
     )
 
 
-def _raise_changed_catalog(
-    catalog: DeclarationCatalog,
-    expected: _CatalogAuthorityState,
-    error: BaseException,
-) -> None:
-    """Give temporary catalog corruption precedence over a planning failure."""
-    try:
-        current = _issued_catalog_state(catalog)
-    except BaseException as authority_error:
-        raise authority_error from error
-    if current is not expected:
-        raise CompositionError(
-            "$", "declaration catalog authority state changed"
-        ) from error
-
-
 def _validate_structured_skill_plan_success(
     result: StructuredSkillPlan,
     resolution: ExternalResolutionResult,
@@ -244,37 +232,6 @@ def _validate_structured_skill_plan_success(
         raise CompositionError(
             "$", "structured Skill plan belongs to another resolution"
         )
-
-
-def _require_same_resolution_owner(
-    resolution: ExternalResolutionResult,
-    expected: _ExternalResolutionState,
-) -> None:
-    """Require one resolution to retain its exact issued state."""
-    if _issued_external_resolution_state(resolution) is not expected:
-        raise CompositionError("$", "external resolution authority state changed")
-
-
-def _require_manifest(
-    record: RegisteredDeclaration,
-) -> CompositionManifestDeclaration:
-    declaration = record.declaration
-    if not isinstance(declaration, CompositionManifestDeclaration):
-        _record_error(record, (), "resolved root is not a composition manifest")
-    manifest = cast(CompositionManifestDeclaration, declaration)
-    if manifest.mechanism is not CompositionMechanism.SEPARATE_DIRECTORY:
-        _record_error(
-            record,
-            ("mechanism",),
-            f"manifest mechanism {manifest.mechanism.value!r} is not separate-directory",
-        )
-    if not is_portable_skill_name(manifest.target):
-        _record_error(
-            record,
-            ("target",),
-            "Skill name is not one portable segment of at most 64 UTF-8 bytes",
-        )
-    return manifest
 
 
 def _require_root_procedure(
@@ -319,16 +276,6 @@ def _require_root_procedure(
             "procedure purpose is not a one-line Skill description of at most 1024 characters",
         )
     return record
-
-
-def _is_one_line_description(value: str) -> bool:
-    """Return whether one description has content and no line boundary."""
-    return (
-        bool(value.strip())
-        and value == value.strip()
-        and value.splitlines(keepends=True) == [value]
-        and len(value) <= _MAX_DESCRIPTION_CHARACTERS
-    )
 
 
 def _resolve_operations(
@@ -591,37 +538,4 @@ def _plan_projection_state(
     return tuple(
         identity_value_state(value)
         for value in (manifest, procedure, operations, support_resources)
-    )
-
-
-def _require_same_inputs(
-    resolution: ExternalResolutionResult,
-    resolution_state: _ExternalResolutionState,
-    catalog: DeclarationCatalog,
-    catalog_state: _CatalogAuthorityState,
-) -> None:
-    if _issued_external_resolution_state(resolution) is not resolution_state:
-        raise CompositionError("$", "external resolution authority state changed")
-    if _issued_catalog_state(catalog) is not catalog_state:
-        raise CompositionError("$", "declaration catalog authority state changed")
-    if (
-        catalog_state.result is not resolution_state.acquisition
-        or catalog_state.result_state is not resolution_state.acquisition_state
-    ):
-        raise CompositionError("$", "catalog belongs to another acquisition")
-
-
-def _record_error(
-    record: RegisteredDeclaration,
-    parts: DocumentPath,
-    message: str,
-) -> NoReturn:
-    path = record.root + parts
-    source = nearest_location(record.source.locations, path)
-    raise CompositionError(
-        format_document_path(path),
-        message,
-        path=record.source.path,
-        line=source.line if source else None,
-        column=source.column if source else None,
     )
