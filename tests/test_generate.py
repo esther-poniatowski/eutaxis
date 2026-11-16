@@ -542,7 +542,7 @@ common_sources:
 task_modules:
   - id: programming
     title: Programming
-    path: ../prog.md
+    path: prog.md
     trigger: when coding
     description: ""
 rule_index_enabled: true
@@ -1146,6 +1146,38 @@ def test_task_rule_index_uses_its_structured_source(tmp_path: Path) -> None:
     reports = generator.declaration_resolution_report()
     assert len(reports) == 1
     assert reports[0][1].selection.records == ("resolution/purpose",)
+
+
+def test_standalone_index_resolves_task_paths_from_configuration_root(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "instructions/task.md"
+    source.parent.mkdir()
+    source.write_text(
+        "# Task\n\n**repository-relative**:\n\nIndex this rule.\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "eutaxis.yml"
+    config.write_text(
+        "_schema: eutaxis:configuration@2\n"
+        "task_modules:\n"
+        "  - id: task\n"
+        "    title: Task\n"
+        "    path: instructions/task.md\n"
+        "    trigger: when testing path resolution\n"
+        "    description: Task rules.\n"
+        "rule_index_enabled: true\n"
+        "rule_index_target:\n"
+        "  path: generated/rule-index.md\n"
+        "agents: []\n",
+        encoding="utf-8",
+    )
+
+    rendered = InstructionGenerator(load_config(config)).render_standalone_rule_index()
+
+    assert rendered is not None
+    assert rendered[0] == tmp_path / "generated/rule-index.md"
+    assert "- **task**: repository-relative" in rendered[1]
 
 
 def test_task_rule_index_override_does_not_enter_inline_output(tmp_path: Path) -> None:

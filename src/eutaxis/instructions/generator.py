@@ -514,9 +514,13 @@ class InstructionGenerator:
                 entry_name = module.id
             else:
                 path = (
-                    module.path
-                    if module.path.is_absolute()
-                    else (target_dir / module.path).resolve()
+                    self.config.resolve(module.path)
+                    if use_task_overrides
+                    else (
+                        module.path
+                        if module.path.is_absolute()
+                        else (target_dir / module.path).resolve()
+                    )
                 )
                 labels = self._scan_labels(path)
                 entry_name = path.stem
