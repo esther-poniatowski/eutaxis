@@ -71,6 +71,12 @@ def test_check_failure_mode_allows_visible_anywhere() -> None:
         check_failure_mode(src)  # no raise
 
 
+def test_check_failure_mode_wraps_invalid_classification() -> None:
+    src = _make_source(invocation=("user",), failure_mode="mixed")
+    with pytest.raises(FailureModeError, match="unknown failure mode"):
+        check_failure_mode(src)
+
+
 def test_render_command_refuses_silent_with_model_invocation(
     tmp_path: Path,
 ) -> None:
@@ -80,9 +86,7 @@ def test_render_command_refuses_silent_with_model_invocation(
         required_visibility="pre-action",
     )
     with pytest.raises(FailureModeError):
-        render_command(
-            src, get_adapter("claude"), project_root=tmp_path, home=tmp_path
-        )
+        render_command(src, get_adapter("claude"), project_root=tmp_path, home=tmp_path)
 
 
 def test_model_and_user_invocation_renders_without_disable_invocation(

@@ -41,6 +41,11 @@ from types import MappingProxyType
 
 import yaml
 
+from ..skill_placement import (
+    SkillPlacementCandidate,
+    SkillPlacementError,
+    validate_skill_placement,
+)
 from .adapters import AgentAdapter
 from .disclosure import DISCLOSURE_PROGRESSIVE, disclose
 from .exceptions import CommandRenderError, FailureModeError
@@ -80,23 +85,16 @@ def check_failure_mode(source: CommandSource) -> None:
     FailureModeError
         On a forbidden combination, with the source path in the message.
     """
-    if source.failure_mode != "silent":
-        return
-    if "model" in source.invocation:
-        raise FailureModeError(
-            f"Refusing to emit a skill that admits model invocation from a "
-            f"silent-failure source: {source.source_path}. Remove 'model' "
-            f"from `invocation`, move the rule to the always-on body, or "
-            f"re-author it as visible-failure. See ADR "
-            f"failure-mode-as-source-field."
+    try:
+        candidate = SkillPlacementCandidate(
+            identifier=source.name,
+            source=str(source.source_path),
+            failure_mode=source.failure_mode,
+            required_visibility=source.required_visibility,
         )
-    if source.required_visibility == "pre-invocation":
-        raise FailureModeError(
-            f"Refusing to emit any skill from a silent-failure source whose "
-            f"required-visibility is 'pre-invocation': {source.source_path}. "
-            f"The rule must route to the always-on body. See ADR "
-            f"failure-mode-as-source-field."
-        )
+        validate_skill_placement((candidate,), source.invocation)
+    except SkillPlacementError as error:
+        raise FailureModeError(str(error)) from error
 
 
 def render_command(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..skill_placement import SkillPlacementError
+
 
 class CommandError(Exception):
     """Base exception for the commands subsystem.
@@ -33,7 +35,7 @@ class OwnershipError(CommandError):
     exit_code = 2
 
 
-class FailureModeError(CommandError):
+class FailureModeError(CommandError, SkillPlacementError):
     """Raised when a source's failure-mode classification forbids the target regime.
 
     A ``failure-mode: silent`` source cannot ship as a ``model-invoked`` skill;
