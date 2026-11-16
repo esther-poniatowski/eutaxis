@@ -70,18 +70,35 @@ class IdentityAuthorityStore(Generic[_T]):
 
 def identity_value_state(value: object) -> object:
     """Capture immutable semantics and carrier identities without callables."""
+    return _identity_value_state(value, set())
+
+
+def _identity_value_state(value: object, expanded: set[int]) -> object:
+    """Capture one object graph while expanding each carrier at most once."""
     if isinstance(value, Enum):
         return (type(value), value.value)
     if value is None or type(value) in {str, int, float, bool}:
         return value
     if isinstance(value, Path):
         return (type(value), id(value), str(value))
+    if (
+        isinstance(value, Mapping)
+        or type(value) in {tuple, frozenset}
+        or is_dataclass(value)
+    ):
+        identity = id(value)
+        if identity in expanded:
+            return ("reference", type(value), identity)
+        expanded.add(identity)
     if isinstance(value, Mapping):
         return (
             type(value),
             id(value),
             tuple(
-                (identity_value_state(key), identity_value_state(item))
+                (
+                    _identity_value_state(key, expanded),
+                    _identity_value_state(item, expanded),
+                )
                 for key, item in value.items()
             ),
         )
@@ -89,20 +106,28 @@ def identity_value_state(value: object) -> object:
         return (
             tuple,
             id(value),
-            tuple(identity_value_state(item) for item in value),
+            tuple(_identity_value_state(item, expanded) for item in value),
         )
     if type(value) is frozenset:
         return (
             frozenset,
             id(value),
-            tuple(sorted((identity_value_state(item) for item in value), key=repr)),
+            tuple(
+                sorted(
+                    (_identity_value_state(item, expanded) for item in value),
+                    key=repr,
+                )
+            ),
         )
     if is_dataclass(value):
         return (
             type(value),
             id(value),
             tuple(
-                (field.name, identity_value_state(getattr(value, field.name)))
+                (
+                    field.name,
+                    _identity_value_state(getattr(value, field.name), expanded),
+                )
                 for field in fields(value)
             ),
         )

@@ -7,12 +7,50 @@ from dataclasses import dataclass
 from threading import Barrier, Thread
 from weakref import ref
 
-from eutaxis.declarations._authority import IdentityAuthorityStore
+from eutaxis.declarations._authority import (
+    IdentityAuthorityStore,
+    identity_value_state,
+)
 
 
 @dataclass(frozen=True)
 class _SemanticValue:
     payload: object
+
+
+class _ObservedMapping(dict[str, int]):
+    """Count semantic traversals without changing the mapped values."""
+
+    traversals = 0
+
+    def items(self):
+        type(self).traversals += 1
+        return super().items()
+
+
+def test_identity_value_state_expands_a_shared_carrier_once() -> None:
+    shared = _ObservedMapping(value=1)
+    value = _SemanticValue((shared, shared))
+    _ObservedMapping.traversals = 0
+
+    initial = identity_value_state(value)
+
+    assert _ObservedMapping.traversals == 1
+    shared["value"] = 2
+    assert identity_value_state(value) != initial
+
+
+def test_identity_value_state_terminates_on_a_cycle() -> None:
+    value: dict[str, object] = {}
+    value["self"] = value
+
+    state = identity_value_state(value)
+
+    assert state == (
+        dict,
+        id(value),
+        (("self", ("reference", dict, id(value))),),
+    )
 
 
 def test_identity_store_never_requires_value_hashing_or_equality() -> None:
