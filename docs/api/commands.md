@@ -19,7 +19,7 @@ Discover and parse command sources across discovery layers.
 Return the directory holding built-in command sources.
 
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.loader.user_dir"></a>
 
@@ -28,9 +28,9 @@ Return the directory holding built-in command sources.
 Return the user-level command source directory.
 
 * **Parameters:**
-  **home** (*Path* *|* *None*)
+  **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.loader.project_dir"></a>
 
@@ -39,9 +39,9 @@ Return the user-level command source directory.
 Return the project-level command source directory.
 
 * **Parameters:**
-  **project_root** (*Path*)
+  **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.loader.load_sources"></a>
 
@@ -53,10 +53,10 @@ Later layers override earlier ones by `name`. Discovery order is
 built-in, user, project.
 
 * **Parameters:**
-  * **project_root** (*Path* *|* *None*)
-  * **home** (*Path* *|* *None*)
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
-  list[[*CommandSource*](#eutaxis.commands.models.CommandSource)]
+  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*CommandSource*](#eutaxis.commands.models.CommandSource)]
 
 <a id="eutaxis.commands.loader.load_from_instruction_config"></a>
 
@@ -78,10 +78,10 @@ The discovery layer is recorded as `"config"` on each returned
 source.
 
 * **Parameters:**
-  * **config_path** (*Path*)
-  * **root** (*Path* *|* *None*)
+  * **config_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
-  list[[*CommandSource*](#eutaxis.commands.models.CommandSource)]
+  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*CommandSource*](#eutaxis.commands.models.CommandSource)]
 
 <a id="module-eutaxis.commands.registry"></a>
 
@@ -113,7 +113,7 @@ Raised when the on-disk registry cannot be decoded as JSON.
 
 ### *class* eutaxis.commands.registry.Registry(state_dir)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 State for installed commands.
 
@@ -133,7 +133,7 @@ half-written file.
 Return all install records currently on disk.
 
 * **Return type:**
-  list[[*InstallRecord*](#eutaxis.commands.models.InstallRecord)]
+  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*InstallRecord*](#eutaxis.commands.models.InstallRecord)]
 
 <a id="eutaxis.commands.registry.Registry.upsert"></a>
 
@@ -153,10 +153,10 @@ Insert or replace the record for the same deployment target.
 Drop the matching record and return it, if any.
 
 * **Parameters:**
-  * **name** (*str*)
-  * **adapter** (*str*)
-  * **scope** (*str*)
-  * **path** (*Path* *|* *None*)
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
   [*InstallRecord*](#eutaxis.commands.models.InstallRecord) | None
 
@@ -171,9 +171,9 @@ already holds `lock_path` continuously. Ordinary callers must
 use the default so registry reads and writes remain serialized.
 
 * **Parameters:**
-  **externally_locked** (*bool*)
+  **externally_locked** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
 * **Return type:**
-  *Iterator*[None]
+  [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[None]
 
 <a id="eutaxis.commands.registry.Registry.deployment_locked"></a>
 
@@ -182,7 +182,7 @@ use the default so registry reads and writes remain serialized.
 Serialize every filesystem and registry mutation of Skills.
 
 * **Return type:**
-  *Iterator*[None]
+  [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[None]
 
 <a id="eutaxis.commands.registry.Registry.mutation_locked"></a>
 
@@ -191,7 +191,7 @@ Serialize every filesystem and registry mutation of Skills.
 Hold the deployment and registry locks in canonical order.
 
 * **Return type:**
-  *Iterator*[None]
+  [*Iterator*](https://docs.python.org/3/library/typing.html#typing.Iterator)[None]
 
 <a id="eutaxis.commands.registry.Registry.find"></a>
 
@@ -200,10 +200,10 @@ Hold the deployment and registry locks in canonical order.
 Return the matching record, if any.
 
 * **Parameters:**
-  * **name** (*str*)
-  * **adapter** (*str*)
-  * **scope** (*str*)
-  * **path** (*Path* *|* *None*)
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
   [*InstallRecord*](#eutaxis.commands.models.InstallRecord) | None
 
@@ -214,7 +214,7 @@ Return the matching record, if any.
 Return the current UTC time as an ISO-8601 string.
 
 * **Return type:**
-  str
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 <a id="eutaxis.commands.registry.default_state_dir"></a>
 
@@ -223,9 +223,9 @@ Return the current UTC time as an ISO-8601 string.
 Return the default user-level state directory.
 
 * **Parameters:**
-  **home** (*Path* *|* *None*)
+  **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *|* *None*)
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="module-eutaxis.commands.rendering"></a>
 
@@ -298,8 +298,8 @@ Render a command source for one adapter as a multi-file artifact.
 * **Parameters:**
   * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
   * **adapter** (*AgentAdapter*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
   [*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact)
 
@@ -312,7 +312,7 @@ Assemble one adapter-neutral input into a host-native Skill artifact.
 * **Parameters:**
   * **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
   * **adapter** (*AgentAdapter*)
-  * **warnings** (*tuple* *[**str* *,*  *...* *]*)
+  * **warnings** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
 * **Return type:**
   [*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact)
 
@@ -378,23 +378,23 @@ Grammar of one index entry, read back by the rule query.
 
 ### *class* eutaxis.commands.disclosure.DisclosedBody(entrypoint_body, rule_files)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Result of splitting one skill body.
 
 * **Parameters:**
-  * **entrypoint_body** (*str*)
-  * **rule_files** (*tuple* *[*[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *,*  *...* *]*)
+  * **entrypoint_body** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **rule_files** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *,*  *...* *]*)
 
 <a id="eutaxis.commands.disclosure.DisclosedBody.entrypoint_body"></a>
 
-#### entrypoint_body *: str*
+#### entrypoint_body *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 Body of `SKILL.md`.
 
 <a id="eutaxis.commands.disclosure.DisclosedBody.rule_files"></a>
 
-#### rule_files *: tuple[[ArtifactFile](#eutaxis.commands.models.ArtifactFile), ...]*
+#### rule_files *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[ArtifactFile](#eutaxis.commands.models.ArtifactFile), ...]*
 
 One file per rule, at `rules/<label>.md`, in source order.
 
@@ -412,9 +412,9 @@ Return the artifact-relative path of the file of one rule.
 ```
 
 * **Parameters:**
-  **label** (*str*)
+  **label** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  str
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 <a id="eutaxis.commands.disclosure.index_entry"></a>
 
@@ -434,7 +434,7 @@ Return the index entry of one rule.
 * **Parameters:**
   **rule** ([*Rule*](instructions.md#eutaxis.instructions.rules.Rule))
 * **Return type:**
-  str
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 <a id="eutaxis.commands.disclosure.disclose"></a>
 
@@ -443,8 +443,8 @@ Return the index entry of one rule.
 Split a skill body into an index body and one file per rule.
 
 * **Parameters:**
-  * **body** (*str*) – Rendered Markdown body of the skill, without frontmatter.
-  * **module** (*str*) – Name of the skill, used in error messages.
+  * **body** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Rendered Markdown body of the skill, without frontmatter.
+  * **module** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Name of the skill, used in error messages.
 * **Returns:**
   Index body and rule files. A body without rules is returned as the
   index body unchanged, with no rule file.
@@ -509,44 +509,44 @@ File that a link to a sibling skill points to.
 
 ### *class* eutaxis.commands.links.Link(line_number, start, end, target, wrapped)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 One link destination found in a Markdown text.
 
 * **Parameters:**
-  * **line_number** (*int*)
-  * **start** (*int*)
-  * **end** (*int*)
-  * **target** (*str*)
-  * **wrapped** (*bool*)
+  * **line_number** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **start** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **end** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **target** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **wrapped** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
 
 <a id="eutaxis.commands.links.Link.line_number"></a>
 
-#### line_number *: int*
+#### line_number *: [int](https://docs.python.org/3/builtins/functions.html#int)*
 
 Line of the link, counted from 1.
 
 <a id="eutaxis.commands.links.Link.start"></a>
 
-#### start *: int*
+#### start *: [int](https://docs.python.org/3/builtins/functions.html#int)*
 
 Offset of the destination in its line, angle brackets included.
 
 <a id="eutaxis.commands.links.Link.end"></a>
 
-#### end *: int*
+#### end *: [int](https://docs.python.org/3/builtins/functions.html#int)*
 
 Offset just past the destination in its line.
 
 <a id="eutaxis.commands.links.Link.target"></a>
 
-#### target *: str*
+#### target *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 Destination as written, without angle brackets.
 
 <a id="eutaxis.commands.links.Link.wrapped"></a>
 
-#### wrapped *: bool*
+#### wrapped *: [bool](https://docs.python.org/3/builtins/functions.html#bool)*
 
 Whether the destination is written between angle brackets.
 
@@ -566,9 +566,9 @@ Lines inside fenced code and characters inside code spans are skipped.
 ```
 
 * **Parameters:**
-  **text** (*str*)
+  **text** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  *Iterator*[[*Link*](#eutaxis.commands.links.Link)]
+  [*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator)[[*Link*](#eutaxis.commands.links.Link)]
 
 <a id="eutaxis.commands.links.replace_links"></a>
 
@@ -589,10 +589,10 @@ written between angle brackets. Line endings are kept.
 ```
 
 * **Parameters:**
-  * **text** (*str*)
-  * **replace** (*Callable* *[* *[*[*Link*](#eutaxis.commands.links.Link) *]* *,* *str* *|* *None* *]*)
+  * **text** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **replace** ([*Callable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable) *[* *[*[*Link*](#eutaxis.commands.links.Link) *]* *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None* *]*)
 * **Return type:**
-  str
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 <a id="eutaxis.commands.links.is_relative_target"></a>
 
@@ -609,9 +609,9 @@ Return whether `target` names a path relative to its document.
 ```
 
 * **Parameters:**
-  **target** (*str*)
+  **target** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  bool
+  [bool](https://docs.python.org/3/builtins/functions.html#bool)
 
 <a id="eutaxis.commands.links.normalize_path"></a>
 
@@ -623,43 +623,43 @@ Symbolic links are not followed, so the result does not depend on the
 state of the file system.
 
 * **Parameters:**
-  **path** (*Path*)
+  **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.links.MissingLink"></a>
 
 ### *class* eutaxis.commands.links.MissingLink(source_path, line_number, target, resolved)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 A relative link of a source whose target does not exist.
 
 * **Parameters:**
-  * **source_path** (*Path*)
-  * **line_number** (*int*)
-  * **target** (*str*)
-  * **resolved** (*Path*)
+  * **source_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **line_number** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **target** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **resolved** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 
 <a id="eutaxis.commands.links.MissingLink.source_path"></a>
 
-#### source_path *: Path*
+#### source_path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
 
 <a id="eutaxis.commands.links.MissingLink.line_number"></a>
 
-#### line_number *: int*
+#### line_number *: [int](https://docs.python.org/3/builtins/functions.html#int)*
 
 <a id="eutaxis.commands.links.MissingLink.target"></a>
 
-#### target *: str*
+#### target *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.links.MissingLink.resolved"></a>
 
-#### resolved *: Path*
+#### resolved *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
 
 <a id="eutaxis.commands.links.MissingLink.message"></a>
 
-#### *property* message *: str*
+#### *property* message *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 Diagnostic with the location of the link in its source.
 
@@ -667,24 +667,24 @@ Diagnostic with the location of the link in its source.
 
 ### *class* eutaxis.commands.links.LinkResolver(source_dir, skills=<factory>, exists=<function Path.exists>)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Resolve the relative links of one source for its compiled skill.
 
 * **Parameters:**
-  * **source_dir** (*Path*)
-  * **skills** (*Mapping* *[**Path* *,* *str* *]*)
-  * **exists** (*Callable* *[* *[**Path* *]* *,* *bool* *]*)
+  * **source_dir** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **skills** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
+  * **exists** ([*Callable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable) *[* *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]* *,* [*bool*](https://docs.python.org/3/builtins/functions.html#bool) *]*)
 
 <a id="eutaxis.commands.links.LinkResolver.source_dir"></a>
 
-#### source_dir *: Path*
+#### source_dir *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
 
 Directory against which the relative links of the source resolve.
 
 <a id="eutaxis.commands.links.LinkResolver.skills"></a>
 
-#### skills *: Mapping[Path, str]*
+#### skills *: [Mapping](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping)[[Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/builtins/stdtypes.html#str)]*
 
 Normalized source path of each sibling skill, mapped to its name.
 
@@ -701,9 +701,9 @@ Existence test of a resolved target.
 Return the normalized path that a relative `target` names.
 
 * **Parameters:**
-  **target** (*str*)
+  **target** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.links.LinkResolver.missing"></a>
 
@@ -712,12 +712,12 @@ Return the normalized path that a relative `target` names.
 Return the relative links of `text` that resolve to no file.
 
 * **Parameters:**
-  * **text** (*str*) – Body of the source, before any split.
+  * **text** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Body of the source, before any split.
   * **source_path** (*Path*) – Source file, quoted in each diagnostic.
-  * **first_line** (*int*) – Line of the source file on which `text` starts.
-  * **artifact_paths** (*frozenset* *[**str* *]*)
+  * **first_line** ([*int*](https://docs.python.org/3/builtins/functions.html#int)) – Line of the source file on which `text` starts.
+  * **artifact_paths** ([*frozenset*](https://docs.python.org/3/builtins/stdtypes.html#frozenset) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
 * **Return type:**
-  list[[*MissingLink*](#eutaxis.commands.links.MissingLink)]
+  [list](https://docs.python.org/3/builtins/stdtypes.html#list)[[*MissingLink*](#eutaxis.commands.links.MissingLink)]
 
 <a id="eutaxis.commands.links.LinkResolver.rewrite"></a>
 
@@ -726,13 +726,13 @@ Return the relative links of `text` that resolve to no file.
 Rewrite the relative links of one emitted file.
 
 * **Parameters:**
-  * **text** (*str*) – Content of the emitted Markdown file.
-  * **emitter** (*str*) – Path of that file relative to the artifact root, such as
+  * **text** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Content of the emitted Markdown file.
+  * **emitter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Path of that file relative to the artifact root, such as
     `"SKILL.md"` or `"rules/topic-first.md"`.
-  * **artifact_paths** (*frozenset* *[**str* *]*) – Paths of every file of the artifact, relative to its root. A link
+  * **artifact_paths** ([*frozenset*](https://docs.python.org/3/builtins/stdtypes.html#frozenset) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*) – Paths of every file of the artifact, relative to its root. A link
     to one of them stays as written.
 * **Return type:**
-  str
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 ### Examples
 
@@ -770,14 +770,14 @@ should be handled by the caller before invocation.
 Substitute `{{ name }}` placeholders against `context`.
 
 * **Parameters:**
-  * **template** (*str*) – Template string. Placeholders look like `{{ name }}` or
+  * **template** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str)) – Template string. Placeholders look like `{{ name }}` or
     `{{ ns.name }}`. Whitespace inside the braces is tolerated.
-  * **context** (*dict* *[**str* *,* *Any* *]*) – Variable context. Dotted names traverse nested mappings or
+  * **context** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* *Any* *]*) – Variable context. Dotted names traverse nested mappings or
     attributes.
 * **Returns:**
   The rendered string.
 * **Return type:**
-  str
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 * **Raises:**
   [**TemplateError**](#eutaxis.commands.exceptions.TemplateError) – If a placeholder references an unknown name.
 
@@ -804,43 +804,43 @@ user-owned and refused unless `force=True`.
 
 ### *class* eutaxis.commands.installer.InstallOutcome(name, adapter, scope, path, action, warnings=())
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Result of one install or uninstall operation.
 
 `path` is the artifact **directory**.
 
 * **Parameters:**
-  * **name** (*str*)
-  * **adapter** (*str*)
-  * **scope** (*str*)
-  * **path** (*Path*)
-  * **action** (*str*)
-  * **warnings** (*tuple* *[**str* *,*  *...* *]*)
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **action** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **warnings** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
 
 <a id="eutaxis.commands.installer.InstallOutcome.name"></a>
 
-#### name *: str*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.installer.InstallOutcome.adapter"></a>
 
-#### adapter *: str*
+#### adapter *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.installer.InstallOutcome.scope"></a>
 
-#### scope *: str*
+#### scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.installer.InstallOutcome.path"></a>
 
-#### path *: Path*
+#### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
 
 <a id="eutaxis.commands.installer.InstallOutcome.action"></a>
 
-#### action *: str*
+#### action *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.installer.InstallOutcome.warnings"></a>
 
-#### warnings *: tuple[str, ...]* *= ()*
+#### warnings *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
 
 Warnings of the render, such as a link whose target does not exist.
 
@@ -853,11 +853,11 @@ Render and write one skill artifact to its native location.
 * **Parameters:**
   * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
   * **adapter** (*AgentAdapter*)
-  * **scope** (*str*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
-  * **force** (*bool*)
+  * **force** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
 * **Return type:**
   [*InstallOutcome*](#eutaxis.commands.installer.InstallOutcome)
 
@@ -870,11 +870,11 @@ Publish one rendered Skill under the deployment lock with rollback.
 * **Parameters:**
   * **rendered** ([*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact))
   * **adapter** (*AgentAdapter*)
-  * **scope** (*str*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
-  * **force** (*bool*)
+  * **force** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
 * **Return type:**
   [*InstallOutcome*](#eutaxis.commands.installer.InstallOutcome)
 
@@ -885,23 +885,23 @@ Publish one rendered Skill under the deployment lock with rollback.
 Publish several rendered Skills as one failure-atomic write set.
 
 * **Parameters:**
-  * **artifacts** (*Collection* *[**tuple* *[*[*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact) *,* *AgentAdapter* *]* *]*) – Rendered artifact and matching adapter pairs. Each artifact supplies
+  * **artifacts** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact) *,* *AgentAdapter* *]* *]*) – Rendered artifact and matching adapter pairs. Each artifact supplies
     its installation scope.
-  * **project_root** (*Path*) – Project root used to resolve project-scope targets.
-  * **home** (*Path*) – User home used to resolve user-scope targets.
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)) – Project root used to resolve project-scope targets.
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)) – User home used to resolve user-scope targets.
   * **registry** ([*Registry*](#eutaxis.commands.registry.Registry)) – Registry updated with the complete installed set.
-  * **finalize** (*Callable* *[* *[* *]* *,* *None* *]*  *|* *None*) – Optional callback run after every artifact is installed but before the
+  * **finalize** ([*Callable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable) *[* *[* *]* *,* *None* *]*  *|* *None*) – Optional callback run after every artifact is installed but before the
     transaction commits.
-  * **rollback_files** (*Collection* *[**Path* *]*) – State files changed by `finalize` and restored if any operation
+  * **rollback_files** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*) – State files changed by `finalize` and restored if any operation
     fails.
-  * **force** (*bool*) – Whether an existing non-Eutaxis directory may be replaced.
-  * **externally_locked** (*bool*) – Whether a transaction coordinator already holds the deployment and
+  * **force** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool)) – Whether an existing non-Eutaxis directory may be replaced.
+  * **externally_locked** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool)) – Whether a transaction coordinator already holds the deployment and
     registry locks continuously, in canonical order. Ordinary callers
     must use the default.
 * **Returns:**
   One outcome for each input artifact, in input order.
 * **Return type:**
-  tuple of [InstallOutcome](#eutaxis.commands.installer.InstallOutcome)
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple) of [InstallOutcome](#eutaxis.commands.installer.InstallOutcome)
 * **Raises:**
   * [**CommandRenderError**](#eutaxis.commands.exceptions.CommandRenderError) – If the batch is empty, repeats a target, or contains an invalid
         artifact.
@@ -915,13 +915,13 @@ Publish several rendered Skills as one failure-atomic write set.
 Remove one artifact under the deployment lock with rollback.
 
 * **Parameters:**
-  * **name** (*str*)
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **adapter** (*AgentAdapter*)
-  * **scope** (*str*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
-  * **force** (*bool*)
+  * **force** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
 * **Return type:**
   [*InstallOutcome*](#eutaxis.commands.installer.InstallOutcome)
 
@@ -940,11 +940,11 @@ reported as a removal.
 * **Parameters:**
   * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource))
   * **adapter** (*AgentAdapter*)
-  * **scope** (*str*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  tuple[[*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact), *Path*, str]
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact), [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/builtins/stdtypes.html#str)]
 
 <a id="eutaxis.commands.installer.diff_artifact"></a>
 
@@ -955,11 +955,11 @@ Return one rendered artifact, its directory, and its diff from disk.
 * **Parameters:**
   * **rendered** ([*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact))
   * **adapter** (*AgentAdapter*)
-  * **scope** (*str*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  tuple[[*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact), *Path*, str]
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact), [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [str](https://docs.python.org/3/builtins/stdtypes.html#str)]
 
 <a id="eutaxis.commands.installer.verify_artifact"></a>
 
@@ -974,11 +974,11 @@ directory kinds. It returns the verified artifact directory.
 * **Parameters:**
   * **rendered** ([*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact))
   * **adapter** (*AgentAdapter*)
-  * **scope** (*str*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.installer.is_eutaxis_owned"></a>
 
@@ -991,9 +991,9 @@ its `SKILL.md` frontmatter carries the `x-eutaxis-owned` marker. A
 missing or empty directory is not an artifact and yields `False`.
 
 * **Parameters:**
-  **target_dir** (*Path*)
+  **target_dir** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  bool
+  [bool](https://docs.python.org/3/builtins/functions.html#bool)
 
 <a id="module-eutaxis.commands.synchronization"></a>
 
@@ -1007,7 +1007,7 @@ Plan and apply the complete config-registered Skill set.
 
 ### *class* eutaxis.commands.synchronization.SkillSyncManifest(state_dir, config_path)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Skill names recorded for one configuration, adapter, and scope.
 
@@ -1022,11 +1022,11 @@ Skill names recorded for one configuration, adapter, and scope.
 Return names recorded for one adapter and scope.
 
 * **Parameters:**
-  * **adapter** (*str*)
-  * **scope** (*str*)
-  * **project_root** (*Path*)
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  frozenset[str]
+  [frozenset](https://docs.python.org/3/builtins/stdtypes.html#frozenset)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)]
 
 <a id="eutaxis.commands.synchronization.SkillSyncManifest.names_managed_by_other_configs"></a>
 
@@ -1035,11 +1035,11 @@ Return names recorded for one adapter and scope.
 Return names claimed by every other configuration manifest.
 
 * **Parameters:**
-  * **adapter** (*str*)
-  * **scope** (*str*)
-  * **project_root** (*Path*)
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  frozenset[str]
+  [frozenset](https://docs.python.org/3/builtins/stdtypes.html#frozenset)[[str](https://docs.python.org/3/builtins/stdtypes.html#str)]
 
 <a id="eutaxis.commands.synchronization.SkillSyncManifest.update"></a>
 
@@ -1048,9 +1048,9 @@ Return names claimed by every other configuration manifest.
 Atomically record the successful result for selected adapters.
 
 * **Parameters:**
-  * **scope** (*str*)
-  * **project_root** (*Path*)
-  * **names_by_adapter** (*Mapping* *[**str* *,* *Collection* *[**str* *]* *]*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **names_by_adapter** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *]*)
 * **Return type:**
   None
 
@@ -1061,32 +1061,54 @@ Atomically record the successful result for selected adapters.
 Serialize plans and writes across configuration manifests.
 
 * **Return type:**
-  *Iterator*[None]
+  [*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator)[None]
+
+<a id="eutaxis.commands.synchronization.SkillTargetObservation"></a>
+
+### *class* eutaxis.commands.synchronization.SkillTargetObservation(kind, digest)
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Digest of one complete Skill target tree at planning time.
+
+* **Parameters:**
+  * **kind** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **digest** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+
+<a id="eutaxis.commands.synchronization.SkillTargetObservation.kind"></a>
+
+#### kind *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.synchronization.SkillTargetObservation.digest"></a>
+
+#### digest *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.synchronization.SkillSyncAction"></a>
 
-### *class* eutaxis.commands.synchronization.SkillSyncAction(action, name, adapter, scope, path, source=None, warnings=())
+### *class* eutaxis.commands.synchronization.SkillSyncAction(action, name, adapter, scope, path, source=None, artifact=None, target_observation=None, warnings=())
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 One planned change to an installed Skill.
 
 * **Parameters:**
-  * **action** (*str*)
-  * **name** (*str*)
+  * **action** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **adapter** (*AgentAdapter*)
-  * **scope** (*str*)
-  * **path** (*Path*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **source** ([*CommandSource*](#eutaxis.commands.models.CommandSource) *|* *None*)
-  * **warnings** (*tuple* *[**str* *,*  *...* *]*)
+  * **artifact** ([*RenderedArtifact*](#eutaxis.commands.models.RenderedArtifact) *|* *None*)
+  * **target_observation** ([*SkillTargetObservation*](#eutaxis.commands.synchronization.SkillTargetObservation) *|* *None*)
+  * **warnings** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
 
 <a id="eutaxis.commands.synchronization.SkillSyncAction.action"></a>
 
-#### action *: str*
+#### action *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.synchronization.SkillSyncAction.name"></a>
 
-#### name *: str*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.synchronization.SkillSyncAction.adapter"></a>
 
@@ -1094,19 +1116,60 @@ One planned change to an installed Skill.
 
 <a id="eutaxis.commands.synchronization.SkillSyncAction.scope"></a>
 
-#### scope *: str*
+#### scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.synchronization.SkillSyncAction.path"></a>
 
-#### path *: Path*
+#### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
 
 <a id="eutaxis.commands.synchronization.SkillSyncAction.source"></a>
 
-#### source *: [CommandSource](#eutaxis.commands.models.CommandSource) | None* *= None*
+#### source *: [CommandSource](#eutaxis.commands.models.CommandSource) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction.artifact"></a>
+
+#### artifact *: [RenderedArtifact](#eutaxis.commands.models.RenderedArtifact) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
+
+<a id="eutaxis.commands.synchronization.SkillSyncAction.target_observation"></a>
+
+#### target_observation *: [SkillTargetObservation](#eutaxis.commands.synchronization.SkillTargetObservation) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
 
 <a id="eutaxis.commands.synchronization.SkillSyncAction.warnings"></a>
 
-#### warnings *: tuple[str, ...]* *= ()*
+#### warnings *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
+
+<a id="eutaxis.commands.synchronization.PreparedSkillSync"></a>
+
+### *class* eutaxis.commands.synchronization.PreparedSkillSync
+
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
+
+Process-issued Skill actions and the digest binding their exact state.
+
+<a id="eutaxis.commands.synchronization.PreparedSkillSync.actions"></a>
+
+#### actions *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[SkillSyncAction](#eutaxis.commands.synchronization.SkillSyncAction), ...]*
+
+<a id="eutaxis.commands.synchronization.PreparedSkillSync.digest"></a>
+
+#### digest *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
+
+<a id="eutaxis.commands.synchronization.prepare_skill_sync"></a>
+
+### eutaxis.commands.synchronization.prepare_skill_sync(sources, adapters, \*, scope, project_root, home, managed_names_by_adapter=None, protected_names_by_adapter=None)
+
+Prepare exact rendered actions without modifying installed Skills.
+
+* **Parameters:**
+  * **sources** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*CommandSource*](#eutaxis.commands.models.CommandSource) *]*)
+  * **adapters** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[**AgentAdapter* *]*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **managed_names_by_adapter** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *]*  *|* *None*)
+  * **protected_names_by_adapter** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *]*  *|* *None*)
+* **Return type:**
+  [*PreparedSkillSync*](#eutaxis.commands.synchronization.PreparedSkillSync)
 
 <a id="eutaxis.commands.synchronization.plan_skill_sync"></a>
 
@@ -1121,15 +1184,15 @@ name enters the plan only while its directory carries an Eutaxis marker.
 Skills managed by other configurations cannot enter the removal set.
 
 * **Parameters:**
-  * **sources** (*list* *[*[*CommandSource*](#eutaxis.commands.models.CommandSource) *]*)
-  * **adapters** (*list* *[**AgentAdapter* *]*)
-  * **scope** (*str*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
-  * **managed_names_by_adapter** (*Mapping* *[**str* *,* *Collection* *[**str* *]* *]*  *|* *None*)
-  * **protected_names_by_adapter** (*Mapping* *[**str* *,* *Collection* *[**str* *]* *]*  *|* *None*)
+  * **sources** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*CommandSource*](#eutaxis.commands.models.CommandSource) *]*)
+  * **adapters** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[**AgentAdapter* *]*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **managed_names_by_adapter** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *]*  *|* *None*)
+  * **protected_names_by_adapter** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]* *]*  *|* *None*)
 * **Return type:**
-  tuple[[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction), …]
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction), …]
 
 <a id="eutaxis.commands.synchronization.apply_skill_sync"></a>
 
@@ -1138,32 +1201,67 @@ Skills managed by other configurations cannot enter the removal set.
 Apply one failure-atomic Skill plan and return the resulting states.
 
 * **Parameters:**
-  * **actions** (*tuple* *[*[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction) *,*  *...* *]*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
+  * **actions** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction) *,*  *...* *]*)
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
   * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
-  * **finalize** (*Callable* *[* *[* *]* *,* *None* *]*  *|* *None*)
-  * **rollback_files** (*Collection* *[**Path* *]*)
+  * **finalize** ([*Callable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable) *[* *[* *]* *,* *None* *]*  *|* *None*)
+  * **rollback_files** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*)
 * **Return type:**
-  tuple[[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction), …]
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction), …]
+
+<a id="eutaxis.commands.synchronization.apply_prepared_skill_sync"></a>
+
+### eutaxis.commands.synchronization.apply_prepared_skill_sync(prepared, \*, selected, project_root, home, registry, finalize=None, rollback_files=(), externally_locked=False)
+
+Apply exactly the selected prepared actions after rejecting drift.
+
+The function acquires the deployment lock before comparing every planned
+target with its planning-time observation. It writes the artifacts retained
+in `prepared` and never renders a source during publication.
+
+`externally_locked` is reserved for a transaction coordinator that holds
+the deployment and registry locks continuously, in that order.
+
+A successful update or removal retains the displaced prior directory so an
+edit through an old open file cannot be deleted after verification. The
+corresponding outcome reports its recovery path in `warnings`; the caller
+may remove that directory after reconciling concurrent-editor state.
+
+* **Parameters:**
+  * **prepared** ([*PreparedSkillSync*](#eutaxis.commands.synchronization.PreparedSkillSync))
+  * **selected** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction) *]*)
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
+  * **finalize** ([*Callable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable) *[* *[* *]* *,* *None* *]*  *|* *None*)
+  * **rollback_files** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*)
+  * **externally_locked** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+* **Return type:**
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillSyncAction*](#eutaxis.commands.synchronization.SkillSyncAction), …]
 
 <a id="eutaxis.commands.synchronization.skill_write_transaction"></a>
 
-### eutaxis.commands.synchronization.skill_write_transaction(paths, registry, \*, file_paths=(), externally_locked=False)
+### eutaxis.commands.synchronization.skill_write_transaction(paths, registry, \*, file_paths=(), externally_locked=False, guarded_rollback=False)
 
-Restore every target when one write in a managed set fails.
+Restore transaction-owned target states when a managed write fails.
 
 `externally_locked` is reserved for a transaction coordinator that
 already holds the deployment and registry locks continuously, in that
 order. Ordinary callers must use the default.
 
+`guarded_rollback` is reserved for callers that publish through the
+yielded journal. Such rollback preserves an untouched target and any
+target changed after the journal’s atomic publication.
+
 * **Parameters:**
-  * **paths** (*Iterator* *[**Path* *]*  *|* *Collection* *[**Path* *]*)
+  * **paths** ([*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*  *|* [*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*)
   * **registry** ([*Registry*](#eutaxis.commands.registry.Registry))
-  * **file_paths** (*Collection* *[**Path* *]*)
-  * **externally_locked** (*bool*)
+  * **file_paths** ([*Collection*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Collection) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *]*)
+  * **externally_locked** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
+  * **guarded_rollback** ([*bool*](https://docs.python.org/3/builtins/functions.html#bool))
 * **Return type:**
-  *Iterator*[None]
+  [*Iterator*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterator)[ *\_SkillWriteJournal*]
 
 <a id="module-eutaxis.commands.skill_budgets"></a>
 
@@ -1177,50 +1275,50 @@ Measure Skill entrypoints and declared loading units.
 
 ### *class* eutaxis.commands.skill_budgets.SkillBudgetMeasurement(kind, name, adapter, byte_size, byte_budget, files, publication_owners=())
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 One measured Skill entrypoint or loading unit.
 
 * **Parameters:**
-  * **kind** (*str*)
-  * **name** (*str*)
-  * **adapter** (*str*)
-  * **byte_size** (*int*)
-  * **byte_budget** (*int* *|* *None*)
-  * **files** (*tuple* *[**str* *,*  *...* *]*)
-  * **publication_owners** (*tuple* *[**str* *,*  *...* *]*)
+  * **kind** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **byte_size** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **byte_budget** ([*int*](https://docs.python.org/3/builtins/functions.html#int) *|* *None*)
+  * **files** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **publication_owners** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.kind"></a>
 
-#### kind *: str*
+#### kind *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.name"></a>
 
-#### name *: str*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.adapter"></a>
 
-#### adapter *: str*
+#### adapter *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.byte_size"></a>
 
-#### byte_size *: int*
+#### byte_size *: [int](https://docs.python.org/3/builtins/functions.html#int)*
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.byte_budget"></a>
 
-#### byte_budget *: int | None*
+#### byte_budget *: [int](https://docs.python.org/3/builtins/functions.html#int) | [None](https://docs.python.org/3/builtins/constants.html#None)*
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.files"></a>
 
-#### files *: tuple[str, ...]*
+#### files *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.publication_owners"></a>
 
-#### publication_owners *: tuple[str, ...]* *= ()*
+#### publication_owners *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
 
 <a id="eutaxis.commands.skill_budgets.SkillBudgetMeasurement.over_budget"></a>
 
-#### *property* over_budget *: bool*
+#### *property* over_budget *: [bool](https://docs.python.org/3/builtins/functions.html#bool)*
 
 Return whether the measured size exceeds its configured budget.
 
@@ -1232,12 +1330,12 @@ Measure every rendered entrypoint and declared loading unit.
 
 * **Parameters:**
   * **config** ([*InstructionConfig*](instructions.md#eutaxis.instructions.models.InstructionConfig))
-  * **sources** (*list* *[*[*CommandSource*](#eutaxis.commands.models.CommandSource) *]*)
+  * **sources** ([*list*](https://docs.python.org/3/builtins/stdtypes.html#list) *[*[*CommandSource*](#eutaxis.commands.models.CommandSource) *]*)
   * **adapter** (*AgentAdapter*)
-  * **project_root** (*Path*)
-  * **home** (*Path*)
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  tuple[[*SkillBudgetMeasurement*](#eutaxis.commands.skill_budgets.SkillBudgetMeasurement), …]
+  [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[*SkillBudgetMeasurement*](#eutaxis.commands.skill_budgets.SkillBudgetMeasurement), …]
 
 <a id="module-eutaxis.commands.models"></a>
 
@@ -1259,23 +1357,23 @@ metadata / invocation policy / tool dependencies in the sibling
 
 ### *class* eutaxis.commands.models.ActionSpec(kind, template)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Optional shell-backed action carried by a command source.
 
 * **Parameters:**
-  * **kind** (*str*)
-  * **template** (*str*)
+  * **kind** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **template** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 
 <a id="eutaxis.commands.models.ActionSpec.kind"></a>
 
-#### kind *: str*
+#### kind *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 Action kind. Only `"shell"` is supported in v1.
 
 <a id="eutaxis.commands.models.ActionSpec.template"></a>
 
-#### template *: str*
+#### template *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 Templated command string with `{{ var }}` placeholders.
 
@@ -1283,23 +1381,23 @@ Templated command string with `{{ var }}` placeholders.
 
 ### *class* eutaxis.commands.models.TargetsSpec(include=(), exclude=())
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Per-source allow/deny list of adapter names.
 
 An empty `include` tuple means “all registered adapters”.
 
 * **Parameters:**
-  * **include** (*tuple* *[**str* *,*  *...* *]*)
-  * **exclude** (*tuple* *[**str* *,*  *...* *]*)
+  * **include** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **exclude** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
 
 <a id="eutaxis.commands.models.TargetsSpec.include"></a>
 
-#### include *: tuple[str, ...]* *= ()*
+#### include *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
 
 <a id="eutaxis.commands.models.TargetsSpec.exclude"></a>
 
-#### exclude *: tuple[str, ...]* *= ()*
+#### exclude *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
 
 <a id="eutaxis.commands.models.TargetsSpec.admits"></a>
 
@@ -1317,25 +1415,25 @@ False
 ```
 
 * **Parameters:**
-  **adapter_name** (*str*)
+  **adapter_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  bool
+  [bool](https://docs.python.org/3/builtins/functions.html#bool)
 
 <a id="eutaxis.commands.models.SiblingSkill"></a>
 
 ### *class* eutaxis.commands.models.SiblingSkill(name, targets)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Another source compiled from the same configuration, as a link target.
 
 * **Parameters:**
-  * **name** (*str*)
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **targets** ([*TargetsSpec*](#eutaxis.commands.models.TargetsSpec))
 
 <a id="eutaxis.commands.models.SiblingSkill.name"></a>
 
-#### name *: str*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 Name of the skill, which is also the name of its directory.
 
@@ -1350,7 +1448,7 @@ does not receive it falls back to the absolute source path.
 
 ### *class* eutaxis.commands.models.AdapterPassthrough(frontmatter=<factory>, files=<factory>)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Adapter-specific overrides declared in the source frontmatter.
 
@@ -1359,19 +1457,19 @@ frontmatter (`frontmatter`) and extra sibling files (`files`)
 alongside the entrypoint.
 
 * **Parameters:**
-  * **frontmatter** (*dict* *[**str* *,* *object* *]*)
-  * **files** (*dict* *[**str* *,* *str* *]*)
+  * **frontmatter** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*object*](https://docs.python.org/3/builtins/functions.html#object) *]*)
+  * **files** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *]*)
 
 <a id="eutaxis.commands.models.AdapterPassthrough.frontmatter"></a>
 
-#### frontmatter *: dict[str, object]*
+#### frontmatter *: [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [object](https://docs.python.org/3/builtins/functions.html#object)]*
 
 Extra keys merged into the rendered `SKILL.md` frontmatter.
 Values are emitted verbatim by the YAML dumper.
 
 <a id="eutaxis.commands.models.AdapterPassthrough.files"></a>
 
-#### files *: dict[str, str]*
+#### files *: [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [str](https://docs.python.org/3/builtins/stdtypes.html#str)]*
 
 Sibling file contents keyed by POSIX-style relative path
 (e.g. `"agents/openai.yaml"`). Templated against the same context
@@ -1381,45 +1479,45 @@ as the body.
 
 ### *class* eutaxis.commands.models.CommandSource(name, description, invocation, failure_mode, scope_default, targets, action, body, required_visibility=None, argument_hint='', adapters=<factory>, overrides=<factory>, disclosure='inline', source_path=PosixPath('.'), body_start_line=1, sibling_skills=<factory>, layer='builtin')
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Parsed Markdown command source.
 
 * **Parameters:**
-  * **name** (*str*)
-  * **description** (*str*)
-  * **invocation** (*tuple* *[**str* *,*  *...* *]*)
-  * **failure_mode** (*str*)
-  * **scope_default** (*str*)
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **description** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **invocation** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **failure_mode** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope_default** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **targets** ([*TargetsSpec*](#eutaxis.commands.models.TargetsSpec))
   * **action** ([*ActionSpec*](#eutaxis.commands.models.ActionSpec) *|* *None*)
-  * **body** (*str*)
-  * **required_visibility** (*str* *|* *None*)
-  * **argument_hint** (*str*)
-  * **adapters** (*dict* *[**str* *,* [*AdapterPassthrough*](#eutaxis.commands.models.AdapterPassthrough) *]*)
-  * **overrides** (*dict* *[**str* *,* *dict* *]*)
-  * **disclosure** (*str*)
-  * **source_path** (*Path*)
-  * **body_start_line** (*int*)
-  * **sibling_skills** (*dict* *[**Path* *,* [*SiblingSkill*](#eutaxis.commands.models.SiblingSkill) *]*)
-  * **layer** (*str*)
+  * **body** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **required_visibility** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *|* *None*)
+  * **argument_hint** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **adapters** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*AdapterPassthrough*](#eutaxis.commands.models.AdapterPassthrough) *]*)
+  * **overrides** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *]*)
+  * **disclosure** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **source_path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **body_start_line** ([*int*](https://docs.python.org/3/builtins/functions.html#int))
+  * **sibling_skills** ([*dict*](https://docs.python.org/3/builtins/stdtypes.html#dict) *[*[*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path) *,* [*SiblingSkill*](#eutaxis.commands.models.SiblingSkill) *]*)
+  * **layer** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 
 <a id="eutaxis.commands.models.CommandSource.name"></a>
 
-#### name *: str*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 Slug used for the artifact directory and the invocation symbol.
 
 <a id="eutaxis.commands.models.CommandSource.description"></a>
 
-#### description *: str*
+#### description *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 One-line summary surfaced by `commands list` and the agent’s
 skill picker.
 
 <a id="eutaxis.commands.models.CommandSource.invocation"></a>
 
-#### invocation *: tuple[str, ...]*
+#### invocation *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
 
 `"user"` (user
 invokes explicitly via `/<name>` on Claude or `$<name>` on
@@ -1435,7 +1533,7 @@ both routes).
 
 <a id="eutaxis.commands.models.CommandSource.failure_mode"></a>
 
-#### failure_mode *: str*
+#### failure_mode *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 Silent-failure classification. `"silent"` if violation produces
 irreversible state mutation; `"visible"` if the defect is
@@ -1447,7 +1545,7 @@ is `pre-invocation`.
 
 <a id="eutaxis.commands.models.CommandSource.scope_default"></a>
 
-#### scope_default *: str*
+#### scope_default *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 `"user"` or `"project"`.
 
@@ -1462,19 +1560,19 @@ Adapter allow/deny list.
 
 <a id="eutaxis.commands.models.CommandSource.action"></a>
 
-#### action *: [ActionSpec](#eutaxis.commands.models.ActionSpec) | None*
+#### action *: [ActionSpec](#eutaxis.commands.models.ActionSpec) | [None](https://docs.python.org/3/builtins/constants.html#None)*
 
 Optional shell-backed action.
 
 <a id="eutaxis.commands.models.CommandSource.body"></a>
 
-#### body *: str*
+#### body *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 Markdown body, with `{{ var }}` placeholders still present.
 
 <a id="eutaxis.commands.models.CommandSource.required_visibility"></a>
 
-#### required_visibility *: str | None* *= None*
+#### required_visibility *: [str](https://docs.python.org/3/builtins/stdtypes.html#str) | [None](https://docs.python.org/3/builtins/constants.html#None)* *= None*
 
 Required for `silent` sources only. `"pre-invocation"` if the
 rule must be visible before deciding which procedure applies;
@@ -1484,26 +1582,26 @@ sources.
 
 <a id="eutaxis.commands.models.CommandSource.argument_hint"></a>
 
-#### argument_hint *: str* *= ''*
+#### argument_hint *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= ''*
 
 Optional `argument-hint` value (UX hint, e.g. `"[--all]"`).
 
 <a id="eutaxis.commands.models.CommandSource.adapters"></a>
 
-#### adapters *: dict[str, [AdapterPassthrough](#eutaxis.commands.models.AdapterPassthrough)]*
+#### adapters *: [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [AdapterPassthrough](#eutaxis.commands.models.AdapterPassthrough)]*
 
 Per-adapter frontmatter and sibling files. Keyed by adapter name.
 
 <a id="eutaxis.commands.models.CommandSource.overrides"></a>
 
-#### overrides *: dict[str, dict]*
+#### overrides *: [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)]*
 
 Per-adapter overrides for first-class fields (only
 `action.template` is honored today).
 
 <a id="eutaxis.commands.models.CommandSource.disclosure"></a>
 
-#### disclosure *: str* *= 'inline'*
+#### disclosure *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= 'inline'*
 
 Layout of the compiled skill. `"inline"` emits the whole body in
 `SKILL.md`; `"progressive"` emits an index of the rules in
@@ -1512,20 +1610,20 @@ Layout of the compiled skill. `"inline"` emits the whole body in
 
 <a id="eutaxis.commands.models.CommandSource.source_path"></a>
 
-#### source_path *: Path* *= PosixPath('.')*
+#### source_path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)* *= PosixPath('.')*
 
 Path to the source Markdown file on disk.
 
 <a id="eutaxis.commands.models.CommandSource.body_start_line"></a>
 
-#### body_start_line *: int* *= 1*
+#### body_start_line *: [int](https://docs.python.org/3/builtins/functions.html#int)* *= 1*
 
 Line of the source file on which `body` starts, used to locate
 diagnostics in the authored file.
 
 <a id="eutaxis.commands.models.CommandSource.sibling_skills"></a>
 
-#### sibling_skills *: dict[Path, [SiblingSkill](#eutaxis.commands.models.SiblingSkill)]*
+#### sibling_skills *: [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path), [SiblingSkill](#eutaxis.commands.models.SiblingSkill)]*
 
 Sources compiled from the same configuration, keyed by normalized
 source path. The renderer rewrites a relative link to one of them into a
@@ -1534,7 +1632,7 @@ directory.
 
 <a id="eutaxis.commands.models.CommandSource.layer"></a>
 
-#### layer *: str* *= 'builtin'*
+#### layer *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= 'builtin'*
 
 `"builtin"`, `"user"`, `"project"`, or
 `"config"` (for sources loaded from an instruction-assembly
@@ -1547,7 +1645,7 @@ configuration rather than a layered directory).
 
 ### *class* eutaxis.commands.models.ArtifactFile(relative_path, content)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 One file inside a rendered skill artifact directory.
 
@@ -1556,72 +1654,72 @@ One file inside a rendered skill artifact directory.
 `".eutaxis-owned.json"`).
 
 * **Parameters:**
-  * **relative_path** (*str*)
-  * **content** (*str*)
+  * **relative_path** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **content** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 
 <a id="eutaxis.commands.models.ArtifactFile.relative_path"></a>
 
-#### relative_path *: str*
+#### relative_path *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.ArtifactFile.content"></a>
 
-#### content *: str*
+#### content *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.SkillRenderInput"></a>
 
 ### *class* eutaxis.commands.models.SkillRenderInput(name, description, scope, invocation, entrypoint_body, contract_file, resources, adapter_passthrough)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Adapter-neutral content required to assemble one Agent Skill.
 
 * **Parameters:**
-  * **name** (*str*)
-  * **description** (*str*)
-  * **scope** (*str*)
-  * **invocation** (*tuple* *[**str* *,*  *...* *]*)
-  * **entrypoint_body** (*str*)
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **description** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **invocation** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
+  * **entrypoint_body** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
   * **contract_file** ([*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *|* *None*)
-  * **resources** (*tuple* *[*[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *,*  *...* *]*)
-  * **adapter_passthrough** (*Mapping* *[**str* *,* [*AdapterPassthrough*](#eutaxis.commands.models.AdapterPassthrough) *]*)
+  * **resources** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *,*  *...* *]*)
+  * **adapter_passthrough** ([*Mapping*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,* [*AdapterPassthrough*](#eutaxis.commands.models.AdapterPassthrough) *]*)
 
 <a id="eutaxis.commands.models.SkillRenderInput.name"></a>
 
-#### name *: str*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.SkillRenderInput.description"></a>
 
-#### description *: str*
+#### description *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.SkillRenderInput.scope"></a>
 
-#### scope *: str*
+#### scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.SkillRenderInput.invocation"></a>
 
-#### invocation *: tuple[str, ...]*
+#### invocation *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]*
 
 <a id="eutaxis.commands.models.SkillRenderInput.entrypoint_body"></a>
 
-#### entrypoint_body *: str*
+#### entrypoint_body *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.SkillRenderInput.contract_file"></a>
 
-#### contract_file *: [ArtifactFile](#eutaxis.commands.models.ArtifactFile) | None*
+#### contract_file *: [ArtifactFile](#eutaxis.commands.models.ArtifactFile) | [None](https://docs.python.org/3/builtins/constants.html#None)*
 
 <a id="eutaxis.commands.models.SkillRenderInput.resources"></a>
 
-#### resources *: tuple[[ArtifactFile](#eutaxis.commands.models.ArtifactFile), ...]*
+#### resources *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[ArtifactFile](#eutaxis.commands.models.ArtifactFile), ...]*
 
 <a id="eutaxis.commands.models.SkillRenderInput.adapter_passthrough"></a>
 
-#### adapter_passthrough *: Mapping[str, [AdapterPassthrough](#eutaxis.commands.models.AdapterPassthrough)]*
+#### adapter_passthrough *: [Mapping](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [AdapterPassthrough](#eutaxis.commands.models.AdapterPassthrough)]*
 
 <a id="eutaxis.commands.models.RenderedArtifact"></a>
 
 ### *class* eutaxis.commands.models.RenderedArtifact(name, adapter, scope, files, content_hash, warnings=())
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 One Skill input rendered for an adapter as a multi-file artifact.
 
@@ -1631,24 +1729,24 @@ carries the `x-eutaxis-owned` hash) and the
 `agents/openai.yaml`) may also be present.
 
 * **Parameters:**
-  * **name** (*str*)
-  * **adapter** (*str*)
-  * **scope** (*str*)
-  * **files** (*tuple* *[*[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *,*  *...* *]*)
-  * **content_hash** (*str*)
-  * **warnings** (*tuple* *[**str* *,*  *...* *]*)
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **files** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile) *,*  *...* *]*)
+  * **content_hash** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **warnings** ([*tuple*](https://docs.python.org/3/builtins/stdtypes.html#tuple) *[*[*str*](https://docs.python.org/3/builtins/stdtypes.html#str) *,*  *...* *]*)
 
 <a id="eutaxis.commands.models.RenderedArtifact.name"></a>
 
-#### name *: str*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.RenderedArtifact.adapter"></a>
 
-#### adapter *: str*
+#### adapter *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.RenderedArtifact.scope"></a>
 
-#### scope *: str*
+#### scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 `"user"` or `"project"`.
 
@@ -1657,15 +1755,15 @@ carries the `x-eutaxis-owned` hash) and the
 
 <a id="eutaxis.commands.models.RenderedArtifact.files"></a>
 
-#### files *: tuple[[ArtifactFile](#eutaxis.commands.models.ArtifactFile), ...]*
+#### files *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[ArtifactFile](#eutaxis.commands.models.ArtifactFile), ...]*
 
 <a id="eutaxis.commands.models.RenderedArtifact.content_hash"></a>
 
-#### content_hash *: str*
+#### content_hash *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.RenderedArtifact.warnings"></a>
 
-#### warnings *: tuple[str, ...]* *= ()*
+#### warnings *: [tuple](https://docs.python.org/3/builtins/stdtypes.html#tuple)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), ...]* *= ()*
 
 Defects found while rendering, such as a relative link whose target
 does not exist. They do not enter the content hash.
@@ -1674,43 +1772,43 @@ does not exist. They do not enter the content hash.
 
 ### *class* eutaxis.commands.models.InstallRecord(name, adapter, scope, path, content_hash, installed_at)
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 One row of the install manifest.
 
 `path` is the artifact **directory**, not a single file.
 
 * **Parameters:**
-  * **name** (*str*)
-  * **adapter** (*str*)
-  * **scope** (*str*)
-  * **path** (*Path*)
-  * **content_hash** (*str*)
-  * **installed_at** (*str*)
+  * **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **adapter** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **path** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **content_hash** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **installed_at** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 
 <a id="eutaxis.commands.models.InstallRecord.name"></a>
 
-#### name *: str*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.InstallRecord.adapter"></a>
 
-#### adapter *: str*
+#### adapter *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.InstallRecord.scope"></a>
 
-#### scope *: str*
+#### scope *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.InstallRecord.path"></a>
 
-#### path *: Path*
+#### path *: [Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path)*
 
 <a id="eutaxis.commands.models.InstallRecord.content_hash"></a>
 
-#### content_hash *: str*
+#### content_hash *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="eutaxis.commands.models.InstallRecord.installed_at"></a>
 
-#### installed_at *: str*
+#### installed_at *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)*
 
 <a id="module-eutaxis.commands.exceptions"></a>
 
@@ -1724,7 +1822,7 @@ Exceptions for the commands subsystem.
 
 ### *exception* eutaxis.commands.exceptions.CommandError
 
-Bases: `Exception`
+Bases: [`Exception`](https://docs.python.org/3/builtins/exceptions.html#Exception)
 
 Base exception for the commands subsystem.
 
@@ -1827,48 +1925,48 @@ into `SKILL.md` frontmatter.
 
 ### *class* eutaxis.commands.adapters.claude.ClaudeCodeAdapter(name='claude')
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Compile a command source into a Claude skill directory.
 
 * **Parameters:**
-  **name** (*str*)
+  **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 
 <a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.name"></a>
 
-#### name *: str* *= 'claude'*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= 'claude'*
 
 <a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.supports_scope"></a>
 
 #### supports_scope(scope)
 
 * **Parameters:**
-  **scope** (*str*)
+  **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  bool
+  [bool](https://docs.python.org/3/builtins/functions.html#bool)
 
 <a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.artifact_dir"></a>
 
 #### artifact_dir(command_name, scope, \*, home, project_root)
 
 * **Parameters:**
-  * **command_name** (*str*)
-  * **scope** (*str*)
-  * **home** (*Path*)
-  * **project_root** (*Path*)
+  * **command_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.skills_root"></a>
 
 #### skills_root(scope, \*, home, project_root)
 
 * **Parameters:**
-  * **scope** (*str*)
-  * **home** (*Path*)
-  * **project_root** (*Path*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.skill_frontmatter"></a>
 
@@ -1876,9 +1974,9 @@ Compile a command source into a Claude skill directory.
 
 * **Parameters:**
   * **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
-  * **rendered_body** (*str*)
+  * **rendered_body** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  dict[str, object]
+  [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [object](https://docs.python.org/3/builtins/functions.html#object)]
 
 <a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.sibling_files"></a>
 
@@ -1887,7 +1985,7 @@ Compile a command source into a Claude skill directory.
 * **Parameters:**
   **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
 * **Return type:**
-  *Iterable*[[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile)]
+  [*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile)]
 
 <a id="eutaxis.commands.adapters.claude.ClaudeCodeAdapter.relative_artifact_link"></a>
 
@@ -1896,12 +1994,12 @@ Compile a command source into a Claude skill directory.
 Return an installed relative link between Claude Skill files.
 
 * **Parameters:**
-  * **from_artifact** (*str*)
-  * **from_file** (*str*)
-  * **to_artifact** (*str*)
-  * **to_file** (*str*)
+  * **from_artifact** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **from_file** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **to_artifact** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **to_file** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  str
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)
 
 <a id="module-eutaxis.commands.adapters.codex"></a>
 
@@ -1941,48 +2039,48 @@ artifact metadata (skills-comparison.md:106).
 
 ### *class* eutaxis.commands.adapters.codex.CodexAdapter(name='codex')
 
-Bases: `object`
+Bases: [`object`](https://docs.python.org/3/builtins/functions.html#object)
 
 Compile a command source into a Codex skill directory.
 
 * **Parameters:**
-  **name** (*str*)
+  **name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 
 <a id="eutaxis.commands.adapters.codex.CodexAdapter.name"></a>
 
-#### name *: str* *= 'codex'*
+#### name *: [str](https://docs.python.org/3/builtins/stdtypes.html#str)* *= 'codex'*
 
 <a id="eutaxis.commands.adapters.codex.CodexAdapter.supports_scope"></a>
 
 #### supports_scope(scope)
 
 * **Parameters:**
-  **scope** (*str*)
+  **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  bool
+  [bool](https://docs.python.org/3/builtins/functions.html#bool)
 
 <a id="eutaxis.commands.adapters.codex.CodexAdapter.artifact_dir"></a>
 
 #### artifact_dir(command_name, scope, \*, home, project_root)
 
 * **Parameters:**
-  * **command_name** (*str*)
-  * **scope** (*str*)
-  * **home** (*Path*)
-  * **project_root** (*Path*)
+  * **command_name** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.adapters.codex.CodexAdapter.skills_root"></a>
 
 #### skills_root(scope, \*, home, project_root)
 
 * **Parameters:**
-  * **scope** (*str*)
-  * **home** (*Path*)
-  * **project_root** (*Path*)
+  * **scope** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **home** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+  * **project_root** ([*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 * **Return type:**
-  *Path*
+  [*Path*](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 
 <a id="eutaxis.commands.adapters.codex.CodexAdapter.skill_frontmatter"></a>
 
@@ -1990,9 +2088,9 @@ Compile a command source into a Codex skill directory.
 
 * **Parameters:**
   * **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
-  * **rendered_body** (*str*)
+  * **rendered_body** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  dict[str, object]
+  [dict](https://docs.python.org/3/builtins/stdtypes.html#dict)[[str](https://docs.python.org/3/builtins/stdtypes.html#str), [object](https://docs.python.org/3/builtins/functions.html#object)]
 
 <a id="eutaxis.commands.adapters.codex.CodexAdapter.sibling_files"></a>
 
@@ -2001,7 +2099,7 @@ Compile a command source into a Codex skill directory.
 * **Parameters:**
   **source** ([*SkillRenderInput*](#eutaxis.commands.models.SkillRenderInput))
 * **Return type:**
-  *Iterable*[[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile)]
+  [*Iterable*](https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable)[[*ArtifactFile*](#eutaxis.commands.models.ArtifactFile)]
 
 <a id="eutaxis.commands.adapters.codex.CodexAdapter.relative_artifact_link"></a>
 
@@ -2010,9 +2108,9 @@ Compile a command source into a Codex skill directory.
 Return an installed relative link between Codex Skill files.
 
 * **Parameters:**
-  * **from_artifact** (*str*)
-  * **from_file** (*str*)
-  * **to_artifact** (*str*)
-  * **to_file** (*str*)
+  * **from_artifact** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **from_file** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **to_artifact** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
+  * **to_file** ([*str*](https://docs.python.org/3/builtins/stdtypes.html#str))
 * **Return type:**
-  str
+  [str](https://docs.python.org/3/builtins/stdtypes.html#str)

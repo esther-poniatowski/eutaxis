@@ -2,26 +2,31 @@
 
 from __future__ import annotations
 
+import ctypes
 import fcntl
 import hashlib
 import json
 import os
 import shutil
+import stat
 import tempfile
+import weakref
 from collections.abc import Callable, Collection, Iterator, Mapping
 from contextlib import contextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .adapters import AgentAdapter
 from .exceptions import CommandError, OwnershipError
 from .installer import (
+    _install_artifact,
     _uninstall_command,
+    _write_artifact_file,
     diff_command,
-    install_command,
     is_eutaxis_owned,
+    verify_artifact,
 )
-from .models import CommandSource
+from .models import CommandSource, RenderedArtifact
 from .names import is_skill_name
 from .registry import Registry
 
@@ -160,6 +165,14 @@ def _deployment_key(adapter: str, scope: str, project_root: Path) -> str:
 
 
 @dataclass(frozen=True)
+class SkillTargetObservation:
+    """Digest of one complete Skill target tree at planning time."""
+
+    kind: str
+    digest: str
+
+
+@dataclass(frozen=True, eq=False)
 class SkillSyncAction:
     """One planned change to an installed Skill."""
 
@@ -169,7 +182,63 @@ class SkillSyncAction:
     scope: str
     path: Path
     source: CommandSource | None = None
+    artifact: RenderedArtifact | None = None
+    target_observation: SkillTargetObservation | None = None
     warnings: tuple[str, ...] = ()
+
+
+_ISSUED_SKILL_SYNC_ACTIONS: weakref.WeakSet[SkillSyncAction] = weakref.WeakSet()
+
+
+@dataclass(frozen=True, init=False, eq=False)
+class PreparedSkillSync:
+    """Process-issued Skill actions and the digest binding their exact state."""
+
+    actions: tuple[SkillSyncAction, ...]
+    digest: str
+
+
+_ISSUED_PREPARED_SKILL_SYNCS: weakref.WeakKeyDictionary[
+    PreparedSkillSync, tuple[str, tuple[int, ...]]
+] = weakref.WeakKeyDictionary()
+
+
+def _issue_prepared_skill_sync(
+    actions: tuple[SkillSyncAction, ...],
+) -> PreparedSkillSync:
+    """Issue one plan and retain its exact identity-bound authenticated state."""
+    instance = object.__new__(PreparedSkillSync)
+    digest = _skill_sync_digest(actions)
+    object.__setattr__(instance, "actions", actions)
+    object.__setattr__(instance, "digest", digest)
+    _ISSUED_PREPARED_SKILL_SYNCS[instance] = (
+        digest,
+        tuple(id(action) for action in actions),
+    )
+    return instance
+
+
+def prepare_skill_sync(
+    sources: list[CommandSource],
+    adapters: list[AgentAdapter],
+    *,
+    scope: str,
+    project_root: Path,
+    home: Path,
+    managed_names_by_adapter: Mapping[str, Collection[str]] | None = None,
+    protected_names_by_adapter: Mapping[str, Collection[str]] | None = None,
+) -> PreparedSkillSync:
+    """Prepare exact rendered actions without modifying installed Skills."""
+    actions = plan_skill_sync(
+        sources,
+        adapters,
+        scope=scope,
+        project_root=project_root,
+        home=home,
+        managed_names_by_adapter=managed_names_by_adapter,
+        protected_names_by_adapter=protected_names_by_adapter,
+    )
+    return _issue_prepared_skill_sync(actions)
 
 
 def plan_skill_sync(
@@ -229,6 +298,7 @@ def plan_skill_sync(
                     f"Refusing to synchronize over non-eutaxis directory: {target}. "
                     "Back up or remove the directory before synchronizing."
                 )
+            observation = _observe_skill_target(target)
             rendered, _, diff = diff_command(
                 source,
                 adapter,
@@ -236,23 +306,29 @@ def plan_skill_sync(
                 project_root=project_root,
                 home=home,
             )
+            if _observe_skill_target(target) != observation:
+                raise CommandError(
+                    f"Skill target changed during preparation: {target}."
+                )
             if not target.exists() or not any(target.iterdir()):
                 action = "create"
             elif diff:
                 action = "update"
             else:
                 action = "unchanged"
-            actions.append(
-                SkillSyncAction(
-                    action=action,
-                    name=source.name,
-                    adapter=adapter,
-                    scope=scope,
-                    path=target,
-                    source=source,
-                    warnings=rendered.warnings,
-                )
+            planned = SkillSyncAction(
+                action=action,
+                name=source.name,
+                adapter=adapter,
+                scope=scope,
+                path=target,
+                source=source,
+                artifact=rendered,
+                target_observation=observation,
+                warnings=rendered.warnings,
             )
+            _ISSUED_SKILL_SYNC_ACTIONS.add(planned)
+            actions.append(planned)
 
     for adapter in adapters:
         retired = (
@@ -274,15 +350,16 @@ def plan_skill_sync(
                     f"Refusing to remove previously managed non-eutaxis "
                     f"target: {target}."
                 )
-            actions.append(
-                SkillSyncAction(
-                    action="remove",
-                    name=name,
-                    adapter=adapter,
-                    scope=scope,
-                    path=target,
-                )
+            planned = SkillSyncAction(
+                action="remove",
+                name=name,
+                adapter=adapter,
+                scope=scope,
+                path=target,
+                target_observation=_observe_skill_target(target),
             )
+            _ISSUED_SKILL_SYNC_ACTIONS.add(planned)
+            actions.append(planned)
 
     return tuple(actions)
 
@@ -297,47 +374,684 @@ def apply_skill_sync(
     rollback_files: Collection[Path] = (),
 ) -> tuple[SkillSyncAction, ...]:
     """Apply one failure-atomic Skill plan and return the resulting states."""
+    prepared = _issue_prepared_skill_sync(actions)
+    return apply_prepared_skill_sync(
+        prepared,
+        selected=actions,
+        project_root=project_root,
+        home=home,
+        registry=registry,
+        finalize=finalize,
+        rollback_files=rollback_files,
+    )
+
+
+def apply_prepared_skill_sync(
+    prepared: PreparedSkillSync,
+    *,
+    selected: Collection[SkillSyncAction],
+    project_root: Path,
+    home: Path,
+    registry: Registry,
+    finalize: Callable[[], None] | None = None,
+    rollback_files: Collection[Path] = (),
+    externally_locked: bool = False,
+) -> tuple[SkillSyncAction, ...]:
+    """Apply exactly the selected prepared actions after rejecting drift.
+
+    The function acquires the deployment lock before comparing every planned
+    target with its planning-time observation. It writes the artifacts retained
+    in ``prepared`` and never renders a source during publication.
+
+    ``externally_locked`` is reserved for a transaction coordinator that holds
+    the deployment and registry locks continuously, in that order.
+
+    A successful update or removal retains the displaced prior directory so an
+    edit through an old open file cannot be deleted after verification. The
+    corresponding outcome reports its recovery path in ``warnings``; the caller
+    may remove that directory after reconciling concurrent-editor state.
+    """
+    _validate_prepared_plan(prepared)
+    selected_actions = tuple(selected)
+    _validate_selected_actions(prepared.actions, selected_actions)
+    _validate_action_targets(
+        prepared.actions,
+        project_root=project_root,
+        home=home,
+    )
     outcomes: list[SkillSyncAction] = []
-    with skill_write_transaction(
-        (action.path for action in actions),
-        registry,
-        file_paths=rollback_files,
-    ):
-        for action in actions:
-            if action.action == "remove":
-                outcome = _uninstall_command(
-                    name=action.name,
-                    adapter=action.adapter,
-                    scope=action.scope,
-                    project_root=project_root,
-                    home=home,
-                    registry=registry,
+    mutation_lock = nullcontext() if externally_locked else registry.mutation_locked()
+    with mutation_lock:
+        for action in prepared.actions:
+            observation = action.target_observation
+            if observation is None:  # pragma: no cover - dataclass invariant
+                raise RuntimeError(f"Prepared action lacks observation: {action.name}")
+            if _observe_skill_target(action.path) != observation:
+                raise CommandError(
+                    f"Skill target changed after preparation: {action.path}."
                 )
-            else:
-                if action.source is None:  # pragma: no cover - dataclass invariant
-                    raise RuntimeError(f"Install action lacks source: {action.name}")
-                outcome = install_command(
-                    action.source,
-                    action.adapter,
-                    scope=action.scope,
-                    project_root=project_root,
-                    home=home,
-                    registry=registry,
-                )
-            outcomes.append(
-                SkillSyncAction(
+        with skill_write_transaction(
+            (action.path for action in selected_actions),
+            registry,
+            file_paths=rollback_files,
+            externally_locked=True,
+            guarded_rollback=True,
+        ) as journal:
+            for action in prepared.actions:
+                if _observe_skill_target(action.path) != action.target_observation:
+                    raise CommandError(
+                        f"Skill target changed during publication: {action.path}."
+                    )
+            for action in selected_actions:
+                assert action.target_observation is not None
+                if _observe_skill_target(action.path) != action.target_observation:
+                    raise CommandError(
+                        f"Skill target changed during publication: {action.path}."
+                    )
+                if action.action in {"create", "update"}:
+                    assert action.artifact is not None
+                    journal.publish(
+                        action.path,
+                        action.artifact,
+                        action.target_observation,
+                    )
+                    installed = _install_artifact(
+                        action.artifact,
+                        action.adapter,
+                        scope=action.scope,
+                        project_root=project_root,
+                        home=home,
+                        registry=registry,
+                    )
+                    outcome = replace(
+                        installed,
+                        action="created" if action.action == "create" else "updated",
+                    )
+                elif action.action == "remove":
+                    journal.remove(action.path, action.target_observation)
+                    removed = _uninstall_command(
+                        name=action.name,
+                        adapter=action.adapter,
+                        scope=action.scope,
+                        project_root=project_root,
+                        home=home,
+                        registry=registry,
+                    )
+                    outcome = replace(removed, action="removed")
+                else:
+                    assert action.artifact is not None
+                    outcome = _install_artifact(
+                        action.artifact,
+                        action.adapter,
+                        scope=action.scope,
+                        project_root=project_root,
+                        home=home,
+                        registry=registry,
+                    )
+                completed = SkillSyncAction(
                     action=outcome.action,
                     name=outcome.name,
                     adapter=action.adapter,
                     scope=outcome.scope,
                     path=outcome.path,
                     source=action.source,
+                    artifact=action.artifact,
+                    target_observation=action.target_observation,
                     warnings=outcome.warnings,
                 )
+                _ISSUED_SKILL_SYNC_ACTIONS.add(completed)
+                outcomes.append(completed)
+            _verify_selected_post_state(
+                selected_actions,
+                project_root=project_root,
+                home=home,
+                registry=registry,
             )
-        if finalize is not None:
-            finalize()
+            if finalize is not None:
+                finalize()
+                _verify_selected_post_state(
+                    selected_actions,
+                    project_root=project_root,
+                    home=home,
+                    registry=registry,
+                )
+            journal.verify_for_commit()
+    retained = journal.retained_backups()
+    if retained:
+        outcomes = [
+            (
+                replace(
+                    outcome,
+                    warnings=outcome.warnings
+                    + (f"Prior Skill retained for recovery: {retained[outcome.path]}",),
+                )
+                if outcome.path in retained
+                else outcome
+            )
+            for outcome in outcomes
+        ]
     return tuple(outcomes)
+
+
+def _verify_selected_post_state(
+    actions: tuple[SkillSyncAction, ...],
+    *,
+    project_root: Path,
+    home: Path,
+    registry: Registry,
+) -> None:
+    """Verify artifact and registry postconditions before transaction commit."""
+    for action in actions:
+        if action.action == "remove":
+            if is_eutaxis_owned(action.path):
+                raise OwnershipError(
+                    f"Removed Skill remains Eutaxis-owned: {action.path}."
+                )
+            if (
+                registry.find(
+                    name=action.name,
+                    adapter=action.adapter.name,
+                    scope=action.scope,
+                    path=action.path,
+                )
+                is not None
+            ):
+                raise OwnershipError(
+                    f"Removed Skill remains in the registry: {action.path}."
+                )
+        else:
+            assert action.artifact is not None
+            verify_artifact(
+                action.artifact,
+                action.adapter,
+                scope=action.scope,
+                project_root=project_root,
+                home=home,
+            )
+            record = registry.find(
+                name=action.name,
+                adapter=action.adapter.name,
+                scope=action.scope,
+                path=action.path,
+            )
+            if (
+                record is None
+                or record.path != action.path
+                or record.content_hash != action.artifact.content_hash
+            ):
+                raise OwnershipError(
+                    f"Installed Skill registry row differs from the artifact: "
+                    f"{action.path}."
+                )
+
+
+def _validate_selected_actions(
+    actions: tuple[SkillSyncAction, ...],
+    selected: tuple[SkillSyncAction, ...],
+) -> None:
+    """Require a duplicate-free subset of the exact prepared action objects."""
+    action_ids = {id(action) for action in actions}
+    selected_ids = [id(action) for action in selected]
+    if len(selected_ids) != len(set(selected_ids)):
+        raise CommandError("Selected Skill synchronization actions repeat a target.")
+    if any(action_id not in action_ids for action_id in selected_ids):
+        raise CommandError(
+            "Selected Skill synchronization action does not belong to the plan."
+        )
+
+
+def _validate_prepared_plan(prepared: PreparedSkillSync) -> None:
+    """Reject an incomplete, inconsistent, or changed prepared plan."""
+    issued = _ISSUED_PREPARED_SKILL_SYNCS.get(prepared)
+    current_identity = tuple(id(action) for action in prepared.actions)
+    if issued is None or issued[1] != current_identity:
+        raise CommandError("Prepared Skill synchronization plan was not issued here.")
+    if issued[0] != prepared.digest or prepared.digest != _skill_sync_digest(
+        prepared.actions
+    ):
+        raise CommandError("Prepared Skill synchronization plan has changed.")
+    for action in prepared.actions:
+        if action not in _ISSUED_SKILL_SYNC_ACTIONS:
+            raise CommandError(
+                f"Prepared Skill action was not issued here: {action.name}."
+            )
+        if action.action not in {"create", "update", "unchanged", "remove"}:
+            raise CommandError(
+                f"Prepared Skill action has invalid operation: {action.action!r}."
+            )
+        if action.target_observation is None:
+            raise CommandError(
+                f"Prepared Skill action lacks a target observation: {action.name}."
+            )
+        if action.action == "remove":
+            if action.artifact is not None:
+                raise CommandError(
+                    f"Prepared removal carries an artifact: {action.name}."
+                )
+            continue
+        artifact = action.artifact
+        if artifact is None:
+            raise CommandError(
+                f"Prepared Skill action lacks an artifact: {action.name}."
+            )
+        if (
+            artifact.name != action.name
+            or artifact.adapter != action.adapter.name
+            or artifact.scope != action.scope
+        ):
+            raise CommandError(
+                f"Prepared Skill artifact does not match its action: {action.name}."
+            )
+
+
+def _validate_action_targets(
+    actions: tuple[SkillSyncAction, ...],
+    *,
+    project_root: Path,
+    home: Path,
+) -> None:
+    """Require every retained path to match its adapter deployment target."""
+    for action in actions:
+        expected = action.adapter.artifact_dir(
+            action.name,
+            action.scope,
+            project_root=project_root,
+            home=home,
+        )
+        if action.path != expected:
+            raise CommandError(
+                "Prepared Skill target does not match the apply context: "
+                f"{action.path} != {expected}."
+            )
+
+
+def _skill_sync_digest(actions: tuple[SkillSyncAction, ...]) -> str:
+    """Bind action order, exact artifacts, targets, and observed target states."""
+    payload: list[dict[str, object]] = []
+    for action in actions:
+        artifact = action.artifact
+        observation = action.target_observation
+        payload.append(
+            {
+                "action": action.action,
+                "name": action.name,
+                "adapter": action.adapter.name,
+                "scope": action.scope,
+                "path": str(action.path),
+                "artifact": (
+                    None
+                    if artifact is None
+                    else {
+                        "name": artifact.name,
+                        "adapter": artifact.adapter,
+                        "scope": artifact.scope,
+                        "content_hash": artifact.content_hash,
+                        "files": [
+                            {
+                                "path": item.relative_path,
+                                "sha256": hashlib.sha256(
+                                    item.content.encode("utf-8", errors="strict")
+                                ).hexdigest(),
+                            }
+                            for item in artifact.files
+                        ],
+                    }
+                ),
+                "target": (
+                    None
+                    if observation is None
+                    else {"kind": observation.kind, "digest": observation.digest}
+                ),
+            }
+        )
+    encoded = json.dumps(
+        payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _observe_skill_target(path: Path) -> SkillTargetObservation:
+    """Digest one tree through no-follow descriptors and stable identities."""
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        root_descriptor = os.open(path, flags)
+    except FileNotFoundError:
+        return _absent_target_observation()
+    except OSError as exc:
+        raise OwnershipError(
+            f"Skill target is not a regular directory: {path}."
+        ) from exc
+
+    try:
+        initial = os.fstat(root_descriptor)
+        entries = [_observed_entry(".", "directory", initial)]
+        _observe_directory_entries(
+            root_descriptor,
+            relative=Path(),
+            display=path,
+            entries=entries,
+        )
+        final = os.fstat(root_descriptor)
+        _require_stable_stat(initial, final, path)
+        try:
+            current = os.stat(path, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise CommandError(
+                f"Skill target changed during observation: {path}."
+            ) from exc
+        if not _same_identity(initial, current) or not stat.S_ISDIR(current.st_mode):
+            raise CommandError(f"Skill target changed during observation: {path}.")
+    finally:
+        os.close(root_descriptor)
+
+    encoded = json.dumps(
+        entries, ensure_ascii=True, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+    return SkillTargetObservation(
+        kind="directory", digest=hashlib.sha256(encoded).hexdigest()
+    )
+
+
+def _absent_target_observation() -> SkillTargetObservation:
+    """Return the canonical observation for an absent Skill target."""
+    payload = b'[{"kind":"absent"}]'
+    return SkillTargetObservation(
+        kind="absent", digest=hashlib.sha256(payload).hexdigest()
+    )
+
+
+def _observe_directory_entries(
+    descriptor: int,
+    *,
+    relative: Path,
+    display: Path,
+    entries: list[dict[str, object]],
+) -> None:
+    """Append a directory closure without following a replaced path entry."""
+    with os.scandir(descriptor) as iterator:
+        children = sorted(iterator, key=lambda entry: entry.name)
+    for child in children:
+        child_relative = relative / child.name
+        child_display = display / child.name
+        listed = child.stat(follow_symlinks=False)
+        if stat.S_ISLNK(listed.st_mode):
+            raise OwnershipError(
+                f"Refusing to observe symbolic link inside Skill target: {child_display}."
+            )
+        if stat.S_ISDIR(listed.st_mode):
+            flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+            kind = "directory"
+        elif stat.S_ISREG(listed.st_mode):
+            flags = os.O_RDONLY | os.O_NOFOLLOW
+            kind = "file"
+        else:
+            raise OwnershipError(
+                f"Unsupported entry inside Skill target: {child_display}."
+            )
+        try:
+            child_descriptor = os.open(child.name, flags, dir_fd=descriptor)
+        except OSError as exc:
+            raise CommandError(
+                f"Skill target changed during observation: {child_display}."
+            ) from exc
+        try:
+            initial = os.fstat(child_descriptor)
+            if not _same_identity(listed, initial):
+                raise CommandError(
+                    f"Skill target changed during observation: {child_display}."
+                )
+            entry = _observed_entry(child_relative.as_posix(), kind, initial)
+            entries.append(entry)
+            if kind == "directory":
+                _observe_directory_entries(
+                    child_descriptor,
+                    relative=child_relative,
+                    display=child_display,
+                    entries=entries,
+                )
+            else:
+                entry["sha256"] = _descriptor_digest(child_descriptor)
+            final = os.fstat(child_descriptor)
+            _require_stable_stat(initial, final, child_display)
+        finally:
+            os.close(child_descriptor)
+
+
+def _observed_entry(
+    path: str, kind: str, metadata: os.stat_result
+) -> dict[str, object]:
+    """Return the stable metadata represented in a target observation."""
+    return {
+        "path": path,
+        "kind": kind,
+        "mode": stat.S_IMODE(metadata.st_mode),
+    }
+
+
+def _descriptor_digest(descriptor: int) -> str:
+    """Hash all bytes from an already validated regular-file descriptor."""
+    digest = hashlib.sha256()
+    while chunk := os.read(descriptor, 1024 * 1024):
+        digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _same_identity(first: os.stat_result, second: os.stat_result) -> bool:
+    """Return whether two stat results identify the same filesystem object."""
+    return (first.st_dev, first.st_ino) == (second.st_dev, second.st_ino)
+
+
+def _require_stable_stat(
+    initial: os.stat_result,
+    final: os.stat_result,
+    path: Path,
+) -> None:
+    """Reject identity, kind, mode, size, or write-time changes during a read."""
+    fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")
+    if any(getattr(initial, field) != getattr(final, field) for field in fields):
+        raise CommandError(f"Skill target changed during observation: {path}.")
+
+
+@dataclass(frozen=True)
+class _AtomicPublication:
+    """Filesystem state retained for one atomic target replacement."""
+
+    backup: Path | None
+    backup_state: SkillTargetObservation | None
+    published_state: SkillTargetObservation
+
+
+def _atomic_rename_noreplace(source: Path, target: Path) -> None:
+    """Rename one directory only when the destination remains absent."""
+    _atomic_rename(source, target, mac_flag=0x00000004, linux_flag=0x1)
+
+
+def _atomic_exchange(first: Path, second: Path) -> None:
+    """Exchange two directories without exposing an absent destination."""
+    _atomic_rename(first, second, mac_flag=0x00000002, linux_flag=0x2)
+
+
+def _atomic_rename(
+    source: Path,
+    target: Path,
+    *,
+    mac_flag: int,
+    linux_flag: int,
+) -> None:
+    """Call the host's fail-closed atomic directory rename primitive."""
+    library = ctypes.CDLL(None, use_errno=True)
+    source_bytes = os.fsencode(source)
+    target_bytes = os.fsencode(target)
+    system = os.uname().sysname
+    if system == "Darwin":
+        operation = library.renamex_np
+        operation.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+        operation.restype = ctypes.c_int
+        result = operation(source_bytes, target_bytes, mac_flag)
+    elif system == "Linux" and hasattr(library, "renameat2"):
+        operation = library.renameat2
+        operation.argtypes = [
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        ]
+        operation.restype = ctypes.c_int
+        result = operation(-100, source_bytes, -100, target_bytes, linux_flag)
+    else:
+        raise CommandError(
+            "Atomic no-replace Skill publication is unavailable on this host."
+        )
+    if result != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), str(target))
+
+
+def _unused_sibling(path: Path, role: str) -> Path:
+    """Reserve and release one unique sibling name for an atomic rename."""
+    sibling = Path(
+        tempfile.mkdtemp(prefix=f".{path.name}.eutaxis-{role}-", dir=path.parent)
+    )
+    sibling.rmdir()
+    return sibling
+
+
+class _SkillWriteJournal:
+    """Publish complete targets atomically and preserve rollback conflicts."""
+
+    def __init__(self, paths: Collection[Path]) -> None:
+        self._paths = frozenset(paths)
+        self._publications: dict[Path, _AtomicPublication] = {}
+
+    def publish(
+        self,
+        path: Path,
+        artifact: RenderedArtifact,
+        expected: SkillTargetObservation,
+    ) -> None:
+        """Stage a complete artifact and atomically replace its target."""
+        self._require_unused(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        stage = Path(
+            tempfile.mkdtemp(prefix=f".{path.name}.eutaxis-stage-", dir=path.parent)
+        )
+        recorded = False
+        try:
+            for artifact_file in artifact.files:
+                _write_artifact_file(stage, artifact_file)
+            if _observe_skill_target(path) != expected:
+                raise CommandError(f"Skill target changed before replacement: {path}.")
+            if expected.kind == "absent":
+                os.chmod(stage, 0o755)
+                published = _observe_skill_target(stage)
+                _atomic_rename_noreplace(stage, path)
+                self._publications[path] = _AtomicPublication(
+                    backup=None,
+                    backup_state=None,
+                    published_state=published,
+                )
+            else:
+                os.chmod(stage, stat.S_IMODE(os.lstat(path).st_mode))
+                published = _observe_skill_target(stage)
+                _atomic_exchange(stage, path)
+                self._publications[path] = _AtomicPublication(
+                    backup=stage,
+                    backup_state=expected,
+                    published_state=published,
+                )
+            recorded = True
+            self._require_publication_matches(path)
+        except BaseException:
+            if not recorded and stage.is_dir():
+                shutil.rmtree(stage)
+            raise
+
+    def remove(self, path: Path, expected: SkillTargetObservation) -> None:
+        """Atomically displace one complete target before registry removal."""
+        self._require_unused(path)
+        if _observe_skill_target(path) != expected:
+            raise CommandError(f"Skill target changed before removal: {path}.")
+        backup = _unused_sibling(path, "previous")
+        _atomic_rename_noreplace(path, backup)
+        self._publications[path] = _AtomicPublication(
+            backup=backup,
+            backup_state=expected,
+            published_state=_absent_target_observation(),
+        )
+        self._require_publication_matches(path)
+
+    def verify_for_commit(self) -> None:
+        """Reject edits to published or displaced targets before commit."""
+        for path in self._publications:
+            self._require_publication_matches(path)
+
+    def commit(self) -> None:
+        """Retain prior targets as surfaced concurrent-edit recovery material."""
+
+    def retained_backups(self) -> Mapping[Path, Path]:
+        """Return committed prior targets that require explicit later cleanup."""
+        return {
+            path: publication.backup
+            for path, publication in self._publications.items()
+            if publication.backup is not None
+        }
+
+    def rollback_decision(self, path: Path) -> tuple[bool, str | None]:
+        """Restore an atomic replacement unless its published state changed."""
+        publication = self._publications.get(path)
+        if publication is None:
+            return False, None
+        try:
+            current = _observe_skill_target(path)
+        except BaseException as exc:
+            return (
+                False,
+                f"target {path}: rollback could not verify current state "
+                f"({type(exc).__name__}: {exc}); current content was preserved",
+            )
+        if current != publication.published_state:
+            retained = (
+                f"; prior target retained at {publication.backup}"
+                if publication.backup is not None
+                else ""
+            )
+            return (
+                False,
+                f"target {path}: content changed after the transaction write; "
+                f"the conflicting content was preserved{retained}",
+            )
+        backup = publication.backup
+        if backup is None:
+            if path.is_dir():
+                shutil.rmtree(path)
+        elif current.kind == "absent":
+            _atomic_rename_noreplace(backup, path)
+        else:
+            _atomic_exchange(path, backup)
+            if backup.is_dir():
+                shutil.rmtree(backup)
+        return False, None
+
+    def _require_publication_matches(self, path: Path) -> None:
+        """Require both sides of one atomic publication to retain exact state."""
+        publication = self._publications[path]
+        if _observe_skill_target(path) != publication.published_state:
+            raise CommandError(f"Published Skill target changed before commit: {path}.")
+        backup = publication.backup
+        if backup is not None and (
+            _observe_skill_target(backup) != publication.backup_state
+        ):
+            raise CommandError(
+                f"Displaced Skill target changed during publication: {path}."
+            )
+
+    def _require_unused(self, path: Path) -> None:
+        """Require one covered target without an earlier publication."""
+        if path not in self._paths:
+            raise RuntimeError(f"Write journal does not cover target: {path}")
+        if path in self._publications:
+            raise RuntimeError(f"Write journal target was already published: {path}")
 
 
 @contextmanager
@@ -347,15 +1061,21 @@ def skill_write_transaction(
     *,
     file_paths: Collection[Path] = (),
     externally_locked: bool = False,
-) -> Iterator[None]:
-    """Restore every target when one write in a managed set fails.
+    guarded_rollback: bool = False,
+) -> Iterator[_SkillWriteJournal]:
+    """Restore transaction-owned target states when a managed write fails.
 
     ``externally_locked`` is reserved for a transaction coordinator that
     already holds the deployment and registry locks continuously, in that
     order. Ordinary callers must use the default.
+
+    ``guarded_rollback`` is reserved for callers that publish through the
+    yielded journal. Such rollback preserves an untouched target and any
+    target changed after the journal's atomic publication.
     """
     unique_paths = tuple(dict.fromkeys(Path(path) for path in paths))
     unique_files = tuple(dict.fromkeys(Path(path) for path in file_paths))
+    journal = _SkillWriteJournal(unique_paths)
     deployment_lock = (
         nullcontext() if externally_locked else registry.deployment_locked()
     )
@@ -393,10 +1113,17 @@ def skill_write_transaction(
                 )
             try:
                 with registry.transaction(externally_locked=externally_locked):
-                    yield
+                    yield journal
+                journal.commit()
             except BaseException as primary:
                 cleanup_failures: list[str] = []
                 for path, backup in reversed(snapshots):
+                    if guarded_rollback:
+                        restore, conflict = journal.rollback_decision(path)
+                        if conflict is not None:
+                            cleanup_failures.append(conflict)
+                        if not restore:
+                            continue
                     try:
                         _restore_directory_snapshot(path, backup)
                     except BaseException as cleanup:

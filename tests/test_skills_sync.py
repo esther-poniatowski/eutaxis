@@ -3,13 +3,31 @@
 from __future__ import annotations
 
 import json
+import stat
+from dataclasses import replace
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 from eutaxis.cli import app
-from eutaxis.commands.synchronization import SkillSyncManifest
+from eutaxis.commands import (
+    CommandError,
+    CommandSource,
+    OwnershipError,
+    PreparedSkillSync,
+    Registry,
+    get_adapter,
+    verify_artifact,
+)
+from eutaxis.commands import synchronization as synchronization_module
+from eutaxis.commands.models import TargetsSpec
+from eutaxis.commands.synchronization import (
+    SkillSyncManifest,
+    apply_prepared_skill_sync,
+    prepare_skill_sync,
+)
 
 
 def _write_module(path: Path, name: str, body: str = "rule body\n") -> None:
@@ -54,6 +72,45 @@ def _skills(home: Path, *arguments: str):
         app,
         ["skills", *arguments, "--agent", "claude"],
         env={"HOME": str(home)},
+    )
+
+
+def _source(name: str, body: str) -> CommandSource:
+    """Return one direct source for prepared-publication tests."""
+    return CommandSource(
+        name=name,
+        description=f"{name} description",
+        invocation=("model", "user"),
+        failure_mode="visible",
+        scope_default="user",
+        targets=TargetsSpec(),
+        action=None,
+        body=body,
+    )
+
+
+def _prepare(sources: list[CommandSource], *, home: Path, project_root: Path):
+    """Prepare user-scope Claude actions against one isolated home."""
+    return prepare_skill_sync(
+        sources,
+        [get_adapter("claude")],
+        scope="user",
+        project_root=project_root,
+        home=home,
+    )
+
+
+def _tree_state(root: Path) -> tuple[tuple[str, bytes, int, int], ...]:
+    """Capture file bytes, modes, and modification times below one target."""
+    return tuple(
+        (
+            path.relative_to(root).as_posix(),
+            path.read_bytes(),
+            path.stat().st_mode,
+            path.stat().st_mtime_ns,
+        )
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
     )
 
 
@@ -340,3 +397,728 @@ def test_skills_sync_rejects_unsafe_name_in_manifest(tmp_path: Path) -> None:
 
     assert result.exit_code == 2, result.output
     assert "invalid deployments" in result.output
+
+
+def test_prepared_sync_writes_only_selected_exact_artifact(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    sources = [_source("alpha", "alpha body\n"), _source("beta", "beta body\n")]
+    prepared = _prepare(sources, home=home, project_root=tmp_path)
+    alpha, beta = prepared.actions
+    registry = Registry(home / ".eutaxis" / "state")
+
+    outcomes = apply_prepared_skill_sync(
+        prepared,
+        selected=(alpha,),
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+
+    assert [outcome.name for outcome in outcomes] == ["alpha"]
+    assert alpha.artifact is not None
+    verify_artifact(
+        alpha.artifact,
+        alpha.adapter,
+        scope=alpha.scope,
+        project_root=tmp_path,
+        home=home,
+    )
+    assert not beta.path.exists()
+
+
+def test_prepared_sync_preserves_unselected_target_bytes_and_metadata(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    sources = [_source("alpha", "alpha body\n"), _source("beta", "beta body\n")]
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(sources, home=home, project_root=tmp_path)
+    apply_prepared_skill_sync(
+        initial,
+        selected=(initial.actions[0],),
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    alpha_path = initial.actions[0].path
+    before = _tree_state(alpha_path)
+    prepared = _prepare(sources, home=home, project_root=tmp_path)
+    alpha, beta = prepared.actions
+
+    assert alpha.action == "unchanged"
+    apply_prepared_skill_sync(
+        prepared,
+        selected=(beta,),
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+
+    assert _tree_state(alpha_path) == before
+
+
+def test_prepared_sync_rejects_target_drift_before_any_write(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    prepared = _prepare(
+        [_source("alpha", "alpha body\n")], home=home, project_root=tmp_path
+    )
+    action = prepared.actions[0]
+    action.path.mkdir(parents=True)
+    marker = action.path / "concurrent.txt"
+    marker.write_text("concurrent content\n", encoding="utf-8")
+
+    with pytest.raises(CommandError, match="changed after preparation"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=(action,),
+            project_root=tmp_path,
+            home=home,
+            registry=Registry(home / ".eutaxis" / "state"),
+        )
+
+    assert marker.read_text(encoding="utf-8") == "concurrent content\n"
+    assert not (action.path / "SKILL.md").exists()
+
+
+def test_prepared_sync_rejects_changed_plan_and_foreign_selection(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    prepared = _prepare(
+        [_source("alpha", "alpha body\n")], home=home, project_root=tmp_path
+    )
+    registry = Registry(home / ".eutaxis" / "state")
+
+    object.__setattr__(prepared, "digest", "0" * 64)
+    with pytest.raises(CommandError, match="plan has changed"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=(prepared.actions[0],),
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+        )
+
+    prepared = _prepare(
+        [_source("alpha", "alpha body\n")], home=home, project_root=tmp_path
+    )
+    foreign = replace(prepared.actions[0])
+    with pytest.raises(CommandError, match="does not belong"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=(foreign,),
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+        )
+    assert not prepared.actions[0].path.exists()
+
+
+def test_prepared_sync_binds_the_apply_home_and_complete_plan(tmp_path: Path) -> None:
+    first_home = tmp_path / "first-home"
+    second_home = tmp_path / "second-home"
+    first_home.mkdir()
+    second_home.mkdir()
+    prepared = _prepare(
+        [_source("alpha", "alpha body\n"), _source("beta", "beta body\n")],
+        home=first_home,
+        project_root=tmp_path,
+    )
+
+    with pytest.raises(CommandError, match="does not match the apply context"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=(prepared.actions[0],),
+            project_root=tmp_path,
+            home=second_home,
+            registry=Registry(second_home / ".eutaxis" / "state"),
+        )
+
+    beta_marker = prepared.actions[1].path
+    beta_marker.mkdir(parents=True)
+    (beta_marker / "concurrent.txt").write_text("changed\n", encoding="utf-8")
+    with pytest.raises(CommandError, match="changed after preparation"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=(prepared.actions[0],),
+            project_root=tmp_path,
+            home=first_home,
+            registry=Registry(first_home / ".eutaxis" / "state"),
+        )
+
+    assert not prepared.actions[0].path.exists()
+    assert not (second_home / ".claude" / "skills" / "alpha").exists()
+
+
+def test_prepared_project_sync_binds_the_apply_root(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+    for path in (home, first_root, second_root):
+        path.mkdir()
+    prepared = prepare_skill_sync(
+        [_source("alpha", "alpha body\n")],
+        [get_adapter("claude")],
+        scope="project",
+        project_root=first_root,
+        home=home,
+    )
+
+    with pytest.raises(CommandError, match="does not match the apply context"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=second_root,
+            home=home,
+            registry=Registry(home / ".eutaxis" / "state"),
+        )
+
+    assert not (first_root / ".claude" / "skills" / "alpha").exists()
+    assert not (second_root / ".claude" / "skills" / "alpha").exists()
+
+
+def test_legacy_sync_reconciles_unchanged_registry_without_rewriting(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    sources = [_source("alpha", "alpha body\n")]
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(sources, home=home, project_root=tmp_path)
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    prepared = _prepare(sources, home=home, project_root=tmp_path)
+    assert prepared.actions[0].action == "unchanged"
+    before = _tree_state(prepared.actions[0].path)
+    registry.path.write_text("[]\n", encoding="utf-8")
+
+    synchronization_module.apply_skill_sync(
+        prepared.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+
+    assert _tree_state(prepared.actions[0].path) == before
+    assert (
+        registry.find(
+            name="alpha",
+            adapter="claude",
+            scope="user",
+            path=prepared.actions[0].path,
+        )
+        is not None
+    )
+
+
+def test_prepared_sync_final_verification_rolls_back_late_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    prepared = _prepare(
+        [_source("alpha", "alpha body\n"), _source("beta", "beta body\n")],
+        home=home,
+        project_root=tmp_path,
+    )
+    original_install = synchronization_module._install_artifact
+
+    def mutate_first_after_install(*args, **kwargs):
+        outcome = original_install(*args, **kwargs)
+        if args[0].name == "beta":
+            alpha = prepared.actions[0].path / "SKILL.md"
+            alpha.write_text("concurrent replacement\n", encoding="utf-8")
+        return outcome
+
+    monkeypatch.setattr(
+        synchronization_module, "_install_artifact", mutate_first_after_install
+    )
+
+    with pytest.raises(
+        synchronization_module.OwnershipError,
+        match="differs from the rendered artifact",
+    ):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=Registry(home / ".eutaxis" / "state"),
+        )
+
+    assert (prepared.actions[0].path / "SKILL.md").read_text(
+        encoding="utf-8"
+    ) == "concurrent replacement\n"
+    assert not prepared.actions[1].path.exists()
+
+
+def test_prepared_sync_preserves_concurrent_change_to_unwritten_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    prepared = _prepare(
+        [_source("alpha", "alpha body\n"), _source("beta", "beta body\n")],
+        home=home,
+        project_root=tmp_path,
+    )
+    alpha, beta = prepared.actions
+    original_install = synchronization_module._install_artifact
+
+    def change_second_after_first_write(*args, **kwargs):
+        outcome = original_install(*args, **kwargs)
+        if args[0].name == "alpha":
+            beta.path.mkdir(parents=True)
+            (beta.path / "concurrent.txt").write_text(
+                "concurrent content\n", encoding="utf-8"
+            )
+        return outcome
+
+    monkeypatch.setattr(
+        synchronization_module, "_install_artifact", change_second_after_first_write
+    )
+
+    with pytest.raises(CommandError, match="changed during publication"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=Registry(home / ".eutaxis" / "state"),
+        )
+
+    assert not alpha.path.exists()
+    assert (beta.path / "concurrent.txt").read_text(
+        encoding="utf-8"
+    ) == "concurrent content\n"
+
+
+def test_prepared_sync_rejects_finalize_registry_drift_and_rolls_back(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    prepared = _prepare(
+        [_source("alpha", "alpha body\n")], home=home, project_root=tmp_path
+    )
+    action = prepared.actions[0]
+    registry = Registry(home / ".eutaxis" / "state")
+
+    def remove_pending_row() -> None:
+        registry.remove(
+            name=action.name,
+            adapter=action.adapter.name,
+            scope=action.scope,
+            path=action.path,
+        )
+
+    with pytest.raises(OwnershipError, match="registry row differs"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+            finalize=remove_pending_row,
+        )
+
+    assert not action.path.exists()
+    assert (
+        registry.find(
+            name=action.name,
+            adapter=action.adapter.name,
+            scope=action.scope,
+            path=action.path,
+        )
+        is None
+    )
+
+
+def test_atomic_publish_keeps_original_after_staging_write_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(
+        [_source("alpha", "original body\n")], home=home, project_root=tmp_path
+    )
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    prepared = _prepare(
+        [_source("alpha", "updated body\n")], home=home, project_root=tmp_path
+    )
+    action = prepared.actions[0]
+    tree_before = _tree_state(action.path)
+    registry_before = registry.path.read_bytes()
+    original_write = synchronization_module._write_artifact_file
+    calls = 0
+
+    def fail_after_first_file(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("injected staging failure")
+        return original_write(*args, **kwargs)
+
+    monkeypatch.setattr(
+        synchronization_module, "_write_artifact_file", fail_after_first_file
+    )
+
+    with pytest.raises(OSError, match="injected staging failure"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+        )
+
+    assert _tree_state(action.path) == tree_before
+    assert registry.path.read_bytes() == registry_before
+
+
+def test_atomic_remove_restores_original_after_registry_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(
+        [_source("alpha", "original body\n")], home=home, project_root=tmp_path
+    )
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    action = initial.actions[0]
+    tree_before = _tree_state(action.path)
+    registry_before = registry.path.read_bytes()
+    prepared = prepare_skill_sync(
+        [],
+        [get_adapter("claude")],
+        scope="user",
+        project_root=tmp_path,
+        home=home,
+        managed_names_by_adapter={"claude": {"alpha"}},
+    )
+    original_uninstall = synchronization_module._uninstall_command
+
+    def fail_after_registry_removal(*args, **kwargs):
+        original_uninstall(*args, **kwargs)
+        raise OSError("injected removal failure")
+
+    monkeypatch.setattr(
+        synchronization_module, "_uninstall_command", fail_after_registry_removal
+    )
+
+    with pytest.raises(OSError, match="injected removal failure"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+        )
+
+    assert _tree_state(action.path) == tree_before
+    assert registry.path.read_bytes() == registry_before
+
+
+def test_atomic_update_restores_after_post_exchange_observation_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(
+        [_source("alpha", "original body\n")], home=home, project_root=tmp_path
+    )
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    prepared = _prepare(
+        [_source("alpha", "updated body\n")], home=home, project_root=tmp_path
+    )
+    target = prepared.actions[0].path
+    tree_before = _tree_state(target)
+    original_exchange = synchronization_module._atomic_exchange
+    original_observe = synchronization_module._observe_skill_target
+    exchanged = False
+    failed = False
+
+    def mark_exchange(first: Path, second: Path) -> None:
+        nonlocal exchanged
+        original_exchange(first, second)
+        exchanged = True
+
+    def fail_first_target_observation(path: Path):
+        nonlocal failed
+        if exchanged and not failed and path == target:
+            failed = True
+            raise OSError("injected post-exchange observation failure")
+        return original_observe(path)
+
+    monkeypatch.setattr(synchronization_module, "_atomic_exchange", mark_exchange)
+    monkeypatch.setattr(
+        synchronization_module,
+        "_observe_skill_target",
+        fail_first_target_observation,
+    )
+
+    with pytest.raises(OSError, match="post-exchange observation failure"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+        )
+
+    assert _tree_state(target) == tree_before
+    assert not tuple(target.parent.glob(".alpha.eutaxis-stage-*"))
+
+
+def test_atomic_remove_restores_after_post_rename_observation_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(
+        [_source("alpha", "original body\n")], home=home, project_root=tmp_path
+    )
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    target = initial.actions[0].path
+    tree_before = _tree_state(target)
+    prepared = prepare_skill_sync(
+        [],
+        [get_adapter("claude")],
+        scope="user",
+        project_root=tmp_path,
+        home=home,
+        managed_names_by_adapter={"claude": {"alpha"}},
+    )
+    original_rename = synchronization_module._atomic_rename_noreplace
+    original_observe = synchronization_module._observe_skill_target
+    renamed = False
+    failed = False
+
+    def mark_removal_rename(source: Path, destination: Path) -> None:
+        nonlocal renamed
+        original_rename(source, destination)
+        if source == target:
+            renamed = True
+
+    def fail_first_target_observation(path: Path):
+        nonlocal failed
+        if renamed and not failed and path == target:
+            failed = True
+            raise OSError("injected post-removal observation failure")
+        return original_observe(path)
+
+    monkeypatch.setattr(
+        synchronization_module, "_atomic_rename_noreplace", mark_removal_rename
+    )
+    monkeypatch.setattr(
+        synchronization_module,
+        "_observe_skill_target",
+        fail_first_target_observation,
+    )
+
+    with pytest.raises(OSError, match="post-removal observation failure"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+        )
+
+    assert _tree_state(target) == tree_before
+    assert not tuple(target.parent.glob(".alpha.eutaxis-previous-*"))
+
+
+def test_atomic_create_refuses_concurrent_empty_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    prepared = _prepare(
+        [_source("alpha", "alpha body\n")], home=home, project_root=tmp_path
+    )
+    target = prepared.actions[0].path
+    original_rename = synchronization_module._atomic_rename_noreplace
+
+    def create_target_before_claim(source: Path, destination: Path) -> None:
+        if destination == target:
+            target.mkdir(parents=True)
+            target.chmod(0o700)
+        original_rename(source, destination)
+
+    monkeypatch.setattr(
+        synchronization_module,
+        "_atomic_rename_noreplace",
+        create_target_before_claim,
+    )
+
+    with pytest.raises(OSError):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=Registry(home / ".eutaxis" / "state"),
+        )
+
+    assert target.is_dir()
+    assert stat.S_IMODE(target.stat().st_mode) == 0o700
+    assert not (target / "SKILL.md").exists()
+
+
+def test_successful_update_surfaces_retained_recovery_target(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(
+        [_source("alpha", "original body\n")], home=home, project_root=tmp_path
+    )
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    prepared = _prepare(
+        [_source("alpha", "updated body\n")], home=home, project_root=tmp_path
+    )
+
+    outcomes = apply_prepared_skill_sync(
+        prepared,
+        selected=prepared.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+
+    warning = next(
+        item for item in outcomes[0].warnings if item.startswith("Prior Skill retained")
+    )
+    recovery = Path(warning.split(": ", 1)[1])
+    assert recovery.is_dir()
+    assert "original body" in (recovery / "SKILL.md").read_text(encoding="utf-8")
+    assert "updated body" in (
+        prepared.actions[0].path / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+
+def test_target_observation_rejects_file_and_root_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "skill"
+    target.mkdir()
+    entrypoint = target / "SKILL.md"
+    entrypoint.write_text("content\n", encoding="utf-8")
+    external = tmp_path / "external"
+    external.write_text("external\n", encoding="utf-8")
+    original_open = synchronization_module.os.open
+
+    def replace_file_before_open(path, flags, *args, **kwargs):
+        if path == "SKILL.md" and kwargs.get("dir_fd") is not None:
+            entrypoint.unlink()
+            entrypoint.symlink_to(external)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(synchronization_module.os, "open", replace_file_before_open)
+    with pytest.raises(CommandError, match="changed during observation"):
+        synchronization_module._observe_skill_target(target)
+
+    monkeypatch.setattr(synchronization_module.os, "open", original_open)
+    entrypoint.unlink()
+    entrypoint.write_text("content\n", encoding="utf-8")
+    displaced = tmp_path / "displaced"
+    original_stat = synchronization_module.os.stat
+
+    def replace_root_before_final_stat(path, *args, **kwargs):
+        if Path(path) == target and kwargs.get("follow_symlinks") is False:
+            target.rename(displaced)
+            target.mkdir()
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(
+        synchronization_module.os, "stat", replace_root_before_final_stat
+    )
+    with pytest.raises(CommandError, match="changed during observation"):
+        synchronization_module._observe_skill_target(target)
+
+
+def test_prepared_sync_rejects_unissued_plan_and_defines_empty_selection(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    prepared = _prepare(
+        [_source("alpha", "alpha body\n")], home=home, project_root=tmp_path
+    )
+    forged = object.__new__(PreparedSkillSync)
+    for name, value in prepared.__dict__.items():
+        object.__setattr__(forged, name, value)
+
+    with pytest.raises(CommandError, match="was not issued here"):
+        apply_prepared_skill_sync(
+            forged,
+            selected=(),
+            project_root=tmp_path,
+            home=home,
+            registry=Registry(home / ".eutaxis" / "state"),
+        )
+
+    finalized: list[str] = []
+    outcomes = apply_prepared_skill_sync(
+        prepared,
+        selected=(),
+        project_root=tmp_path,
+        home=home,
+        registry=Registry(home / ".eutaxis" / "state"),
+        finalize=lambda: finalized.append("done"),
+    )
+
+    assert outcomes == ()
+    assert finalized == ["done"]
+    assert not prepared.actions[0].path.exists()

@@ -657,7 +657,7 @@ def test_sync_rolls_back_the_complete_route_after_a_late_write_failure(
         ),
         encoding="utf-8",
     )
-    original_install = synchronization_module.install_command
+    original_install = synchronization_module._install_artifact
 
     def fail_after_owner_write(*args, **kwargs):
         outcome = original_install(*args, **kwargs)
@@ -666,7 +666,7 @@ def test_sync_rolls_back_the_complete_route_after_a_late_write_failure(
         return outcome
 
     monkeypatch.setattr(
-        synchronization_module, "install_command", fail_after_owner_write
+        synchronization_module, "_install_artifact", fail_after_owner_write
     )
 
     result = _run(home, "sync", "-c", str(config), "--agent", "claude", "--apply")

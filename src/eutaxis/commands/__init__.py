@@ -26,7 +26,7 @@ assemble_skill
 install_artifact, install_artifacts, install_command, uninstall_command,
 diff_artifact, diff_command, verify_artifact
     Filesystem-effecting operations guarded by ownership markers.
-skill_write_transaction
+prepare_skill_sync, apply_prepared_skill_sync, skill_write_transaction
     Deployment lock and rollback boundary for a complete Skill write set.
 is_eutaxis_owned
     Ownership predicate for an artifact directory.
@@ -70,10 +70,14 @@ from .models import (
 from .registry import Registry, RegistryCorruptedError
 from .rendering import assemble_skill, check_failure_mode, render_command
 from .synchronization import (
+    PreparedSkillSync,
     SkillSyncAction,
     SkillSyncManifest,
+    SkillTargetObservation,
+    apply_prepared_skill_sync,
     apply_skill_sync,
     plan_skill_sync,
+    prepare_skill_sync,
     skill_write_transaction,
 )
 
@@ -90,14 +94,17 @@ __all__ = [
     "Registry",
     "RegistryCorruptedError",
     "RenderedArtifact",
+    "PreparedSkillSync",
     "SkillBudgetMeasurement",
     "SkillRenderInput",
     "SkillSyncAction",
     "SkillSyncManifest",
+    "SkillTargetObservation",
     "TemplateError",
     "all_adapters",
     "assemble_skill",
     "apply_skill_sync",
+    "apply_prepared_skill_sync",
     "check_failure_mode",
     "diff_command",
     "diff_artifact",
@@ -111,6 +118,7 @@ __all__ = [
     "measure_skill_budgets",
     "verify_artifact",
     "plan_skill_sync",
+    "prepare_skill_sync",
     "register_adapter",
     "render_command",
     "skill_write_transaction",
