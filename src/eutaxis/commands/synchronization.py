@@ -31,6 +31,7 @@ from .names import is_skill_name
 from .registry import Registry
 
 SYNC_MANIFEST_SCHEMA = "eutaxis:skill-sync-manifest@1"
+RETAINED_SKILLS_DIRECTORY = "retained-skills"
 
 
 class SkillSyncManifest:
@@ -527,6 +528,7 @@ def apply_prepared_skill_sync(
                     registry=registry,
                 )
             journal.verify_for_commit()
+            journal.prepare_commit()
             receipts = journal.publication_receipts()
             if before_commit is not None:
                 before_commit(receipts)
@@ -931,19 +933,29 @@ def _atomic_rename(
 
 def _unused_sibling(path: Path, role: str) -> Path:
     """Reserve and release one unique sibling name for an atomic rename."""
-    sibling = Path(
-        tempfile.mkdtemp(prefix=f".{path.name}.eutaxis-{role}-", dir=path.parent)
-    )
+    return _unused_child(path.parent, path.name, role)
+
+
+def _unused_child(parent: Path, name: str, role: str) -> Path:
+    """Reserve and release one unique child name for an atomic rename."""
+    sibling = Path(tempfile.mkdtemp(prefix=f".{name}.eutaxis-{role}-", dir=parent))
     sibling.rmdir()
     return sibling
+
+
+def _same_filesystem(first: Path, second: Path) -> bool:
+    """Return whether two existing paths support an atomic rename."""
+    return os.stat(first).st_dev == os.lstat(second).st_dev
 
 
 class _SkillWriteJournal:
     """Publish complete targets atomically and preserve rollback conflicts."""
 
-    def __init__(self, paths: Collection[Path]) -> None:
+    def __init__(self, paths: Collection[Path], recovery_root: Path) -> None:
         self._paths = frozenset(paths)
+        self._recovery_root = recovery_root.expanduser().resolve()
         self._publications: dict[Path, _AtomicPublication] = {}
+        self._prepared = False
 
     def publish(
         self,
@@ -1007,8 +1019,43 @@ class _SkillWriteJournal:
         for path in self._publications:
             self._require_publication_matches(path)
 
+    def prepare_commit(self) -> None:
+        """Move every displaced tree outside Skill discovery roots."""
+        if self._prepared:
+            return
+        for path in self._paths:
+            skill_root = path.parent.resolve()
+            if (
+                self._recovery_root == skill_root
+                or skill_root in self._recovery_root.parents
+            ):
+                raise CommandError(
+                    "Retained Skill root must be outside every Skill discovery "
+                    f"root: {self._recovery_root}."
+                )
+        self._recovery_root.mkdir(parents=True, exist_ok=True)
+        for path, publication in tuple(self._publications.items()):
+            backup = publication.backup
+            if backup is None:
+                continue
+            if not _same_filesystem(self._recovery_root, backup):
+                raise CommandError(
+                    "Retained Skill root must share a filesystem with its Skill "
+                    f"target: {path}."
+                )
+            retained = _unused_child(
+                self._recovery_root,
+                path.name,
+                "previous",
+            )
+            _atomic_rename_noreplace(backup, retained)
+            self._publications[path] = replace(publication, backup=retained)
+            self._require_publication_matches(path)
+        self._prepared = True
+
     def commit(self) -> None:
-        """Retain prior targets as surfaced concurrent-edit recovery material."""
+        """Retain prior targets outside every Skill discovery root."""
+        self.prepare_commit()
 
     def retained_backups(self) -> Mapping[Path, Path]:
         """Return committed prior targets that require explicit later cleanup."""
@@ -1081,6 +1128,8 @@ class _SkillWriteJournal:
 
     def _require_unused(self, path: Path) -> None:
         """Require one covered target without an earlier publication."""
+        if self._prepared:
+            raise RuntimeError("Skill write journal was already prepared for commit")
         if path not in self._paths:
             raise RuntimeError(f"Write journal does not cover target: {path}")
         if path in self._publications:
@@ -1108,7 +1157,10 @@ def skill_write_transaction(
     """
     unique_paths = tuple(dict.fromkeys(Path(path) for path in paths))
     unique_files = tuple(dict.fromkeys(Path(path) for path in file_paths))
-    journal = _SkillWriteJournal(unique_paths)
+    journal = _SkillWriteJournal(
+        unique_paths,
+        registry.state_dir / RETAINED_SKILLS_DIRECTORY,
+    )
     deployment_lock = (
         nullcontext() if externally_locked else registry.deployment_locked()
     )

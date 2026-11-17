@@ -1122,6 +1122,8 @@ def test_successful_update_surfaces_retained_recovery_target(tmp_path: Path) -> 
     assert receipts[0].retained_path == recovery
     assert receipts[0].published_state.kind == "directory"
     assert receipts[0].retained_state == prepared.actions[0].target_observation
+    assert recovery.parent == registry.state_dir / "retained-skills"
+    assert not tuple(prepared.actions[0].path.parent.glob(".*.eutaxis-stage-*"))
     assert recovery.is_dir()
     assert "original body" in (recovery / "SKILL.md").read_text(encoding="utf-8")
     assert "updated body" in (prepared.actions[0].path / "SKILL.md").read_text(
@@ -1157,6 +1159,134 @@ def test_precommit_receipt_failure_rolls_back_publication(tmp_path: Path) -> Non
             before_commit=lambda value: (_ for _ in ()).throw(
                 RuntimeError("receipt persistence failed")
             ),
+        )
+
+    assert "original body" in (prepared.actions[0].path / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert not tuple(prepared.actions[0].path.parent.glob(".*.eutaxis-stage-*"))
+    assert not tuple((registry.state_dir / "retained-skills").iterdir())
+
+
+def test_recovery_root_inside_skill_discovery_root_is_rejected(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    safe_registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(
+        [_source("alpha", "original body\n")], home=home, project_root=tmp_path
+    )
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=safe_registry,
+    )
+    prepared = _prepare(
+        [_source("alpha", "updated body\n")], home=home, project_root=tmp_path
+    )
+    unsafe_registry = Registry(prepared.actions[0].path.parent / "state")
+
+    with pytest.raises(CommandError, match="outside every Skill discovery root"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=unsafe_registry,
+        )
+
+    assert "original body" in (prepared.actions[0].path / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert not tuple(prepared.actions[0].path.parent.glob(".*.eutaxis-stage-*"))
+
+
+def test_recovery_relocation_failure_restores_original_skill(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(
+        [_source("alpha", "original body\n")], home=home, project_root=tmp_path
+    )
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    prepared = _prepare(
+        [_source("alpha", "updated body\n")], home=home, project_root=tmp_path
+    )
+    recovery_root = registry.state_dir / "retained-skills"
+    original_rename = synchronization_module._atomic_rename_noreplace
+
+    def fail_recovery_relocation(source: Path, destination: Path) -> None:
+        if destination.parent == recovery_root:
+            raise OSError("injected recovery relocation failure")
+        original_rename(source, destination)
+
+    monkeypatch.setattr(
+        synchronization_module,
+        "_atomic_rename_noreplace",
+        fail_recovery_relocation,
+    )
+
+    with pytest.raises(OSError, match="recovery relocation failure"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
+        )
+
+    assert "original body" in (prepared.actions[0].path / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert not tuple(prepared.actions[0].path.parent.glob(".*.eutaxis-stage-*"))
+    assert not tuple(recovery_root.iterdir())
+
+
+def test_cross_filesystem_recovery_root_restores_original_skill(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    registry = Registry(home / ".eutaxis" / "state")
+    initial = _prepare(
+        [_source("alpha", "original body\n")], home=home, project_root=tmp_path
+    )
+    apply_prepared_skill_sync(
+        initial,
+        selected=initial.actions,
+        project_root=tmp_path,
+        home=home,
+        registry=registry,
+    )
+    prepared = _prepare(
+        [_source("alpha", "updated body\n")], home=home, project_root=tmp_path
+    )
+    monkeypatch.setattr(
+        synchronization_module,
+        "_same_filesystem",
+        lambda first, second: False,
+    )
+
+    with pytest.raises(CommandError, match="must share a filesystem"):
+        apply_prepared_skill_sync(
+            prepared,
+            selected=prepared.actions,
+            project_root=tmp_path,
+            home=home,
+            registry=registry,
         )
 
     assert "original body" in (prepared.actions[0].path / "SKILL.md").read_text(
@@ -1214,8 +1344,10 @@ def test_publication_receipts_cover_create_update_and_remove(tmp_path: Path) -> 
     assert receipts[0].retained_path is None
     assert receipts[0].retained_state is None
     assert receipts[1].retained_path is not None
+    assert receipts[1].retained_path.parent == registry.state_dir / "retained-skills"
     assert receipts[1].retained_state == update.actions[0].target_observation
     assert receipts[2].retained_path is not None
+    assert receipts[2].retained_path.parent == registry.state_dir / "retained-skills"
     assert receipts[2].retained_state == remove.actions[0].target_observation
 
 
