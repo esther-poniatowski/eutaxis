@@ -15,11 +15,11 @@ The following work is complete.
 - [x] [Rule query and progressive disclosure](docs/adr/rule-level-access-to-modules.md) (`eutaxis rule show|list`, `disclosure: progressive`).
 - [x] [Loading-unit budgets](docs/guide/configuration.md#^skill-loading-budgets) for Skill entrypoints, read batches and complete activation routes.
 - [x] [Skills command](docs/guide/cli-reference.md#^skills-command): previews changes, removes only recorded artifacts and recovers idempotently.
+- [x] [Workspace-only Oikos pilot and first conversions](docs/internals/structured-declaration-system-plan.md): deploys the first structured Skills and verifies rollback.
 
 ## Priority
 
-- [ ] **Complete the external-source path and run the Oikos pilot.** Close every pre-pilot gate in the [staged implementation plan](docs/internals/structured-declaration-system-plan.md), then run the reversible pilot.
-- [ ] **Convert additional Oikos sources only after the pilot.** Do not rename the source directories before the pilot and its rollback gate pass.
+- [ ] **Complete the general external release path.** Publish and verify release capsules as specified in the [staged implementation plan](docs/internals/structured-declaration-system-plan.md).
 - [ ] Review the archived sources and decide which content to include, which can be deleted safely.
 - [ ] Implement a functionality to cleanup config files. This involves:
   - detecting the configs in Codex (TOML) and Claude code (JSON) that violate the recommended patterns,

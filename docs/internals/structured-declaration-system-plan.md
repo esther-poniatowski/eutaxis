@@ -177,7 +177,7 @@ Eutaxis now follows the settled design but must still close the release boundari
   - generates and validates canonical locks through the general command;
   - proves semantic comparison and rollback through general commands; and
   - emits the selected query packet and consumer artifacts.
-- The workspace-only Oikos pilot proceeds through the reviewed Git bridge specified by the [acquisition contract](../adr/external-declaration-identity-and-acquisition.md#^reviewed-declaration-releases). Its pilot ledger and consumer artifacts are complete; the repository-wide migration records remain pending.
+- The workspace-only Oikos pilot passed using the reviewed Git bridge specified by the [acquisition contract](../adr/external-declaration-identity-and-acquisition.md#^reviewed-declaration-releases).
 - SQLite remains conditional on measured JSON-index performance.
 
 ## Work sequence
@@ -325,8 +325,8 @@ This phase gives each host the smallest artifact that preserves the complete res
   - [x] Prove that the shared check facade rejects each rule forbidden by the matrix before any artifact is generated.
   - [x] Prove that a failed Skill write restores every changed file and registry entry to its pre-write value.
   - [ ] Confirm that structured `testing` triggers and stays inactive in the same contexts as the legacy Skill, with the same permitted invocation routes.
-  - [ ] Apply `testing` only after preview, golden and adversarial gates pass.
-  - [ ] After applying, independently compare the live artifact with the reviewed bytes.
+  - [x] Apply `testing` only after preview, golden and adversarial gates pass.
+  - [x] After applying, independently compare the live artifact with the reviewed bytes.
   - [ ] Roll back and report failure when the live bytes differ from the reviewed bytes.
 - [x] Emit normalized JSON query packets with context, trace, registry versions, hashes, source revisions, selection outcomes, and explicit successful completion.
 - [ ] Bundle rendered fallbacks for Skills whose deployment cannot guarantee catalog access.
@@ -379,7 +379,7 @@ This phase gives each host the smallest artifact that preserves the complete res
 The shared revision and serialization slice, both private source observers, candidate assembly, sealed semantic validation, safe lock-file boundaries, and the public lock command are implemented and adversarially accepted. The packaged observer permits production issuance only inside the no-argument running-distribution bootstrap. The workspace observer reads only manifest-declared paths, completes every authoritative read before verification, and rebinds every source identity and carrier sequence to the original live workspace and manifest at consumption. Candidate assembly retains those observations, constructs the complete lock, serializes exact canonical bytes, parses those bytes again, and authenticates the complete relation before single-use consumption. The validation transaction repeats ordinary locked acquisition, builds the complete semantic registry, exposes no authority outside the transaction, and returns exact bytes only after retiring its candidate and receipt. The command then writes those bytes to standard output, checks an existing lock without repair, or creates an absent lock through verified no-replace publication. The typed comparator now reports deterministic changes across authenticated corpora without treating transport metadata as semantics. Git proof remains deferred to transport generalization. The workspace-only Oikos pilot can now use the reviewed Git commit-and-revert bridge. Eutaxis still must append and validate capsule records for the general release path.
 - [x] Emit normalized query packets selected by the pilot; the generic packet is validated against the Oikos process-core declarations.
 - [x] Pilot one coherent Oikos rule set and one procedure through the complete external-source path.
-- [ ] Convert additional sources only after the pilot passes.
+- [x] Convert the first additional sources and verify both host outputs after the pilot.
 
 Each implementation item closes only after an independent adversarial review,
 repair of every high- and medium-severity finding, targeted verification, and a
@@ -744,11 +744,9 @@ The external resolution and composition checks report:
 - Sphinx regenerates the API reference with zero warnings
 - `git diff --check` passes
 
-The workspace-only pilot now has its accountability ledger and consumer
-projections. For this pilot, the reviewed Git commit retains the current output
-as the golden baseline and rollback target. However, the repository-wide scope
-and ledger remain pending. General capsule commands form separate release-system
-debt.
+Oikos binds its repository-wide migration scope and ledger to the reviewed
+sources and consumer projections. The pilot used a reviewed Git commit as its
+rollback target. General capsule commands remain open.
 
 **Exit evidence:** the external pilot cites its acquired revisions and survives validation, resolution, enforcement, rendering, and drift checking.
 
