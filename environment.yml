@@ -34,5 +34,5 @@ dependencies:
   - pip:
       - hodegos @ git+https://github.com/esther-poniatowski/hodegos.git@a151a28010058fda08a652aea345422037ff0d3c
       # Test dependency: the tests check the SARIF logs with `elenchos.profile`
-      - elenchos @ git+https://github.com/esther-poniatowski/elenchos.git@089a764aafd137d5095a77fe3dbdb9198e6ae85b
+      - elenchos @ git+https://github.com/esther-poniatowski/elenchos.git@33160b25e26226f50283a0503ba9c39796901ea2
 variables:
