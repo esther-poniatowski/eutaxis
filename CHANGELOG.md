@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - `--target-project` on the `skills` subcommands (except `list`) names the project that receives project-scope artifacts and fills `{{ project_root }}`. It defaults to the root, and it lets one configuration file install project-scope Skills into another project.
 - `--root` on `eutaxis rule` selects the authored modules of the configuration file found below that root.
 - `--dir` on `eutaxis scan` names the folder walked for instruction files.
+- The tests of `eutaxis declarations check` check its SARIF logs with `elenchos.profile`, the interface of the [findings profile of Elenchos](https://github.com/esther-poniatowski/elenchos/blob/main/docs/profile.md). Elenchos is a test dependency, pinned at commit `089a764a` in `environment.yml` and in the extra `dev`. The logs do not yet conform to the profile, so each test freezes the nodes of its log that break the profile, and fails when that list changes.
 
 ### Changed
 

@@ -29,6 +29,7 @@ The following work is complete.
 
 ## Next steps
 
+- [ ] **Conform the SARIF log of `eutaxis declarations check` to the [findings profile of Elenchos](https://github.com/esther-poniatowski/elenchos/blob/main/docs/profile.md).** The tests in `tests/test_declarations_check_cli.py` freeze the nodes that break the profile, and each frozen list becomes empty once the writer conforms. The `$schema` must name the schema of errata 01, and the driver name must be lowercase. The driver lacks a version and a default level for each rule. The run lacks `columnKind`, and a failed run lacks its notification of level `error`. Each result needs one location, whose logical name is `path:<path>#<locus>` and whose URI is relative to `SRCROOT`. The locus is the blocking part: the errors carry locations such as `$.relations[0].target`, and the profile requires a JSON Pointer. Converting that string in the writer would add one more field-path converter beside the one owned by Anagraphe. Therefore, the errors must carry a positional path, or the conversion must go through Anagraphe; the choice is open.
 - [ ] Let a consumer repository, such as Geonexus, hold `decision` declarations. Validate them with `eutaxis declarations check` outside Oikos, and render a Markdown reading view of each, showing its drivers, its options, the assessment of each option and its verdict. Geonexus migrates its decision records once both work.
 - [ ] Stabilize the prompt-family layout and starter templates
 - [ ] Implement scaffold CLI command for prompt-composition projects

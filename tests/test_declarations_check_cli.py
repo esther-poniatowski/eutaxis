@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from elenchos.profile import violations  # type: ignore[import-untyped]
 from typer.testing import CliRunner
 
 import eutaxis.declarations._cli as check_cli_module
@@ -209,6 +210,33 @@ def _sarif(result) -> dict[str, object]:
     return json.loads(result.stdout)
 
 
+# The writer does not yet conform to the findings profile of Elenchos (see TODO.md).
+# Each test therefore freezes the nodes of its log that break the profile. A new break
+# fails the test, and a repair fails it too, until the frozen list shrinks to the empty
+# list of a conforming log.
+_LOG_BREAKS = ("/$schema", "/runs/0/tool/driver", "/runs/0/tool/driver/name")
+"""Nodes of every log that break the profile: schema URI, driver version and name."""
+
+_LOCATED_BREAKS = (
+    "/runs/0",
+    "/runs/0/results/0/locations/0/logicalLocations/0/name",
+    "/runs/0/results/0/locations/0/physicalLocation/artifactLocation",
+    "/runs/0/tool/driver/rules/0",
+)
+"""Further nodes of a log holding one located result: `columnKind`, the resource of the
+logical name, the URI base, and the default level of the rule."""
+
+
+def _profile_breaks(report: object) -> list[str]:
+    """Return the sorted pointers of the log nodes reported by `elenchos.profile`."""
+    return sorted(violation.pointer for violation in violations(report))
+
+
+def _breaks(*pointers: str) -> list[str]:
+    """Return the sorted pointers of the frozen breaks of one log."""
+    return sorted((*_LOG_BREAKS, *pointers))
+
+
 def test_check_accepts_consumer_facets_and_emits_clean_sarif(tmp_path: Path) -> None:
     manifest = _write_workspace(tmp_path)
 
@@ -222,6 +250,7 @@ def test_check_accepts_consumer_facets_and_emits_clean_sarif(tmp_path: Path) -> 
     run = report["runs"][0]  # type: ignore[index]
     assert run["results"] == []
     assert run["invocations"] == [{"executionSuccessful": True}]
+    assert _profile_breaks(report) == _breaks()
 
 
 @pytest.mark.parametrize(
@@ -248,7 +277,9 @@ def test_check_accepts_permitted_rule_skill_placement(
     result = _invoke(tmp_path, manifest)
 
     assert result.exit_code == 0
-    assert _sarif(result)["runs"][0]["results"] == []  # type: ignore[index]
+    report = _sarif(result)
+    assert report["runs"][0]["results"] == []  # type: ignore[index]
+    assert _profile_breaks(report) == _breaks()
 
 
 @pytest.mark.parametrize(
@@ -275,9 +306,11 @@ def test_check_rejects_forbidden_rule_skill_placement(
     result = _invoke(tmp_path, manifest)
 
     assert result.exit_code == 1
-    finding = _sarif(result)["runs"][0]["results"][0]  # type: ignore[index]
+    report = _sarif(result)
+    finding = report["runs"][0]["results"][0]  # type: ignore[index]
     assert finding["ruleId"] == "eutaxis.declarations.registry"
     assert finding["locations"][0]["logicalLocations"] == [{"name": "$.invocation"}]
+    assert _profile_breaks(report) == _breaks(*_LOCATED_BREAKS)
     assert "geonexus/skill-rule" in finding["message"]["text"]
     assert message in finding["message"]["text"]
 
@@ -298,6 +331,7 @@ def test_check_reports_a_located_declaration_schema_finding(tmp_path: Path) -> N
     physical = finding["locations"][0]["physicalLocation"]
     assert physical["artifactLocation"]["uri"].endswith("repository-rule.yaml")
     assert physical["region"]["startLine"] > 0
+    assert _profile_breaks(report) == _breaks(*_LOCATED_BREAKS)
 
 
 def test_check_reports_a_cross_record_registry_finding(tmp_path: Path) -> None:
@@ -316,6 +350,7 @@ def test_check_reports_a_cross_record_registry_finding(tmp_path: Path) -> None:
     assert finding["locations"][0]["logicalLocations"] == [
         {"name": "$.relations[0].target"}
     ]
+    assert _profile_breaks(report) == _breaks(*_LOCATED_BREAKS)
 
 
 def test_check_reports_an_incomplete_decision_matrix(tmp_path: Path) -> None:
@@ -362,6 +397,7 @@ def test_check_reports_an_incomplete_decision_matrix(tmp_path: Path) -> None:
     assert finding["locations"][0]["logicalLocations"] == [
         {"name": "$.options[0].assessments"}
     ]
+    assert _profile_breaks(report) == _breaks(*_LOCATED_BREAKS)
 
 
 def test_check_reports_operational_failure_as_sarif(tmp_path: Path) -> None:
@@ -374,6 +410,14 @@ def test_check_reports_operational_failure_as_sarif(tmp_path: Path) -> None:
     run = report["runs"][0]  # type: ignore[index]
     assert run["invocations"] == [{"executionSuccessful": False}]
     assert run["results"][0]["ruleId"] == "eutaxis.acquisition.io"
+    assert _profile_breaks(report) == _breaks(
+        "/runs/0",
+        "/runs/0/invocations/0",
+        "/runs/0/results/0/locations/0",
+        "/runs/0/results/0/locations/0/physicalLocation/artifactLocation",
+        "/runs/0/results/0/locations/0/physicalLocation/artifactLocation/uri",
+        "/runs/0/tool/driver/rules/0",
+    )
 
 
 def test_check_maps_unexpected_workspace_open_failure_to_exit_two(
@@ -396,6 +440,12 @@ def test_check_maps_unexpected_workspace_open_failure_to_exit_two(
     run = report["runs"][0]  # type: ignore[index]
     assert run["invocations"] == [{"executionSuccessful": False}]
     assert run["results"][0]["ruleId"] == "eutaxis.execution.internal"
+    assert _profile_breaks(report) == _breaks(
+        "/runs/0",
+        "/runs/0/invocations/0",
+        "/runs/0/results/0",
+        "/runs/0/tool/driver/rules/0",
+    )
 
 
 def test_check_promotes_cleanup_failure_without_hiding_corpus_finding(
@@ -437,6 +487,15 @@ def test_check_promotes_cleanup_failure_without_hiding_corpus_finding(
         "eutaxis.declarations.schema",
     ]
     assert [item["ruleIndex"] for item in run["results"]] == [0, 1]
+    assert _profile_breaks(report) == _breaks(
+        "/runs/0",
+        "/runs/0/invocations/0",
+        "/runs/0/results/0",
+        "/runs/0/results/1/locations/0/logicalLocations/0/name",
+        "/runs/0/results/1/locations/0/physicalLocation/artifactLocation",
+        "/runs/0/tool/driver/rules/0",
+        "/runs/0/tool/driver/rules/1",
+    )
 
 
 def test_check_maps_stalled_stdout_to_exit_two(

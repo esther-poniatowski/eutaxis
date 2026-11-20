@@ -50,6 +50,8 @@ dev = [
     "pytest-cov",
     "mypy",
     "types-pyyaml",
+    # The tests check the SARIF logs of `eutaxis declarations check` with `elenchos.profile`.
+    "elenchos @ git+https://github.com/esther-poniatowski/elenchos.git@089a764aafd137d5095a77fe3dbdb9198e6ae85b",
 ]
 
 
