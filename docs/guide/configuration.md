@@ -7,7 +7,7 @@ index: ""
 
 # Configuration
 
-The `generate` command reads a YAML configuration file that declares shared sources, per-agent sources, and output targets. The configuration file is named `eutaxis.yml` and lies at one of the places that [Hodegos](https://github.com/esther-poniatowski/hodegos/blob/main/docs/specification.md) searches: the project root, its subfolder `.config/`, or a folder that the `hodegos.yml` of the root declares. Relative paths written in the file resolve against the root of the command, never against the folder of the file, so the file moves between these places without an edit. The resolution of the root and the lookup of the file are stated in [Root and configuration file](cli-reference.md#root-and-configuration-file).
+The `generate` command reads a YAML configuration file that declares shared sources, per-agent sources, and output targets. The configuration file is named `eutaxis.yml` and lies at one of the places that [Hodegos](https://github.com/esther-poniatowski/hodegos/blob/main/docs/specification.md) searches: the project root, its subfolder `.config/`, or its subfolder `config/`. A file kept in another folder, such as `shared/`, is named with the configuration option `--config`. Relative paths written in the file resolve against the root of the command, never against the folder of the file, so the file moves between these places without an edit. The resolution of the root and the lookup of the file are stated in [Root and configuration file](cli-reference.md#root-and-configuration-file).
 
 ## Top-level keys
 

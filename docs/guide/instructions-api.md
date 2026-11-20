@@ -23,7 +23,7 @@ generator.write_all()
 
 ## Configuration loading
 
-`load_config(config_path, root=None)` loads a YAML instruction config and returns an `InstructionConfig`. The current format is `_schema: eutaxis:configuration@2`, the value of `CONFIG_SCHEMA`. The reader also accepts legacy version 1 files, but only version 2 admits declaration sources. The relative source and target paths of the file resolve against `root`. Without `root`, they resolve against the folder of the file. A file kept in `.config/` or in a folder that `hodegos.yml` declares therefore needs `root`, such as the root that `discover_configuration` returns.
+`load_config(config_path, root=None)` loads a YAML instruction config and returns an `InstructionConfig`. The current format is `_schema: eutaxis:configuration@2`, the value of `CONFIG_SCHEMA`. The reader also accepts legacy version 1 files, but only version 2 admits declaration sources. The relative source and target paths of the file resolve against `root`. Without `root`, they resolve against the folder of the file. A file kept in `.config/` or in `config/` therefore needs `root`, such as the root that `discover_configuration` returns.
 
 ```python
 from pathlib import Path
