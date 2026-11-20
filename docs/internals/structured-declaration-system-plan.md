@@ -786,7 +786,7 @@ conda run -n eutaxis env PYTHONPATH=src python -m specs.verify_release_capsule "
 - [x] Test an initial capsule and a successor that retires a target.
 - [x] Build and verify a draft bundle from real Oikos compiler outputs. The trial rebuilt all 14 generated files from stored sources and rejected a changed source, lock, or output and an omitted target.
 - [x] Prepare an initial bundle from authenticated workspace sources, staged compiler outputs and reviewed golden files through a reusable command. The command reproduced the Oikos trial capsule digest.
-- [ ] Prepare successor bundles with typed changes and predecessor bindings.
+- [x] Prepare successor bundles with typed changes and predecessor bindings. The Oikos trial changed one rule and recorded the two files of a retired Skill as absent. The verifier accepted both capsules from the successor bundle. Rebuilding from stored sources reproduced all 12 published files.
 - [ ] Let operators approve, activate, recover and roll back releases under the release contract.
 
 #### Prepare an initial bundle
@@ -820,3 +820,16 @@ conda run -n eutaxis env PYTHONPATH=src python -m specs.prepare_release_capsule 
 The command verifies the bundle before publishing it at an absent path and
 prints its digest. Use that digest with the draft verifier to check the bundle
 again after moving or unpacking it.
+
+#### Prepare a successor bundle
+
+Use the same command with `--predecessor-bundle "$prior_bundle"` and
+`--predecessor "$prior_digest"`. Supply only `outputs` and `distribution`
+in the JSON plan. Eutaxis reads the baseline from the prior bundle. Describe
+the complete set of new outputs in the plan. Each prior target omitted
+from that set becomes explicitly absent.
+
+The successor carries the verified history. Its review packet binds the
+source records, output maps and typed semantic changes. The verifier
+recomputes the changes from both semantic snapshots and checks every
+ancestor. Verify the successor by its digest with the same verifier command.

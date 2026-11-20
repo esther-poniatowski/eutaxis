@@ -80,6 +80,17 @@ def compare_external_declarations(
     candidate_state = _issued_external_result_state(candidate)
     baseline_objects = _semantic_objects(baseline_state)
     candidate_objects = _semantic_objects(candidate_state)
+    comparison = _compare_semantic_objects(baseline_objects, candidate_objects)
+    _require_unchanged_authority(baseline, baseline_state)
+    _require_unchanged_authority(candidate, candidate_state)
+    return comparison
+
+
+def _compare_semantic_objects(
+    baseline_objects: Mapping[SemanticObjectKey, Mapping[str, JsonValue]],
+    candidate_objects: Mapping[SemanticObjectKey, Mapping[str, JsonValue]],
+) -> SemanticComparison:
+    """Compare typed semantic projections independently of acquisition."""
     differences: list[SemanticDifference] = []
     for key in sorted(
         baseline_objects.keys() | candidate_objects.keys(),
@@ -120,8 +131,6 @@ def compare_external_declarations(
                     )
                 )
 
-    _require_unchanged_authority(baseline, baseline_state)
-    _require_unchanged_authority(candidate, candidate_state)
     return SemanticComparison(tuple(differences))
 
 

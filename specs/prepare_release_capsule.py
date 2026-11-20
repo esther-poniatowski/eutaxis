@@ -1,9 +1,10 @@
-"""Prepare a draft initial declaration release from staged compiler outputs."""
+"""Prepare a draft declaration release from staged compiler outputs."""
 
 from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -28,10 +29,36 @@ from eutaxis.declarations.external_result import (
     _issued_external_result_state,
     open_external_declaration_acquisition_from_path,
 )
-from eutaxis.declarations.markdown_projection import _thaw_json
-from eutaxis.declarations.semantic_comparison import _key_order, _semantic_objects
+from eutaxis.declarations.semantic_comparison import _semantic_objects
 
-from .verify_release_capsule import _digest, _locked_workspace_files, verify_bundle
+from .release_semantics import encode_differences, encode_snapshot
+from .verify_release_capsule import (
+    _digest,
+    _load_record,
+    _locked_workspace_files,
+    _open_bundle_blobs,
+    _read,
+    verify_bundle,
+    verify_capsule,
+)
+
+
+@dataclass(frozen=True)
+class Predecessor:
+    """Locate the preceding bundle and pin its expected capsule digest."""
+
+    bundle: Path
+    address: str
+
+
+@dataclass(frozen=True)
+class _PriorReview:
+    """Carry the verified predecessor inputs for the successor comparison."""
+
+    targets: dict[str, str | None]
+    acquisition: str
+    semantics_address: str
+    semantics_bytes: bytes
 
 
 class _Snapshot:
@@ -96,7 +123,7 @@ def _read_target_map(
 
 
 def _read_review_inputs(
-    plan: Path, writer: _BlobWriter
+    plan: Path, writer: _BlobWriter, *, initial: bool
 ) -> tuple[dict[str, str | None], dict[str, str | None], str | None, str]:
     """Capture the explicit compiler outputs, baseline, ledger and distribution."""
     with _trusted_directory_from_workspace_path(str(plan.parent)) as root:
@@ -105,18 +132,20 @@ def _read_review_inputs(
             values = json.loads(
                 snapshot.read(plan.name), object_pairs_hook=_unique_object
             )
-            fields = {"outputs", "goldens", "accountability-ledger", "distribution"}
+            fields = {"outputs", "distribution"}
+            if initial:
+                fields |= {"goldens", "accountability-ledger"}
             if not isinstance(values, dict) or values.keys() != fields:
                 raise ValueError(
-                    "Plan requires outputs, goldens, accountability-ledger and distribution"
+                    f"Plan requires exactly these fields: {', '.join(sorted(fields))}"
                 )
             baseline = _read_target_map(
-                snapshot, writer, values["goldens"], baseline=True
+                snapshot, writer, values.get("goldens", {}), baseline=True
             )
             outputs = _read_target_map(
                 snapshot, writer, values["outputs"], baseline=False
             )
-            ledger_path = values["accountability-ledger"]
+            ledger_path = values.get("accountability-ledger")
             ledger = (
                 None if ledger_path is None else writer.put(snapshot.read(ledger_path))
             )
@@ -131,7 +160,7 @@ def _capture_acquisition(
     lock: str,
     distribution: str,
     writer: _BlobWriter,
-) -> tuple[dict[str, object], str]:
+) -> tuple[dict[str, object], bytes]:
     """Bind authenticated acquisition bytes and typed semantic objects."""
     with open_external_declaration_acquisition_from_path(
         str(workspace), manifest, lock
@@ -157,18 +186,7 @@ def _capture_acquisition(
                     writer.put(content)
                 snapshot.verify()
 
-        objects = _semantic_objects(state)
-        semantics = writer.record(
-            [
-                {
-                    "kind": key.object_kind.value,
-                    "id": key.id,
-                    "version": key.version,
-                    "value": _thaw_json(objects[key]),
-                }
-                for key in sorted(objects, key=_key_order)
-            ]
-        )
+        semantics = encode_snapshot(_semantic_objects(state))
         authorization = {
             "acquisition-manifest": {
                 "path": manifest,
@@ -185,8 +203,33 @@ def _capture_acquisition(
     return authorization, semantics
 
 
+def _retain_predecessor(predecessor: Predecessor, writer: _BlobWriter) -> _PriorReview:
+    """Copy the verified predecessor chain into the candidate byte store."""
+    with _open_bundle_blobs(predecessor.bundle) as blobs:
+        verify_capsule(blobs, predecessor.address)
+        capsule = _load_record(blobs, predecessor.address, "release")
+        review = _load_record(blobs, capsule["review-packet"], "review")
+        semantics = review["semantics"]["candidate"]
+        prior = _PriorReview(
+            capsule["managed-targets"],
+            review["acquisition"]["candidate"],
+            semantics,
+            _read(blobs, semantics),
+        )
+        blobs.verify()
+        for content in blobs.observed_bytes():
+            writer.put(content)
+    return prior
+
+
 def prepare_bundle(
-    workspace: Path, manifest: str, lock: str, plan: Path, bundle: Path
+    workspace: Path,
+    manifest: str,
+    lock: str,
+    plan: Path,
+    bundle: Path,
+    *,
+    predecessor: Predecessor | None = None,
 ) -> str:
     """Verify and publish a draft bundle at an absent path."""
     workspace = workspace.absolute()
@@ -198,30 +241,51 @@ def prepare_bundle(
     with TemporaryDirectory(prefix=".eutaxis-release-", dir=bundle.parent) as staging:
         candidate = Path(staging) / "bundle"
         writer = _BlobWriter(candidate)
-        baseline, outputs, ledger, distribution = _read_review_inputs(plan, writer)
-        authorization, semantics = _capture_acquisition(
+        baseline, outputs, ledger, distribution = _read_review_inputs(
+            plan, writer, initial=predecessor is None
+        )
+        authorization, semantics_bytes = _capture_acquisition(
             workspace, manifest, lock, distribution, writer
         )
+        semantics = writer.put(semantics_bytes)
+        baseline_acquisition = None
+        predecessor_address = None
+        initial_baseline: dict[str, object] | None = {
+            "accountability-ledger": ledger,
+            "golden-targets": baseline,
+        }
+        semantic_review = {
+            "kind": "initial",
+            "accountability-ledger": ledger,
+            "candidate": semantics,
+        }
+        if predecessor is not None:
+            prior = _retain_predecessor(predecessor, writer)
+            baseline = prior.targets
+            baseline_acquisition = prior.acquisition
+            predecessor_address = predecessor.address
+            initial_baseline = None
+            semantic_review = {
+                "kind": "successor",
+                "baseline": prior.semantics_address,
+                "candidate": semantics,
+                "differences": writer.put(
+                    encode_differences(prior.semantics_bytes, semantics_bytes)
+                ),
+            }
         binding = {
             "_schema": "eutaxis:declaration-release@1",
-            "predecessor": None,
-            "initial-baseline": {
-                "accountability-ledger": ledger,
-                "golden-targets": baseline,
-            },
+            "predecessor": predecessor_address,
+            "initial-baseline": initial_baseline,
             **authorization,
             "managed-targets": dict.fromkeys(baseline) | outputs,
         }
         review = {
             "_schema": "eutaxis:declaration-review@1",
             "candidate-binding": _digest(jcs_bytes(binding)),
-            "semantics": {
-                "kind": "initial",
-                "accountability-ledger": ledger,
-                "candidate": semantics,
-            },
+            "semantics": semantic_review,
             "acquisition": {
-                "baseline": None,
+                "baseline": baseline_acquisition,
                 "candidate": writer.record(authorization),
             },
             "artifacts": {
@@ -236,7 +300,7 @@ def prepare_bundle(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Prepare one initial bundle and print its digest to standard output."""
+    """Prepare one initial or successor bundle and print its digest."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True, type=Path)
     parser.add_argument("--manifest", required=True, help="Workspace-relative manifest")
@@ -247,10 +311,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--bundle", required=True, type=Path, help="Absent bundle directory"
     )
+    parser.add_argument(
+        "--predecessor-bundle", type=Path, help="Prior bundle directory"
+    )
+    parser.add_argument("--predecessor", help="Expected prior capsule digest")
     args = parser.parse_args(argv)
+    if (args.predecessor_bundle is None) != (args.predecessor is None):
+        parser.error("--predecessor-bundle and --predecessor must be supplied together")
+    predecessor = (
+        None
+        if args.predecessor is None
+        else Predecessor(args.predecessor_bundle, args.predecessor)
+    )
     try:
         address = prepare_bundle(
-            args.workspace, args.manifest, args.lock, args.plan, args.bundle
+            args.workspace,
+            args.manifest,
+            args.lock,
+            args.plan,
+            args.bundle,
+            predecessor=predecessor,
         )
     except (
         AcquisitionContractError,

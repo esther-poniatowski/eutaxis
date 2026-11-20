@@ -57,6 +57,7 @@ def _release(
     omit_retired: bool = False,
     change_after_review: bool = False,
     omit_workspace: bool = False,
+    incorrect_diff: bool = False,
 ) -> tuple[str, str, str]:
     """Build a complete candidate and its review in the fixture store."""
     initial = prior is None
@@ -65,7 +66,7 @@ def _release(
     new = {"host/new.md": _store(blobs, b"new instructions")}
     outputs = old if initial else new
     ledger = _store(blobs, b"legacy ledger")
-    semantics = _store(blobs, jcs_bytes({"declarations": ["example/rule"]}))
+    semantics = _store(blobs, jcs_bytes([]))
     workspace_files = {
         path: _store(blobs, content) for path, content in acquisition.files.items()
     }
@@ -107,7 +108,7 @@ def _release(
                 "kind": "successor",
                 "baseline": prior_semantics,
                 "candidate": semantics,
-                "differences": _store(blobs, jcs_bytes([])),
+                "differences": _store(blobs, jcs_bytes([{}] if incorrect_diff else [])),
             }
         ),
         "acquisition": {
@@ -157,6 +158,23 @@ def test_rejects_omitted_retired_target_even_with_valid_digests(
     initial = _release(blobs, acquisition)
     successor = _release(blobs, acquisition, prior=initial, omit_retired=True)
     with pytest.raises(ValueError, match="include every prior and candidate target"):
+        verify_capsule(blobs, successor[0])
+
+
+def test_rejects_readdressed_incorrect_diff(acquisition: Snapshot) -> None:
+    blobs: dict[str, bytes] = {}
+    initial = _release(blobs, acquisition)
+    successor = _release(blobs, acquisition, prior=initial, incorrect_diff=True)
+    with pytest.raises(ValueError, match="differences do not match"):
+        verify_capsule(blobs, successor[0])
+
+
+def test_successor_checks_ancestor_only_payload(acquisition: Snapshot) -> None:
+    blobs: dict[str, bytes] = {}
+    initial = _release(blobs, acquisition)
+    successor = _release(blobs, acquisition, prior=initial)
+    blobs[_store(blobs, b"legacy ledger")] = b"changed"
+    with pytest.raises(ValueError, match="Stored bytes differ"):
         verify_capsule(blobs, successor[0])
 
 

@@ -115,3 +115,104 @@ def test_prepare_rejects_fault_without_publishing(
     assert diagnostic in captured.err
     assert not bundle.exists()
     assert not list(bundle.parent.glob(".eutaxis-release-*"))
+
+
+def test_prepare_successor_chain(
+    setup_release: ReleaseFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    args, plan, initial, lock = setup_release
+    assert main([*args, "--bundle", str(initial)]) == 0
+    initial_address = capsys.readouterr().out.strip()
+    assert len(initial_address) == 71
+    plan.write_text(
+        json.dumps(
+            {
+                "outputs": {"host/replacement.md": "compiled.md"},
+                "distribution": "distribution.tar",
+            }
+        )
+    )
+    source = lock.parent / "declarations" / "process-core.yaml"
+    old = source.read_text()
+    source.write_text(old.replace("reader-facing purpose", "reader-facing goal"))
+    result = _invoke(lock.parent, "declarations/acquisition.yaml")
+    assert result.exit_code == 0, result.stderr
+    lock.write_bytes(result.stdout_bytes)
+
+    successor = initial.with_name("successor")
+    successor_args = [
+        *args,
+        "--bundle",
+        str(successor),
+        "--predecessor-bundle",
+        str(initial),
+        "--predecessor",
+        initial_address,
+    ]
+    assert main(successor_args) == 0
+    address = capsys.readouterr().out.strip()
+    store = successor / "blobs" / "sha256"
+
+    def read(digest: str) -> bytes:
+        """Read exact bytes from the successor store."""
+        return (store / digest.removeprefix("sha256:")).read_bytes()
+
+    capsule = json.loads(read(address))
+    review = json.loads(read(capsule["review-packet"]))
+    diff = json.loads(read(review["semantics"]["differences"]))
+    assert capsule["predecessor"] == initial_address
+    assert capsule["initial-baseline"] is None
+    assert capsule["managed-targets"]["host/new.md"] is None
+    assert capsule["managed-targets"]["host/old.md"] is None
+    assert [(row["id"], row["change"]) for row in diff] == [
+        ("oikos/process-core", "modified")
+    ]
+    assert review["acquisition"]["baseline"] != review["acquisition"]["candidate"]
+    verify_bundle(successor, address)
+    verify_bundle(successor, initial_address)
+
+    after = initial.with_name("after")
+    assert (
+        main(
+            [
+                *args,
+                "--bundle",
+                str(after),
+                "--predecessor-bundle",
+                str(successor),
+                "--predecessor",
+                address,
+            ]
+        )
+        == 0
+    )
+    after_address = capsys.readouterr().out.strip()
+    verify_bundle(after, after_address)
+    verify_bundle(after, initial_address)
+
+
+def test_prepare_rejects_wrong_predecessor(
+    setup_release: ReleaseFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    args, plan, initial, _ = setup_release
+    assert main([*args, "--bundle", str(initial)]) == 0
+    capsys.readouterr()
+    plan.write_text(json.dumps({"outputs": {}, "distribution": "distribution.tar"}))
+    output = initial.with_name("successor")
+    with pytest.raises(SystemExit) as error:
+        main(
+            [
+                *args,
+                "--bundle",
+                str(output),
+                "--predecessor-bundle",
+                str(initial),
+                "--predecessor",
+                "sha256:" + "0" * 64,
+            ]
+        )
+    assert error.value.code == 1
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "Preparation failed" in captured.err
+    assert not output.exists()

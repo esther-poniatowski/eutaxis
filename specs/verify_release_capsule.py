@@ -6,6 +6,8 @@ import argparse
 import hashlib
 import json
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
@@ -28,6 +30,8 @@ from eutaxis.declarations.byte_carriers import (
 )
 from eutaxis.declarations.canonical_json import jcs_bytes, parse_canonical_json_bytes
 from eutaxis.declarations.exceptions import AcquisitionContractError, ByteCarrierError
+
+from .release_semantics import encode_differences
 
 ACQUISITION_FIELDS = (
     "acquisition-manifest",
@@ -59,13 +63,20 @@ class _BundleBlobs:
         if match is None:
             raise ValueError(f"Invalid blob address: {address!r}")
         if address not in self._observations:
-            self._observations[address] = self._directory.read_authoritative(match[1])
+            observation = self._directory.read_optional_authoritative(match[1])
+            if observation is None:
+                raise KeyError(address)
+            self._observations[address] = observation
         return self._observations[address].data
 
     def verify(self) -> None:
         """Reopen each referenced blob and verify the retained observation."""
         for observation in self._observations.values():
             self._directory.verify(observation)
+
+    def observed_bytes(self) -> Iterator[bytes]:
+        """Yield only the blobs reached by the verification pass."""
+        return (observation.data for observation in self._observations.values())
 
 
 def _digest(content: bytes) -> str:
@@ -174,21 +185,47 @@ def _verify_review_binding(blobs: ByteStore, capsule: dict[str, Any]) -> dict[st
 
 
 def verify_capsule(blobs: ByteStore, address: str) -> None:
-    """Check canonical records, bound bytes, and complete targets by address.
+    """Check each release from the selected capsule to its initial baseline.
 
     The caller supplies the reviewed capsule address and a read-only byte store.
     """
     capsule = _load_record(blobs, address, "release")
     review = _verify_review_binding(blobs, capsule)
+    seen = {address}
+    while (predecessor := capsule["predecessor"]) is not None:
+        if predecessor in seen:
+            raise ValueError("Release history contains a cycle")
+        seen.add(predecessor)
+        prior_capsule = _load_record(blobs, predecessor, "release")
+        prior_review = _verify_review_binding(blobs, prior_capsule)
+        _verify_release(blobs, capsule, review, (prior_capsule, prior_review))
+        capsule, review = prior_capsule, prior_review
+    _verify_release(blobs, capsule, review, None)
+
+
+def _verify_release(
+    blobs: ByteStore,
+    capsule: dict[str, Any],
+    review: dict[str, Any],
+    prior: tuple[dict[str, Any], dict[str, Any]] | None,
+) -> None:
+    """Verify one release and its reviewed relation to the preceding release."""
     semantics = review["semantics"]
     acquisition = review["acquisition"]
     artifacts = review["artifacts"]
     _verify_acquisition(blobs, capsule, acquisition["candidate"])
-    _read(blobs, semantics["candidate"])
+    distribution = capsule["distribution-revision"]
+    try:
+        distribution_bytes = blobs[distribution]
+    except KeyError:
+        pass  # Early draft bundles may store the revision without an archive.
+    else:
+        if _digest(distribution_bytes) != distribution:
+            raise ValueError(f"Stored bytes differ from {distribution}")
+    candidate_semantics = _read(blobs, semantics["candidate"])
     baseline = _read_targets(blobs, artifacts["baseline"], require_present=False)
     outputs = _read_targets(blobs, artifacts["candidate"], require_present=True)
-    predecessor = capsule["predecessor"]
-    if predecessor is None:
+    if prior is None:
         initial = capsule["initial-baseline"]
         if semantics["kind"] != "initial" or (
             semantics["accountability-ledger"] != initial["accountability-ledger"]
@@ -199,8 +236,7 @@ def verify_capsule(blobs: ByteStore, address: str) -> None:
         if semantics["accountability-ledger"] is not None:
             _read(blobs, semantics["accountability-ledger"])
     else:
-        prior_capsule = _load_record(blobs, predecessor, "release")
-        prior_review = _verify_review_binding(blobs, prior_capsule)
+        prior_capsule, prior_review = prior
         if semantics["kind"] != "successor" or (
             semantics["baseline"] != prior_review["semantics"]["candidate"]
         ):
@@ -209,8 +245,10 @@ def verify_capsule(blobs: ByteStore, address: str) -> None:
             raise ValueError("Review does not bind predecessor acquisition")
         if baseline != prior_capsule["managed-targets"]:
             raise ValueError("Review does not bind predecessor targets")
-        _read(blobs, semantics["baseline"])
-        _read(blobs, semantics["differences"])
+        baseline_semantics = _read(blobs, semantics["baseline"])
+        differences = _read(blobs, semantics["differences"])
+        if differences != encode_differences(baseline_semantics, candidate_semantics):
+            raise ValueError("Review differences do not match the semantic snapshots")
     if acquisition["baseline"] is not None:
         _read(blobs, acquisition["baseline"])
     expected_targets = dict.fromkeys(baseline) | outputs
@@ -220,14 +258,21 @@ def verify_capsule(blobs: ByteStore, address: str) -> None:
         )
 
 
-def verify_bundle(bundle: Path, address: str) -> None:
-    """Verify one capsule stored below the bundle’s blob directory."""
+@contextmanager
+def _open_bundle_blobs(bundle: Path) -> Iterator[_BundleBlobs]:
+    """Retain the bundle blob directory for an observation."""
+    bundle = bundle.absolute()
     blob_path = (Path(bundle.name) / "blobs" / "sha256").as_posix()
     with _trusted_directory_from_workspace_path(str(bundle.parent)) as parent:
         with parent.retain_directory(blob_path) as directory:
-            blobs = _BundleBlobs(directory)
-            verify_capsule(blobs, address)
-            blobs.verify()
+            yield _BundleBlobs(directory)
+
+
+def verify_bundle(bundle: Path, address: str) -> None:
+    """Verify one capsule stored below the bundle’s blob directory."""
+    with _open_bundle_blobs(bundle) as blobs:
+        verify_capsule(blobs, address)
+        blobs.verify()
 
 
 def main(argv: list[str] | None = None) -> int:
