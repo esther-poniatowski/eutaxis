@@ -16,18 +16,26 @@ index: ""
 
 ## Root and configuration file
 
-Every command that works on a project resolves one root folder. The configuration file is looked up below the root, and the relative paths written in the configuration file resolve against the root. The root is the first answer in this order:
+Every command that works on a project resolves one root folder. The configuration file is looked up below the root, and the relative paths written in the configuration file resolve against the root. [Hodegos](https://github.com/esther-poniatowski/hodegos/blob/main/docs/specification.md) resolves both, as its specification states. The root is the first answer in this order:
 
 1. the root option `--root` (`-r`);
 2. the environment variable `EUTAXIS_ROOT`, when it is set and not empty;
-3. the nearest folder, from the current folder upward, that holds `config/tools/eutaxis.yml` or `eutaxis.yml`;
+3. the nearest folder, from the current folder upward, that holds `eutaxis.yml` at one of its places;
 4. the current folder.
+
+The places of a folder are the folder itself, its subfolder `.config/`, and each folder that its declaration `hodegos.yml` lists. A project keeping its configuration files in another folder, such as `shared/`, declares that folder:
+
+```yaml
+_schema: hodegos:configuration@1
+folders:
+  - shared
+```
 
 The ancestor search of step 3 lets a command run from any subfolder of a project. The environment variable serves editors and continuous integration without a change of command.
 
-The configuration file is named `eutaxis.yml`. Without the configuration option `--config` (`-c`), a command reads `config/tools/eutaxis.yml` or `eutaxis.yml` below the root. The command stops with an error that names both files when both exist, and with an error that names both places when neither exists: Eutaxis declares every source and every output in the configuration file, so it has no built-in defaults.
+The configuration file is named `eutaxis.yml`. Without the configuration option `--config` (`-c`), a command reads `eutaxis.yml` at the one place of the root that holds it. The command stops with an error that names both files when two places hold one, and with an error that names the places when none holds one: Eutaxis declares every source and every output in the configuration file, so it has no built-in defaults. An invalid `hodegos.yml` met by the search is a configuration error, for every command that resolves a root.
 
-A path given on the command line, including the value of `--config`, is relative to the current folder. A path written in the configuration file is relative to the root, so the file moves between the root and `config/tools/` without an edit. A configuration file that declares the retired key `root` is a configuration error. A configuration file whose key `_schema` is absent or unsupported is a configuration error too, and the message names the current value; see [Configuration: format identifier](configuration.md#format-identifier).
+A path given on the command line, including the value of `--config`, is relative to the current folder. A path written in the configuration file is relative to the root, so the file moves between the places of the root without an edit. A configuration file that declares the retired key `root` is a configuration error. A configuration file whose key `_schema` is absent or unsupported is a configuration error too, and the message names the current value; see [Configuration: format identifier](configuration.md#format-identifier).
 
 ## Exit statuses
 

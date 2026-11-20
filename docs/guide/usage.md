@@ -31,7 +31,7 @@ eutaxis init --template codex-project
 
 The command writes a starter configuration file `eutaxis.yml`, an `AGENTS.md` placeholder, and a `docs/instructions/` tree. Two templates are available; see [Project scaffolding](project-scaffolding.md) for the difference between them.
 
-A configuration may also be written by hand, as `eutaxis.yml` at the project root or as `config/tools/eutaxis.yml`. The configuration file declares its format in the first key `_schema`; the [format identifier](configuration.md#format-identifier) states the rule. The minimal configuration below declares two shared sources and one cumulative-file target:
+A configuration may also be written by hand, as `eutaxis.yml` at the project root, in its subfolder `.config/`, or in a folder that its `hodegos.yml` declares. The configuration file declares its format in the first key `_schema`; the [format identifier](configuration.md#format-identifier) states the rule. The minimal configuration below declares two shared sources and one cumulative-file target:
 
 ```yaml
 _schema: eutaxis:configuration@2
@@ -56,7 +56,7 @@ eutaxis generate
 
 The command writes the file declared under `agents[0].target.path` (the project `AGENTS.md` in the example above). The on-disk path is also reported by `eutaxis list`.
 
-The command finds the project root as the nearest folder, from the current folder upward, that holds `eutaxis.yml` or `config/tools/eutaxis.yml`, and every path of the configuration file resolves against that root. The root option `--root` and the environment variable `EUTAXIS_ROOT` name the root explicitly, and the configuration option `-c` names a configuration file kept elsewhere; see [Root and configuration file](cli-reference.md#root-and-configuration-file). The same resolution serves `check`, `list`, `scan`, `rule` and the `skills` subcommands.
+The command finds the project root as the nearest folder, from the current folder upward, that holds `eutaxis.yml` at one of its places, and every path of the configuration file resolves against that root. The root option `--root` and the environment variable `EUTAXIS_ROOT` name the root explicitly, and the configuration option `-c` names a configuration file kept elsewhere; see [Root and configuration file](cli-reference.md#root-and-configuration-file). The same resolution serves `check`, `list`, `scan`, `rule` and the `skills` subcommands.
 
 ### 4. Compile on-demand rule sets to Skills (optional)
 
@@ -93,7 +93,7 @@ The cumulative instruction file carries rules that must hold on every turn. The 
 Two deployment patterns differ only in the repository that holds the configuration and in the target paths:
 
 - **Project-local.** The configuration sits in the project; source and target paths are relative to the project root.
-- **Global.** The configuration sits in a personal configuration repository, such as `~/agent-config/config/tools/eutaxis.yml`; source paths are relative to that repository; target paths are absolute paths to each agent's global instruction file (see the [Supported agents](../../README.md#supported-agents) table for the per-agent paths). The commands run from that repository, or name it with `--root ~/agent-config`.
+- **Global.** The configuration sits in a personal configuration repository, such as `~/agent-config/eutaxis.yml`; source paths are relative to that repository; target paths are absolute paths to each agent's global instruction file (see the [Supported agents](../../README.md#supported-agents) table for the per-agent paths). The commands run from that repository, or name it with `--root ~/agent-config`.
 
 The configuration below illustrates the global pattern with two agent outputs:
 

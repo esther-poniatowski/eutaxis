@@ -1,5 +1,13 @@
 """Tests of the command-line conventions: root, configuration file, paths, exit
-statuses, confirmations and retired names."""
+statuses, confirmations and retired names.
+
+Hodegos locates the root and the configuration file. The root is the folder
+given by ``--root``, else by ``EUTAXIS_ROOT``, else the nearest folder, from the
+current one upward, holding ``eutaxis.yml`` at one of its places, else the
+current folder. The places of a folder are the folder itself, its ``.config/``,
+and the folders that its ``hodegos.yml`` declares; two places holding a file
+is an error. A named ``--config`` is read from the current folder.
+"""
 
 from __future__ import annotations
 
@@ -15,12 +23,17 @@ from eutaxis.commands.cli_errors import exit_with_error
 from eutaxis.instructions import (
     CONFIG_SCHEMA,
     ConfigurationError,
-    find_config,
+    discover_configuration,
+    discover_root,
     load_config,
-    resolve_root,
-    settings_root,
 )
 from eutaxis.ops import encode_project_slug
+
+SHARED = Path("shared") / "eutaxis.yml"
+"""Configuration file kept in a folder that the declaration of the root lists."""
+
+DECLARATION = "_schema: hodegos:configuration@1\nfolders:\n  - shared\n"
+"""Declaration ``hodegos.yml`` of a project keeping its configuration in ``shared/``."""
 
 
 def _write_settings(path: Path, *, target: str, extra: str = "") -> Path:
@@ -40,6 +53,12 @@ def _write_settings(path: Path, *, target: str, extra: str = "") -> Path:
     return path
 
 
+def _declare_shared(project: Path) -> None:
+    """Write the declaration ``hodegos.yml`` that lists ``shared/``."""
+    project.mkdir(parents=True, exist_ok=True)
+    (project / "hodegos.yml").write_text(DECLARATION, encoding="utf-8")
+
+
 def _project(tmp_path: Path) -> Path:
     project = tmp_path / "project"
     project.mkdir()
@@ -50,49 +69,84 @@ def _project(tmp_path: Path) -> Path:
 # Settings lookup ----------------------------------------------------------
 
 
-def test_find_config_reads_config_tools(tmp_path: Path) -> None:
-    nested = tmp_path / "config" / "tools" / "eutaxis.yml"
-    nested.parent.mkdir(parents=True)
-    nested.write_text("{}\n", encoding="utf-8")
+def test_discovery_reads_the_root_and_dot_config(tmp_path: Path) -> None:
+    flat = tmp_path / "a" / "eutaxis.yml"
+    hidden = tmp_path / "b" / ".config" / "eutaxis.yml"
+    for path in (flat, hidden):
+        path.parent.mkdir(parents=True)
+        path.write_text("{}\n", encoding="utf-8")
 
-    assert find_config(None, tmp_path) == nested.resolve()
+    assert discover_configuration(tmp_path / "a") == (flat.parent, flat)
+    assert discover_configuration(tmp_path / "b") == (tmp_path / "b", hidden)
 
 
-def test_find_config_reads_the_root(tmp_path: Path) -> None:
+def test_discovery_reads_a_folder_that_the_root_declares(tmp_path: Path) -> None:
+    _declare_shared(tmp_path)
+    (tmp_path / SHARED).parent.mkdir()
+    (tmp_path / SHARED).write_text("{}\n", encoding="utf-8")
+
+    assert discover_configuration(tmp_path) == (tmp_path, tmp_path / SHARED)
+
+
+def test_discovery_ignores_an_undeclared_folder(tmp_path: Path) -> None:
+    (tmp_path / SHARED).parent.mkdir()
+    (tmp_path / SHARED).write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="no configuration"):
+        discover_configuration(tmp_path)
+
+
+def test_discovery_refuses_two_places_and_names_both(tmp_path: Path) -> None:
+    _declare_shared(tmp_path)
+    shared = tmp_path / SHARED
     flat = tmp_path / "eutaxis.yml"
-    flat.write_text("{}\n", encoding="utf-8")
-
-    assert find_config(None, tmp_path) == flat.resolve()
-
-
-def test_find_config_refuses_two_settings_files_and_names_both(tmp_path: Path) -> None:
-    nested = tmp_path / "config" / "tools" / "eutaxis.yml"
-    flat = tmp_path / "eutaxis.yml"
-    nested.parent.mkdir(parents=True)
-    nested.write_text("{}\n", encoding="utf-8")
+    shared.parent.mkdir()
+    shared.write_text("{}\n", encoding="utf-8")
     flat.write_text("{}\n", encoding="utf-8")
 
     with pytest.raises(ConfigurationError) as excinfo:
-        find_config(None, tmp_path)
+        discover_configuration(tmp_path)
 
-    assert str(nested.resolve()) in str(excinfo.value)
-    assert str(flat.resolve()) in str(excinfo.value)
+    assert str(shared) in str(excinfo.value)
+    assert str(flat) in str(excinfo.value)
     assert excinfo.value.exit_code == 2
 
 
-def test_find_config_returns_explicit_path_without_lookup(tmp_path: Path) -> None:
+def test_discovery_returns_a_named_file_without_lookup(tmp_path: Path) -> None:
+    (tmp_path / "eutaxis.yml").write_text("{}\n", encoding="utf-8")
     explicit = tmp_path / "elsewhere.yml"
+    explicit.write_text("{}\n", encoding="utf-8")
 
-    assert find_config(explicit, tmp_path / "unused") == explicit.resolve()
+    assert discover_configuration(tmp_path, explicit)[1] == explicit
 
 
-def test_find_config_names_every_place_when_none_exists(tmp_path: Path) -> None:
+def test_discovery_rejects_a_named_file_that_does_not_exist(tmp_path: Path) -> None:
+    (tmp_path / "eutaxis.yml").write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="absent.yml"):
+        discover_configuration(tmp_path, tmp_path / "absent.yml")
+
+
+def test_discovery_names_the_places_when_none_holds_a_file(tmp_path: Path) -> None:
     with pytest.raises(ConfigurationError) as excinfo:
-        find_config(None, tmp_path)
+        discover_configuration(tmp_path)
 
     message = str(excinfo.value)
-    assert str(tmp_path / "config" / "tools" / "eutaxis.yml") in message
-    assert str(tmp_path / "eutaxis.yml") in message
+    assert str(tmp_path) in message
+    assert "write eutaxis.yml at the root, in .config/, or in a folder that " in message
+    assert "hodegos.yml declares" in message
+
+
+def test_invalid_declaration_is_a_configuration_error(tmp_path: Path) -> None:
+    (tmp_path / "hodegos.yml").write_text("folders: [shared]\n", encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="hodegos.yml"):
+        discover_root(tmp_path)
+    for arguments in (["generate"], ["commands", "list"], ["init"]):
+        result = CliRunner().invoke(app, [*arguments, "--root", str(tmp_path)])
+        assert result.exit_code == 2, (arguments, result.output)
+        assert "hodegos.yml" in result.stderr
+        assert result.exception is None or isinstance(result.exception, SystemExit)
 
 
 def test_former_settings_file_name_is_not_read(tmp_path: Path) -> None:
@@ -108,13 +162,13 @@ def test_former_settings_file_name_is_not_read(tmp_path: Path) -> None:
 
 def test_two_settings_files_fail_the_command_with_status_2(tmp_path: Path) -> None:
     project = _project(tmp_path)
-    _write_settings(project / "config" / "tools" / "eutaxis.yml", target="A.md")
+    _write_settings(project / ".config" / "eutaxis.yml", target="A.md")
     _write_settings(project / "eutaxis.yml", target="B.md")
 
     result = CliRunner().invoke(app, ["generate", "--root", str(project)])
 
     assert result.exit_code == 2
-    assert "Two configuration files compete" in result.stderr
+    assert "two places hold a configuration" in result.stderr
     assert not (project / "A.md").exists()
     assert not (project / "B.md").exists()
 
@@ -123,10 +177,12 @@ def test_missing_settings_file_fails_with_status_2() -> None:
     result = CliRunner().invoke(app, ["check"])
 
     assert result.exit_code == 2
-    assert "config/tools/eutaxis.yml" in result.stderr
+    assert "hodegos.yml declares" in result.stderr
 
 
 def test_absent_explicit_config_fails_with_status_2(tmp_path: Path) -> None:
+    (tmp_path / "eutaxis.yml").write_text("{}\n", encoding="utf-8")
+
     result = CliRunner().invoke(app, ["list", "-c", "absent.yml"])
 
     assert result.exit_code == 2
@@ -136,35 +192,41 @@ def test_absent_explicit_config_fails_with_status_2(tmp_path: Path) -> None:
 # Root resolution -----------------------------------------------------------
 
 
-def test_resolve_root_prefers_option_then_variable_then_ancestor(tmp_path: Path) -> None:
+def test_discover_root_prefers_option_then_variable_then_ancestor(
+    tmp_path: Path,
+) -> None:
     project = tmp_path / "project"
     nested = project / "a" / "b"
     nested.mkdir(parents=True)
-    (project / "config" / "tools").mkdir(parents=True)
-    (project / "config" / "tools" / "eutaxis.yml").write_text("{}\n", encoding="utf-8")
+    _declare_shared(project)
+    (project / SHARED).parent.mkdir()
+    (project / SHARED).write_text("{}\n", encoding="utf-8")
     other = tmp_path / "other"
     other.mkdir()
 
     environ = {"EUTAXIS_ROOT": str(other)}
-    assert resolve_root(Path("x"), cwd=nested, environ=environ) == nested / "x"
-    assert resolve_root(None, cwd=nested, environ=environ) == other.resolve()
-    assert resolve_root(None, cwd=nested, environ={}) == project.resolve()
-    assert resolve_root(None, cwd=other, environ={}) == other.resolve()
-    assert resolve_root(None, cwd=nested, environ={"EUTAXIS_ROOT": ""}) == (
-        project.resolve()
-    )
+    assert discover_root(Path("x"), cwd=nested, environ=environ) == nested / "x"
+    assert discover_root(None, cwd=nested, environ=environ) == other
+    assert discover_root(None, cwd=nested, environ={}) == project
+    assert discover_root(None, cwd=other, environ={}) == other
+    assert discover_root(None, cwd=nested, environ={"EUTAXIS_ROOT": ""}) == project
 
 
-def test_settings_root_is_the_project_of_a_file_in_config_tools(tmp_path: Path) -> None:
-    assert settings_root(tmp_path / "config" / "tools" / "eutaxis.yml") == tmp_path
-    assert settings_root(tmp_path / "eutaxis.yml") == tmp_path
+def test_load_config_without_root_resolves_against_the_folder_of_the_file(
+    tmp_path: Path,
+) -> None:
+    project = _project(tmp_path)
+    settings = _write_settings(project / "eutaxis.yml", target="AGENTS.md")
+
+    assert load_config(settings).root == project
 
 
 def test_generate_runs_from_a_subfolder_of_the_project(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project = _project(tmp_path)
-    _write_settings(project / "config" / "tools" / "eutaxis.yml", target="AGENTS.md")
+    _declare_shared(project)
+    _write_settings(project / SHARED, target="AGENTS.md")
     subfolder = project / "docs" / "deep"
     subfolder.mkdir(parents=True)
     monkeypatch.chdir(subfolder)
@@ -218,12 +280,15 @@ def test_paths_of_an_explicit_settings_file_resolve_against_the_root(
     assert not (settings.parent / "AGENTS.md").exists()
 
 
-def test_settings_file_moves_to_config_tools_without_an_edit(tmp_path: Path) -> None:
+@pytest.mark.parametrize("place", [Path(".config") / "eutaxis.yml", SHARED])
+def test_settings_file_moves_between_places_without_an_edit(
+    tmp_path: Path, place: Path
+) -> None:
     project = _project(tmp_path)
+    _declare_shared(project)
     flat = _write_settings(project / "eutaxis.yml", target="AGENTS.md")
-    nested = project / "config" / "tools" / "eutaxis.yml"
-    nested.parent.mkdir(parents=True)
-    flat.rename(nested)
+    (project / place).parent.mkdir(parents=True)
+    flat.rename(project / place)
 
     result = CliRunner().invoke(app, ["generate", "--root", str(project)])
 
@@ -326,7 +391,7 @@ def test_generate_without_identifier_exits_2_naming_the_value(
 
 
 def _skills_project(tmp_path: Path) -> Path:
-    """Create a project whose configuration file sits in ``config/tools/``."""
+    """Create a project whose configuration file sits in a declared ``shared/``."""
     project = tmp_path / "project"
     module = project / "instructions" / "alpha.md"
     module.parent.mkdir(parents=True)
@@ -335,7 +400,8 @@ def _skills_project(tmp_path: Path) -> Path:
         "invocation: [model, user]\nfailure-mode: visible\n---\nbody\n",
         encoding="utf-8",
     )
-    settings = project / "config" / "tools" / "eutaxis.yml"
+    _declare_shared(project)
+    settings = project / SHARED
     settings.parent.mkdir(parents=True)
     settings.write_text(
         "_schema: eutaxis:configuration@1\n"

@@ -23,14 +23,14 @@ generator.write_all()
 
 ## Configuration loading
 
-`load_config(config_path, root=None)` loads a YAML instruction config and returns an `InstructionConfig`. The current format is `_schema: eutaxis:configuration@2`, the value of `CONFIG_SCHEMA`. The reader also accepts legacy version 1 files, but only version 2 admits declaration sources. The relative source and target paths of the file resolve against `root`. Without `root`, they resolve against the root implied by the place of the file, returned by `settings_root(config_path)`: the folder that holds `config/` for a file in `config/tools/`, and the folder of the file otherwise.
+`load_config(config_path, root=None)` loads a YAML instruction config and returns an `InstructionConfig`. The current format is `_schema: eutaxis:configuration@2`, the value of `CONFIG_SCHEMA`. The reader also accepts legacy version 1 files, but only version 2 admits declaration sources. The relative source and target paths of the file resolve against `root`. Without `root`, they resolve against the folder of the file. A file kept in `.config/` or in a folder that `hodegos.yml` declares therefore needs `root`, such as the root that `discover_configuration` returns.
 
 ```python
 from pathlib import Path
 
 from eutaxis.instructions import load_config
 
-config = load_config(Path("config/tools/eutaxis.yml"))
+config = load_config(Path("eutaxis.yml"))
 ```
 
 A configuration file kept outside the folder against which its paths resolve takes that folder as `root`:
@@ -42,7 +42,14 @@ config = load_config(
 )
 ```
 
-The command line resolves the root with `resolve_root` and finds the configuration file below it with `find_config`, as described in [Root and configuration file](cli-reference.md#root-and-configuration-file).
+The command line locates the root and the configuration file through [Hodegos](https://github.com/esther-poniatowski/hodegos/blob/main/docs/specification.md). `discover_configuration(root=None, config=None)` returns both, and `discover_root(root=None)` returns the root of a command that reads no configuration file; each raises `ConfigurationError` when Hodegos rejects the request. `TOOL` declares the convention of Eutaxis to Hodegos. The rules are described in [Root and configuration file](cli-reference.md#root-and-configuration-file).
+
+```python
+from eutaxis.instructions import discover_configuration, load_config
+
+root, path = discover_configuration()
+config = load_config(path, root=root)
+```
 
 ## Generation
 

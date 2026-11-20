@@ -20,7 +20,7 @@ from typing import Any
 
 import typer
 
-from .._cli_options import command_path, command_root, reports_errors, root_option
+from .._cli_options import command_path, command_settings, reports_errors, root_option
 from . import (
     CommandError,
     CommandNotFoundError,
@@ -54,8 +54,8 @@ from ..instructions import InstructionConfig, InstructionError, load_config
 from ..instructions.loading_units import expand_loading_unit
 
 _CONFIG_HELP = (
-    "Configuration file, relative to the current folder. Default: "
-    "config/tools/eutaxis.yml or eutaxis.yml below the root."
+    "Configuration file, relative to the current folder. Default: eutaxis.yml "
+    "at the root, in .config/, or in a folder that hodegos.yml declares."
 )
 _ROOT_HELP = (
     "Folder below which the configuration file is looked up and against which the "
@@ -686,10 +686,8 @@ def _effective_adapter_names(source: CommandSource, registered: list[str]) -> li
 
 def _settings(config: str | None, root: str | None) -> tuple[Path, Path]:
     """Return the configuration file and the root of a command."""
-    from ..instructions import find_config
-
-    base = command_root(root)
-    return find_config(command_path(config), base), base
+    base, config_path = command_settings(config, root)
+    return config_path, base
 
 
 def _target_project(target_project: str | None, settings: tuple[Path, Path]) -> Path:

@@ -72,7 +72,7 @@ Eutaxis currently ships the checked features. The unchecked features remain plan
 
 ## Quick Start
 
-A project's instruction layout is declared in the configuration file `config/tools/eutaxis.yml`, or in `eutaxis.yml` at the project root. The file declares its format in the first key `_schema`. The configuration below lists two shared Markdown sources and one cumulative-file target:
+A project's instruction layout is declared in the configuration file `eutaxis.yml`, at the project root, in its subfolder `.config/`, or in a folder that its `hodegos.yml` declares, as the [specification of Hodegos](https://github.com/esther-poniatowski/hodegos/blob/main/docs/specification.md) states. The file declares its format in the first key `_schema`. The configuration below lists two shared Markdown sources and one cumulative-file target:
 
 ```yaml
 # eutaxis.yml

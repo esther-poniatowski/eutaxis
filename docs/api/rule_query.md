@@ -184,18 +184,21 @@ This module holds the file-system reads; parsing is delegated to
 
 <a id="eutaxis.rule_query.sources.catalog_from_config"></a>
 
-### eutaxis.rule_query.sources.catalog_from_config(config_path, root=None)
+### eutaxis.rule_query.sources.catalog_from_config(config_path, root=None, \*, task_module_ids=None)
 
 Collect the rules of every module that a configuration declares.
 
-A module declared by several entries contributes the union of their
-selections. An entry without `sections` or `exclude_sections`, and
-every `task_modules` entry, selects the whole module.
+The complete catalog contains every configured source. A filtered task
+module contributes its `rule_index_source`, or its `path` when no
+override is configured.
 
 * **Parameters:**
   * **config_path** (*Path*) – Instruction-assembly configuration.
   * **root** (*Path* *,* *optional*) – Folder against which the paths of the configuration resolve.
-    Default: the root implied by the place of the file.
+    Default: the folder of the file.
+  * **task_module_ids** (*collection* *of* *str* *,* *optional*) – Task module identifiers to collect through their rule-index sources.
+    Common and agent sources are omitted when this filter is present. The
+    complete catalog is collected by default.
 * **Raises:**
   [**RuleSourceError**](#eutaxis.rule_query.exceptions.RuleSourceError) – When a declared module is missing on disk.
 * **Return type:**

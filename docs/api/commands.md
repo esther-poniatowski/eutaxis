@@ -65,8 +65,8 @@ built-in, user, project.
 Load Skill sources from an instruction-assembly configuration.
 
 The paths of the configuration resolve against `root`, or, when it is
-absent, against the root implied by the place of the file (see
-`eutaxis.instructions.settings_root`).
+absent, against the folder of the file (see
+`eutaxis.instructions.load_config`).
 
 Each `task_modules` entry names a Markdown file whose frontmatter
 must satisfy the Skill source schema (`name`, `description`,

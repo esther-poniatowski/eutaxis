@@ -1,10 +1,10 @@
 # Generic global agent-instructions config skeleton.
 #
-# Copy this file into the consumer project as config/tools/eutaxis.yml (or
-# eutaxis.yml at its root) and fill in the placeholders below with that
-# project's instruction modules and output paths. Eutaxis does not ship any
-# consumer-specific data; everything project-specific belongs in the
-# consumer's copy.
+# Copy this file into the consumer project as eutaxis.yml at its root, in its
+# .config/ folder, or in a folder that its hodegos.yml declares, and fill in
+# the placeholders below with that project's instruction modules and output
+# paths. Eutaxis does not ship any consumer-specific data; everything
+# project-specific belongs in the consumer's copy.
 #
 # Relative paths resolve against the root of the command: --root, then
 # EUTAXIS_ROOT, then the nearest folder above the current one that holds the

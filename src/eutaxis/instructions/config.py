@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from hodegos import Discovery, DiscoveryError, Tool, discover
 import yaml
 
 from ..names import is_safe_slug
@@ -36,7 +36,7 @@ class ConfigLoader:
     1 admits Markdown sources; version 2 also admits structured declaration
     sources. The relative paths of
     the configuration file resolve against ``root``, or, when ``root`` is
-    absent, against ``settings_root(config_path)``. The retired key ``root`` is
+    absent, against the folder of the file. The retired key ``root`` is
     rejected.
     """
 
@@ -174,14 +174,14 @@ class ConfigLoader:
                 f"{self.config_path} declares the key 'root', which is retired. "
                 "The paths of the configuration file resolve against the root of "
                 "the command: --root, then EUTAXIS_ROOT, then the nearest "
-                "folder above the current one that holds config/tools/eutaxis.yml "
-                "or eutaxis.yml, then the current folder. Remove the key. To "
+                "folder above the current one that holds eutaxis.yml at one of "
+                "its places, then the current folder. Remove the key. To "
                 "install project-scope Skills into another project, pass "
                 "--target-project to the skills subcommands."
             )
         if self.root is not None:
             return self.root
-        return settings_root(self.config_path)
+        return self.config_path.parent
 
     def _parse_sources(self, raw_sources: Any) -> list[InstructionSource]:
         if raw_sources is None:
@@ -689,7 +689,11 @@ class ConfigLoader:
         return value
 
 
-CONFIG_FILENAME = "eutaxis.yml"
+TOOL = Tool("eutaxis", ("yml",))
+"""Convention of Eutaxis declared to Hodegos, which names the file ``eutaxis.yml``
+and the variable ``EUTAXIS_ROOT``."""
+
+CONFIG_FILENAME = TOOL.file_names[0]
 """File name of the configuration file of Eutaxis."""
 
 SCHEMA_KEY = "_schema"
@@ -704,31 +708,50 @@ CONFIG_SCHEMA = "eutaxis:configuration@2"
 CONFIG_SCHEMAS = frozenset({CONFIG_SCHEMA_V1, CONFIG_SCHEMA})
 """Configuration formats admitted by this reader."""
 
-CONFIG_SEARCH_PATHS: tuple[Path, ...] = (
-    Path("config") / "tools" / CONFIG_FILENAME,
-    Path(CONFIG_FILENAME),
+HODEGOS_SPECIFICATION = (
+    "https://github.com/esther-poniatowski/hodegos/blob/main/docs/specification.md"
 )
-"""Places of the configuration file below the root. At most one of them may exist."""
-
-ROOT_ENV_VAR = "EUTAXIS_ROOT"
-"""Environment variable that names the root when ``--root`` is absent."""
+"""Specification of the places of the configuration and of the resolution of the root."""
 
 
-def resolve_root(
+def _discover(
+    root: Path | None,
+    config: Path | None,
+    cwd: Path | None,
+    environ: Mapping[str, str] | None,
+) -> Discovery:
+    """Return the discovery of Hodegos, its failure raised as a configuration error."""
+    try:
+        return discover(
+            TOOL,
+            root=root.expanduser() if root is not None else None,
+            config=config.expanduser() if config is not None else None,
+            cwd=cwd,
+            environ=environ,
+        )
+    except DiscoveryError as exc:
+        raise ConfigurationError(str(exc)) from exc
+
+
+def discover_root(
     root: Path | None = None,
     *,
     cwd: Path | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> Path:
-    """Return the root of a command, from the first source that gives one.
+    """Return the root of a command, resolved by Hodegos.
 
-    The sources are tried in this order:
+    The root is the first answer of:
 
     1. ``root``, the value of ``--root``;
     2. the environment variable ``EUTAXIS_ROOT``, when set and not empty;
-    3. the nearest ancestor of the current folder, the folder itself
-       included, that holds a configuration file at one of ``CONFIG_SEARCH_PATHS``;
+    3. the nearest folder, from the current folder upward, that holds
+       ``eutaxis.yml`` at one of its places;
     4. the current folder.
+
+    The places of a folder are the folder itself, its subfolder ``.config/``,
+    and each folder that its declaration ``hodegos.yml`` lists, as the
+    specification of Hodegos states (``HODEGOS_SPECIFICATION``).
 
     Parameters
     ----------
@@ -742,77 +765,64 @@ def resolve_root(
     Returns
     -------
     Path
-        Absolute root folder.
-    """
-    current = (cwd or Path.cwd()).expanduser().resolve()
-    if root is not None:
-        return _absolute(root, current)
-    variable = (os.environ if environ is None else environ).get(ROOT_ENV_VAR, "")
-    if variable:
-        return _absolute(Path(variable), current)
-    for folder in (current, *current.parents):
-        if any((folder / place).is_file() for place in CONFIG_SEARCH_PATHS):
-            return folder
-    return current
-
-
-def settings_root(config_path: Path) -> Path:
-    """Return the root implied by the place of a configuration file.
-
-    A file in ``config/tools/`` implies the folder that holds ``config/``;
-    any other file implies its own folder. ``load_config`` uses this root
-    when its caller gives none; the command line always passes the root
-    that ``resolve_root`` returns.
-    """
-    folder = config_path.expanduser().resolve().parent
-    if folder.name == "tools" and folder.parent.name == "config":
-        return folder.parent.parent
-    return folder
-
-
-def find_config(config: Path | None, root: Path) -> Path:
-    """Return the configuration file that a command reads.
-
-    Parameters
-    ----------
-    config : Path, optional
-        Path given with ``--config``. When set, it is returned resolved
-        against the current folder, without any lookup; ``load_config``
-        reports it when it does not exist.
-    root : Path
-        Root folder of the project. Without ``config``, the configuration file is
-        ``config/tools/eutaxis.yml`` or ``eutaxis.yml`` below this folder.
-
-    Returns
-    -------
-    Path
-        Absolute path of the configuration file.
+        Absolute root folder, without symbolic links.
 
     Raises
     ------
     ConfigurationError
-        When ``config`` is absent and either both places or no place below
-        ``root`` holds a configuration file. Eutaxis has no built-in defaults:
+        When Hodegos rejects a declaration ``hodegos.yml`` met by the search,
+        or when two places of the root hold a configuration file.
+    """
+    return _discover(root, None, cwd, environ).root.resolve()
+
+
+def discover_configuration(
+    root: Path | None = None,
+    config: Path | None = None,
+    *,
+    cwd: Path | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> tuple[Path, Path]:
+    """Return the root of a command and its configuration file, located by Hodegos.
+
+    Parameters
+    ----------
+    root : Path, optional
+        Root given with ``--root``, relative to the current folder. Without it,
+        the root is resolved as ``discover_root`` states.
+    config : Path, optional
+        Configuration file given with ``--config``, relative to the current
+        folder.
+    cwd : Path, optional
+        Current folder. Default: the working directory of the process.
+    environ : Mapping[str, str], optional
+        Environment variables. Default: ``os.environ``.
+
+    Returns
+    -------
+    tuple[Path, Path]
+        The root and the configuration file, both absolute and without
+        symbolic links: ``config`` when given, otherwise the single place of
+        the root that holds ``eutaxis.yml``.
+
+    Raises
+    ------
+    ConfigurationError
+        When ``config`` names no file, when Hodegos rejects a declaration
+        ``hodegos.yml``, when two places of the root hold a configuration
+        file, or when no place holds one. Eutaxis has no built-in defaults:
         every source and every output is declared in the configuration file.
     """
-    if config is not None:
-        return config.expanduser().resolve()
-    base = root.expanduser().resolve()
-    candidates = [base / relative for relative in CONFIG_SEARCH_PATHS]
-    present = [candidate for candidate in candidates if candidate.is_file()]
-    if len(present) > 1:
+    found = _discover(root, config, cwd, environ)
+    resolved = found.root.resolve()
+    if found.configuration is None:
         raise ConfigurationError(
-            "Two configuration files compete: "
-            + " and ".join(str(path) for path in present)
-            + ". Keep one of them."
+            f"{resolved}: no configuration: write {CONFIG_FILENAME} at the root, "
+            "in .config/, or in a folder that hodegos.yml declares, or name it "
+            "with --config. Eutaxis has no built-in defaults: eutaxis init "
+            "scaffolds a configuration file."
         )
-    if present:
-        return present[0]
-    searched = " or ".join(str(candidate) for candidate in candidates)
-    raise ConfigurationError(
-        f"No configuration file at {searched}. Eutaxis has no built-in defaults: "
-        "create the file (eutaxis init scaffolds one), or pass --config or --root."
-    )
+    return resolved, found.configuration.path.resolve()
 
 
 def load_config(config_path: Path, root: Path | None = None) -> InstructionConfig:
@@ -824,12 +834,8 @@ def load_config(config_path: Path, root: Path | None = None) -> InstructionConfi
         Configuration file.
     root : Path, optional
         Folder against which the relative paths of the file resolve.
-        Default: ``settings_root(config_path)``.
+        Default: the folder of the file. A file kept in ``.config/`` or in a
+        folder that ``hodegos.yml`` declares therefore needs ``root``, such
+        as the root that ``discover_configuration`` returns.
     """
     return ConfigLoader(config_path, root=root).load()
-
-
-def _absolute(path: Path, base: Path) -> Path:
-    """Return ``path`` made absolute against ``base``, without symbolic links."""
-    path = path.expanduser()
-    return (path if path.is_absolute() else base / path).resolve()

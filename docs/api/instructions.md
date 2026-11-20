@@ -24,7 +24,7 @@ The configuration file declares its format in the key `_schema`. Version
 1 admits Markdown sources; version 2 also admits structured declaration
 sources. The relative paths of
 the configuration file resolve against `root`, or, when `root` is
-absent, against `settings_root(config_path)`. The retired key `root` is
+absent, against the folder of the file. The retired key `root` is
 rejected.
 
 * **Parameters:**
@@ -39,6 +39,13 @@ Load a YAML configuration file.
 
 * **Return type:**
   [*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig)
+
+<a id="eutaxis.instructions.config.TOOL"></a>
+
+### eutaxis.instructions.config.TOOL *= Tool(name='eutaxis', extensions=('yml',), pyproject=False, stacked=False)*
+
+Convention of Eutaxis declared to Hodegos, which names the file `eutaxis.yml`
+and the variable `EUTAXIS_ROOT`.
 
 <a id="eutaxis.instructions.config.CONFIG_FILENAME"></a>
 
@@ -70,76 +77,65 @@ Current format identifier, including structured declaration sources.
 
 Configuration formats admitted by this reader.
 
-<a id="eutaxis.instructions.config.CONFIG_SEARCH_PATHS"></a>
+<a id="eutaxis.instructions.config.HODEGOS_SPECIFICATION"></a>
 
-### eutaxis.instructions.config.CONFIG_SEARCH_PATHS *: tuple[Path, ...]* *= (PosixPath('config/tools/eutaxis.yml'), PosixPath('eutaxis.yml'))*
+### eutaxis.instructions.config.HODEGOS_SPECIFICATION *= 'https://github.com/esther-poniatowski/hodegos/blob/main/docs/specification.md'*
 
-Places of the configuration file below the root. At most one of them may exist.
+Specification of the places of the configuration and of the resolution of the root.
 
-<a id="eutaxis.instructions.config.ROOT_ENV_VAR"></a>
+<a id="eutaxis.instructions.config.discover_root"></a>
 
-### eutaxis.instructions.config.ROOT_ENV_VAR *= 'EUTAXIS_ROOT'*
+### eutaxis.instructions.config.discover_root(root=None, \*, cwd=None, environ=None)
 
-Environment variable that names the root when `--root` is absent.
+Return the root of a command, resolved by Hodegos.
 
-<a id="eutaxis.instructions.config.resolve_root"></a>
-
-### eutaxis.instructions.config.resolve_root(root=None, \*, cwd=None, environ=None)
-
-Return the root of a command, from the first source that gives one.
-
-The sources are tried in this order:
+The root is the first answer of:
 
 1. `root`, the value of `--root`;
 2. the environment variable `EUTAXIS_ROOT`, when set and not empty;
-3. the nearest ancestor of the current folder, the folder itself
-   included, that holds a configuration file at one of `CONFIG_SEARCH_PATHS`;
+3. the nearest folder, from the current folder upward, that holds
+   `eutaxis.yml` at one of its places;
 4. the current folder.
+
+The places of a folder are the folder itself, its subfolder `.config/`,
+and each folder that its declaration `hodegos.yml` lists, as the
+specification of Hodegos states (`HODEGOS_SPECIFICATION`).
 
 * **Parameters:**
   * **root** (*Path* *,* *optional*) – Root given on the command line, relative to the current folder.
   * **cwd** (*Path* *,* *optional*) – Current folder. Default: the working directory of the process.
   * **environ** (*Mapping* *[**str* *,* *str* *]* *,* *optional*) – Environment variables. Default: `os.environ`.
 * **Returns:**
-  Absolute root folder.
-* **Return type:**
-  Path
-
-<a id="eutaxis.instructions.config.settings_root"></a>
-
-### eutaxis.instructions.config.settings_root(config_path)
-
-Return the root implied by the place of a configuration file.
-
-A file in `config/tools/` implies the folder that holds `config/`;
-any other file implies its own folder. `load_config` uses this root
-when its caller gives none; the command line always passes the root
-that `resolve_root` returns.
-
-* **Parameters:**
-  **config_path** (*Path*)
-* **Return type:**
-  *Path*
-
-<a id="eutaxis.instructions.config.find_config"></a>
-
-### eutaxis.instructions.config.find_config(config, root)
-
-Return the configuration file that a command reads.
-
-* **Parameters:**
-  * **config** (*Path* *,* *optional*) – Path given with `--config`. When set, it is returned resolved
-    against the current folder, without any lookup; `load_config`
-    reports it when it does not exist.
-  * **root** (*Path*) – Root folder of the project. Without `config`, the configuration file is
-    `config/tools/eutaxis.yml` or `eutaxis.yml` below this folder.
-* **Returns:**
-  Absolute path of the configuration file.
+  Absolute root folder, without symbolic links.
 * **Return type:**
   Path
 * **Raises:**
-  [**ConfigurationError**](#eutaxis.instructions.exceptions.ConfigurationError) – When `config` is absent and either both places or no place below
-      `root` holds a configuration file. Eutaxis has no built-in defaults:
+  [**ConfigurationError**](#eutaxis.instructions.exceptions.ConfigurationError) – When Hodegos rejects a declaration `hodegos.yml` met by the search,
+      or when two places of the root hold a configuration file.
+
+<a id="eutaxis.instructions.config.discover_configuration"></a>
+
+### eutaxis.instructions.config.discover_configuration(root=None, config=None, \*, cwd=None, environ=None)
+
+Return the root of a command and its configuration file, located by Hodegos.
+
+* **Parameters:**
+  * **root** (*Path* *,* *optional*) – Root given with `--root`, relative to the current folder. Without it,
+    the root is resolved as `discover_root` states.
+  * **config** (*Path* *,* *optional*) – Configuration file given with `--config`, relative to the current
+    folder.
+  * **cwd** (*Path* *,* *optional*) – Current folder. Default: the working directory of the process.
+  * **environ** (*Mapping* *[**str* *,* *str* *]* *,* *optional*) – Environment variables. Default: `os.environ`.
+* **Returns:**
+  The root and the configuration file, both absolute and without
+  symbolic links: `config` when given, otherwise the single place of
+  the root that holds `eutaxis.yml`.
+* **Return type:**
+  tuple[Path, Path]
+* **Raises:**
+  [**ConfigurationError**](#eutaxis.instructions.exceptions.ConfigurationError) – When `config` names no file, when Hodegos rejects a declaration
+      `hodegos.yml`, when two places of the root hold a configuration
+      file, or when no place holds one. Eutaxis has no built-in defaults:
       every source and every output is declared in the configuration file.
 
 <a id="eutaxis.instructions.config.load_config"></a>
@@ -151,7 +147,9 @@ Load instruction configuration from disk.
 * **Parameters:**
   * **config_path** (*Path*) – Configuration file.
   * **root** (*Path* *,* *optional*) – Folder against which the relative paths of the file resolve.
-    Default: `settings_root(config_path)`.
+    Default: the folder of the file. A file kept in `.config/` or in a
+    folder that `hodegos.yml` declares therefore needs `root`, such
+    as the root that `discover_configuration` returns.
 * **Return type:**
   [*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig)
 
@@ -1136,7 +1134,7 @@ Output file target and surrounding literal content.
 
 <a id="eutaxis.instructions.models.TaskModule"></a>
 
-### *class* eutaxis.instructions.models.TaskModule(id, title, path, trigger, description=None)
+### *class* eutaxis.instructions.models.TaskModule(id, title, path, trigger, description=None, rule_index_source=None)
 
 Bases: `object`
 
@@ -1148,6 +1146,7 @@ A task-specific instruction module compiled to an Agent Skill artifact.
   * **path** (*Path*)
   * **trigger** (*str*)
   * **description** (*str* *|* *None*)
+  * **rule_index_source** ([*SourceFile*](#eutaxis.instructions.models.SourceFile) *|* [*DeclarationSource*](#eutaxis.instructions.models.DeclarationSource) *|* *None*)
 
 <a id="eutaxis.instructions.models.TaskModule.id"></a>
 
@@ -1168,6 +1167,10 @@ A task-specific instruction module compiled to an Agent Skill artifact.
 <a id="eutaxis.instructions.models.TaskModule.description"></a>
 
 #### description *: str | None* *= None*
+
+<a id="eutaxis.instructions.models.TaskModule.rule_index_source"></a>
+
+#### rule_index_source *: [SourceFile](#eutaxis.instructions.models.SourceFile) | [DeclarationSource](#eutaxis.instructions.models.DeclarationSource) | None* *= None*
 
 <a id="eutaxis.instructions.models.SkillLoadingMember"></a>
 

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, NoReturn
 
 import typer
 from . import info as pkg_info, __version__
-from ._cli_options import command_path, command_root, root_option
+from ._cli_options import command_path, command_root, command_settings, root_option
 from .commands._cli import commands_app
 from .commands._skills_cli import skills_app
 from .declarations._cli import declarations_app
@@ -27,8 +27,8 @@ if TYPE_CHECKING:
     from .instructions import DeclarationSource, InstructionConfig, InstructionGenerator
 
 _CONFIG_HELP = (
-    "Configuration file, relative to the current folder. Default: "
-    "config/tools/eutaxis.yml or eutaxis.yml below the root."
+    "Configuration file, relative to the current folder. Default: eutaxis.yml "
+    "at the root, in .config/, or in a folder that hodegos.yml declares."
 )
 _ROOT_HELP = (
     "Folder below which the configuration file is looked up and against which the "
@@ -358,15 +358,14 @@ def _echo_rejected_labels(generator: "InstructionGenerator") -> None:
 def _load_settings(config: str | None, root: str | None) -> "InstructionConfig":
     """Find and load the configuration file of a command.
 
-    The root comes from ``--root``, ``EUTAXIS_ROOT``, the nearest folder that
-    holds the configuration file, or the current folder. Without ``--config``, the
-    configuration file is looked up below the root. The paths written in the file
-    resolve against the root.
+    Hodegos resolves the root from ``--root``, ``EUTAXIS_ROOT``, the nearest
+    folder that holds the configuration file, or the current folder. Without
+    ``--config``, the configuration file is the single place of the root that
+    holds ``eutaxis.yml``. The paths written in the file resolve against the root.
     """
-    from .instructions import find_config, load_config
+    from .instructions import load_config
 
-    base = command_root(root)
-    config_path = find_config(command_path(config), base)
+    base, config_path = command_settings(config, root)
     return load_config(config_path, root=base)
 
 
@@ -503,11 +502,12 @@ def cli_init(
     ),
 ) -> None:
     """Scaffold prompt-composition structure into a project."""
+    from .instructions import InstructionError
     from .scaffold import ScaffoldError, scaffold_workspace
 
     try:
         paths = scaffold_workspace(command_root(root), template=template, force=force)
-    except ScaffoldError as exc:
+    except (ScaffoldError, InstructionError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=exc.exit_code) from exc
 

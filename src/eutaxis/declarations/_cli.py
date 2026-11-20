@@ -11,6 +11,7 @@ import click
 import typer
 
 from .._cli_options import command_path, command_root, root_option
+from ..instructions.exceptions import InstructionError
 from .byte_carriers import TrustedDirectory, _trusted_directory_from_workspace_path
 from .candidate_validation import (
     _attach_cleanup_cause,
@@ -164,7 +165,7 @@ def cli_explain(
         manifest_path = _path_below_root(manifest, workspace, role="manifest")
         lock_path = _path_below_root(lock, workspace, role="lock")
         parsed_context = _parse_context_options(context or [])
-    except ValueError as exc:
+    except (ValueError, InstructionError) as exc:
         _exit_explain(exc, code=2, completion="not-started")
 
     acquisition: ExternalAcquisitionResult | None = None

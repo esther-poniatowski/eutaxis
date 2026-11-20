@@ -18,9 +18,9 @@ from typing import NoReturn
 
 import typer
 
-from .._cli_options import command_path, command_root, root_option
+from .._cli_options import command_settings, root_option
 from ..commands import CommandError, get_adapter
-from ..instructions import InstructionError, find_config, load_config
+from ..instructions import InstructionError, load_config
 from ..instructions.loading_units import expand_loading_unit
 from .catalog import RuleCatalog, resolve_rule, select_parts
 from .exceptions import RuleQueryError, RuleSourceError
@@ -185,8 +185,7 @@ def _catalog(
     if skills_dir is not None and agent is not None:
         raise RuleSourceError("--skills-dir names the directory to read; drop --agent.")
     if config is not None or root is not None:
-        base = command_root(root)
-        config_path = find_config(command_path(config), base)
+        base, config_path = command_settings(config, root)
         return catalog_from_config(
             config_path,
             root=base,
@@ -216,8 +215,7 @@ def _loading_unit_task_ids(
             "--loading-unit cannot be combined with --module, --skills-dir, "
             "or --agent."
         )
-    base = command_root(root)
-    config_path = find_config(command_path(config), base)
+    base, config_path = command_settings(config, root)
     loaded = load_config(config_path, root=base)
     unit = next(
         (

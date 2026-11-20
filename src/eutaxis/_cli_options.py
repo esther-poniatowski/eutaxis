@@ -2,9 +2,9 @@
 
 The module applies the command-line conventions of the workspace:
 
-- the reserved option ``--root`` names the root, which ``resolve_root``
-  completes from ``EUTAXIS_ROOT``, from the nearest folder that holds the
-  configuration file, or from the current folder;
+- the reserved option ``--root`` names the root, which Hodegos completes
+  from ``EUTAXIS_ROOT``, from the nearest folder that holds the
+  configuration file at one of its places, or from the current folder;
 - every error of the package exits with the status that its exception
   carries: 2 for a usage or configuration error, 1 for a problem found by a
   check or a validation;
@@ -41,11 +41,47 @@ def command_root(root: str | None) -> Path:
     Returns
     -------
     Path
-        Absolute root folder, resolved by ``resolve_root``.
-    """
-    from .instructions.config import resolve_root
+        Absolute root folder, resolved by ``discover_root``.
 
-    return resolve_root(Path(root) if root is not None else None)
+    Raises
+    ------
+    ConfigurationError
+        When Hodegos rejects a declaration ``hodegos.yml`` or finds two
+        configuration files at the root.
+    """
+    from .instructions.config import discover_root
+
+    return discover_root(Path(root) if root is not None else None)
+
+
+def command_settings(config: str | None, root: str | None) -> tuple[Path, Path]:
+    """Return the root of a command and its configuration file.
+
+    Parameters
+    ----------
+    config : str, optional
+        Value of ``--config``, relative to the current folder.
+    root : str, optional
+        Value of ``--root``, relative to the current folder.
+
+    Returns
+    -------
+    tuple[Path, Path]
+        The root and the configuration file, located by
+        ``discover_configuration``.
+
+    Raises
+    ------
+    ConfigurationError
+        When Hodegos rejects the request or a declaration ``hodegos.yml``, or
+        when the root holds no configuration file or two of them.
+    """
+    from .instructions.config import discover_configuration
+
+    return discover_configuration(
+        Path(root) if root is not None else None,
+        Path(config) if config is not None else None,
+    )
 
 
 def command_path(path: str | None) -> Path | None:

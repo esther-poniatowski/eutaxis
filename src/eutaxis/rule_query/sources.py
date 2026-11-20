@@ -64,7 +64,7 @@ def catalog_from_config(
         Instruction-assembly configuration.
     root : Path, optional
         Folder against which the paths of the configuration resolve.
-        Default: the root implied by the place of the file.
+        Default: the folder of the file.
     task_module_ids : collection of str, optional
         Task module identifiers to collect through their rule-index sources.
         Common and agent sources are omitted when this filter is present. The
