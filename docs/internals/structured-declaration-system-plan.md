@@ -782,9 +782,41 @@ The bundle directory stores blobs under `blobs/sha256/` with hexadecimal filenam
 conda run -n eutaxis env PYTHONPATH=src python -m specs.verify_release_capsule "$bundle" "$capsule"
 ```
 
-- [ ] Define the canonical fields that bind source snapshots, the lock and consumer artifacts.
-- [ ] Verify each record’s canonical bytes and each bound payload digest from the stored snapshot.
-- [ ] Check that the target map covers both the candidate outputs and the preceding targets. For the first release, use the golden baseline targets as the preceding set.
-- [ ] Test an initial capsule and a successor that retires a target. Plant a changed source, a changed lock, a changed artifact and a missing absent-target entry.
+- [x] Define the canonical fields and verify stored records, payload digests and complete target maps.
+- [x] Test an initial capsule and a successor that retires a target.
+- [x] Build and verify a draft bundle from real Oikos compiler outputs. The trial rebuilt all 14 generated files from stored sources and rejected a changed source, lock, or output and an omitted target.
+- [x] Prepare an initial bundle from authenticated workspace sources, staged compiler outputs and reviewed golden files through a reusable command. The command reproduced the Oikos trial capsule digest.
+- [ ] Prepare successor bundles with typed changes and predecessor bindings.
+- [ ] Let operators approve, activate, recover and roll back releases under the release contract.
 
-The verifier must reject each altered fixture without writing consumer targets. After these tests pass, the activation command can reuse the verifier.
+#### Prepare an initial bundle
+
+The [draft preparation command](../../specs/prepare_release_capsule.py) takes
+an authenticated workspace lock and a JSON plan. Stage the compiler outputs
+and reviewed reference files beside the plan. Map logical target names to
+paths relative to the plan's directory. A golden value of `null` records
+an absent target. A golden target omitted from the outputs becomes absent
+in the candidate bundle.
+
+```json
+{
+  "outputs": {"host/instructions.md": "compiled/instructions.md"},
+  "goldens": {"host/instructions.md": "reviewed/instructions.md"},
+  "accountability-ledger": "reviewed/accountability.yaml",
+  "distribution": "compiler-source.tar"
+}
+```
+
+Use `null` for the ledger only where the release contract permits it. In
+`distribution`, name the archive of the compiler used to build the staged
+outputs. The command binds the exact bytes supplied for review.
+
+```sh
+conda run -n eutaxis env PYTHONPATH=src python -m specs.prepare_release_capsule \
+  --workspace "$workspace" --manifest declarations/acquisition.yaml \
+  --lock declarations/acquisition.lock.json --plan "$plan" --bundle "$bundle"
+```
+
+The command verifies the bundle before publishing it at an absent path and
+prints its digest. Use that digest with the draft verifier to check the bundle
+again after moving or unpacking it.

@@ -19,7 +19,7 @@ The following work is complete.
 
 ## Priority
 
-- [ ] **Complete the general external release path.** First, [verify a capsule and its review packet](docs/internals/structured-declaration-system-plan.md#^verify-capsules).
+- [ ] **Complete the general external release path.** Follow the [release bundle checklist](docs/internals/structured-declaration-system-plan.md#^verify-capsules).
 - [ ] Review the archived sources and decide which content to include, which can be deleted safely.
 - [ ] Implement a functionality to cleanup config files. This involves:
   - detecting the configs in Codex (TOML) and Claude code (JSON) that violate the recommended patterns,
