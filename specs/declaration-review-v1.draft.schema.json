@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Draft declaration review packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["_schema", "candidate-binding", "semantics", "acquisition", "artifacts"],
+  "properties": {
+    "_schema": {"const": "eutaxis:declaration-review@1"},
+    "candidate-binding": {"$ref": "#/$defs/digest"},
+    "semantics": {
+      "oneOf": [
+        {"$ref": "#/$defs/initial-semantics"},
+        {"$ref": "#/$defs/successor-semantics"}
+      ]
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "candidate"],
+      "properties": {
+        "baseline": {"$ref": "#/$defs/optional-digest"},
+        "candidate": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "candidate"],
+      "properties": {
+        "baseline": {"$ref": "#/$defs/digest"},
+        "candidate": {"$ref": "#/$defs/digest"}
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "minLength": 71,
+      "maxLength": 71
+    },
+    "optional-digest": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/digest"}]
+    },
+    "initial-semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "accountability-ledger", "candidate"],
+      "properties": {
+        "kind": {"const": "initial"},
+        "accountability-ledger": {"$ref": "#/$defs/optional-digest"},
+        "candidate": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "successor-semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "baseline", "candidate", "differences"],
+      "properties": {
+        "kind": {"const": "successor"},
+        "baseline": {"$ref": "#/$defs/digest"},
+        "candidate": {"$ref": "#/$defs/digest"},
+        "differences": {"$ref": "#/$defs/digest"}
+      }
+    }
+  },
+  "if": {
+    "properties": {
+      "semantics": {"$ref": "#/$defs/successor-semantics"}
+    }
+  },
+  "then": {
+    "properties": {
+      "acquisition": {"properties": {"baseline": {"$ref": "#/$defs/digest"}}}
+    }
+  }
+}

@@ -769,6 +769,10 @@ The [draft capsule schema](../../specs/declaration-release-v1.draft.schema.json)
 
 The target map uses logical names. For each name, a digest identifies the exact file bytes and a null value records absence.
 
+The [draft review packet](../../specs/declaration-review-v1.draft.schema.json) binds the canonical capsule fields other than `review-packet`. The capsule records the digest of the complete packet.
+
+The packet records distinct digests for semantics, authorized sources and consumer files. The first review can cite the legacy ledger. A successor review must bind both structured corpora and their typed diff.
+
 - [ ] Define the canonical fields that bind source snapshots, the lock and consumer artifacts.
 - [ ] Verify each record’s canonical bytes and each bound payload digest from the stored snapshot.
 - [ ] Check that the target map covers both the candidate outputs and the preceding targets. For the first release, use the golden baseline targets as the preceding set.
