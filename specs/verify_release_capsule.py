@@ -6,12 +6,20 @@ import argparse
 import hashlib
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from eutaxis.declarations.acquisition_contract import (
+    AcquisitionKind,
+    AcquisitionLock,
+    AcquisitionManifest,
+    _parse_acquisition_manifest_bytes,
+    parse_acquisition_lock_bytes,
+    validate_acquisition_contract,
+)
 from eutaxis.declarations.acquisition_paths import normalized_relative_path
 from eutaxis.declarations.byte_carriers import (
     AuthoritativeByteCarrier,
@@ -19,7 +27,7 @@ from eutaxis.declarations.byte_carriers import (
     _trusted_directory_from_workspace_path,
 )
 from eutaxis.declarations.canonical_json import jcs_bytes, parse_canonical_json_bytes
-from eutaxis.declarations.exceptions import ByteCarrierError
+from eutaxis.declarations.exceptions import AcquisitionContractError, ByteCarrierError
 
 ACQUISITION_FIELDS = (
     "acquisition-manifest",
@@ -114,13 +122,46 @@ def _verify_acquisition(
     authorization = {field: capsule[field] for field in ACQUISITION_FIELDS}
     if _read(blobs, address) != jcs_bytes(authorization):
         raise ValueError("Review acquisition does not bind the capsule sources")
-    for field in ("acquisition-manifest", "acquisition-lock"):
-        entry = capsule[field]
-        normalized_relative_path(entry["path"], allow_dot=False)
-        _read(blobs, entry["sha256"])
-    for path, digest in capsule["workspace-files"].items():
-        normalized_relative_path(path, allow_dot=False)
+    manifest_entry = capsule["acquisition-manifest"]
+    manifest_path = normalized_relative_path(manifest_entry["path"], allow_dot=False)
+    manifest = _parse_acquisition_manifest_bytes(
+        _read(blobs, manifest_entry["sha256"]), path=Path(manifest_path)
+    )
+    lock_entry = capsule["acquisition-lock"]
+    normalized_relative_path(lock_entry["path"], allow_dot=False)
+    lock = parse_acquisition_lock_bytes(_read(blobs, lock_entry["sha256"]))
+    validate_acquisition_contract(manifest, lock)
+    if capsule["packaged-source-revision"] != lock.internal_source.acquisition_revision:
+        raise ValueError("Packaged source revision differs from the acquisition lock")
+    expected_files = _locked_workspace_files(manifest, lock)
+    if capsule["workspace-files"] != expected_files:
+        raise ValueError("Workspace files differ from the acquisition lock")
+    for digest in expected_files.values():
         _read(blobs, digest)
+
+
+def _locked_workspace_files(
+    manifest: AcquisitionManifest, lock: AcquisitionLock
+) -> dict[str, str]:
+    """Map the locked workspace declarations, resources, and facets to blobs."""
+    files: dict[str, str] = {}
+
+    def bind(root: str, path: str, digest: str) -> None:
+        """Reject incompatible bindings for the same workspace path."""
+        coordinate = (PurePosixPath(root) / path).as_posix()
+        if files.setdefault(coordinate, digest) != digest:
+            raise ValueError(f"Conflicting locked workspace bytes for {coordinate}")
+
+    for source, locked in zip(manifest.sources, lock.sources, strict=True):
+        if source.kind is not AcquisitionKind.WORKSPACE:
+            raise ValueError(f"Unsupported source kind in release: {source.kind}")
+        for item in (*locked.files, *locked.resources):
+            bind(source.root, item.path, item.sha256)
+    for extension, locked in zip(
+        manifest.facet_extensions, lock.facet_registry.extensions, strict=True
+    ):
+        bind(extension.root, locked.path, locked.sha256)
+    return files
 
 
 def _verify_review_binding(blobs: ByteStore, capsule: dict[str, Any]) -> dict[str, Any]:
@@ -197,7 +238,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         verify_bundle(args.bundle, args.address)
-    except (ByteCarrierError, OSError, ValidationError, ValueError) as error:
+    except (
+        AcquisitionContractError,
+        ByteCarrierError,
+        OSError,
+        ValidationError,
+        ValueError,
+    ) as error:
         parser.exit(1, f"Verification failed: {error}\n")
     print(f"Verified capsule {args.address}")
     return 0

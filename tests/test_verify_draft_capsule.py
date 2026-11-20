@@ -1,14 +1,45 @@
 """Exercise complete initial and successor bundles against the draft verifier."""
 
 import hashlib
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
 
-from eutaxis.declarations.exceptions import ByteCarrierError
+from eutaxis.declarations.acquisition_contract import parse_acquisition_lock_bytes
 from eutaxis.declarations.canonical_json import jcs_bytes
+from eutaxis.declarations.exceptions import AcquisitionContractError, ByteCarrierError
 from specs import verify_release_capsule
 from specs.verify_release_capsule import ACQUISITION_FIELDS, verify_capsule
+from tests.test_lock_cli import _invoke, _write_workspace
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """Retain the manifest, generated lock and source files for a fixture."""
+
+    manifest: bytes
+    lock: bytes
+    files: dict[str, bytes]
+    packaged_revision: str
+
+
+@pytest.fixture
+def acquisition(tmp_path: Path) -> Snapshot:
+    """Produce the lock through the normal Eutaxis lock command."""
+    workspace = tmp_path / "snapshot"
+    manifest_path = _write_workspace(workspace)
+    result = _invoke(workspace, manifest_path)
+    assert result.exit_code == 0, result.stderr
+    paths = ("declarations/process-core.yaml", "declarations/context-facets.yaml")
+    return Snapshot(
+        (workspace / manifest_path).read_bytes(),
+        result.stdout_bytes,
+        {path: (workspace / path).read_bytes() for path in paths},
+        parse_acquisition_lock_bytes(
+            result.stdout_bytes
+        ).internal_source.acquisition_revision,
+    )
 
 
 def _store(blobs: dict[str, bytes], content: bytes) -> str:
@@ -20,10 +51,12 @@ def _store(blobs: dict[str, bytes], content: bytes) -> str:
 
 def _release(
     blobs: dict[str, bytes],
+    acquisition: Snapshot,
     *,
     prior: tuple[str, str, str] | None = None,
     omit_retired: bool = False,
     change_after_review: bool = False,
+    omit_workspace: bool = False,
 ) -> tuple[str, str, str]:
     """Build a complete candidate and its review in the fixture store."""
     initial = prior is None
@@ -33,6 +66,11 @@ def _release(
     outputs = old if initial else new
     ledger = _store(blobs, b"legacy ledger")
     semantics = _store(blobs, jcs_bytes({"declarations": ["example/rule"]}))
+    workspace_files = {
+        path: _store(blobs, content) for path, content in acquisition.files.items()
+    }
+    if omit_workspace:
+        del workspace_files["declarations/context-facets.yaml"]
     capsule = {
         "_schema": "eutaxis:declaration-release@1",
         "predecessor": predecessor,
@@ -43,14 +81,14 @@ def _release(
         ),
         "acquisition-manifest": {
             "path": "declarations/acquisition.yaml",
-            "sha256": _store(blobs, b"manifest"),
+            "sha256": _store(blobs, acquisition.manifest),
         },
         "acquisition-lock": {
             "path": "declarations/acquisition.lock.json",
-            "sha256": _store(blobs, b"canonical lock"),
+            "sha256": _store(blobs, acquisition.lock),
         },
-        "workspace-files": {"declarations/rules.yaml": _store(blobs, b"rule source")},
-        "packaged-source-revision": _store(blobs, b"packaged sources"),
+        "workspace-files": workspace_files,
+        "packaged-source-revision": acquisition.packaged_revision,
         "distribution-revision": _store(blobs, b"distribution"),
         "managed-targets": (
             outputs if initial or omit_retired else {"host/old.md": None, **outputs}
@@ -87,49 +125,72 @@ def _release(
     return _store(blobs, jcs_bytes(capsule)), semantics, authorization
 
 
-def test_verifies_initial_and_successor_without_writes() -> None:
+def test_verifies_initial_and_successor_without_writes(acquisition: Snapshot) -> None:
     blobs: dict[str, bytes] = {}
-    initial = _release(blobs)
-    successor = _release(blobs, prior=initial)
+    initial = _release(blobs, acquisition)
+    successor = _release(blobs, acquisition, prior=initial)
     snapshot = blobs.copy()
     verify_capsule(blobs, initial[0])
     verify_capsule(blobs, successor[0])
     assert blobs == snapshot
 
 
-@pytest.mark.parametrize(
-    "original", [b"rule source", b"canonical lock", b"old instructions"]
-)
-def test_rejects_altered_payload(original: bytes) -> None:
+@pytest.mark.parametrize("kind", ["source", "lock", "artifact"])
+def test_rejects_altered_payload(acquisition: Snapshot, kind: str) -> None:
     blobs: dict[str, bytes] = {}
-    initial = _release(blobs)
+    initial = _release(blobs, acquisition)
+    original = {
+        "source": acquisition.files["declarations/process-core.yaml"],
+        "lock": acquisition.lock,
+        "artifact": b"old instructions",
+    }[kind]
     address = _store(blobs, original)
     blobs[address] = b"changed"
     with pytest.raises(ValueError, match="Stored bytes differ"):
         verify_capsule(blobs, initial[0])
 
 
-def test_rejects_omitted_retired_target_even_with_valid_digests() -> None:
+def test_rejects_omitted_retired_target_even_with_valid_digests(
+    acquisition: Snapshot,
+) -> None:
     blobs: dict[str, bytes] = {}
-    initial = _release(blobs)
-    successor = _release(blobs, prior=initial, omit_retired=True)
+    initial = _release(blobs, acquisition)
+    successor = _release(blobs, acquisition, prior=initial, omit_retired=True)
     with pytest.raises(ValueError, match="include every prior and candidate target"):
         verify_capsule(blobs, successor[0])
 
 
-def test_rejects_capsule_changed_after_review() -> None:
+def test_rejects_capsule_changed_after_review(acquisition: Snapshot) -> None:
     blobs: dict[str, bytes] = {}
-    capsule = _release(blobs, change_after_review=True)
+    capsule = _release(blobs, acquisition, change_after_review=True)
     with pytest.raises(ValueError, match="Review does not bind"):
         verify_capsule(blobs, capsule[0])
 
 
-def _write_bundle(root: Path) -> tuple[str, Path]:
+def test_rejects_omitted_workspace_file_even_with_valid_digests(
+    acquisition: Snapshot,
+) -> None:
+    blobs: dict[str, bytes] = {}
+    capsule = _release(blobs, acquisition, omit_workspace=True)
+    with pytest.raises(
+        ValueError, match="Workspace files differ from the acquisition lock"
+    ):
+        verify_capsule(blobs, capsule[0])
+
+
+def test_rejects_noncanonical_lock_with_valid_digest(acquisition: Snapshot) -> None:
+    blobs: dict[str, bytes] = {}
+    capsule = _release(blobs, replace(acquisition, lock=acquisition.lock + b"\n"))
+    with pytest.raises(AcquisitionContractError, match="exact JSON Canonicalization"):
+        verify_capsule(blobs, capsule[0])
+
+
+def _write_bundle(root: Path, acquisition: Snapshot) -> tuple[str, Path]:
     """Materialize a valid fixture and return its capsule and source blob."""
     blobs: dict[str, bytes] = {}
-    initial = _release(blobs)
-    address = _release(blobs, prior=initial)[0]
-    source = _store(blobs, b"rule source")
+    initial = _release(blobs, acquisition)
+    address = _release(blobs, acquisition, prior=initial)[0]
+    source = _store(blobs, acquisition.files["declarations/process-core.yaml"])
     blob_dir = root / "blobs" / "sha256"
     blob_dir.mkdir(parents=True)
     for digest, content in blobs.items():
@@ -138,9 +199,9 @@ def _write_bundle(root: Path) -> tuple[str, Path]:
 
 
 def test_bundle_command_verifies_files_without_writing(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], acquisition: Snapshot
 ) -> None:
-    address, blob = _write_bundle(tmp_path)
+    address, blob = _write_bundle(tmp_path, acquisition)
     contents = {file.name: file.read_bytes() for file in blob.parent.iterdir()}
     assert verify_release_capsule.main([str(tmp_path), address]) == 0
     assert capsys.readouterr().out == f"Verified capsule {address}\n"
@@ -148,9 +209,9 @@ def test_bundle_command_verifies_files_without_writing(
 
 
 def test_bundle_rejects_symlink_to_matching_bytes(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], acquisition: Snapshot
 ) -> None:
-    address, blob = _write_bundle(tmp_path)
+    address, blob = _write_bundle(tmp_path, acquisition)
     content = tmp_path / "outside-blob-store"
     blob.rename(content)
     blob.symlink_to(content)
@@ -161,9 +222,9 @@ def test_bundle_rejects_symlink_to_matching_bytes(
 
 
 def test_bundle_rejects_changed_blob_after_first_pass(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, acquisition: Snapshot
 ) -> None:
-    address, blob = _write_bundle(tmp_path)
+    address, blob = _write_bundle(tmp_path, acquisition)
 
     def change_before_recheck(store, digest):
         verify_capsule(store, digest)

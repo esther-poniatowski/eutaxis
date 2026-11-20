@@ -774,6 +774,7 @@ The [draft review packet](../../specs/declaration-review-v1.draft.schema.json) b
 The packet records distinct digests for semantics, authorized sources and consumer files. The first review can cite the legacy ledger. A successor review must bind both structured corpora and their typed diff.
 
 The [draft verifier](../../specs/verify_release_capsule.py) checks a capsule and its stored bytes by digest.
+The verifier checks the manifest against the lock. The workspace snapshot must match the locked files, facet registries and resources.
 
 The bundle directory stores blobs under `blobs/sha256/` with hexadecimal filenames. To check a bundle from the repository root, set the shell variables `bundle` to its path and `capsule` to the reviewed digest.
 
