@@ -760,3 +760,14 @@ This phase ensures that no legacy unit or consumer remains unaccounted for.
 - [x] Require zero unaccounted units and prove the ledger gate fails when a planted legacy unit is omitted.
 
 **Exit evidence:** every legacy unit and consumer projection is accounted for, and rollback restores the last reviewed generated release.
+
+### Verify release capsules ^verify-capsules
+
+The verifier checks a capsule and its review packet against the [release contract](../adr/external-declaration-identity-and-acquisition.md#^reviewed-declaration-releases). The verifier covers packaged and workspace sources.
+
+- [ ] Define the canonical fields that bind source snapshots, the lock and consumer artifacts.
+- [ ] Verify each record’s canonical bytes and each bound payload digest from the stored snapshot.
+- [ ] Check that the target map covers both the candidate outputs and the preceding targets. For the first release, use the golden baseline targets as the preceding set.
+- [ ] Test an initial capsule and a successor that retires a target. Plant a changed source, a changed lock, a changed artifact and a missing absent-target entry.
+
+The verifier must reject each altered fixture without writing consumer targets. After these tests pass, the activation command can reuse the verifier.
