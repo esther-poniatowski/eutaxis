@@ -46,8 +46,7 @@ def command_root(root: str | None) -> Path:
     Raises
     ------
     ConfigurationError
-        When Hodegos rejects a declaration ``hodegos.yml`` or finds two
-        configuration files at the root.
+        When Hodegos finds two configuration files at the root.
     """
     from .instructions.config import discover_root
 
@@ -73,8 +72,8 @@ def command_settings(config: str | None, root: str | None) -> tuple[Path, Path]:
     Raises
     ------
     ConfigurationError
-        When Hodegos rejects the request or a declaration ``hodegos.yml``, or
-        when the root holds no configuration file or two of them.
+        When Hodegos rejects the request, or when the root holds no
+        configuration file or two of them.
     """
     from .instructions.config import discover_configuration
 

@@ -749,9 +749,10 @@ def discover_root(
        ``eutaxis.yml`` at one of its places;
     4. the current folder.
 
-    The places of a folder are the folder itself, its subfolder ``.config/``,
-    and each folder that its declaration ``hodegos.yml`` lists, as the
-    specification of Hodegos states (``HODEGOS_SPECIFICATION``).
+    The places of a folder are the file ``eutaxis.yml`` in the folder, in its
+    subfolder ``.config/`` and in its subfolder ``config/``, as the
+    specification of Hodegos states (``HODEGOS_SPECIFICATION``). A file kept
+    in another folder is named with ``--config``.
 
     Parameters
     ----------
@@ -770,8 +771,8 @@ def discover_root(
     Raises
     ------
     ConfigurationError
-        When Hodegos rejects a declaration ``hodegos.yml`` met by the search,
-        or when two places of the root hold a configuration file.
+        When two places of the root hold a configuration file, or when
+        Hodegos rejects the request.
     """
     return _discover(root, None, cwd, environ).root.resolve()
 
@@ -808,19 +809,18 @@ def discover_configuration(
     Raises
     ------
     ConfigurationError
-        When ``config`` names no file, when Hodegos rejects a declaration
-        ``hodegos.yml``, when two places of the root hold a configuration
-        file, or when no place holds one. Eutaxis has no built-in defaults:
-        every source and every output is declared in the configuration file.
+        When ``config`` names no file, when two places of the root hold a
+        configuration file, or when no place holds one. Eutaxis has no
+        built-in defaults: every source and every output is declared in the
+        configuration file.
     """
     found = _discover(root, config, cwd, environ)
     resolved = found.root.resolve()
     if found.configuration is None:
         raise ConfigurationError(
-            f"{resolved}: no configuration: write {CONFIG_FILENAME} at the root, "
-            "in .config/, or in a folder that hodegos.yml declares, or name it "
-            "with --config. Eutaxis has no built-in defaults: eutaxis init "
-            "scaffolds a configuration file."
+            f"{resolved}: no configuration: write {CONFIG_FILENAME} in config/, "
+            "in .config/ or at the root, or name it with --config. Eutaxis has "
+            "no built-in defaults: eutaxis init scaffolds a configuration file."
         )
     return resolved, found.configuration.path.resolve()
 
@@ -834,8 +834,8 @@ def load_config(config_path: Path, root: Path | None = None) -> InstructionConfi
         Configuration file.
     root : Path, optional
         Folder against which the relative paths of the file resolve.
-        Default: the folder of the file. A file kept in ``.config/`` or in a
-        folder that ``hodegos.yml`` declares therefore needs ``root``, such
-        as the root that ``discover_configuration`` returns.
+        Default: the folder of the file. A file kept in ``.config/`` or in
+        ``config/`` therefore needs ``root``, such as the root that
+        ``discover_configuration`` returns.
     """
     return ConfigLoader(config_path, root=root).load()

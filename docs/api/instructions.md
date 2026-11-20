@@ -97,9 +97,10 @@ The root is the first answer of:
    `eutaxis.yml` at one of its places;
 4. the current folder.
 
-The places of a folder are the folder itself, its subfolder `.config/`,
-and each folder that its declaration `hodegos.yml` lists, as the
-specification of Hodegos states (`HODEGOS_SPECIFICATION`).
+The places of a folder are the file `eutaxis.yml` in the folder, in its
+subfolder `.config/` and in its subfolder `config/`, as the
+specification of Hodegos states (`HODEGOS_SPECIFICATION`). A file kept
+in another folder is named with `--config`.
 
 * **Parameters:**
   * **root** (*Path* *,* *optional*) – Root given on the command line, relative to the current folder.
@@ -110,8 +111,8 @@ specification of Hodegos states (`HODEGOS_SPECIFICATION`).
 * **Return type:**
   Path
 * **Raises:**
-  [**ConfigurationError**](#eutaxis.instructions.exceptions.ConfigurationError) – When Hodegos rejects a declaration `hodegos.yml` met by the search,
-      or when two places of the root hold a configuration file.
+  [**ConfigurationError**](#eutaxis.instructions.exceptions.ConfigurationError) – When two places of the root hold a configuration file, or when
+      Hodegos rejects the request.
 
 <a id="eutaxis.instructions.config.discover_configuration"></a>
 
@@ -133,10 +134,10 @@ Return the root of a command and its configuration file, located by Hodegos.
 * **Return type:**
   tuple[Path, Path]
 * **Raises:**
-  [**ConfigurationError**](#eutaxis.instructions.exceptions.ConfigurationError) – When `config` names no file, when Hodegos rejects a declaration
-      `hodegos.yml`, when two places of the root hold a configuration
-      file, or when no place holds one. Eutaxis has no built-in defaults:
-      every source and every output is declared in the configuration file.
+  [**ConfigurationError**](#eutaxis.instructions.exceptions.ConfigurationError) – When `config` names no file, when two places of the root hold a
+      configuration file, or when no place holds one. Eutaxis has no
+      built-in defaults: every source and every output is declared in the
+      configuration file.
 
 <a id="eutaxis.instructions.config.load_config"></a>
 
@@ -147,9 +148,9 @@ Load instruction configuration from disk.
 * **Parameters:**
   * **config_path** (*Path*) – Configuration file.
   * **root** (*Path* *,* *optional*) – Folder against which the relative paths of the file resolve.
-    Default: the folder of the file. A file kept in `.config/` or in a
-    folder that `hodegos.yml` declares therefore needs `root`, such
-    as the root that `discover_configuration` returns.
+    Default: the folder of the file. A file kept in `.config/` or in
+    `config/` therefore needs `root`, such as the root that
+    `discover_configuration` returns.
 * **Return type:**
   [*InstructionConfig*](#eutaxis.instructions.models.InstructionConfig)
 

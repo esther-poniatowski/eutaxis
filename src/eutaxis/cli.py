@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 _CONFIG_HELP = (
     "Configuration file, relative to the current folder. Default: eutaxis.yml "
-    "at the root, in .config/, or in a folder that hodegos.yml declares."
+    "at the root, in .config/ or in config/."
 )
 _ROOT_HELP = (
     "Folder below which the configuration file is looked up and against which the "
