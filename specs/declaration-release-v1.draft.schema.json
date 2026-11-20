@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Draft declaration release capsule",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "_schema",
+    "predecessor",
+    "initial-baseline",
+    "acquisition-manifest",
+    "acquisition-lock",
+    "workspace-files",
+    "packaged-source-revision",
+    "distribution-revision",
+    "review-packet",
+    "managed-targets"
+  ],
+  "properties": {
+    "_schema": {"const": "eutaxis:declaration-release@1"},
+    "predecessor": {"$ref": "#/$defs/optional-digest"},
+    "initial-baseline": true,
+    "acquisition-manifest": {"$ref": "#/$defs/placed-blob"},
+    "acquisition-lock": {"$ref": "#/$defs/placed-blob"},
+    "workspace-files": {"$ref": "#/$defs/blob-map"},
+    "packaged-source-revision": {"$ref": "#/$defs/digest"},
+    "distribution-revision": {"$ref": "#/$defs/digest"},
+    "review-packet": {"$ref": "#/$defs/digest"},
+    "managed-targets": {"$ref": "#/$defs/target-map"}
+  },
+  "if": {"properties": {"predecessor": {"type": "null"}}},
+  "then": {"properties": {"initial-baseline": {"$ref": "#/$defs/baseline"}}},
+  "else": {"properties": {"initial-baseline": {"type": "null"}}},
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "minLength": 71,
+      "maxLength": 71
+    },
+    "optional-digest": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/digest"}]
+    },
+    "placed-blob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "blob-map": {
+      "type": "object",
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {"$ref": "#/$defs/digest"}
+    },
+    "target-map": {
+      "type": "object",
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {"$ref": "#/$defs/optional-digest"}
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accountability-ledger", "golden-targets"],
+      "properties": {
+        "accountability-ledger": {"$ref": "#/$defs/optional-digest"},
+        "golden-targets": {"$ref": "#/$defs/target-map"}
+      }
+    }
+  }
+}

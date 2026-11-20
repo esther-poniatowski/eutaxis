@@ -765,6 +765,10 @@ This phase ensures that no legacy unit or consumer remains unaccounted for.
 
 The verifier checks a capsule and its review packet against the [release contract](../adr/external-declaration-identity-and-acquisition.md#^reviewed-declaration-releases). The verifier covers packaged and workspace sources.
 
+The [draft capsule schema](../../specs/declaration-release-v1.draft.schema.json) identifies each stored payload by its digest. The verifier must validate each snapshot path before reading its bytes.
+
+The target map uses logical names. For each name, a digest identifies the exact file bytes and a null value records absence.
+
 - [ ] Define the canonical fields that bind source snapshots, the lock and consumer artifacts.
 - [ ] Verify each record’s canonical bytes and each bound payload digest from the stored snapshot.
 - [ ] Check that the target map covers both the candidate outputs and the preceding targets. For the first release, use the golden baseline targets as the preceding set.
