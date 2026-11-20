@@ -775,6 +775,12 @@ The packet records distinct digests for semantics, authorized sources and consum
 
 The [draft verifier](../../specs/verify_release_capsule.py) checks a capsule and its stored bytes by digest.
 
+The bundle directory stores blobs under `blobs/sha256/` with hexadecimal filenames. To check a bundle from the repository root, set the shell variables `bundle` to its path and `capsule` to the reviewed digest.
+
+```sh
+conda run -n eutaxis env PYTHONPATH=src python -m specs.verify_release_capsule "$bundle" "$capsule"
+```
+
 - [ ] Define the canonical fields that bind source snapshots, the lock and consumer artifacts.
 - [ ] Verify each record’s canonical bytes and each bound payload digest from the stored snapshot.
 - [ ] Check that the target map covers both the candidate outputs and the preceding targets. For the first release, use the golden baseline targets as the preceding set.

@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
-from collections.abc import Mapping
+import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError
 
 from eutaxis.declarations.acquisition_paths import normalized_relative_path
+from eutaxis.declarations.byte_carriers import (
+    AuthoritativeByteCarrier,
+    RetainedDirectory,
+    _trusted_directory_from_workspace_path,
+)
 from eutaxis.declarations.canonical_json import jcs_bytes, parse_canonical_json_bytes
+from eutaxis.declarations.exceptions import ByteCarrierError
 
 ACQUISITION_FIELDS = (
     "acquisition-manifest",
@@ -22,12 +30,42 @@ ACQUISITION_FIELDS = (
 )
 
 
+class ByteStore(Protocol):
+    """Read a blob by its content address."""
+
+    def __getitem__(self, address: str) -> bytes:
+        """Return the bytes stored under the address."""
+
+
+class _BundleBlobs:
+    """Read digest-named files through a retained directory descriptor."""
+
+    def __init__(self, directory: RetainedDirectory) -> None:
+        """Start one observation of the bundle."""
+        self._directory = directory
+        self._observations: dict[str, AuthoritativeByteCarrier] = {}
+
+    def __getitem__(self, address: str) -> bytes:
+        """Read each referenced blob once before the final verification pass."""
+        match = re.fullmatch(r"sha256:([0-9a-f]{64})", address)
+        if match is None:
+            raise ValueError(f"Invalid blob address: {address!r}")
+        if address not in self._observations:
+            self._observations[address] = self._directory.read_authoritative(match[1])
+        return self._observations[address].data
+
+    def verify(self) -> None:
+        """Reopen each referenced blob and verify the retained observation."""
+        for observation in self._observations.values():
+            self._directory.verify(observation)
+
+
 def _digest(content: bytes) -> str:
     """Address one exact byte sequence."""
     return "sha256:" + hashlib.sha256(content).hexdigest()
 
 
-def _read(blobs: Mapping[str, bytes], address: str) -> bytes:
+def _read(blobs: ByteStore, address: str) -> bytes:
     """Read bytes and check their address."""
     try:
         content = blobs[address]
@@ -46,9 +84,7 @@ def _object(content: bytes) -> dict[str, Any]:
     return value
 
 
-def _load_record(
-    blobs: Mapping[str, bytes], address: str, record: str
-) -> dict[str, Any]:
+def _load_record(blobs: ByteStore, address: str, record: str) -> dict[str, Any]:
     """Validate a content-addressed draft record."""
     name = f"declaration-{record}-v1.draft.schema.json"
     schema = json.loads(Path(__file__).with_name(name).read_text(encoding="utf-8"))
@@ -58,7 +94,7 @@ def _load_record(
 
 
 def _read_targets(
-    blobs: Mapping[str, bytes], address: str, *, require_present: bool
+    blobs: ByteStore, address: str, *, require_present: bool
 ) -> dict[str, str | None]:
     """Verify target names and each present artifact reference."""
     targets = _object(_read(blobs, address))
@@ -72,7 +108,7 @@ def _read_targets(
 
 
 def _verify_acquisition(
-    blobs: Mapping[str, bytes], capsule: dict[str, Any], address: str
+    blobs: ByteStore, capsule: dict[str, Any], address: str
 ) -> None:
     """Bind the reviewed acquisition record to the capsule and its bytes."""
     authorization = {field: capsule[field] for field in ACQUISITION_FIELDS}
@@ -87,9 +123,7 @@ def _verify_acquisition(
         _read(blobs, digest)
 
 
-def _verify_review_binding(
-    blobs: Mapping[str, bytes], capsule: dict[str, Any]
-) -> dict[str, Any]:
+def _verify_review_binding(blobs: ByteStore, capsule: dict[str, Any]) -> dict[str, Any]:
     """Verify the review against the capsule without its review digest."""
     review = _load_record(blobs, capsule["review-packet"], "review")
     binding = {key: value for key, value in capsule.items() if key != "review-packet"}
@@ -98,7 +132,7 @@ def _verify_review_binding(
     return review
 
 
-def verify_capsule(blobs: Mapping[str, bytes], address: str) -> None:
+def verify_capsule(blobs: ByteStore, address: str) -> None:
     """Check canonical records, bound bytes, and complete targets by address.
 
     The caller supplies the reviewed capsule address and a read-only byte store.
@@ -143,3 +177,31 @@ def verify_capsule(blobs: Mapping[str, bytes], address: str) -> None:
         raise ValueError(
             "Managed targets must include every prior and candidate target"
         )
+
+
+def verify_bundle(bundle: Path, address: str) -> None:
+    """Verify one capsule stored below the bundle’s blob directory."""
+    blob_path = (Path(bundle.name) / "blobs" / "sha256").as_posix()
+    with _trusted_directory_from_workspace_path(str(bundle.parent)) as parent:
+        with parent.retain_directory(blob_path) as directory:
+            blobs = _BundleBlobs(directory)
+            verify_capsule(blobs, address)
+            blobs.verify()
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the read-only draft verifier on one bundle."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("bundle", type=Path)
+    parser.add_argument("address", help="Reviewed capsule digest")
+    args = parser.parse_args(argv)
+    try:
+        verify_bundle(args.bundle, args.address)
+    except (ByteCarrierError, OSError, ValidationError, ValueError) as error:
+        parser.exit(1, f"Verification failed: {error}\n")
+    print(f"Verified capsule {args.address}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
