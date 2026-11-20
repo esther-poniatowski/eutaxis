@@ -787,7 +787,9 @@ conda run -n eutaxis env PYTHONPATH=src python -m specs.verify_release_capsule "
 - [x] Build and verify a draft bundle from real Oikos compiler outputs. The trial rebuilt all 14 generated files from stored sources and rejected a changed source, lock, or output and an omitted target.
 - [x] Prepare an initial bundle from authenticated workspace sources, staged compiler outputs and reviewed golden files through a reusable command. The command reproduced the Oikos trial capsule digest.
 - [x] Prepare successor bundles with typed changes and predecessor bindings. The Oikos trial changed one rule and recorded the two files of a retired Skill as absent. The verifier accepted both capsules from the successor bundle. Rebuilding from stored sources reproduced all 12 published files.
-- [ ] Let operators approve, activate, recover and roll back releases under the release contract.
+- [x] Let operators approve a verified capsule against the expected record and release. The Oikos trial rejected reuse for a different capsule and a stale record number.
+- [ ] Activate a reviewed bundle under the release contract. Compare the operator's record with the verified live state before any writes.
+- [ ] Recover after an interrupted update. Add a command to roll back to a preceding release under the release contract.
 
 #### Prepare an initial bundle
 
@@ -833,3 +835,23 @@ The successor carries the verified history. Its review packet binds the
 source records, output maps and typed semantic changes. The verifier
 recomputes the changes from both semantic snapshots and checks every
 ancestor. Verify the successor by its digest with the same verifier command.
+
+#### Record operator approval
+
+After reviewing the candidate, use the [draft approval command](../../specs/approve_release_capsule.py)
+with its exact capsule digest. For an initial release, pass `--expect-empty`.
+For a successor, supply both the expected active record number and its capsule
+digest. The predecessor must match the expected active release.
+
+```sh
+conda run -n eutaxis env PYTHONPATH=src python -m specs.approve_release_capsule \
+  "$bundle" "$capsule" --expect-record "$record" --expect-active "$active" \
+  > "$operator_approval"
+```
+
+Store the record outside the bundle under the operator's control. The record
+binds the capsule, review packet and expected state. To check the record,
+replace `> "$operator_approval"` with `--check "$operator_approval"`.
+The checker verifies the bundle and matches the saved bytes against the
+supplied state. A future command must verify the live chain before it can
+activate a release.

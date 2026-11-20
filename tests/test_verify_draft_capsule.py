@@ -58,12 +58,13 @@ def _release(
     change_after_review: bool = False,
     omit_workspace: bool = False,
     incorrect_diff: bool = False,
+    successor_output: bytes = b"new instructions",
 ) -> tuple[str, str, str]:
     """Build a complete candidate and its review in the fixture store."""
     initial = prior is None
     predecessor, prior_semantics, prior_acquisition = prior or (None, None, None)
     old = {"host/old.md": _store(blobs, b"old instructions")}
-    new = {"host/new.md": _store(blobs, b"new instructions")}
+    new = {"host/new.md": _store(blobs, successor_output)}
     outputs = old if initial else new
     ledger = _store(blobs, b"legacy ledger")
     semantics = _store(blobs, jcs_bytes([]))
