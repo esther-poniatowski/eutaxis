@@ -788,8 +788,9 @@ conda run -n eutaxis env PYTHONPATH=src python -m specs.verify_release_capsule "
 - [x] Prepare an initial bundle from authenticated workspace sources, staged compiler outputs and reviewed golden files through a reusable command. The command reproduced the Oikos trial capsule digest.
 - [x] Prepare successor bundles with typed changes and predecessor bindings. The Oikos trial changed one rule and recorded the two files of a retired Skill as absent. The verifier accepted both capsules from the successor bundle. Rebuilding from stored sources reproduced all 12 published files.
 - [x] Let operators approve a verified capsule against the expected record and release. The Oikos trial rejected reuse for a different capsule and a stale record number.
-- [ ] Activate a reviewed bundle under the release contract. Compare the operator's record with the verified live state before any writes.
-- [ ] Recover after an interrupted update. Add a command to roll back to a preceding release under the release contract.
+- [x] Activate a reviewed bundle under the release contract. Check the operator's record and the target baseline before writing.
+- [x] Recover after an interrupted update. The Oikos trial restored all 14 files after a process exit. A retry committed the successor with 12 files and two absent targets.
+- [ ] Add a command to roll back to a preceding release under the release contract.
 
 #### Prepare an initial bundle
 
@@ -853,5 +854,23 @@ Store the record outside the bundle under the operator's control. The record
 binds the capsule, review packet and expected state. To check the record,
 replace `> "$operator_approval"` with `--check "$operator_approval"`.
 The checker verifies the bundle and matches the saved bytes against the
-supplied state. A future command must verify the live chain before it can
-activate a release.
+supplied state. The activation command derives that state from the live chain.
+
+#### Activate or recover a release
+
+Use an existing release-store directory and a separate target directory.
+The [draft command](../../specs/activate_release_capsule.py) binds the store
+to that target directory. Exclude agent readers and other writers during
+the update and any recovery. The capsule describes file bytes and absence.
+Eutaxis writes files with mode `0600`.
+
+```sh
+conda run -n eutaxis env PYTHONPATH=src python -m specs.activate_release_capsule \
+  --store "$store" --targets "$targets" \
+  activate "$bundle" "$capsule" --approval "$operator_approval"
+```
+
+`status` reports the committed record. `recover` resolves a pending update.
+Both commands take the same `--store` and `--targets` values. Without a commit
+marker, `recover` restores the earlier bytes. Any conflicting edit stays in
+place. With a commit marker, `recover` clears the pending record.
