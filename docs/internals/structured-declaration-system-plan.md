@@ -791,7 +791,8 @@ conda run -n eutaxis env PYTHONPATH=src python -m specs.verify_release_capsule "
 - [x] Activate a reviewed bundle under the release contract. Check the operator's record and the target baseline before writing.
 - [x] Recover after an interrupted update. The Oikos trial restored all 14 files after a process exit. A retry committed the successor with 12 files and two absent targets.
 - [x] Roll back to the active capsule's predecessor under the release contract. Verify recovery from a process exit during the Oikos trial.
-- [ ] Review the draft release workflow before offering it to consuming projects. Check the target directory and file modes. Verify how the host excludes other readers and writers.
+- [x] Review the draft against Oikos target paths, file modes and writer locks. The [Oikos adoption handoff](https://github.com/esther-poniatowski/oikos/blob/main/docs/instruction-release-restoration.md) records the gaps.
+- [ ] Check the bundle contract against a read-only Oikos plan built from a synthetic inventory.
 
 #### Prepare an initial bundle
 
