@@ -178,3 +178,98 @@ def test_concurrent_promoters_commit_at_most_one_successor(
     assert len(committed) == 1
     assert read_head(store).active == ExpectedActive(1, committed[0])
     assert not list(store.glob("pending-*"))
+
+
+def _activate_successor(
+    chain: ReleaseChain, directories: tuple[Path, Path]
+) -> ExpectedActive:
+    """Commit the fixture successor and return its recorded live state."""
+    _activate_initial(chain, directories)
+    bundle, initial, successor, _ = chain
+    store, targets = directories
+    approved = _approval(store, bundle, successor, ExpectedActive(0, initial))
+    assert activation.activate_release(store, targets, bundle, successor, approved) == 1
+    return ExpectedActive(1, successor)
+
+
+def test_rollback_appends_history_and_allows_fresh_forward_approval(
+    chain: ReleaseChain, directories: tuple[Path, Path]
+) -> None:
+    expected = _activate_successor(chain, directories)
+    bundle, initial, successor, _ = chain
+    store, targets = directories
+    original = {name: (store / name).read_bytes() for name in ("commit-0", "commit-1")}
+    assert activation.rollback_release(store, targets, expected) == (2, initial)
+    assert read_head(store).active == ExpectedActive(2, initial)
+    assert all((store / name).read_bytes() == data for name, data in original.items())
+    assert consumer_bytes(targets, "host/old.md") == b"old instructions"
+    assert consumer_bytes(targets, "host/new.md") is None
+    assert not list(store.glob("pending-*"))
+    with pytest.raises(ValueError, match="expected active state differs"):
+        activation.rollback_release(store, targets, expected)
+    with pytest.raises(ValueError, match="no predecessor"):
+        activation.rollback_release(store, targets, ExpectedActive(2, initial))
+    with pytest.raises(ValueError, match="Approval does not match"):
+        activation.activate_release(
+            store, targets, bundle, successor, store.parent / "approval.json"
+        )
+    approved = _approval(store, bundle, successor, ExpectedActive(2, initial))
+    assert activation.activate_release(store, targets, bundle, successor, approved) == 3
+
+
+def test_rollback_rejects_consumer_drift(
+    chain: ReleaseChain, directories: tuple[Path, Path]
+) -> None:
+    expected = _activate_successor(chain, directories)
+    store, targets = directories
+    before = set(store.iterdir())
+    (targets / "host" / "new.md").write_bytes(b"edited")
+    with pytest.raises(ValueError, match="differs from the reviewed baseline"):
+        activation.rollback_release(store, targets, expected)
+    assert set(store.iterdir()) == before
+    assert consumer_bytes(targets, "host/new.md") == b"edited"
+
+
+def test_interrupted_rollback_preserves_successor_until_commit(
+    chain: ReleaseChain, directories: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = _activate_successor(chain, directories)
+    store, targets = directories
+    original = activation.update_target
+
+    def interrupt(root, name, expected_bytes, selected):
+        original(root, name, expected_bytes, selected)
+        if name == "host/new.md" and selected is None:
+            raise OSError("planted rollback interruption")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(activation, "update_target", interrupt)
+        with pytest.raises(OSError, match="planted rollback interruption"):
+            activation.rollback_release(store, targets, expected)
+    assert read_head(store).active == expected
+    assert consumer_bytes(targets, "host/new.md") == b"new instructions"
+    assert consumer_bytes(targets, "host/old.md") is None
+    assert not list(store.glob("pending-*"))
+
+
+def test_rollback_after_marker_failure_keeps_predecessor_files(
+    chain: ReleaseChain, directories: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = _activate_successor(chain, directories)
+    _, initial, _, _ = chain
+    store, targets = directories
+    original = activation.sync_directory
+
+    def fail(directory: Path) -> None:
+        if directory == store and (store / "commit-2").exists():
+            raise OSError("planted rollback marker failure")
+        original(directory)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(activation, "sync_directory", fail)
+        with pytest.raises(ValueError, match="may have committed"):
+            activation.rollback_release(store, targets, expected)
+    assert read_head(store).active == ExpectedActive(2, initial)
+    assert "Cleared committed intent" in activation.recover_release(store, targets)
+    assert consumer_bytes(targets, "host/new.md") is None
+    assert consumer_bytes(targets, "host/old.md") == b"old instructions"

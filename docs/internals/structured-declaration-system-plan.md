@@ -790,7 +790,8 @@ conda run -n eutaxis env PYTHONPATH=src python -m specs.verify_release_capsule "
 - [x] Let operators approve a verified capsule against the expected record and release. The Oikos trial rejected reuse for a different capsule and a stale record number.
 - [x] Activate a reviewed bundle under the release contract. Check the operator's record and the target baseline before writing.
 - [x] Recover after an interrupted update. The Oikos trial restored all 14 files after a process exit. A retry committed the successor with 12 files and two absent targets.
-- [ ] Add a command to roll back to a preceding release under the release contract.
+- [x] Roll back to the active capsule's predecessor under the release contract. Verify recovery from a process exit during the Oikos trial.
+- [ ] Review the draft release workflow before offering it to consuming projects. Check the target directory and file modes. Verify how the host excludes other readers and writers.
 
 #### Prepare an initial bundle
 
@@ -874,3 +875,20 @@ conda run -n eutaxis env PYTHONPATH=src python -m specs.activate_release_capsule
 Both commands take the same `--store` and `--targets` values. Without a commit
 marker, `recover` restores the earlier bytes. Any conflicting edit stays in
 place. With a commit marker, `recover` clears the pending record.
+
+#### Roll back a release
+
+Use `status` to obtain the active record number and capsule digest. Pass both
+values to `rollback` under the same exclusion boundary. Eutaxis selects the
+active capsule's predecessor and restores its stored files. Eutaxis records
+the change at the next record number. The operator must approve any later
+forward update against the new record number.
+
+```sh
+conda run -n eutaxis env PYTHONPATH=src python -m specs.activate_release_capsule \
+  --store "$store" --targets "$targets" \
+  rollback --expect-record "$record" --expect-active "$active"
+```
+
+Use `recover` if the process exits during rollback. If the rollback marker is absent,
+`recover` restores the files from the release active before the rollback.

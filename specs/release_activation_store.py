@@ -43,6 +43,28 @@ class Release:
 
 
 @dataclass(frozen=True)
+class TargetTransition:
+    """Describe the before and after states of every affected target."""
+
+    baseline: TargetBytes
+    targets: TargetBytes
+
+
+def target_transition(active: Release | None, selected: Release) -> TargetTransition:
+    """Derive target states for a forward update or a direct rollback."""
+    active_address = None if active is None else active.address
+    if selected.predecessor == active_address:
+        return TargetTransition(selected.baseline, selected.targets)
+    if active is not None and active.predecessor == selected.address:
+        return TargetTransition(
+            active.targets, dict.fromkeys(active.targets) | selected.targets
+        )
+    raise ValueError(
+        "Selected release is neither a successor nor the active predecessor"
+    )
+
+
+@dataclass(frozen=True)
 class Head:
     """Last committed position and its content-addressed record."""
 
@@ -233,6 +255,7 @@ def activation_record(head: Head, selected: str) -> dict[str, object]:
 def read_head(root: Path) -> Head:
     """Verify the contiguous chain and each capsule it selects."""
     head = Head()
+    active = None
     for number, path in sorted(sequence_paths(root, "commit").items()):
         if number != head.next_number:
             raise ValueError(f"Gap in activation history at record {head.next_number}")
@@ -243,11 +266,16 @@ def read_head(root: Path) -> Head:
             activation_record(head, address)
         ):
             raise ValueError(f"Invalid activation record at sequence {number}")
-        release = read_release(record_path(root, "release", address), address)
-        if release.predecessor != head.active.release:
-            raise ValueError(f"Capsule predecessor mismatch at record {number}")
+        release = read_stored_release(root, address)
+        target_transition(active, release)
         head = Head(ExpectedActive(number, address), digest)
+        active = release
     return head
+
+
+def read_stored_release(root: Path, address: str) -> Release:
+    """Verify a capsule retained in the activation store."""
+    return read_release(record_path(root, "release", address), address)
 
 
 def retain_release(root: Path, release: Release) -> None:
