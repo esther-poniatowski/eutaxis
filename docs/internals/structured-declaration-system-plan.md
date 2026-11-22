@@ -794,7 +794,8 @@ conda run -n eutaxis env PYTHONPATH=src python -m specs.verify_release_capsule "
 - [x] Review the draft against Oikos target paths, file modes and writer locks. The [Oikos adoption handoff](https://github.com/esther-poniatowski/oikos/blob/main/docs/instruction-release-restoration.md) records the gaps.
 - [x] Check the bundle contract against a read-only Oikos plan built from a synthetic inventory. The Oikos planner preserved shared and unrelated records while retiring a whole Skill.
 - [x] Check a staged local machine release with the same planner. Oikos matched its verified local baseline and rejected the mismatched successor.
-- [ ] Rehearse the host pause before a live trial with a reviewed machine release.
+- [x] Rehearse the host pause. The Oikos operator reported exit status `0` from an independent shell.
+- [ ] Run a live trial with a reviewed machine release and a fresh host pause check.
 
 #### Prepare an initial bundle
 
