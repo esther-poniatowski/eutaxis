@@ -795,7 +795,7 @@ conda run -n eutaxis env PYTHONPATH=src python -m specs.verify_release_capsule "
 - [x] Check the bundle contract against a read-only Oikos plan built from a synthetic inventory. The Oikos planner preserved shared and unrelated records while retiring a whole Skill.
 - [x] Check a staged local machine release with the same planner. Oikos matched its verified local baseline and rejected the mismatched successor.
 - [x] Rehearse the host pause. The Oikos operator reported exit status `0` from an independent shell.
-- [ ] Run a live trial with a reviewed machine release and a fresh host pause check.
+- [x] Run a live trial with a reviewed machine release and a fresh host pause check. On 2026-11-25, the Oikos facade installed the [published wording change](https://github.com/esther-poniatowski/oikos/commit/3cff482bc60d387353e1fc1b1689b73752210213). The operator verified both instruction files and all 54 Skill trees. A separate check after reopening the hosts passed.
 
 #### Prepare an initial bundle
 
