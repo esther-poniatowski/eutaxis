@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ..instructions import load_config
 from .adapters import AgentAdapter
-from .loader import load_from_instruction_config
+from .loader import load_configured_skill_sources
 from .loading_unit_publication import (
     order_published_skill_sources,
     prepare_published_loading_units,
@@ -37,7 +37,7 @@ def prepare_configured_skill_sync(
     subsequent application.
     """
     config = load_config(config_path, root=root)
-    sources = load_from_instruction_config(config_path, root=root)
+    sources = load_configured_skill_sources(config)
     published, _ = prepare_published_loading_units(
         config,
         sources,

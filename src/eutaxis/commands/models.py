@@ -85,7 +85,7 @@ class AdapterPassthrough:
 
 @dataclass(frozen=True)
 class CommandSource:
-    """Parsed Markdown command source."""
+    """Configured or discovered Skill source."""
 
     name: str
     """Slug used for the artifact directory and the invocation symbol."""
@@ -165,6 +165,9 @@ class CommandSource:
     """Discovery layer: ``"builtin"``, ``"user"``, ``"project"``, or
     ``"config"`` (for sources loaded from an instruction-assembly
     configuration rather than a layered directory)."""
+
+    literal_body: bool = False
+    """Keep an authenticated structured projection free of Markdown source transforms."""
 
 
 @dataclass(frozen=True)

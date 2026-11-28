@@ -53,7 +53,27 @@ def measure_skill_budgets(
         project_root=project_root,
         home=home,
     )
-    source_by_module = sources_by_module(config, prepared)
+    return measure_prepared_skill_budgets(
+        config,
+        prepared,
+        publications,
+        adapter,
+        project_root=project_root,
+        home=home,
+    )
+
+
+def measure_prepared_skill_budgets(
+    config: InstructionConfig,
+    sources: list[CommandSource],
+    publications: tuple[LoadingUnitPublication, ...],
+    adapter: AgentAdapter,
+    *,
+    project_root: Path,
+    home: Path,
+) -> tuple[SkillBudgetMeasurement, ...]:
+    """Measure the same prepared sources and route manifests reported by a command."""
+    source_by_module = sources_by_module(config, sources)
     rendered = {
         module_id: render_command(
             source,

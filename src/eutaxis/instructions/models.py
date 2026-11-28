@@ -45,6 +45,7 @@ class TaskModule:
     trigger: str
     description: str | None = None
     rule_index_source: SourceFile | DeclarationSource | None = None
+    skill_source: DeclarationSource | None = None
 
 
 @dataclass(frozen=True)

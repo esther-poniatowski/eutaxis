@@ -80,7 +80,7 @@ The declaration source resolves and renders once per command. Its immutable cand
 
 ## Task module entries
 
-Each entry in `task_modules` references a Markdown file eligible for compilation to a Skill artifact:
+Each entry in `task_modules` selects the source of a Skill artifact. Markdown is the default source:
 
 ```yaml
 task_modules:
@@ -95,12 +95,13 @@ task_modules:
 |-------|------|----------|-------------|
 | `id` | string | yes | Unique slug identifying the rule set. Used by `eutaxis skills` commands. |
 | `title` | string | yes | Human-readable title used in the pointer section when emitted. |
-| `path` | string | yes | Path to the source Markdown file, relative to the configured root. |
+| `path` | string | yes | Module path relative to the configured root. Also supplies the Markdown source by default. |
 | `trigger` | string | yes | Plain-language activation hint, surfaced in the pointer section when emitted. |
 | `description` | string | no | One-line summary. When omitted, the loader reads it from the source file's YAML frontmatter. |
 | `rule_index_source` | source entry | no | Source used for this module's standalone rule-index row. Defaults to `path`. |
+| `skill_source` | declaration source entry | no | Authenticated rule-set source for the installed Skill and its loading units. Defaults to `path`. |
 
-Each referenced file must declare the source-schema frontmatter required by the Skills compiler (`invocation`, `failure-mode`, optionally `required-visibility`). The fields and their roles are documented in [Concepts: source schema](concepts.md). The Skill compiler refuses to emit an artifact from a file that omits any required field.
+Markdown Skill sources require `invocation` and `failure-mode` in their frontmatter. Silent sources also require `required-visibility`. The compiler checks these fields against the [source schema](concepts.md).
 
 The optional field `rule_index_source` accepts the same Markdown or declaration source grammar as the `common_sources` list. When this field holds a declaration source, its `module` must equal the task module `id`. The example keeps the Markdown file as the Skill source, while an authenticated manifest supplies the module's index labels:
 
@@ -120,6 +121,27 @@ task_modules:
         context:
           example.repository: true
 ```
+
+Under configuration schema 2, `skill_source` can select a separate-directory manifest that names one rule set. The declaration's module and the manifest's target must both match the task module's `id`. Eutaxis reads the Skill metadata from the structured records.
+
+```yaml
+_schema: eutaxis:configuration@2
+task_modules:
+  - id: python
+    title: Python
+    path: docs/instructions/tasks/python.md
+    trigger: when authoring Python source
+    description: Python authoring guidance
+    skill_source:
+      declaration:
+        module: python
+        acquisition_manifest: declarations/acquisition.yaml
+        acquisition_lock: declarations/acquisition.lock.json
+        composition_manifest: example/python-skill
+        context: {}
+```
+
+Eutaxis builds loading routes from the installed Skill render. Budget checks measure those files. A loading unit includes a structured rule-set Skill through its entrypoint. The compiler preserves Markdown in the structured render. Write relative links from the installed entrypoint. The task router reads `description` from `path` by default. Set `description` if that Markdown file is absent. Set `rule_index_source` to select a structured source for the rule index and configured rule queries.
 
 The default cumulative file carries a pointer section that lists each `task_modules` entry. When the rule sets are also compiled to Skills via `eutaxis skills install`, the pointer section is redundant; suppress it by setting `task_modules_router_enabled: false` at the top level of the configuration.
 

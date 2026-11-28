@@ -155,7 +155,7 @@ Exit statuses:
 
 The configuration registers instruction files. The `skills` command compiles them into Agent Skill artifacts. ^skills-command
 
-Markdown files under `task_modules` are candidate sources. Their frontmatter must satisfy the source schema. Sources with a silent failure mode must also declare `required-visibility`.
+Each task module supplies a Markdown source or an authenticated rule-set Skill. Markdown frontmatter must satisfy the source schema. Sources with a silent failure mode must also declare `required-visibility`.
 
 ```sh
 eutaxis skills list [-c <config-file>] [--root <folder>]

@@ -372,6 +372,18 @@ class ConfigLoader:
                 "A task module declaration used by the rule index must use "
                 f"the task module id: {raw['id']}"
             )
+        skill_source: DeclarationSource | None = None
+        if "skill_source" in raw:
+            parsed = self._parse_source(raw["skill_source"])
+            if not isinstance(parsed, DeclarationSource):
+                raise ConfigurationError(
+                    "task_module skill_source must be a declaration source"
+                )
+            if parsed.module != str(raw["id"]):
+                raise ConfigurationError(
+                    f"Skill declaration source must use the task module id: {raw['id']}"
+                )
+            skill_source = parsed
         return TaskModule(
             id=str(raw["id"]),
             title=str(raw["title"]),
@@ -379,6 +391,7 @@ class ConfigLoader:
             trigger=str(raw["trigger"]),
             description=str(description) if description is not None else None,
             rule_index_source=rule_index_source,
+            skill_source=skill_source,
         )
 
     def _parse_skill_loading_units(self, raw_units: Any) -> list[SkillLoadingUnit]:
@@ -611,6 +624,7 @@ class ConfigLoader:
                     trigger=module.trigger,
                     description=description,
                     rule_index_source=module.rule_index_source,
+                    skill_source=module.skill_source,
                 )
             resolved.append(module)
         config.task_modules = resolved

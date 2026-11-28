@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import re
+from contextlib import ExitStack
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -21,6 +22,9 @@ from .models import (
     SiblingSkill,
     TargetsSpec,
 )
+
+if TYPE_CHECKING:
+    from ..instructions.models import InstructionConfig
 
 _FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 _SUPPORTED_INVOCATIONS = frozenset({"user", "model"})
@@ -78,26 +82,81 @@ def load_from_instruction_config(
     absent, against the folder of the file (see
     ``eutaxis.instructions.load_config``).
 
-    Each ``task_modules`` entry names a Markdown file whose frontmatter
-    must satisfy the Skill source schema (``name``, ``description``,
-    ``regime``, ``failure-mode``, and ``required-visibility`` when
-    silent). Missing files or frontmatter raise ``CommandRenderError``
-    with the offending path.
+    Each task module selects a Markdown file or an authenticated rule-set
+    Skill. The loader retains one acquisition per manifest and lock pair
+    until all its configured Skill sources have been projected.
 
     The discovery layer is recorded as ``"config"`` on each returned
     source.
     """
+
     from ..instructions.config import load_config
 
-    config = load_config(config_path, root=root)
+    return load_configured_skill_sources(load_config(config_path, root=root))
+
+
+def load_configured_skill_sources(config: InstructionConfig) -> list[CommandSource]:
+    """Project the Skills selected by an already loaded configuration."""
+    from ..declarations import (
+        ExternalAcquisitionResult,
+        open_external_declaration_acquisition_from_path,
+        plan_structured_rule_skill,
+        resolve_external_compilation_unit,
+    )
+    from ..declarations.exceptions import (
+        AcquisitionContractError,
+        ByteCarrierError,
+        DeclarationError,
+        FacetRegistryError,
+    )
+    from ..declarations.structured_rule_skill_rendering import (
+        configured_rule_skill_source,
+    )
+    from ..skill_placement import SkillPlacementError
+
     sources: list[CommandSource] = []
-    for module in config.task_modules:
-        path = config.resolve(module.path)
-        if not path.is_file():
-            raise CommandRenderError(
-                f"task_module {module.id!r} references missing file: {path}"
-            )
-        sources.append(_load_one(path, layer="config"))
+    acquisitions: dict[tuple[Path, Path], ExternalAcquisitionResult] = {}
+    try:
+        with ExitStack() as retained:
+            for module in config.task_modules:
+                path = config.resolve(module.path)
+                declaration = module.skill_source
+                if declaration is None:
+                    if not path.is_file():
+                        raise CommandRenderError(
+                            f"task_module {module.id!r} references missing file: {path}"
+                        )
+                    sources.append(_load_one(path, layer="config"))
+                    continue
+                pair = (declaration.acquisition_manifest, declaration.acquisition_lock)
+                if pair not in acquisitions:
+                    acquisitions[pair] = retained.enter_context(
+                        open_external_declaration_acquisition_from_path(
+                            str(config.root),
+                            pair[0].as_posix(),
+                            pair[1].as_posix(),
+                        )
+                    )
+                resolution = resolve_external_compilation_unit(
+                    acquisitions[pair],
+                    declaration.composition_manifest,
+                    declaration.context,
+                )
+                plan = plan_structured_rule_skill(resolution)
+                if plan.name != module.id:
+                    raise CommandRenderError(
+                        f"Skill manifest {declaration.composition_manifest!r} targets "
+                        f"{plan.name!r}, expected task module {module.id!r}"
+                    )
+                sources.append(configured_rule_skill_source(plan, path))
+    except (
+        AcquisitionContractError,
+        ByteCarrierError,
+        DeclarationError,
+        FacetRegistryError,
+        SkillPlacementError,
+    ) as error:
+        raise CommandRenderError(f"Could not load configured Skill: {error}") from error
     siblings = {
         normalize_path(source.source_path): SiblingSkill(
             name=source.name, targets=source.targets

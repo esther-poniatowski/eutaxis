@@ -108,6 +108,8 @@ def render_command(
     check_failure_mode(source)
     body_context = _body_context(source, adapter.name, project_root, home)
     render_input = _command_render_input(source, adapter.name, body_context)
+    if source.literal_body:
+        return assemble_skill(render_input, adapter)
     adapter_files = tuple(adapter.sibling_files(render_input))
     rendered_body, rule_files, warnings = _layout_body(
         source,
@@ -216,7 +218,7 @@ def _command_render_input(
     if adapter_name == "claude" and source.argument_hint:
         frontmatter.setdefault("argument-hint", source.argument_hint)
     files = dict(passthrough.files)
-    if adapter_name == "codex":
+    if adapter_name == "codex" and not source.literal_body:
         files = {
             path: (
                 content
@@ -238,7 +240,11 @@ def _command_render_input(
         description=source.description,
         scope=source.scope_default,
         invocation=source.invocation,
-        entrypoint_body=render_template(source.body, body_context),
+        entrypoint_body=(
+            source.body
+            if source.literal_body
+            else render_template(source.body, body_context)
+        ),
         contract_file=None,
         resources=(),
         adapter_passthrough=adapter_passthrough,

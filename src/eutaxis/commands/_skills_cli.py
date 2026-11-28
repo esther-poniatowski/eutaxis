@@ -37,6 +37,7 @@ from . import (
     render_command,
 )
 from .installer import _uninstall_command
+from .loader import load_configured_skill_sources
 from .disclosure import DISCLOSURE_INLINE
 from .adapters import AgentAdapter
 from .loading_unit_publication import (
@@ -49,6 +50,7 @@ from .cli_errors import exit_with_error
 from .models import CommandSource
 from .registry import Registry, default_state_dir
 from .scopes import validate_scope
+from .skill_budgets import measure_prepared_skill_budgets
 from .synchronization import skill_write_transaction
 from ..instructions import InstructionConfig, InstructionError, load_config
 from ..instructions.loading_units import expand_loading_unit
@@ -100,7 +102,7 @@ def cli_loading_unit_list(
         config_path, base = settings
         project = _target_project(target_project, settings)
         loaded = load_config(config_path, root=base)
-        sources = load_from_instruction_config(config_path, root=base)
+        sources = load_configured_skill_sources(loaded)
         adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
         reports = [
             measurement
@@ -143,23 +145,24 @@ def cli_loading_unit_show(
         settings = _settings(config, root)
         config_path, base = settings
         project = _target_project(target_project, settings)
-        loaded, _, publications = _prepared(
+        home = Path.home()
+        loaded, prepared, publications = _prepared(
             config_path,
             base,
             [adapter],
             project_root=project,
-            home=Path.home(),
+            home=home,
         )
-        raw_sources = load_from_instruction_config(config_path, root=base)
         measurement = next(
             (
                 item
-                for item in measure_skill_budgets(
+                for item in measure_prepared_skill_budgets(
                     loaded,
-                    raw_sources,
+                    prepared,
+                    publications,
                     adapter,
                     project_root=project,
-                    home=Path.home(),
+                    home=home,
                 )
                 if item.kind == "loading-unit" and item.name == name
             ),
@@ -607,7 +610,7 @@ def cli_budget(
         config_path, base = settings
         project = _target_project(target_project, settings)
         loaded = load_config(config_path, root=base)
-        sources = load_from_instruction_config(config_path, root=base)
+        sources = load_configured_skill_sources(loaded)
         adapters = all_adapters() if agent == "all" else [get_adapter(agent)]
         reports = [
             measurement
@@ -726,7 +729,7 @@ def _prepared(
     tuple[LoadingUnitPublication, ...],
 ]:
     loaded = load_config(config, root=root)
-    sources = load_from_instruction_config(config, root=root)
+    sources = load_configured_skill_sources(loaded)
     prepared, publications = prepare_published_loading_units(
         loaded,
         sources,
